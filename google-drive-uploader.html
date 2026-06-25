@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive Integration - NOAA Visualizer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 4px;
+            background: #667eea;
+            border-radius: 50%;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        input[type="text"],
+        input[type="file"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        input[type="text"]:focus,
+        input[type="file"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .info-box strong {
+            color: #333;
+        }
+        .url-format {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .status-message {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            display: none;
+        }
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .divider {
+            height: 1px;
+            background: #e0e0e0;
+            margin: 20px 0;
+        }
+        .file-size {
+            color: #999;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Google Drive File Loader</h1>
+        <p class="subtitle">Load NOAA telemetry & video files directly from Google Drive</p>
+
+        <div id="statusMessage" class="status-message"></div>
+
+        <!-- Section 1: From Shareable Link -->
+        <div class="section">
+            <div class="section-title">Method 1: Shareable Link</div>
+            
+            <div class="info-box">
+                <strong>How to get a shareable link:</strong>
+                <ol style="margin: 8px 0; padding-left: 20px;">
+                    <li>Right-click file in Google Drive → Share</li>
+                    <li>Change to "Anyone with the link"</li>
+                    <li>Copy the link and paste below</li>
+                </ol>
+            </div>
+
+            <div class="input-group">
+                <label>Google Drive Shareable Link</label>
+                <input type="text" id="shareLink" placeholder="https://drive.google.com/file/d/1ABC..."/>
+                <div class="file-size">Works with: .txt, .nc, .mp4</div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadFromShareLink()">📥 Load from Link</button>
+                <button class="btn-secondary" onclick="document.getElementById('shareLink').value = ''">Clear</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 2: From File ID -->
+        <div class="section">
+            <div class="section-title">Method 2: File ID (Direct)</div>
+            
+            <div class="info-box">
+                <strong>How to get File ID:</strong>
+                Extract from URL: <code>https://drive.google.com/file/d/<strong>FILE_ID</strong>/view</code>
+            </div>
+
+            <div class="input-group">
+                <label>Google Drive File ID</label>
+                <input type="text" id="fileId" placeholder="1ABC...XYZ123"/>
+                <div class="file-size">Paste just the ID portion</div>
+            </div>
+
+            <div class="input-group">
+                <label>File Type</label>
+                <select id="fileType">
+                    <option value="txt">Telemetry Log (.txt)</option>
+                    <option value="nc">NetCDF File (.nc)</option>
+                    <option value="mp4">Video File (.mp4)</option>
+                </select>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadFromFileId()">📥 Load from ID</button>
+                <button class="btn-secondary" onclick="document.getElementById('fileId').value = ''">Clear</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Section 3: Direct Upload -->
+        <div class="section">
+            <div class="section-title">Method 3: Local Upload</div>
+            
+            <div class="info-box">
+                Upload files directly from your computer instead of Google Drive.
+            </div>
+
+            <div class="input-group">
+                <label>Select File</label>
+                <input type="file" id="localFile" accept=".txt,.nc,.mp4"/>
+            </div>
+
+            <button class="btn-primary" style="width: 100%;" onclick="loadLocalFile()">📂 Load Local File</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; color: #666;">Loading file...</p>
+        </div>
+
+        <!-- Instructions -->
+        <div class="section" style="margin-top: 30px;">
+            <div class="section-title">💡 Tips & Troubleshooting</div>
+            <div class="info-box" style="border-left-color: #17a2b8; margin-bottom: 10px;">
+                <strong>✓ Tips:</strong>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+                    <li>Large files (>100MB) may take longer to load</li>
+                    <li>Make sure file sharing is set to "Anyone with the link"</li>
+                    <li>Supported formats: .txt (telemetry), .nc (NetCDF), .mp4 (video)</li>
+                </ul>
+            </div>
+            <div class="info-box" style="border-left-color: #dc3545;">
+                <strong>✗ If loading fails:</strong>
+                <ul style="margin: 8px 0; padding-left: 20px;">
+                    <li>Check file sharing permissions</li>
+                    <li>Verify the file ID is correct</li>
+                    <li>Try the local upload method instead</li>
+                    <li>Check browser console for error details</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Convert shareable link to direct download URL
+        function extractFileIdFromLink(link) {
+            const match = link.match(/\/file\/d\/([a-zA-Z0-9-_]+)/);
+            return match ? match[1] : null;
+        }
+
+        // Convert Google Drive link to direct download
+        function getDirectDownloadUrl(fileId) {
+            return `https://drive.google.com/uc?export=download&id=${fileId}`;
+        }
+
+        function showStatus(message, isError = false) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${isError ? 'status-error' : 'status-success'}`;
+        }
+
+        function showLoading(show = true) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        async function downloadFile(fileId, fileName) {
+            try {
+                showLoading(true);
+                const url = getDirectDownloadUrl(fileId);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': '*/*'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // Check if we got an error page instead of the file
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('text/html')) {
+                    throw new Error('File not accessible. Check sharing settings.');
+                }
+
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    throw new Error('File is empty or inaccessible');
+                }
+
+                // Create object URL and store in sessionStorage for use in main app
+                const objectUrl = URL.createObjectURL(blob);
+                
+                // Store file data and metadata
+                sessionStorage.setItem('gdrive_file_url', objectUrl);
+                sessionStorage.setItem('gdrive_file_name', fileName);
+                sessionStorage.setItem('gdrive_file_size', blob.size);
+                sessionStorage.setItem('gdrive_file_type', blob.type);
+
+                showLoading(false);
+                showStatus(`✓ File loaded successfully! (${(blob.size / 1024 / 1024).toFixed(2)} MB)`);
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    window.location.href = 'index.html?mode=gdrive';
+                }, 1500);
+
+            } catch (error) {
+                showLoading(false);
+                showStatus(`✗ Error: ${error.message}`, true);
+                console.error('Download error:', error);
+            }
+        }
+
+        async function loadFromShareLink() {
+            const link = document.getElementById('shareLink').value.trim();
+            
+            if (!link) {
+                showStatus('Please paste a Google Drive link', true);
+                return;
+            }
+
+            const fileId = extractFileIdFromLink(link);
+            if (!fileId) {
+                showStatus('Invalid Google Drive link format', true);
+                return;
+            }
+
+            showStatus('Extracting file...');
+            await downloadFile(fileId, 'gdrive_file');
+        }
+
+        async function loadFromFileId() {
+            const fileId = document.getElementById('fileId').value.trim();
+            const fileType = document.getElementById('fileType').value;
+            
+            if (!fileId) {
+                showStatus('Please enter a File ID', true);
+                return;
+            }
+
+            showStatus('Loading file...');
+            await downloadFile(fileId, `file.${fileType}`);
+        }
+
+        function loadLocalFile() {
+            const fileInput = document.getElementById('localFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                showStatus('Please select a file', true);
+                return;
+            }
+
+            try {
+                const objectUrl = URL.createObjectURL(file);
+                
+                // Store file data and metadata
+                sessionStorage.setItem('gdrive_file_url', objectUrl);
+                sessionStorage.setItem('gdrive_file_name', file.name);
+                sessionStorage.setItem('gdrive_file_size', file.size);
+                sessionStorage.setItem('gdrive_file_type', file.type);
+
+                showStatus(`✓ File loaded successfully! (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+                
+                // Redirect to main app
+                setTimeout(() => {
+                    window.location.href = 'index.html?mode=gdrive';
+                }, 1500);
+
+            } catch (error) {
+                showStatus(`✗ Error: ${error.message}`, true);
+            }
+        }
+
+        // Allow Enter key to trigger load
+        document.getElementById('shareLink').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadFromShareLink();
+        });
+
+        document.getElementById('fileId').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadFromFileId();
+        });
+
+        // Show sample file ID format
+        console.log('Google Drive File ID format: https://drive.google.com/file/d/[FILE_ID]/view');
+    </script>
+</body>
+</html>

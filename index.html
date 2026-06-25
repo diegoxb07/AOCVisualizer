@@ -112,12 +112,12 @@
             
             <div class="lg:col-span-4 flex flex-col justify-center gap-6">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">1. Select NOAA Telemetry Log (.txt / .nc) <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span></label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">1. Upload Flight-Level Data (.txt or .nc) <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span></label>
                     <input type="file" id="fileInput" accept=".txt,.nc" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
                 </div>
                 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">2. Select MP4 to Sync</label>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">2. Upload MMR to Sync (.mp4)</label>
                     <input type="file" id="videoInput" accept="video/mp4" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
                 </div>
             </div>
@@ -127,23 +127,23 @@
                 <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-5">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 flex-grow w-full">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Start Window (HHMMSS)</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data Start Window (HHMMSS)</label>
                             <input type="text" id="startTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">End Window (HHMMSS)</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data End Window (HHMMSS)</label>
                             <input type="text" id="endTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate">Video Sync Mode</label>
                             <select id="videoSyncMode" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none transition-colors shadow-sm">
-                                <option value="manual">Manual Start UTC</option>
+                                <option value="manual">Video Start UTC (Only in Manual Mode)</option>
                                 <option value="auto">Auto-Sync (OCR MMR)</option>
                             </select>
                             <div class="absolute top-[100%] left-0 w-full text-[10px] text-purple-400 font-serif mt-1 leading-tight">*Use 'Sync Now' Button to start Auto-Sync.</div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate" title="Manual Start UTC (HHMMSS)">Manual Start UTC</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate" title="Video Start UTC (Only in Manual Mode) (HHMMSS)">MMR Start Time (Manual)</label>
                             <input type="text" id="videoStartInput" value="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                     </div>
@@ -174,7 +174,7 @@
                 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="mapPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
-                        <span>Geographic Mission Tracker</span>
+                        <span>Flight-Level Data Visualizer</span>
                         <div class="flex items-center gap-2">
                             <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[11px] mr-2">
                                 Barb Stride (s)
@@ -217,7 +217,7 @@
 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
-                        <span>Synced Media Element Loop</span>
+                        <span>MMR Media Display</span>
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
@@ -1079,20 +1079,6 @@
         if (filteredData.length > 0) updateVisualComponents(currentIdx);
     });
 
-    // Check if coming from Google Drive
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('mode') === 'gdrive') {
-    const fileUrl = sessionStorage.getItem('gdrive_file_url');
-    const fileName = sessionStorage.getItem('gdrive_file_name');
-    
-    // Use fileUrl in your file input handlers
-    fetch(fileUrl)
-        .then(r => r.blob())
-        .then(blob => {
-            // Process as you would a normal file
-            parseEntireFile(blob);
-        });
-}
     // Binds shortcut placement for custom tracking dots
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {

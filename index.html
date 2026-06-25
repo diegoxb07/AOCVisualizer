@@ -1079,6 +1079,20 @@
         if (filteredData.length > 0) updateVisualComponents(currentIdx);
     });
 
+    // Check if coming from Google Drive
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('mode') === 'gdrive') {
+    const fileUrl = sessionStorage.getItem('gdrive_file_url');
+    const fileName = sessionStorage.getItem('gdrive_file_name');
+    
+    // Use fileUrl in your file input handlers
+    fetch(fileUrl)
+        .then(r => r.blob())
+        .then(blob => {
+            // Process as you would a normal file
+            parseEntireFile(blob);
+        });
+}
     // Binds shortcut placement for custom tracking dots
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {

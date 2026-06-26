@@ -91,6 +91,12 @@
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
+<div id="loadingOverlay" class="fixed inset-0 bg-slate-950/85 z-[10000] hidden flex-col items-center justify-center backdrop-blur-md">
+    <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-5"></div>
+    <h2 class="text-white text-xl md:text-2xl font-bold tracking-widest">PROCESSING FLIGHT DATA</h2>
+    <p class="text-blue-400 text-sm mt-2 font-mono opacity-80">Extracting...</p>
+</div>
+
 <button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
 
 <section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6" id="mainContainer">
@@ -156,12 +162,16 @@
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">3. Filters</label>
-                    <div class="flex flex-wrap gap-x-5 gap-y-3 bg-slate-800/50 p-3 rounded-lg border border-slate-800">
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="toggleExtraHUD" class="accent-blue-500 w-4 h-4 cursor-pointer" /> HUD Extra Metrics</label>
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="togglePfd" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Cockpit PFD</label>
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="toggleGpsAlt" class="accent-blue-500 w-4 h-4 cursor-pointer" /> PFD: Press Alt -> GPS Alt</label>
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="toggleImperial" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Imperial Units (F/ft/mph)</label>
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="simpleTrackerIcon" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Simple Tracker Icon (2D)</label>
+                    <div class="flex flex-wrap gap-x-5 gap-y-3 bg-slate-800/50 p-3 rounded-lg border border-slate-800 items-start">
+                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleExtraHUD" class="accent-blue-500 w-4 h-4 cursor-pointer" /> HUD Extra Metrics</label>
+                        
+                        <div class="flex flex-col gap-2 mt-1">
+                            <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="togglePfd" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Cockpit PFD</label>
+                            <label id="gpsAltContainer" class="hidden items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none border-l-2 border-blue-500/40 pl-2 ml-2"><input type="checkbox" id="toggleGpsAlt" class="accent-blue-500 w-4 h-4 cursor-pointer" /> PFD: Press Alt -> GPS Alt</label>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleImperial" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Imperial Units (F/ft/mph)</label>
+                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="simpleTrackerIcon" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Simple Tracker Icon (2D)</label>
                     </div>
                 </div>
             </div>
@@ -1097,6 +1107,16 @@
     document.getElementById('simpleTrackerIcon').addEventListener('change', () => { if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
 
     document.getElementById('togglePfd').addEventListener('change', (e) => { 
+        const gpsContainer = document.getElementById('gpsAltContainer');
+        if (e.target.checked) {
+            gpsContainer.classList.remove('hidden');
+            gpsContainer.classList.add('flex');
+        } else {
+            gpsContainer.classList.add('hidden');
+            gpsContainer.classList.remove('flex');
+            document.getElementById('toggleGpsAlt').checked = false; 
+        }
+
         if (filteredData.length > 0) { 
             const pfd = document.getElementById('pfdOverlay'); 
             pfd.style.display = e.target.checked ? 'block' : 'none'; 
@@ -1809,155 +1829,170 @@
     // Primary entry point for ingesting either raw NetCDF or TSV plain text file variants
     document.getElementById('fileInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
-
-    // force a reset to 1x speed when you upload any files (makes sure to not bug autosync out)
-    currentSpeedIdx = 0;
-    updateSpeedDisplay();
-
-        const file = e.target.files[0]; const fName = file.name;
         
-        const match = fName.match(/^(\d{4})(\d{2})(\d{2})([a-zA-Z])(.*)\./i);
-        if (match) {
-            flightMetaData.date = `${match[1]}-${match[2]}-${match[3]}`;
-            const planeType = match[4].toUpperCase();
-            if (planeType === 'H') flightMetaData.aircraft = 'NOAA42 (WP-3D Orion)';
-            else if (planeType === 'I') flightMetaData.aircraft = 'NOAA43 (WP-3D Orion)';
-            else if (planeType === 'N') flightMetaData.aircraft = 'NOAA49 (Gulfstream IV-SP)';
-            else flightMetaData.aircraft = 'Unknown';
-            flightMetaData.id = match[0].replace('.', '');
-        } else {
-            flightMetaData.id = file.name; flightMetaData.date = 'Unknown'; flightMetaData.aircraft = 'Unknown';
-        }
+        // Show loading screen immediately
+        const loader = document.getElementById('loadingOverlay');
+        loader.classList.remove('hidden');
+        loader.classList.add('flex');
 
-        const ext = fName.split('.').pop().toLowerCase();
+        // Yield to browser render loop before synchronous parsing blocks the main thread
+        setTimeout(() => {
+            currentSpeedIdx = 0;
+            updateSpeedDisplay();
 
-        if (ext === 'nc') {
-            isNcFile = true;
-            if (videoLoaded) videoSyncMode.disabled = false;
+            const file = e.target.files[0]; const fName = file.name;
             
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const data = evt.target.result;
-                    const nc = new netcdfjs(data);
-                    
-                    const varNames = nc.variables.map(v => v.name);
-                    const varsData = {};
-                    let numRows = 0;
-                    
-                    varNames.forEach(name => {
-                        let rawData = nc.getDataVariable(name);
-                        let variableDef = nc.variables.find(v => v.name === name);
+            const match = fName.match(/^(\d{4})(\d{2})(\d{2})([a-zA-Z])(.*)\./i);
+            if (match) {
+                flightMetaData.date = `${match[1]}-${match[2]}-${match[3]}`;
+                const planeType = match[4].toUpperCase();
+                if (planeType === 'H') flightMetaData.aircraft = 'NOAA42 (WP-3D Orion)';
+                else if (planeType === 'I') flightMetaData.aircraft = 'NOAA43 (WP-3D Orion)';
+                else if (planeType === 'N') flightMetaData.aircraft = 'NOAA49 (Gulfstream IV-SP)';
+                else flightMetaData.aircraft = 'Unknown';
+                flightMetaData.id = match[0].replace('.', '');
+            } else {
+                flightMetaData.id = file.name; flightMetaData.date = 'Unknown'; flightMetaData.aircraft = 'Unknown';
+            }
+
+            const ext = fName.split('.').pop().toLowerCase();
+
+            if (ext === 'nc') {
+                isNcFile = true;
+                if (videoLoaded) videoSyncMode.disabled = false;
+                
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const data = evt.target.result;
+                        const nc = new netcdfjs(data);
                         
-                        let scaleFactor = 1;
-                        let addOffset = 0;
-                        let fillValues = [];
+                        const varNames = nc.variables.map(v => v.name);
+                        const varsData = {};
+                        let numRows = 0;
                         
-                        if (variableDef && variableDef.attributes) {
-                            variableDef.attributes.forEach(a => {
-                                const lowerName = a.name.toLowerCase();
-                                const val = Array.isArray(a.value) ? a.value[0] : a.value;
-                                if (lowerName === 'scale_factor') scaleFactor = val;
-                                if (lowerName === 'add_offset') addOffset = val;
-                                if (lowerName === '_fillvalue' || lowerName === 'missing_value') {
-                                    if (Array.isArray(a.value)) fillValues.push(...a.value);
-                                    else fillValues.push(a.value);
+                        varNames.forEach(name => {
+                            let rawData = nc.getDataVariable(name);
+                            let variableDef = nc.variables.find(v => v.name === name);
+                            
+                            let scaleFactor = 1;
+                            let addOffset = 0;
+                            let fillValues = [];
+                            
+                            if (variableDef && variableDef.attributes) {
+                                variableDef.attributes.forEach(a => {
+                                    const lowerName = a.name.toLowerCase();
+                                    const val = Array.isArray(a.value) ? a.value[0] : a.value;
+                                    if (lowerName === 'scale_factor') scaleFactor = val;
+                                    if (lowerName === 'add_offset') addOffset = val;
+                                    if (lowerName === '_fillvalue' || lowerName === 'missing_value') {
+                                        if (Array.isArray(a.value)) fillValues.push(...a.value);
+                                        else fillValues.push(a.value);
+                                    }
+                                });
+                            }
+                            
+                            let unpacked = new Array(rawData.length);
+                            for(let k = 0; k < rawData.length; k++) {
+                                let rawVal = rawData[k];
+                                if (fillValues.some(fv => Math.abs(fv - rawVal) < 0.0001)) {
+                                    unpacked[k] = -9999;
+                                } else {
+                                    unpacked[k] = (rawVal * scaleFactor) + addOffset;
+                                }
+                            }
+                            varsData[name] = unpacked;
+                            if (varsData[name].length > numRows) numRows = varsData[name].length;
+                        });
+                        
+                        // Time interval validation parser
+                        let startSecs = -1;
+                        let endSecs = -1;
+
+                        if (nc.globalAttributes) {
+                            nc.globalAttributes.forEach(attr => {
+                                if (attr.name === 'TimeInterval' && typeof attr.value === 'string') {
+                                    const m = attr.value.match(/(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/);
+                                    if (m) {
+                                        startSecs = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]);
+                                        endSecs = parseInt(m[4])*3600 + parseInt(m[5])*60 + parseInt(m[6]);
+                                    }
                                 }
                             });
                         }
+
+                        if (startSecs === -1) {
+                            const decoder = new TextDecoder("utf-8");
+                            const rawStr = decoder.decode(data.slice(0, Math.min(data.byteLength, 15000)));
+                            const tiMatch = rawStr.match(/TimeInterval.*?(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/i);
+                            if (tiMatch) {
+                                startSecs = parseInt(tiMatch[1])*3600 + parseInt(tiMatch[2])*60 + parseInt(tiMatch[3]);
+                                endSecs = parseInt(tiMatch[4])*3600 + parseInt(tiMatch[5])*60 + parseInt(tiMatch[6]);
+                            }
+                        }
+
+                        let finalVarNames = varNames;
+                        if (startSecs !== -1 && endSecs !== -1 && numRows > 0) {
+                            if (endSecs < startSecs) endSecs += 86400; // handle midnight rollover
+                            let totalDuration = endSecs - startSecs;
+
+                            // Swap standard timeline constructs logically
+                            finalVarNames = varNames.filter(n => n.toLowerCase() !== 'time');
+                            finalVarNames.unshift('time');
+
+                            let timeArr = new Array(numRows);
+                            for (let i = 0; i < numRows; i++) {
+                                let curSecs = startSecs + (i / Math.max(1, numRows - 1)) * totalDuration;
+                                let h = Math.floor(curSecs / 3600) % 24;
+                                let m = Math.floor((curSecs % 3600) / 60);
+                                let s = Math.round(curSecs % 60);
+                                
+                                if (s === 60) { s = 0; m += 1; }
+                                if (m === 60) { m = 0; h += 1; }
+                                
+                                timeArr[i] = String(h).padStart(2, '0') + String(m).padStart(2, '0') + String(s).padStart(2, '0');
+                            }
+                            varsData['time'] = timeArr;
+                        }
+
+                        // Export internal state back down to TSV framework
+                        let tsvStr = finalVarNames.join('\t') + '\n';
                         
-                        let unpacked = new Array(rawData.length);
-                        for(let k = 0; k < rawData.length; k++) {
-                            let rawVal = rawData[k];
-                            if (fillValues.some(fv => Math.abs(fv - rawVal) < 0.0001)) {
-                                unpacked[k] = -9999;
-                            } else {
-                                unpacked[k] = (rawVal * scaleFactor) + addOffset;
-                            }
-                        }
-                        varsData[name] = unpacked;
-                        if (varsData[name].length > numRows) numRows = varsData[name].length;
-                    });
-                    
-                    // Time interval validation parser
-                    let startSecs = -1;
-                    let endSecs = -1;
-
-                    if (nc.globalAttributes) {
-                        nc.globalAttributes.forEach(attr => {
-                            if (attr.name === 'TimeInterval' && typeof attr.value === 'string') {
-                                const m = attr.value.match(/(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/);
-                                if (m) {
-                                    startSecs = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]);
-                                    endSecs = parseInt(m[4])*3600 + parseInt(m[5])*60 + parseInt(m[6]);
-                                }
-                            }
-                        });
-                    }
-
-                    if (startSecs === -1) {
-                        const decoder = new TextDecoder("utf-8");
-                        const rawStr = decoder.decode(data.slice(0, Math.min(data.byteLength, 15000)));
-                        const tiMatch = rawStr.match(/TimeInterval.*?(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/i);
-                        if (tiMatch) {
-                            startSecs = parseInt(tiMatch[1])*3600 + parseInt(tiMatch[2])*60 + parseInt(tiMatch[3]);
-                            endSecs = parseInt(tiMatch[4])*3600 + parseInt(tiMatch[5])*60 + parseInt(tiMatch[6]);
-                        }
-                    }
-
-                    let finalVarNames = varNames;
-                    if (startSecs !== -1 && endSecs !== -1 && numRows > 0) {
-                        if (endSecs < startSecs) endSecs += 86400; // handle midnight rollover
-                        let totalDuration = endSecs - startSecs;
-
-                        // Swap standard timeline constructs logically
-                        finalVarNames = varNames.filter(n => n.toLowerCase() !== 'time');
-                        finalVarNames.unshift('time');
-
-                        let timeArr = new Array(numRows);
                         for (let i = 0; i < numRows; i++) {
-                            let curSecs = startSecs + (i / Math.max(1, numRows - 1)) * totalDuration;
-                            let h = Math.floor(curSecs / 3600) % 24;
-                            let m = Math.floor((curSecs % 3600) / 60);
-                            let s = Math.round(curSecs % 60);
-                            
-                            if (s === 60) { s = 0; m += 1; }
-                            if (m === 60) { m = 0; h += 1; }
-                            
-                            timeArr[i] = String(h).padStart(2, '0') + String(m).padStart(2, '0') + String(s).padStart(2, '0');
+                            let row = [];
+                            for (let j = 0; j < finalVarNames.length; j++) {
+                                let val = varsData[finalVarNames[j]][i];
+                                row.push(val !== undefined && val !== null ? val : '');
+                            }
+                            tsvStr += row.join('\t') + '\n';
                         }
-                        varsData['time'] = timeArr;
+                        parseEntireFile(tsvStr);
+                        
+                    } catch (err) { 
+                        // Hide loading overlay on error
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        document.getElementById('loadingOverlay').classList.remove('flex');
                     }
-
-                    // Export internal state back down to TSV framework
-                    let tsvStr = finalVarNames.join('\t') + '\n';
-                    
-                    for (let i = 0; i < numRows; i++) {
-                        let row = [];
-                        for (let j = 0; j < finalVarNames.length; j++) {
-                            let val = varsData[finalVarNames[j]][i];
-                            row.push(val !== undefined && val !== null ? val : '');
-                        }
-                        tsvStr += row.join('\t') + '\n';
-                    }
-                    parseEntireFile(tsvStr);
-                    
-                } catch (err) { }
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            isNcFile = false;
-            if (videoLoaded) videoSyncMode.disabled = false;
-            const reader = new FileReader(); 
-            reader.onload = function(evt) { parseEntireFile(evt.target.result); }; 
-            reader.readAsText(file);
-        }
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                isNcFile = false;
+                if (videoLoaded) videoSyncMode.disabled = false;
+                const reader = new FileReader(); 
+                reader.onload = function(evt) { parseEntireFile(evt.target.result); }; 
+                reader.readAsText(file);
+            }
+        }, 50); // Small 50ms delay to guarantee UI render
     });
 
     // Main parser execution: normalizes raw rows into predictable data properties
     function parseEntireFile(rawText) {
         const lines = rawText.split('\n');
-        if (lines.length < 2) return;
+        if (lines.length < 2) {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('flex');
+            return;
+        }
         
         const headers = lines[0].replace(/\r/g, '').split('\t').map(h => h.trim());
         const hMap = {}; headers.forEach((h, idx) => { if (h) hMap[h.toLowerCase()] = idx; });
@@ -2085,7 +2120,11 @@
             } catch (err) { continue; }
         }
 
-        if (tempParsedData.length === 0) return;
+        if (tempParsedData.length === 0) {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('flex');
+            return;
+        }
         
         tempParsedData.sort((a,b) => a.absSeconds - b.absSeconds);
         
@@ -2123,7 +2162,11 @@
             allParsedData.push(current);
         }
 
-        if (allParsedData.length === 0) return;
+        if (allParsedData.length === 0) {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            document.getElementById('loadingOverlay').classList.remove('flex');
+            return;
+        }
         
         availableMetrics.clear();
         allParsedData.forEach(row => {
@@ -2149,6 +2192,10 @@
         }
         
         evaluateAutoSyncDefault();
+
+        // Data processing complete. Hide loading overlay gracefully.
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('loadingOverlay').classList.remove('flex');
     }
 
     // Handles user toggles for showing lines onto the top Master graph array
@@ -2569,6 +2616,19 @@
                 ctx.restore();
             }
             ctx.restore(); 
+
+            // Draw the live 1-sec wind barb right at the nose of the plane icon based on TRUE HEADING
+            if (d.windDir !== null && d.windSpd !== null) {
+                // Calculate the nose offset based on heading (not the track arrow)
+                let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
+                
+                // Push the barb coordinates forward to align with the visual nose of the plane
+                const noseDist = 35 * zoomFactor / mapScale; 
+                let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist;
+                let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
+
+                drawWindBarbFrame(noseX, noseY, d.windDir, d.windSpd, mapScale);
+            }
         }
 
         // Draw custom markers AFTER the plane so they layer properly on top

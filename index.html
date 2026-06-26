@@ -3461,13 +3461,11 @@
         }
         timelineTimeDisplay.innerText = displayStr;
 
-        // Skip massive frame re-calculations when dragging the timeline slider
-        if (!skipCharts) {
-            if (masterChartInstance) masterChartInstance.draw(); // Fast re-render without dataset changes
-            Object.values(customCharts).forEach(c => {
-                if(c) c.draw();
-            });
-        }
+        // Execute fast re-renders (draw) to ensure the white playhead line moves smoothly during dragging
+        if (masterChartInstance) masterChartInstance.draw(); 
+        Object.values(customCharts).forEach(c => {
+            if(c) c.draw();
+        });
     }
 
     function updateSpeedDisplay() {

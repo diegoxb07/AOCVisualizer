@@ -133,18 +133,18 @@
                 <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-5">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 flex-grow w-full">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data Start Window (HHMMSS)</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data Start Time (HHMMSS)</label>
                             <input type="text" id="startTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data End Window (HHMMSS)</label>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data End Time (HHMMSS)</label>
                             <input type="text" id="endTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate">Video Sync Mode</label>
                             <select id="videoSyncMode" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none transition-colors shadow-sm">
-                                <option value="manual">Video Start UTC (Only in Manual Mode)</option>
-                                <option value="auto">Auto-Sync (OCR MMR)</option>
+                                <option value="manual">Manual Time Inputs</option>
+                                <option value="auto">Auto-Sync (MMR)</option>
                             </select>
                             <div class="absolute top-[100%] left-0 w-full text-[10px] text-purple-400 font-serif mt-1 leading-tight">*Use 'Sync Now' Button to start Auto-Sync.</div>
                         </div>
@@ -156,7 +156,7 @@
                     
                     <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0">
                         <button id="exportKmlBtn" disabled class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap">🌍 Export KML</button>
-                        <div class="text-[10px] text-emerald-400 italic mt-1.5 text-right w-full">*Optional: Google Earth</div>
+                        <div class="text-[10px] text-emerald-400 italic mt-1.5 text-right w-full">*Optional: For Google Earth</div>
                     </div>
                 </div>
 
@@ -170,7 +170,7 @@
                             <label id="gpsAltContainer" class="hidden items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none border-l-2 border-blue-500/40 pl-2 ml-2"><input type="checkbox" id="toggleGpsAlt" class="accent-blue-500 w-4 h-4 cursor-pointer" /> PFD: Press Alt -> GPS Alt</label>
                         </div>
 
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleImperial" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Imperial Units (F/ft/mph)</label>
+                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleImperial" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Imperial Units (°F/ft/mph)</label>
                         <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="simpleTrackerIcon" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Simple Tracker Icon (2D)</label>
                     </div>
                 </div>
@@ -184,7 +184,7 @@
                 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="mapPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
-                        <span>Flight-Level Data Visualizer</span>
+                        <span>Flight-Level Data Player</span>
                         <div class="flex items-center gap-2">
                             <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px] mr-2">
                                 Barb Period (s)
@@ -455,6 +455,7 @@
 
     // Synchronization scrubbers to throttle performance hits when dragging the timeline
     let isScrubbing = false;
+    let activeScrubChart = null; // Tracks which graph is currently being dragged
     let wasPlayingBeforeScrub = false;
     let hasInitialSyncOccurred = false;
     let scrubSyncTimeout = null;
@@ -1397,11 +1398,89 @@
         wasPlayingBeforeScrub = isPlaying;
         if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
     }, {passive: true});
-    
+
+    // Global Graph Interaction Bindings
+    window.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'CANVAS') {
+            const chart = Chart.getChart(e.target);
+            if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
+                isScrubbing = true;
+                activeScrubChart = chart;
+                wasPlayingBeforeScrub = isPlaying;
+                if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
+                
+                const rect = e.target.getBoundingClientRect();
+                const xPixel = e.clientX - rect.left;
+                let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel));
+                clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
+                
+                if (clickedIdx !== currentIdx) {
+                    currentIdx = clickedIdx;
+                    if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+                    updateVisualComponents(currentIdx, true);
+                }
+            }
+        }
+    });
+
+    window.addEventListener('touchstart', (e) => {
+        if (e.target.tagName === 'CANVAS') {
+            const chart = Chart.getChart(e.target);
+            if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
+                isScrubbing = true;
+                activeScrubChart = chart;
+                wasPlayingBeforeScrub = isPlaying;
+                if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
+                
+                const rect = e.target.getBoundingClientRect();
+                const xPixel = e.touches[0].clientX - rect.left;
+                let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel));
+                clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
+                
+                if (clickedIdx !== currentIdx) {
+                    currentIdx = clickedIdx;
+                    if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+                    updateVisualComponents(currentIdx, true);
+                }
+            }
+        }
+    }, {passive: true});
+
+    const handleChartDrag = (clientX) => {
+        if (isScrubbing && activeScrubChart && filteredData.length > 0) {
+            const rect = activeScrubChart.canvas.getBoundingClientRect();
+            const xPixel = clientX - rect.left;
+            let dragIdx = Math.round(activeScrubChart.scales.x.getValueForPixel(xPixel));
+            dragIdx = Math.max(0, Math.min(filteredData.length - 1, dragIdx));
+            
+            if (dragIdx !== currentIdx) {
+                currentIdx = dragIdx;
+                if (videoLoaded) {
+                    let targetVideoTime = filteredData[currentIdx].absSeconds - videoStartSeconds;
+                    if (targetVideoTime < 0) targetVideoTime = 0;
+                    if (video.duration && targetVideoTime > video.duration) targetVideoTime = video.duration;
+                    video.currentTime = targetVideoTime;
+                }
+                
+                if (!scrubDebounceTimer) {
+                    requestAnimationFrame(() => {
+                        updateVisualComponents(currentIdx, true);
+                        scrubDebounceTimer = null;
+                    });
+                    scrubDebounceTimer = true;
+                }
+            }
+        }
+    };
+
+    window.addEventListener('mousemove', (e) => { if (isScrubbing && activeScrubChart) handleChartDrag(e.clientX); });
+    window.addEventListener('touchmove', (e) => { if (isScrubbing && activeScrubChart) handleChartDrag(e.touches[0].clientX); }, {passive: true});
+
     // Resumes timeline sequence once dragging is released
     const commitScrub = () => {
         if(isScrubbing) {
             isScrubbing = false; 
+            activeScrubChart = null; // Clear active graph constraint
             if (videoLoaded && filteredData[currentIdx]) {
                 video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
                 if (videoSyncMode.value === 'auto') {
@@ -2490,14 +2569,38 @@
     }
 
     // Plots classical windbarb SVG equivalents based strictly on coordinates/angles
-    function drawWindBarbFrame(x, y, dir, spd, scale) {
-        ctx.save(); ctx.translate(x, y); ctx.scale(1/scale, 1/scale); ctx.rotate((dir - 90) * Math.PI/180);
-        const strokeColor = getSpdColor(spd); ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(18, 0); ctx.stroke();
-        let k = Math.round(spd/5)*5; let hx = 18; const xa = Math.cos(60*Math.PI/180)*6; const ya = Math.sin(60*Math.PI/180)*6;
-        while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-3,0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4; k-=50; }
-        while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.stroke(); hx-=3; k-=10; }
-        if (k >= 5) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa/2,ya/2); ctx.stroke(); }
+    function drawWindBarbFrame(x, y, dir, spd, scale, isDynamic = false) {
+        ctx.save(); ctx.translate(x, y); 
+        let mult = isDynamic ? 1.4 : 1;
+        ctx.scale(mult/scale, mult/scale); 
+        ctx.rotate((dir - 90) * Math.PI/180);
+        
+        const strokeColor = getSpdColor(spd); 
+        
+        const drawShapes = () => {
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(18, 0); ctx.stroke();
+            let k = Math.round(spd/5)*5; let hx = 18; const xa = Math.cos(60*Math.PI/180)*6; const ya = Math.sin(60*Math.PI/180)*6;
+            while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-3,0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4; k-=50; }
+            while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.stroke(); hx-=3; k-=10; }
+            if (k >= 5) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa/2,ya/2); ctx.stroke(); }
+        };
+
+        if (isDynamic) {
+            ctx.strokeStyle = '#000000';
+            ctx.fillStyle = '#000000';
+            ctx.lineWidth = 3.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            drawShapes();
+        }
+
+        ctx.strokeStyle = strokeColor; 
+        ctx.fillStyle = strokeColor; 
+        ctx.lineWidth = 1.2;
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'miter';
+        drawShapes();
+        
         ctx.restore();
     }
     
@@ -2622,12 +2725,12 @@
                 // Calculate the nose offset based on heading (not the track arrow)
                 let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
                 
-                // Push the barb coordinates forward to align with the visual nose of the plane
-                const noseDist = 35 * zoomFactor / mapScale; 
+                // Push the barb coordinates forward to align exactly with the visual nose of the plane
+                const noseDist = 8 * zoomFactor / mapScale; 
                 let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist;
                 let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
 
-                drawWindBarbFrame(noseX, noseY, d.windDir, d.windSpd, mapScale);
+                drawWindBarbFrame(noseX, noseY, d.windDir, d.windSpd, mapScale, true);
             }
         }
 
@@ -3173,9 +3276,13 @@
         const tickConfig = { color: '#999' }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#ff7777' }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
-            onClick: (e, elements, chart) => {
-                if (!filteredData || filteredData.length === 0) return; const xAxis = chart.scales.x; const xPixel = e.native ? e.native.offsetX : e.offsetX; let clickedIdx = Math.round(xAxis.getValueForPixel(xPixel));
-                if (clickedIdx >= 0 && clickedIdx < filteredData.length) { if (videoLoaded) video.currentTime = Math.max(0, filteredData[clickedIdx].absSeconds - videoStartSeconds); else { currentIdx = clickedIdx; updateVisualComponents(currentIdx); } }
+            onHover: (e, elements, chart) => {
+                if (filteredData.length === 0) return;
+                const xAxis = chart.scales.x;
+                const xPixel = e.native ? e.native.offsetX : e.offsetX;
+                const playheadPx = xAxis.getPixelForValue(currentIdx);
+                if (Math.abs(xPixel - playheadPx) < 15) chart.canvas.style.cursor = 'ew-resize';
+                else chart.canvas.style.cursor = 'crosshair';
             },
             scales: { x: { grid: { color: 'rgba(255,255,255,0.02)' }, ticks: { color: '#666', maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(255,255,255,0.03)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#999' }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
             plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e0e0e0', font: { size: 10 }, boxWidth: 10 }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }

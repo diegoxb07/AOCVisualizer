@@ -7,7 +7,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -18,8 +18,8 @@
                     blue:  {300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e'}
                 },
                 fontFamily: {
-                    sans: ['Space Grotesk','ui-sans-serif','system-ui','sans-serif'],
-                    mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','monospace']
+                    sans: ['Inter','ui-sans-serif','system-ui','sans-serif'],
+                    mono: ['Roboto Mono','ui-monospace','SFMono-Regular','monospace']
                 }
             }}
         };
@@ -66,11 +66,11 @@
         
         #videoPanel { height: var(--media-h); display: flex; flex-direction: column; }
         #videoPanel #videoPanel .media-container { width: 100%; flex-grow: 1; min-height: 0; position: relative; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #000; }
-        video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; transform: translate3d(0,0,0); backface-visibility: hidden; background-color: #000; border-radius: 8px; }
+        video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; background-color: #000; border-radius: 8px; }
         #videoPanel:fullscreen { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
         
         .overlays-wrapper { position: absolute; top: 44px; bottom: 30px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
-        #hudOverlay { background-color: rgba(22, 27, 34, 0.9); border: 1px solid #38bdf8; border-radius: 8px; padding: 14px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
+        #hudOverlay { background-color: rgba(22, 27, 34, 0.9); border: 1px solid #38bdf8; border-radius: 8px; padding: 14px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
         #hudOverlay::-webkit-scrollbar { width: 6px; }
         #hudOverlay::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
         #hudOverlay::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 3px; }
@@ -109,9 +109,9 @@
 
         :root { --sig:#38bdf8; --sig-soft:rgba(56,189,248,0.14); --ink:#0b0e13; --panel:#161b22; --line:#20262f; --media-h: clamp(420px, 48vh, 520px); }
 
-        html, body { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
+        html, body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
         body { background-color: var(--ink); -webkit-font-smoothing: antialiased; }
-        .font-mono, [class*="font-mono"], #timelineTimeDisplay, #detectedRangeText { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
+        .font-mono, [class*="font-mono"], #timelineTimeDisplay, #detectedRangeText { font-family: 'Roboto Mono', ui-monospace, monospace !important; }
 
         .uppercase.tracking-wider { letter-spacing: 0.12em; }
 
@@ -120,8 +120,8 @@
         #mainContainer > header h1 { font-weight: 700; letter-spacing: -0.01em; }
 
         .status-chip { display: flex; flex-direction: column; gap: 3px; background: #11151b; border: 1px solid #232b35; border-left: 2px solid #2f3a47; border-radius: 6px; padding: 8px 12px; min-width: 0; transition: border-color 0.2s, background 0.2s; }
-        .status-chip .chip-k { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #5d6773; }
-        .status-chip .chip-v { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: #5d6773; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .status-chip .chip-k { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #5d6773; }
+        .status-chip .chip-v { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; color: #5d6773; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .status-chip .chip-v.on { color: #e6edf3; }
         .status-chip.lit { border-left-color: var(--sig); background: #131922; }
         .status-chip.lit .chip-v.on { color: var(--sig); }
@@ -136,12 +136,12 @@
         #autoSyncLaser .laser-beam { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, rgba(34,197,94,0.9) 18%, #4ade80 50%, rgba(34,197,94,0.9) 82%, transparent); box-shadow: 0 0 12px 2px rgba(34,197,94,0.85), 0 0 28px 6px rgba(34,197,94,0.4); animation: laserScan 1.7s cubic-bezier(0.45,0,0.55,1) infinite alternate; }
         @keyframes laserScan { 0% { top: 2%; } 100% { top: 98%; } }
 
-        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; color: var(--sig); background: #131922; border: 1px solid #2c3a47; border-radius: 4px; letter-spacing: 0; }
+        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: var(--sig); background: #131922; border: 1px solid #2c3a47; border-radius: 4px; letter-spacing: 0; }
 
         .sticky-bottom-bar { align-items: flex-end; row-gap: 10px; }
         .cmd-group { display: flex; flex-direction: column; gap: 5px; }
         .cmd-group + .cmd-group { border-left: 1px solid #262e38; padding-left: 12px; }
-        .cmd-group > .cmd-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #5d6773; padding-left: 1px; }
+        .cmd-group > .cmd-label { font-family: 'Roboto Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #5d6773; padding-left: 1px; }
         .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
         #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
@@ -163,6 +163,13 @@
         *::-webkit-scrollbar-track { background: #0d1116; }
         *::-webkit-scrollbar-thumb { background: #2a323d; border-radius: 6px; border: 2px solid #0d1116; }
         *::-webkit-scrollbar-thumb:hover { background: #38516a; }
+
+        /* Overrides for cleaner tracker readability */
+        #hudOverlay, #satTimeBadge, #satDayLabel {
+            font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+            font-variant-numeric: tabular-nums; 
+            letter-spacing: 0.02em;
+        }
     </style>
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
@@ -250,9 +257,9 @@
                             <input type="text" id="videoStartInput" value="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                         </div>
                     </div>
-                    <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0">
-                        <button id="exportKmlBtn" disabled class="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap">🌍 Export KML</button>
-                        <div class="text-[10px] text-emerald-400 italic mt-1.5 text-right w-full">*Optional: For Google Earth</div>
+                    <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0 gap-2">
+                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded border border-purple-800 transition-colors shadow-sm whitespace-nowrap">🎥 Record Clip</button>
+                        <button id="exportKmlBtn" disabled class="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap">🌍 Export KML</button>
                     </div>
                 </div>
 
@@ -277,7 +284,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="mapPanel">
                     <div class="flex flex-wrap justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20 gap-y-1">
-                        <span>Flight-Level Data Player</span>
+                        <span>Flight-Level Data Player (Scroll in to zoom)</span>
                         <div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-grow ml-auto">
                             <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px]">
                                 Barb Period (s)
@@ -341,7 +348,7 @@
 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
-                        <span>MMR Media Display</span>
+                        <span>MMR Media Display (scroll in to zoom)</span>
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
@@ -509,6 +516,29 @@
     </div>
 </div>
 
+<div id="clipRecordModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 400px;">
+        <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('clipRecordModal').style.display='none'">✕</button>
+        <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2">Record & Export Screen Clip</h2>
+        <p class="text-xs text-slate-400 leading-relaxed">Select the timeline segment you wish to record. The tool will ask you to share your tab, and will auto-play the segment while recording the output to a synced WebM file.</p>
+        
+        <div class="space-y-4 mt-2">
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase">Start Point</label>
+                <input type="range" id="clipStartSlider" min="0" max="100" value="0" class="w-full" oninput="document.getElementById('clipStartLbl').innerText = filteredData[this.value]?.time || '000000'" />
+                <div class="text-right text-xs font-mono text-blue-400 mt-1" id="clipStartLbl">00:00:00</div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase">End Point</label>
+                <input type="range" id="clipEndSlider" min="0" max="100" value="100" class="w-full" oninput="document.getElementById('clipEndLbl').innerText = filteredData[this.value]?.time || '000000'" />
+                <div class="text-right text-xs font-mono text-blue-400 mt-1" id="clipEndLbl">00:00:00</div>
+            </div>
+        </div>
+
+        <button id="startClipRecordBtn" class="mt-4 px-4 py-3 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-sm transition-colors shadow-sm whitespace-nowrap w-full">⏺ Share Tab & Start Recording</button>
+    </div>
+</div>
+
 <script>
     let allParsedData = [];
     let filteredData = [];
@@ -524,6 +554,7 @@
     let satImageBox = null;    
     let satDebounceTimer = null;
     let slideSyncTimer = null;  
+    let isResizingMedia = false; 
 
     let mapFeatures = [];
     let customMarkers = [];
@@ -594,19 +625,35 @@
         badge.classList.remove('hidden');
     }
 
-    // MODIFIED SATELLITE CATALOG (Chronological ordering and dynamic bands)
     const GIBS_LAYERS = [
-        { value:'MODIS-TERRA',  label:'Morning Pass (~10:30) - Terra', wmsPrefix:'MODIS_Terra_', shortName:'MOD09', swath:true,
-          bands: [{id:'CorrectedReflectance_TrueColor', name:'True Color'}, {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'}] },
-        
-        { value:'VIIRS-SNPP',   label:'Early Aft (~13:30) - SNPP', wmsPrefix:'VIIRS_SNPP_', shortName:'VNP09', swath:true, minDate:'2015-11-24',
-          bands: [{id:'CorrectedReflectance_TrueColor', name:'True Color'}, {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'}] },
-          
-        { value:'VIIRS-NOAA20', label:'Early Aft (~13:30) - NOAA20', wmsPrefix:'VIIRS_NOAA20_', shortName:'VJ109', swath:true, minDate:'2018-01-05',
-          bands: [{id:'CorrectedReflectance_TrueColor', name:'True Color'}, {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'}] },
-          
-        { value:'MODIS-AQUA',   label:'Afternoon Pass (~13:30) - Aqua', wmsPrefix:'MODIS_Aqua_', shortName:'MYD09', swath:true,
-          bands: [{id:'CorrectedReflectance_TrueColor', name:'True Color'}, {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'}] }
+        { value:'MODIS-TERRA',  baseLabel:'Terra Pass', wmsPrefix:'MODIS_Terra_', shortName:'MOD09', swath:true,
+          bands: [
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'},
+              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31)'}
+          ] 
+        },
+        { value:'VIIRS-SNPP',   baseLabel:'SNPP Pass', wmsPrefix:'VIIRS_SNPP_', shortName:'VNP09', swath:true, minDate:'2015-11-24',
+          bands: [
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'},
+              {id:'Brightness_Temp_BandM15_Day', name:'Infrared (Band M15)'}
+          ] 
+        },
+        { value:'VIIRS-NOAA20', baseLabel:'NOAA20 Pass', wmsPrefix:'VIIRS_NOAA20_', shortName:'VJ109', swath:true, minDate:'2018-01-05',
+          bands: [
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'},
+              {id:'Brightness_Temp_BandM15_Day', name:'Infrared (Band M15)'}
+          ] 
+        },
+        { value:'MODIS-AQUA',   baseLabel:'Aqua Pass', wmsPrefix:'MODIS_Aqua_', shortName:'MYD09', swath:true,
+          bands: [
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'},
+              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31)'}
+          ] 
+        }
     ];
 
     const SAT_DAY_RANGE = 2;
@@ -653,6 +700,52 @@
         return Y+'-'+M+'-'+D;
     }
 
+    function updateSatelliteDropdownTimes() {
+        const satSelect = document.getElementById('satelliteSelect');
+        if (!satSelect || flightMetaData.date === 'Unknown' || filteredData.length === 0) return;
+        
+        const dateStr = satDateForOffset(satDayOffset);
+        if (!dateStr) return;
+        
+        const centerRow = filteredData[Math.floor(filteredData.length / 2)];
+        const lon = centerRow.lon;
+        const lat = centerRow.lat;
+
+        for (let i = 0; i < satSelect.options.length; i++) {
+            const opt = satSelect.options[i];
+            if (opt.value === 'none') continue;
+            
+            const layerDef = GIBS_LAYERS.find(d => d.value === opt.value);
+            if (!layerDef) continue;
+
+            opt.textContent = `${layerDef.baseLabel} (Searching...)`;
+            
+            lookupModisGranuleTime(layerDef.shortName, dateStr, lon, lat).then(g => {
+                if (g && g.timeStart) {
+                    const s = new Date(g.timeStart).getTime(), e = new Date(g.timeEnd).getTime();
+                    const midMs = s + (e - s) / 2;
+                    const fmtDate = new Date(midMs);
+                    const hh = String(fmtDate.getUTCHours()).padStart(2, '0');
+                    const mm = String(fmtDate.getUTCMinutes()).padStart(2, '0');
+                    opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z]`;
+                    
+                    if (satSelect.value === layerDef.value && satLoadedInfo) {
+                        satLoadedInfo.imageTimeMs = midMs;
+                        satLoadedInfo.modisTimePending = false;
+                        satLoadedInfo.modisExact = true;
+                        updateSatTimeBadge();
+                    }
+                } else {
+                    opt.textContent = `${layerDef.baseLabel} [Daily]`;
+                    if (satSelect.value === layerDef.value && satLoadedInfo) {
+                        satLoadedInfo.modisTimePending = false;
+                        updateSatTimeBadge();
+                    }
+                }
+            });
+        }
+    }
+
     function updateSatelliteOptions() {
         const satSelect = document.getElementById('satelliteSelect');
         const bandSelect = document.getElementById('satBandSelect');
@@ -666,7 +759,7 @@
             if (def.minDate && fDate !== 'Unknown' && fDate < def.minDate) return;
             const el = document.createElement('option');
             el.value = def.value;
-            el.textContent = def.label;
+            el.textContent = def.baseLabel;
             satSelect.appendChild(el);
         });
         const opts = [...satSelect.options].map(o => o.value);
@@ -681,6 +774,8 @@
         bandSelect.style.display = (in2dMode && satSelect.value !== 'none') ? '' : 'none';
 
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        
+        updateSatelliteDropdownTimes();
     }
 
     function updateBandOptions() {
@@ -748,6 +843,7 @@
         if (n < -SAT_DAY_RANGE || n > SAT_DAY_RANGE) return;
         satDayOffset = n;
         updateSatDayLabel();
+        updateSatelliteDropdownTimes();
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
@@ -856,28 +952,35 @@
                     satImageBox = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
                     satImageLoaded = true;
                     bgNeedsUpdate = true;
+                    
+                    const opt = satSelect.options[satSelect.selectedIndex];
+                    let defaultTimeMs = new Date(dateStr + 'T00:00:00Z').getTime();
+                    let exact = false;
+                    let pending = true;
+                    const timeMatch = opt.textContent.match(/\[(\d{2}):(\d{2})Z\]/);
+                    if (timeMatch) {
+                        const d = new Date(dateStr + 'T00:00:00Z');
+                        d.setUTCHours(parseInt(timeMatch[1], 10));
+                        d.setUTCMinutes(parseInt(timeMatch[2], 10));
+                        defaultTimeMs = d.getTime();
+                        exact = true;
+                        pending = false;
+                    } else if (opt.textContent.includes('[Daily]')) {
+                        pending = false;
+                    }
+                    
                     satLoadedInfo = {
-                        layerLabel: layerDef.label,
-                        imageTimeMs: new Date(dateStr + 'T00:00:00Z').getTime(),
+                        layerLabel: layerDef.baseLabel,
+                        imageTimeMs: defaultTimeMs,
                         isModis: true,
-                        modisTimePending: true,
+                        modisTimePending: pending,
+                        modisExact: exact,
                         dayOffset: satDayOffset
                     };
+                    
                     updateSatTimeBadge();
                     if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
 
-                    lookupModisGranuleTime(layerDef.shortName, dateStr, filteredData[currentIdx].lon, filteredData[currentIdx].lat).then(g => {
-                        if (g && g.timeStart && satLoadedInfo && satLoadedInfo.isModis) {
-                            const s = new Date(g.timeStart).getTime(), e = new Date(g.timeEnd).getTime();
-                            satLoadedInfo.imageTimeMs = s + (e - s) / 2;
-                            satLoadedInfo.modisTimePending = false;
-                            satLoadedInfo.modisExact = true;
-                            updateSatTimeBadge();
-                        } else if (satLoadedInfo) {
-                            satLoadedInfo.modisTimePending = false;
-                            updateSatTimeBadge();
-                        }
-                    });
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
                     satLoadedInfo = null; updateSatTimeBadge();
@@ -1375,16 +1478,9 @@
                         const dynamicBase = ocrSecs - video.currentTime;
                         videoStartSeconds = dynamicBase;
 
-                        // SKIP FORWARD LOGIC: Catch up if video starts before data
-                        if (hasTelemetry && ocrSecs < minSecs) {
-                            const jump = minSecs - ocrSecs;
-                            video.currentTime += jump;
-                            if (!silent) showToast(`Video begins before tracking data. Skipped forward ${jump}s.`, 5000);
-                        }
-
                         document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
                         flashAutoSyncLabel(); updateEndWindowFromVideo(true); 
-                        if (!silent && !(hasTelemetry && ocrSecs < minSecs)) showToast("Sync Locked Successfully!", 2000);
+                        if (!silent) showToast("Sync Locked Successfully!", 2000);
                         
                         ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
                         if (wasPlaying) video.play().catch(e=>{});
@@ -1422,7 +1518,6 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `FlightTrack_${flightMetaData.id}.kml`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     });
 
-    // MODIFIED: Dropdown elevation toggle handling
     function toggleMenu(event, menuId) { 
         event.stopPropagation(); 
         document.querySelectorAll('.dropdown-menu').forEach(m => { 
@@ -1749,7 +1844,7 @@
         let dragging = false, startY = 0, startH = 0, rafPending = false;
         const pointerY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
 
-        function onDown(e) { dragging = true; startY = pointerY(e); startH = document.getElementById('mapPanel').getBoundingClientRect().height; bar.classList.add('resizing'); e.preventDefault(); }
+        function onDown(e) { dragging = true; isResizingMedia = true; startY = pointerY(e); startH = document.getElementById('mapPanel').getBoundingClientRect().height; bar.classList.add('resizing'); e.preventDefault(); }
         function onMove(e) {
             if (!dragging) return;
             const h = Math.max(MIN_H, Math.min(MAX_H, startH + (pointerY(e) - startY)));
@@ -1764,7 +1859,7 @@
             }
             if (e.cancelable) e.preventDefault();
         }
-        function onUp() { if (!dragging) return; dragging = false; bar.classList.remove('resizing'); resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }
+        function onUp() { if (!dragging) return; dragging = false; isResizingMedia = false; bar.classList.remove('resizing'); resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }
         handle.addEventListener('mousedown', onDown); handle.addEventListener('touchstart', onDown, { passive: false });
         window.addEventListener('mousemove', onMove); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('mouseup', onUp); window.addEventListener('touchend', onUp);
     })();
@@ -1981,7 +2076,7 @@
         document.getElementById('detectedRangeText').innerText = `[ Detected: ${allParsedData[0].time.slice(0,2)}:${allParsedData[0].time.slice(2,4)} UTC → ${allParsedData[allParsedData.length-1].time.slice(0,2)}:${allParsedData[allParsedData.length-1].time.slice(2,4)} UTC ]`;
         updateMissionHeader();
         
-        ['startTimeInput', 'endTimeInput', 'runBtn', 'exportKmlBtn'].forEach(id => document.getElementById(id).disabled = false);
+        ['startTimeInput', 'endTimeInput', 'runBtn', 'exportKmlBtn', 'exportClipBtn'].forEach(id => document.getElementById(id).disabled = false);
         document.getElementById('startTimeInput').value = allParsedData[0].time; 
         document.getElementById('endTimeInput').value = allParsedData[allParsedData.length-1].time; 
         
@@ -2143,13 +2238,6 @@
                                 
                                 if (timeDiff > 120 || (isManualSyncRequest && timeDiff > 1)) {
                                     videoStartSeconds = dynamicBase;
-                                    
-                                    // SKIP FORWARD LOGIC
-                                    if (allParsedData.length > 0 && ocrSecs < minSecs) {
-                                        const jump = minSecs - ocrSecs;
-                                        video.currentTime += jump;
-                                        showToast(`Video begins before tracking data. Skipped forward ${jump}s.`, 5000);
-                                    }
 
                                     document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
                                     flashAutoSyncLabel(); forceOcrSyncNextTick = false; isManualSyncRequest = false; updateEndWindowFromVideo(true); 
@@ -2297,7 +2385,7 @@
             if (document.getElementById('simpleTrackerIcon').checked) {
                 ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#ef4444'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
-                const planeScale = 0.35 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
+                const planeScale = 0.22 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
                 ctx.save(); ctx.rotate((t_track - 90) * Math.PI/180); 
                 ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25 * zoomFactor, 0); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2 * zoomFactor; ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(32 * zoomFactor, 0); ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); ctx.lineTo(24 * zoomFactor, 3 * zoomFactor); ctx.closePath(); ctx.fillStyle = '#38bdf8'; ctx.fill(); ctx.restore();
@@ -2466,7 +2554,7 @@
         ctx.fillText(hdg !== null ? ((hdg % 360 + 360) % 360).toFixed(0) + '°' : '---', centerHdgX, botY + 4);
     }
 
-function renderHUD(d) {
+    function renderHUD(d) {
         const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
         
@@ -2701,7 +2789,7 @@ function renderHUD(d) {
         timelineTimeDisplay.innerText = displayStr;
 
         const satSel = document.getElementById('satelliteSelect');
-        if (satSel && satSel.value !== 'none' && trackerModeSelect.value === '2d') {
+        if (satSel && satSel.value !== 'none' && trackerModeSelect.value === '2d' && !isResizingMedia) {
             fetchSatelliteImage(currentRow.absSeconds);
             updateSatTimeBadge();
         } else {
@@ -2885,8 +2973,160 @@ function renderHUD(d) {
         }
         bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }).catch(e => {});
+
+    // --- MP4 Video Zoom & Pan Logic ---
+    let vidZoom = 1;
+    let vidPanX = 0;
+    let vidPanY = 0;
+    let isVidDragging = false;
+    let vidStartX = 0;
+    let vidStartY = 0;
+
+    const radarVid = document.getElementById('radarVideo');
+    const vidWrapper = radarVid.parentElement;
+
+    // Set up CSS for bounds and smooth zooming
+    radarVid.style.transformOrigin = 'center center';
+    radarVid.style.transition = 'transform 0.1s ease-out';
+    vidWrapper.style.overflow = 'hidden';
+
+    // Mouse Wheel: Zoom in/out
+    vidWrapper.addEventListener('wheel', (e) => {
+        if (!videoLoaded) return;
+        e.preventDefault();
+        const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
+        vidZoom = Math.max(1, Math.min(vidZoom * zoomDelta, 8)); // Limits zoom from 1x to 8x
+        
+        // Snap back to center if fully zoomed out
+        if (vidZoom === 1) { 
+            vidPanX = 0; 
+            vidPanY = 0; 
+        }
+        radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
+    });
+
+    // Mouse Down: Start Pan
+    vidWrapper.addEventListener('mousedown', (e) => {
+        if (!videoLoaded || vidZoom <= 1) return;
+        isVidDragging = true;
+        vidStartX = e.clientX - vidPanX;
+        vidStartY = e.clientY - vidPanY;
+        vidWrapper.style.cursor = 'grabbing';
+    });
+
+    // Mouse Move: Drag Pan
+    window.addEventListener('mousemove', (e) => {
+        if (!isVidDragging) return;
+        
+        // Let the user pan, but keep it constrained inside the zoom area
+        let maxX = (radarVid.clientWidth * vidZoom - radarVid.clientWidth) / 2;
+        let maxY = (radarVid.clientHeight * vidZoom - radarVid.clientHeight) / 2;
+
+        vidPanX = Math.max(-maxX, Math.min(maxX, e.clientX - vidStartX));
+        vidPanY = Math.max(-maxY, Math.min(maxY, e.clientY - vidStartY));
+
+        radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
+    });
+
+    // Mouse Up: Stop Pan
+    window.addEventListener('mouseup', () => {
+        isVidDragging = false;
+        vidWrapper.style.cursor = 'default';
+    });
+
+    // Double Click: Reset View
+    vidWrapper.addEventListener('dblclick', () => {
+        vidZoom = 1; 
+        vidPanX = 0; 
+        vidPanY = 0;
+        radarVid.style.transform = `translate(0px, 0px) scale(1)`;
+    });
+
+    // --- Record Screen Clip Logic ---
+    document.getElementById('exportClipBtn').addEventListener('click', () => {
+        if(filteredData.length === 0) return;
+        document.getElementById('clipRecordModal').style.display = 'flex';
+        const startSlider = document.getElementById('clipStartSlider');
+        const endSlider = document.getElementById('clipEndSlider');
+        
+        startSlider.max = filteredData.length - 1;
+        endSlider.max = filteredData.length - 1;
+        
+        startSlider.value = 0;
+        endSlider.value = filteredData.length - 1;
+        
+        document.getElementById('clipStartLbl').innerText = filteredData[0].time.slice(0,2) + ":" + filteredData[0].time.slice(2,4) + ":" + filteredData[0].time.slice(4) + " UTC";
+        document.getElementById('clipEndLbl').innerText = filteredData[filteredData.length - 1].time.slice(0,2) + ":" + filteredData[filteredData.length - 1].time.slice(2,4) + ":" + filteredData[filteredData.length - 1].time.slice(4) + " UTC";
+    });
+
+    document.getElementById('startClipRecordBtn').addEventListener('click', async () => {
+        document.getElementById('clipRecordModal').style.display = 'none';
+        
+        let startIdx = parseInt(document.getElementById('clipStartSlider').value);
+        let endIdx = parseInt(document.getElementById('clipEndSlider').value);
+        if (startIdx > endIdx) { let temp = startIdx; startIdx = endIdx; endIdx = temp; }
+        
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({
+                video: { displaySurface: "browser" },
+                audio: true 
+            });
+            
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+            const chunks = [];
+            
+            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `MissionClip_${flightMetaData.id}_Sync.webm`;
+                a.click();
+                showToast("Recording saved successfully! Check your downloads folder.", 4000);
+            };
+            
+            mediaRecorder.start();
+            showToast("Recording Started! The segment will now play automatically...", 3000);
+            
+            currentIdx = startIdx;
+            timelineSlider.value = currentIdx;
+            if (videoLoaded) {
+                video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+            }
+            updateVisualComponents(currentIdx, true);
+            
+            isPlaying = true;
+            playPauseBtn.innerText = "⏸ Pause";
+            playbackAccumulator = 0;
+            lastTickTime = performance.now();
+            
+            window.recordingEndIdx = endIdx;
+            window.activeRecorder = mediaRecorder;
+            window.recordingStream = stream;
+            
+            if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
+            masterSyncEngineTick();
+            
+        } catch (err) {
+            showToast("Screen recording was cancelled or denied.", 4000);
+        }
+    });
+
+    // Background interval to auto-stop recording when it hits the end index
+    setInterval(() => {
+        if (window.activeRecorder && isPlaying && currentIdx >= window.recordingEndIdx) {
+            isPlaying = false;
+            playPauseBtn.innerText = "▶ Play";
+            if (videoLoaded) video.pause();
+            
+            window.activeRecorder.stop();
+            window.recordingStream.getTracks().forEach(track => track.stop());
+            
+            window.activeRecorder = null;
+            window.recordingStream = null;
+        }
+    }, 500);
+
 </script>
 </body>
 </html>
-
-```

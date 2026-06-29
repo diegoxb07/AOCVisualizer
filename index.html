@@ -5,20 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Toolkit</title>
 
-    <!-- silence the cosmetic tailwind cdn production warning (intentional for a single-file tool) -->
-    <script>
-        // silence the cosmetic "cdn.tailwindcss.com should not be used in production" notice.
-        // this is a self-contained single-file tool, not a build pipeline, so the cdn is intentional.
-        (function(){
-            const _w = console.warn;
-            console.warn = function(){
-                const m = arguments[0];
-                if (typeof m === 'string' && m.indexOf('cdn.tailwindcss.com') !== -1) return;
-                return _w.apply(console, arguments);
-            };
-        })();
-    </script>
-
     <!-- type system: Space Grotesk (UI) + JetBrains Mono (telemetry) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

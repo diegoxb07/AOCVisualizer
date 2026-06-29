@@ -133,9 +133,6 @@
         [id^="title-"] { position: relative; padding: 4px 0 9px 13px; margin-bottom: 12px !important; border-bottom: 1px solid #20262f; color: #aab4be !important; }
         [id^="title-"]::before { content: ""; position: absolute; left: 0; top: 3px; bottom: 10px; width: 3px; background: var(--sig); border-radius: 2px; }
 
-        #autoSyncLaser .laser-beam { position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, transparent, rgba(34,197,94,0.9) 18%, #4ade80 50%, rgba(34,197,94,0.9) 82%, transparent); box-shadow: 0 0 12px 2px rgba(34,197,94,0.85), 0 0 28px 6px rgba(34,197,94,0.4); animation: laserScan 1.7s cubic-bezier(0.45,0,0.55,1) infinite alternate; }
-        @keyframes laserScan { 0% { top: 2%; } 100% { top: 98%; } }
-
         .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: var(--sig); background: #131922; border: 1px solid #2c3a47; border-radius: 4px; letter-spacing: 0; }
 
         .sticky-bottom-bar { align-items: flex-end; row-gap: 10px; }
@@ -194,7 +191,7 @@
 <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/85 z-[10000] hidden flex-col items-center justify-center backdrop-blur-md">
     <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-5"></div>
     <h2 class="text-white text-xl md:text-2xl font-bold tracking-widest">PROCESSING FLIGHT DATA</h2>
-    <p class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling the variables for you now!</p>
+    <p class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling variables...</p>
 </div>
 
 <button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
@@ -224,12 +221,23 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8">
             <div class="lg:col-span-4 flex flex-col justify-center gap-6">
                 <div>
-                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">1</span> Upload Flight-Level Data (.txt or .nc) <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span></label>
-                    <input type="file" id="fileInput" accept=".txt,.nc" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        <span class="step-num">1</span> Upload Flight-Level Data (.txt or .nc) 
+                        <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span>
+                    </label>
+                    <div id="dataDropZone" class="relative flex items-center justify-center w-full h-10 bg-slate-800 border-2 border-dashed border-slate-600 rounded-md hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
+                        <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                        <span id="dataDropLabel" class="text-xs text-slate-300 font-medium group-hover:text-blue-300 transition-colors px-2 truncate">Choose File/Drag &amp; Drop</span>
+                    </div>
                 </div>
                 <div>
-                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">2</span> Upload MMR to Sync (.mp4)</label>
-                    <input type="file" id="videoInput" accept="video/mp4" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
+                        <span class="step-num">2</span> Upload MMR to Sync (.mp4)
+                    </label>
+                    <div id="videoDropZone" class="relative flex items-center justify-center w-full h-10 bg-slate-800 border-2 border-dashed border-slate-600 rounded-md hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
+                        <input type="file" id="videoInput" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                        <span id="videoDropLabel" class="text-xs text-slate-300 font-medium group-hover:text-blue-300 transition-colors px-2 truncate">Choose File/Drag &amp; Drop</span>
+                    </div>
                 </div>
             </div>
 
@@ -266,7 +274,6 @@
                 <div>
                     <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">3</span> Filters</label>
                     <div class="flex flex-wrap gap-x-5 gap-y-3 bg-slate-800/50 p-3 rounded-lg border border-slate-800 items-start">
-                        <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleExtraHUD" class="accent-blue-500 w-4 h-4 cursor-pointer" /> HUD Extra Metrics</label>
                         <div class="flex flex-col gap-2 mt-1">
                             <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none"><input type="checkbox" id="togglePfd" class="accent-blue-500 w-4 h-4 cursor-pointer" /> Cockpit PFD</label>
                             <label id="gpsAltContainer" class="hidden items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none border-l-2 border-blue-500/40 pl-2 ml-2"><input type="checkbox" id="toggleGpsAlt" class="accent-blue-500 w-4 h-4 cursor-pointer" /> PFD: Press Alt -> GPS Alt</label>
@@ -284,7 +291,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="mapPanel">
                     <div class="flex flex-wrap justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20 gap-y-1">
-                        <span>Flight-Level Data Player (Scroll in to zoom)</span>
+                        <span>Flight-Level Data Player</span>
                         <div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-grow ml-auto">
                             <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px]">
                                 Barb Period (s)
@@ -299,6 +306,7 @@
                                         <option value="rectangle">Rectangle</option>
                                     </select>
                                     <button id="clearMeasureBtn" class="hidden px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-[11px] rounded border border-red-900 transition-colors shadow-sm whitespace-nowrap">✕ Clear</button>
+                                    <span id="measureHint" class="hidden text-[10px] text-slate-400 italic whitespace-nowrap"></span>
                                 </div>
                             </div>
                             <select id="trackerModeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
@@ -315,7 +323,7 @@
                                     </select>
                                     <select id="satBandSelect" class="hidden bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer" title="Satellite Spectral Band">
                                     </select>
-                                    <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-slate-900/95 border border-slate-700 border-l-2 border-l-blue-500/60 rounded px-1.5 py-1 shadow-lg">
+                                    <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-slate-900 border border-slate-700 border-l-2 border-l-blue-500 rounded px-1.5 py-1 shadow-lg">
                                         <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">◀</button>
                                         <span id="satDayLabel" class="text-[10px] font-mono text-blue-300 min-w-[78px] text-center leading-tight"></span>
                                         <button id="satDayNext" title="Next day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">▶</button>
@@ -348,7 +356,7 @@
 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
-                        <span>MMR Media Display (scroll in to zoom)</span>
+                        <span>MMR Media Display</span>
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
@@ -356,9 +364,6 @@
                         <video id="radarVideo"></video>
                         <div id="ocrIndicator" class="hidden absolute top-2 right-3 pointer-events-none z-30" title="OCR sync active">
                             <span class="block w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.85)]"></span>
-                        </div>
-                        <div id="autoSyncLaser" class="hidden absolute inset-0 overflow-hidden pointer-events-none z-20 rounded-lg">
-                            <div class="laser-beam"></div>
                         </div>
                     </div>
                 </div>
@@ -1038,13 +1043,76 @@
     let currentSpeedIdx = 0;
     let plotMinLon, plotMaxLon, plotMinLat, plotMaxLat, deltaLon, deltaLat;
 
-    let isMeasuring = false, measureShape = 'polygon', measurePointsGeo = [], liveMouseGeo = null;
+    let isMeasuring = false, measureShape = 'polygon', measurePointsGeo = [], drawnShapes = [], liveMouseGeo = null;
+    let baseHudHeight = 0;
     const EARTH_RADIUS_NM = 3440.065;
 
     let isScrubbing = false, activeScrubChart = null, wasPlayingBeforeScrub = false;
     let hasInitialSyncOccurred = false, scrubSyncTimeout = null, forceOcrSyncNextTick = false;
     let isManualSyncRequest = false, scrubDebounceTimer = null;
     let isHoveringShape = false, isDraggingShape = false, lastDragGeo = null;
+    let draggingShapeIndex = -1, hoveredShapeIndex = -1, measureButtons = [], measureClickHandled = false;
+
+    // True point-in-polygon (ray casting) so each shape can be selected/moved individually.
+    function pointInPolygon(pts, lat, lon) {
+        let inside = false;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            const xi = pts[i].lon, yi = pts[i].lat, xj = pts[j].lon, yj = pts[j].lat;
+            const intersect = ((yi > lat) !== (yj > lat)) && (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+    // Pixel distance from a point to a segment (used to hover-select 2-point "line" polygons).
+    function distToSegmentPx(px, py, ax, ay, bx, by) {
+        const dx = bx - ax, dy = by - ay; const len2 = dx*dx + dy*dy;
+        let t = len2 === 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (ax + t*dx), py - (ay + t*dy));
+    }
+    function pointInOneShape(type, pts, g) {
+        if (!pts || pts.length === 0) return false;
+        if (type === 'circle' && pts.length === 2) {
+            const rNM = getDistanceNM(pts[0].lat, pts[0].lon, pts[1].lat, pts[1].lon);
+            return getDistanceNM(pts[0].lat, pts[0].lon, g.lat, g.lon) <= rNM;
+        }
+        if (type === 'rectangle' && pts.length === 2) {
+            const minLat = Math.min(pts[0].lat, pts[1].lat), maxLat = Math.max(pts[0].lat, pts[1].lat);
+            const minLon = Math.min(pts[0].lon, pts[1].lon), maxLon = Math.max(pts[0].lon, pts[1].lon);
+            return g.lat >= minLat && g.lat <= maxLat && g.lon >= minLon && g.lon <= maxLon;
+        }
+        if (type === 'polygon') {
+            if (pts.length >= 3) return pointInPolygon(pts, g.lat, g.lon);
+            if (pts.length === 2) {
+                // 2-point polygon = a line: hit if within ~8px of the segment.
+                const ax = getX(pts[0].lon)*mapScale + mapOffsetX, ay = getY(pts[0].lat)*mapScale + mapOffsetY;
+                const bx = getX(pts[1].lon)*mapScale + mapOffsetX, by = getY(pts[1].lat)*mapScale + mapOffsetY;
+                const px = getX(g.lon)*mapScale + mapOffsetX, py = getY(g.lat)*mapScale + mapOffsetY;
+                return distToSegmentPx(px, py, ax, ay, bx, by) <= 8;
+            }
+        }
+        return false;
+    }
+    // Returns the index of the top-most committed shape under a geo point, or -1.
+    function shapeIndexAtGeo(g) {
+        for (let i = drawnShapes.length - 1; i >= 0; i--) {
+            if (pointInOneShape(drawnShapes[i].type, drawnShapes[i].points, g)) return i;
+        }
+        return -1;
+    }
+    // Hit-test the on-canvas ✓/✕ buttons (positions are in canvas/CSS pixels).
+    function measureButtonAt(mx, my) {
+        for (const b of measureButtons) { if (Math.hypot(mx - b.sx, my - b.sy) <= b.r) return b; }
+        return null;
+    }
+    function commitActivePolygon() {
+        if (measureShape === 'polygon' && measurePointsGeo.length >= 2) {
+            drawnShapes.push({ type: 'polygon', points: [...measurePointsGeo] });
+        } else if ((measureShape === 'circle' || measureShape === 'rectangle') && measurePointsGeo.length >= 2) {
+            drawnShapes.push({ type: measureShape, points: [measurePointsGeo[0], measurePointsGeo[1]] });
+        }
+        measurePointsGeo = []; liveMouseGeo = null;
+    }
 
     function getDistanceNM(lat1, lon1, lat2, lon2) {
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -1064,22 +1132,30 @@
     }
     
     function isPointInShape(geoPt) {
-        if (measurePointsGeo.length === 0) return false;
-        if (measureShape === 'circle' && measurePointsGeo.length === 2) {
-            const rNM = getDistanceNM(measurePointsGeo[0].lat, measurePointsGeo[0].lon, measurePointsGeo[1].lat, measurePointsGeo[1].lon);
-            const distNM = getDistanceNM(measurePointsGeo[0].lat, measurePointsGeo[0].lon, geoPt.lat, geoPt.lon);
-            return distNM <= rNM;
-        } else if (measureShape === 'rectangle' && measurePointsGeo.length === 2) {
-            const minLat = Math.min(measurePointsGeo[0].lat, measurePointsGeo[1].lat), maxLat = Math.max(measurePointsGeo[0].lat, measurePointsGeo[1].lat);
-            const minLon = Math.min(measurePointsGeo[0].lon, measurePointsGeo[1].lon), maxLon = Math.max(measurePointsGeo[0].lon, measurePointsGeo[1].lon);
-            return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
-        } else if (measureShape === 'polygon' && measurePointsGeo.length >= 3 && !isMeasuring) {
-            let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-            measurePointsGeo.forEach(p => {
-                if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
-                if (p.lon < minLon) minLon = p.lon; if (p.lon > maxLon) maxLon = p.lon;
-            });
-            return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
+        const checkPts = (type, pts) => {
+            if (pts.length === 0) return false;
+            if (type === 'circle' && pts.length === 2) {
+                const rNM = getDistanceNM(pts[0].lat, pts[0].lon, pts[1].lat, pts[1].lon);
+                const distNM = getDistanceNM(pts[0].lat, pts[0].lon, geoPt.lat, geoPt.lon);
+                return distNM <= rNM;
+            } else if (type === 'rectangle' && pts.length === 2) {
+                const minLat = Math.min(pts[0].lat, pts[1].lat), maxLat = Math.max(pts[0].lat, pts[1].lat);
+                const minLon = Math.min(pts[0].lon, pts[1].lon), maxLon = Math.max(pts[0].lon, pts[1].lon);
+                return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
+            } else if (type === 'polygon' && pts.length >= 3 && !isMeasuring) {
+                let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+                pts.forEach(p => {
+                    if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
+                    if (p.lon < minLon) minLon = p.lon; if (p.lon > maxLon) maxLon = p.lon;
+                });
+                return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
+            }
+            return false;
+        };
+
+        if (checkPts(measureShape, measurePointsGeo)) return true;
+        for (let shape of drawnShapes) {
+            if (checkPts(shape.type, shape.points)) return true;
         }
         return false;
     }
@@ -1153,6 +1229,46 @@
     }
     window.addEventListener('load', initOCR);
 
+    // --- Mark a drop zone as "file loaded": turn it purple + show the filename small ---
+    function markDropZoneLoaded(zoneId, labelId, filename) {
+        const zone = document.getElementById(zoneId);
+        const label = document.getElementById(labelId);
+        if (!zone || !label) return;
+        zone.classList.remove('bg-slate-800', 'border-slate-600', 'border-dashed', 'hover:border-blue-500', 'hover:bg-slate-700');
+        zone.classList.add('bg-purple-950/40', 'border-purple-800', 'border-solid', 'hover:border-purple-600', 'hover:bg-purple-950/60');
+        label.classList.remove('text-slate-300', 'group-hover:text-blue-300');
+        label.classList.add('text-purple-300', 'group-hover:text-purple-200');
+        label.textContent = filename;
+        label.title = filename;
+    }
+
+    // --- Fullscreen-Friendly Drag & Drop Logic ---
+    ['dataDropZone', 'videoDropZone'].forEach(zoneId => {
+        const zone = document.getElementById(zoneId);
+        if (!zone) return;
+        const input = zone.querySelector('input[type="file"]');
+        
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('border-blue-500', 'bg-slate-700');
+        });
+        
+        zone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            zone.classList.remove('border-blue-500', 'bg-slate-700');
+        });
+        
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('border-blue-500', 'bg-slate-700');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                input.files = e.dataTransfer.files;
+                const event = new Event('change', { bubbles: true });
+                input.dispatchEvent(event);
+            }
+        });
+    });
+
     document.getElementById('collapseLip').addEventListener('click', function() {
         const content = document.getElementById('mediaBarContent'); content.classList.toggle('collapsed');
         this.innerHTML = content.classList.contains('collapsed') ? '▼' : '▲';
@@ -1161,9 +1277,20 @@
 
     const canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d'), video = document.getElementById('radarVideo'), hud = document.getElementById('hudOverlay'), mapPlaceholder = document.getElementById('mapPlaceholder'), playPauseBtn = document.getElementById('playPauseBtn'), timelineSlider = document.getElementById('timelineSlider'), timelineTimeDisplay = document.getElementById('timelineTimeDisplay'), speedDownBtn = document.getElementById('speedDownBtn'), speedDisplayBtn = document.getElementById('speedDisplayBtn'), speedUpBtn = document.getElementById('speedUpBtn'), replayBtn = document.getElementById('replayBtn'), videoSyncMode = document.getElementById('videoSyncMode'), ocrIndicator = document.getElementById('ocrIndicator'), fullscreenBtn = document.getElementById('fullscreenBtn'), fullscreenMapBtn = document.getElementById('fullscreenMapBtn'), fullscreenVideoBtn = document.getElementById('fullscreenVideoBtn'), mapPanel = document.getElementById('mapPanel'), videoPanel = document.getElementById('videoPanel'), trackerModeSelect = document.getElementById('trackerModeSelect'), threeDContainer = document.getElementById('threeDContainer'), attitudeHud = document.getElementById('attitudeHud'), stickyBottomBar = document.getElementById('stickyBottomBar');
 
+    function applySyncModeLock() {
+        // On Auto-Sync the timeline window is driven by the video clock, so the user must NOT type start/end times.
+        const isAuto = videoSyncMode.value === 'auto';
+        const dataLoaded = allParsedData.length > 0;
+        const startEl = document.getElementById('startTimeInput');
+        const endEl = document.getElementById('endTimeInput');
+        if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
+        if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
+    }
+
     function evaluateAutoSyncDefault() {
         if (videoLoaded && allParsedData.length > 0) {
             videoSyncMode.value = 'auto'; ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block';
+            applySyncModeLock();
             forceOcrSyncNextTick = true; isManualSyncRequest = true;
             setTimeout(() => { if (!isPlaying) syncTelemetryToVideoClock(); }, 800);
         }
@@ -1401,6 +1528,7 @@
     videoSyncMode.addEventListener('change', (e) => {
         if (e.target.value === 'auto') { ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; } 
         else { ocrIndicator.style.display = 'none'; if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none'; }
+        applySyncModeLock();
     });
 
     async function performImmediateOcrLock({ silent = false, gateGapSeconds = null } = {}) {
@@ -1412,9 +1540,9 @@
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
         
         videoSyncMode.value = 'auto'; document.getElementById('ocrIndicator').style.display = 'block'; document.getElementById('videoStartInput').disabled = true;
+        applySyncModeLock();
         
         if (!silent) showToast("Scanning frame at native resolution... Please wait.", 4000);
-        const _autoSyncEl = document.getElementById('autoSyncLaser'); if (_autoSyncEl) _autoSyncEl.style.display = 'block';
         
         if (!window.ocrCanvas) { window.ocrCanvas = document.createElement('canvas'); window.ocrCtx = window.ocrCanvas.getContext('2d', { willReadFrequently: true }); }
 
@@ -1422,7 +1550,7 @@
 
         async function attemptSync() {
             if (attempts >= maxAttempts) {
-                isOcrRunning = false; if (_autoSyncEl) _autoSyncEl.style.display = 'none';
+                isOcrRunning = false;
                 video.currentTime = originalVideoTime; 
                 if (wasPlaying) video.play().catch(e=>{});
                 if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000); return;
@@ -1469,7 +1597,7 @@
                             if (ocrSecs < minSecs - 14400 || ocrSecs > maxSecs + 14400) continue;
                         }
                         
-                        validLock = true; isOcrRunning = false; if (_autoSyncEl) _autoSyncEl.style.display = 'none';
+                        validLock = true; isOcrRunning = false;
                         const currentGap = Math.abs(ocrSecs - (videoStartSeconds + video.currentTime));
                         if (gateGapSeconds != null && currentGap < gateGapSeconds) {
                             if (wasPlaying) video.play().catch(e=>{}); break;
@@ -1480,6 +1608,17 @@
 
                         document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
                         flashAutoSyncLabel(); updateEndWindowFromVideo(true); 
+
+                        // If the video begins before any flight-level data exists, skip the intro:
+                        // jump the playhead forward to the data's start time, then let the sync follow.
+                        if (gateGapSeconds == null && hasTelemetry && videoStartSeconds < minSecs - 0.5) {
+                            const skipTo = minSecs - videoStartSeconds;
+                            if (skipTo > 0.1 && video.currentTime < skipTo && (!video.duration || skipTo < video.duration - 0.05)) {
+                                video.currentTime = skipTo;
+                                if (!silent) showToast("Video started before flight data — skipped ahead to data start.", 3500);
+                            }
+                        }
+
                         if (!silent) showToast("Sync Locked Successfully!", 2000);
                         
                         ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
@@ -1489,7 +1628,7 @@
                 }
                 
                 if (!validLock) { video.currentTime += 0.5; video.addEventListener('seeked', attemptSync, { once: true }); }
-            } catch(e) { isOcrRunning = false; if (_autoSyncEl) _autoSyncEl.style.display = 'none'; if (wasPlaying) video.play().catch(e=>{}); }
+            } catch(e) { isOcrRunning = false; if (wasPlaying) video.play().catch(e=>{}); }
         }
         attemptSync(); 
     }
@@ -1553,26 +1692,45 @@
     document.getElementById('measureShapeSelect').addEventListener('change', (e) => { measureShape = e.target.value; measurePointsGeo = []; liveMouseGeo = null; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
 
     function updateMeasureUI() {
-        const hasPoints = measurePointsGeo.length > 0; const showPopout = isMeasuring || hasPoints;
+        const hasPoints = measurePointsGeo.length > 0 || drawnShapes.length > 0; 
+        const showPopout = isMeasuring || hasPoints;
         document.getElementById('measureGroup').style.display = showPopout ? 'flex' : 'none';
         document.getElementById('measureShapeSelect').style.display = isMeasuring ? 'inline-block' : 'none';
         document.getElementById('clearMeasureBtn').style.display = hasPoints ? 'inline-block' : 'none';
+        const hintEl = document.getElementById('measureHint');
+        if (isMeasuring) {
+            hintEl.textContent = measureShape === 'polygon' ? '✓ to finish' : 'click two points';
+            hintEl.style.display = hintEl.textContent ? 'inline-block' : 'none';
+        } else if (drawnShapes.length > 0) {
+            hintEl.textContent = 'drag to move · ✕ to delete';
+            hintEl.style.display = 'inline-block';
+        } else {
+            hintEl.style.display = 'none';
+        }
     }
 
     function stopMeasuringState() {
-        isMeasuring = false; liveMouseGeo = null; const btn = document.getElementById('measureBtn');
+        commitActivePolygon();  // keep a finished (3+ pt) polygon; discard an unfinished stub
+        isMeasuring = false; liveMouseGeo = null; hoveredShapeIndex = -1; const btn = document.getElementById('measureBtn');
         btn.innerText = '📏 Measure'; btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); updateMeasureUI();
     }
 
     document.getElementById('measureBtn').addEventListener('click', () => {
+        const wasMeasuring = isMeasuring;
         isMeasuring = !isMeasuring; const btn = document.getElementById('measureBtn');
         if(isMeasuring) { btn.classList.remove('bg-blue-800', 'hover:bg-blue-700'); btn.classList.add('bg-blue-600', 'hover:bg-blue-500'); btn.innerText = '🛑 Stop Measuring'; } 
         else { btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); btn.innerText = '📏 Measure'; }
-        if (isMeasuring) measurePointsGeo = []; else liveMouseGeo = null;
+        if (isMeasuring) { measurePointsGeo = []; }
+        else { if (wasMeasuring) commitActivePolygon(); liveMouseGeo = null; }
         updateMeasureUI(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     });
 
-    document.getElementById('clearMeasureBtn').addEventListener('click', () => { measurePointsGeo = []; isHoveringShape = false; isDraggingShape = false; updateMeasureUI(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
+    document.getElementById('clearMeasureBtn').addEventListener('click', () => { 
+        measurePointsGeo = []; drawnShapes = []; 
+        isHoveringShape = false; isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1; measureButtons = [];
+        updateMeasureUI(); 
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); 
+    });
 
     timelineSlider.addEventListener('mousedown', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
     timelineSlider.addEventListener('touchstart', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
@@ -1645,6 +1803,7 @@
     
     let arrowSkipSpeed = 1;
     document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isMeasuring) { stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return; }
         if (!filteredData || filteredData.length === 0) return; if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
             e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1; 
@@ -1658,53 +1817,90 @@
 
     canvas.addEventListener('mousedown', (e) => { 
         if (trackerModeSelect.value === '3d') return; 
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         const geo = screenToGeo(e.clientX, e.clientY);
+
+        // On-canvas buttons take priority (✓ finish on the active polygon, ✕ delete on a shape).
+        const btn = measureButtonAt(mx, my);
+        if (btn) {
+            if (btn.kind === 'finish') { stopMeasuringState(); }  // commits the polygon AND exits measure mode
+            else if (btn.kind === 'delete') { drawnShapes.splice(btn.shapeIndex, 1); hoveredShapeIndex = -1; }
+            measureClickHandled = true;
+            updateMeasureUI(); if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
+        }
+
         if (isMeasuring) {
             if (measureShape === 'polygon') {
-                if (measurePointsGeo.length > 2) {
-                    const firstPt = measurePointsGeo[0]; const firstX = getX(firstPt.lon), firstY = getY(firstPt.lat); const clickX = getX(geo.lon), clickY = getY(geo.lat); const dist = Math.sqrt((clickX-firstX)**2 + (clickY-firstY)**2);
-                    if (dist < 15 / mapScale) { stopMeasuringState(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return; }
-                }
                 measurePointsGeo.push(geo);
             } else if (measureShape === 'circle' || measureShape === 'rectangle') {
-                if (measurePointsGeo.length === 0 || measurePointsGeo.length === 2) measurePointsGeo = [geo]; else if (measurePointsGeo.length === 1) { measurePointsGeo.push(geo); stopMeasuringState(); }
+                if (measurePointsGeo.length === 0) measurePointsGeo = [geo];
+                else if (measurePointsGeo.length === 1) measurePointsGeo.push(geo);
+                else measurePointsGeo[1] = geo;  // already 2 points: re-aim the edge/corner; ✓ confirms
             }
             updateMeasureUI(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
         }
 
-        if (!isMeasuring && measurePointsGeo.length > 0 && isPointInShape(geo)) { isDraggingShape = true; lastDragGeo = geo; return; }
+        // Not measuring: clicking inside a committed shape grabs THAT shape only.
+        if (drawnShapes.length > 0) {
+            const hit = shapeIndexAtGeo(geo);
+            if (hit >= 0) { isDraggingShape = true; draggingShapeIndex = hit; lastDragGeo = geo; return; }
+        }
         
         isDraggingMap = true; dragStartX = e.clientX - mapOffsetX; dragStartY = e.clientY - mapOffsetY; canvas.dataset.downX = e.clientX; canvas.dataset.downY = e.clientY; 
     });
     
     canvas.addEventListener('mousemove', (e) => { 
         if (trackerModeSelect.value === '3d') return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         const geo = screenToGeo(e.clientX, e.clientY);
-        if (!isMeasuring && measurePointsGeo.length > 0) {
-            if (isDraggingShape) {
+
+        if (!isMeasuring) {
+            if (isDraggingShape && draggingShapeIndex >= 0) {
                 const dLat = geo.lat - lastDragGeo.lat; const dLon = geo.lon - lastDragGeo.lon;
-                measurePointsGeo = measurePointsGeo.map(p => ({lat: p.lat + dLat, lon: p.lon + dLon}));
-                lastDragGeo = geo; liveMouseGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
-            } else {
-                const wasHovering = isHoveringShape; isHoveringShape = isPointInShape(geo);
-                if (wasHovering !== isHoveringShape) { canvas.style.cursor = isHoveringShape ? 'move' : (isDraggingMap ? 'grabbing' : 'grab'); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
-                if (isHoveringShape) { liveMouseGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } else if (wasHovering) { liveMouseGeo = null; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+                const shp = drawnShapes[draggingShapeIndex];
+                if (shp) shp.points = shp.points.map(p => ({lat: p.lat + dLat, lon: p.lon + dLon}));
+                lastDragGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
+            } else if (drawnShapes.length > 0 && !isDraggingMap) {
+                const overBtn = measureButtonAt(mx, my);
+                const hit = overBtn ? -1 : shapeIndexAtGeo(geo);
+                canvas.style.cursor = overBtn ? 'pointer' : (hit >= 0 ? 'move' : 'grab');
+                if (hit !== hoveredShapeIndex) { hoveredShapeIndex = hit; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
             }
         }
-        if (isMeasuring && measurePointsGeo.length > 0) { liveMouseGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+        if (isMeasuring && (measurePointsGeo.length > 0 || drawnShapes.length > 0)) { liveMouseGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
         if (isDraggingMap) { mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } 
     });
     
     canvas.addEventListener('mouseup', (e) => { 
-        if (isDraggingShape) { isDraggingShape = false; return; }
+        if (measureClickHandled) { measureClickHandled = false; isDraggingMap = false; return; }
+        if (isDraggingShape) { isDraggingShape = false; draggingShapeIndex = -1; return; }
         isDraggingMap = false; if (trackerModeSelect.value === '3d') return;
         const totalDist = Math.sqrt(Math.pow(e.clientX - parseFloat(canvas.dataset.downX || 0), 2) + Math.pow(e.clientY - parseFloat(canvas.dataset.downY || 0), 2));
         if (totalDist < 5) handleTrackerCoordinatesClick(e);
     });
 
-    canvas.addEventListener('mouseleave', () => { isDraggingMap = false; isDraggingShape = false; if (isMeasuring) { stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
+    canvas.addEventListener('mouseleave', () => {
+        // Sliding the cursor off the map should NOT end measuring (too easy to trigger by accident).
+        // Just stop any in-progress drag and clear the rubber-band preview line; keep all shapes + measure mode.
+        isDraggingMap = false; isDraggingShape = false; draggingShapeIndex = -1;
+        let needsRender = false;
+        if (hoveredShapeIndex !== -1) { hoveredShapeIndex = -1; needsRender = true; }
+        if (isMeasuring && liveMouseGeo) { liveMouseGeo = null; needsRender = true; }
+        if (needsRender && filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    });
+    // Deliberate ways to STOP measuring entirely: right-click, the Stop button, or the Esc key.
     canvas.addEventListener('contextmenu', (e) => { if (isMeasuring) { e.preventDefault(); stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
-    canvas.addEventListener('dblclick', resetMapView);
+    canvas.addEventListener('dblclick', (e) => {
+        // While measuring, a double-click finishes the current polygon (3+ pts) and exits measure mode so it can be dragged.
+        if (isMeasuring && measureShape === 'polygon' && measurePointsGeo.length > 2) {
+            stopMeasuringState();
+            if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            return;
+        }
+        if (!isMeasuring) resetMapView();
+    });
     
     canvas.addEventListener('wheel', (e) => {
         if (trackerModeSelect.value === '3d') return;
@@ -1907,6 +2103,7 @@
 
     document.getElementById('videoInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
+        markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true; 
         speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
@@ -1915,11 +2112,12 @@
         video.addEventListener('seeking', syncTelemetryToVideoClock);
         evaluateAutoSyncDefault();
         video.addEventListener('loadeddata', () => { if (videoSyncMode.value === 'auto' && ocrAvailable) performImmediateOcrLock({ silent: true }); }, { once: true });
-        setTimeout(() => { if (videoSyncMode.value === 'auto' && ocrAvailable && !isPlaying) performImmediateOcrLock({ silent: true }); }, 3000);
+        setTimeout(() => { if (videoSyncMode.value === 'auto' && ocrAvailable && !isPlaying) performImmediateOcrLock({ silent: true }); }, 1000);
     });
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
+        markDropZoneLoaded('dataDropZone', 'dataDropLabel', e.target.files[0].name);
         const loader = document.getElementById('loadingOverlay'); loader.classList.remove('hidden'); loader.classList.add('flex');
         setTimeout(() => {
             currentSpeedIdx = 0; updateSpeedDisplay();
@@ -2091,6 +2289,7 @@
         }
         
         evaluateAutoSyncDefault();
+        applySyncModeLock();
 
         if (filteredData.length > 0 && !isPlaying) {
             isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; playbackAccumulator = 0; lastTickTime = performance.now();
@@ -2395,7 +2594,7 @@
 
             if (d.windDir !== null && d.windSpd !== null) {
                 let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
-                const noseDist = 8 * zoomFactor / mapScale; let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist; let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
+                const noseDist = 5.5 * zoomFactor / mapScale; let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist; let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
                 drawWindBarbFrame(noseX, noseY, d.windDir, d.windSpd, mapScale, true);
             }
         }
@@ -2407,66 +2606,127 @@
             }
         });
 
-        if (measurePointsGeo.length > 0) {
-            ctx.save(); ctx.fillStyle = 'rgba(56, 189, 248, 0.25)'; ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 3 / mapScale;
-            if (measureShape === 'polygon') {
-                if (measurePointsGeo.length >= 3) {
-                    ctx.beginPath(); measurePointsGeo.forEach((pt, i) => { const x = getX(pt.lon), y = getY(pt.lat); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
-                    ctx.lineTo(getX(measurePointsGeo[0].lon), getY(measurePointsGeo[0].lat)); ctx.fill();
+        const toScreenPt = (lon, lat) => ({ x: getX(lon) * mapScale + mapOffsetX, y: getY(lat) * mapScale + mapOffsetY });
+        const drawCanvasButton = (kind, shapeIndex, sx, sy, label, bg) => {
+            const r = 11;
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.beginPath(); ctx.arc(sx, sy, r, 0, 2 * Math.PI); ctx.fillStyle = bg; ctx.fill();
+            ctx.lineWidth = 1.5; ctx.strokeStyle = '#0b0e13'; ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, sx, sy + 0.5);
+            ctx.restore();
+            measureButtons.push({ kind, shapeIndex, sx, sy, r: r + 4 });
+        };
+        const shapeScreenBBox = (type, pts) => {
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            pts.forEach(p => { const s = toScreenPt(p.lon, p.lat); minX = Math.min(minX, s.x); maxX = Math.max(maxX, s.x); minY = Math.min(minY, s.y); maxY = Math.max(maxY, s.y); });
+            if (type === 'circle' && pts.length === 2) {
+                const c = toScreenPt(pts[0].lon, pts[0].lat); const ed = toScreenPt(pts[1].lon, pts[1].lat);
+                const rPx = Math.hypot(ed.x - c.x, ed.y - c.y); minX = c.x - rPx; maxX = c.x + rPx; minY = c.y - rPx; maxY = c.y + rPx;
+            }
+            return { minX, maxX, minY, maxY };
+        };
+        const statBox = (sx, sy, lines) => {
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+            const w = 124, h = 14 + lines.length * 15;
+            let bx = sx - w - 6, by = sy; if (bx < 4) bx = sx + 6; if (by < 4) by = 4;
+            ctx.fillStyle = 'rgba(22, 27, 34, 0.9)'; ctx.fillRect(bx, by, w, h);
+            ctx.font = 'bold 11px sans-serif';
+            lines.forEach((ln, i) => { ctx.fillStyle = ln.c; ctx.fillText(ln.t, bx + 6, by + 18 + i * 15); });
+            ctx.restore();
+        };
+
+        const drawShapeGeometry = (type, pts, isActiveShape, shapeIndex, isHovered) => {
+            if (pts.length === 0) return;
+            const stroke = isHovered ? '#7dd3fc' : '#38bdf8';
+            const fill = isHovered ? 'rgba(56, 189, 248, 0.38)' : 'rgba(56, 189, 248, 0.25)';
+            ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineWidth = (type === 'polygon' ? 5 : 3) / mapScale;
+            if (type === 'polygon') {
+                if (pts.length >= 3) {
+                    ctx.beginPath(); pts.forEach((pt, i) => { const x = getX(pt.lon), y = getY(pt.lat); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+                    ctx.lineTo(getX(pts[0].lon), getY(pts[0].lat)); ctx.fill();
                 }
                 ctx.setLineDash([6 / mapScale, 4 / mapScale]); ctx.beginPath(); let totalDist = 0;
-                measurePointsGeo.forEach((pt, i) => {
+                pts.forEach((pt, i) => {
                     const x = getX(pt.lon), y = getY(pt.lat);
-                    if (i === 0) ctx.moveTo(x, y); else { ctx.lineTo(x, y); totalDist += getDistanceNM(measurePointsGeo[i-1].lat, measurePointsGeo[i-1].lon, pt.lat, pt.lon); }
+                    if (i === 0) ctx.moveTo(x, y); else { ctx.lineTo(x, y); totalDist += getDistanceNM(pts[i-1].lat, pts[i-1].lon, pt.lat, pt.lon); }
                     ctx.save(); ctx.translate(x, y); ctx.scale(1/mapScale, 1/mapScale); ctx.beginPath(); ctx.arc(0, 0, 5, 0, 2 * Math.PI); ctx.fillStyle = '#facc15'; ctx.fill(); ctx.restore();
                 });
 
-                if (isMeasuring && liveMouseGeo) {
-                    ctx.lineTo(getX(liveMouseGeo.lon), getY(liveMouseGeo.lat)); let liveSegDist = getDistanceNM(measurePointsGeo[measurePointsGeo.length-1].lat, measurePointsGeo[measurePointsGeo.length-1].lon, liveMouseGeo.lat, liveMouseGeo.lon); totalDist += liveSegDist;
-                    let maxDiam = 0; let tempPts = [...measurePointsGeo, liveMouseGeo];
+                if (isActiveShape && isMeasuring && liveMouseGeo) {
+                    ctx.lineTo(getX(liveMouseGeo.lon), getY(liveMouseGeo.lat)); let liveSegDist = getDistanceNM(pts[pts.length-1].lat, pts[pts.length-1].lon, liveMouseGeo.lat, liveMouseGeo.lon); totalDist += liveSegDist;
+                    let maxDiam = 0; let tempPts = [...pts, liveMouseGeo];
                     for (let i = 0; i < tempPts.length; i++) { for (let j = i + 1; j < tempPts.length; j++) { let d = getDistanceNM(tempPts[i].lat, tempPts[i].lon, tempPts[j].lat, tempPts[j].lon); if (d > maxDiam) maxDiam = d; } }
-                    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX; const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
-                    ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 45, 100, 55); ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(`Seg: ${liveSegDist.toFixed(1)} NM`, liveX + 20, liveY - 30); ctx.fillStyle = '#fff'; ctx.fillText(`Tot: ${totalDist.toFixed(1)} NM`, liveX + 20, liveY - 15); ctx.fillStyle = '#facc15'; ctx.fillText(`Diam: ${maxDiam.toFixed(1)} NM`, liveX + 20, liveY); ctx.restore();
-                } else if (!isMeasuring && isHoveringShape && liveMouseGeo && measurePointsGeo.length >= 3) {
+                    const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX + 130; const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
+                    statBox(liveX, liveY - 45, [{t:`Seg: ${liveSegDist.toFixed(1)} NM`,c:'#38bdf8'},{t:`Tot: ${totalDist.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
+                } else if (!isMeasuring && isHovered && pts.length >= 3) {
                     let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180; let maxDiam = 0;
-                    measurePointsGeo.forEach((p, i) => {
+                    pts.forEach((p, i) => {
                         if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat; if (p.lon < minLon) minLon = p.lon; if (p.lon > maxLon) maxLon = p.lon;
-                        for (let j = i + 1; j < measurePointsGeo.length; j++) { let d = getDistanceNM(p.lat, p.lon, measurePointsGeo[j].lat, measurePointsGeo[j].lon); if (d > maxDiam) maxDiam = d; }
+                        for (let j = i + 1; j < pts.length; j++) { let d = getDistanceNM(p.lat, p.lon, pts[j].lat, pts[j].lon); if (d > maxDiam) maxDiam = d; }
                     });
                     const widthNM = getDistanceNM(minLat, minLon, minLat, maxLon); const heightNM = getDistanceNM(minLat, minLon, maxLat, minLon);
-                    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX; const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
-                    ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60); ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(`Bounds:`, liveX + 20, liveY - 35); ctx.fillStyle = '#fff'; ctx.fillText(`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`, liveX + 20, liveY - 20); ctx.fillStyle = '#facc15'; ctx.fillText(`Diam: ${maxDiam.toFixed(1)} NM`, liveX + 20, liveY - 5); ctx.restore();
+                    const bb = shapeScreenBBox(type, pts);
+                    statBox(bb.minX, bb.minY - 4, [{t:'Bounds:',c:'#38bdf8'},{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
+                } else if (!isMeasuring && isHovered && pts.length === 2) {
+                    const lenNM = getDistanceNM(pts[0].lat, pts[0].lon, pts[1].lat, pts[1].lon);
+                    const mid = toScreenPt((pts[0].lon + pts[1].lon) / 2, (pts[0].lat + pts[1].lat) / 2);
+                    statBox(mid.x, mid.y - 4, [{t:'Length:',c:'#38bdf8'},{t:`${lenNM.toFixed(1)} NM`,c:'#fff'}]);
                 }
                 ctx.stroke();
-
-            } else if (measureShape === 'circle') {
-                const centerGeo = measurePointsGeo[0]; const edgeGeo = measurePointsGeo.length === 2 ? measurePointsGeo[1] : (liveMouseGeo || centerGeo);
+            } else if (type === 'circle') {
+                const centerGeo = pts[0]; const edgeGeo = pts.length === 2 ? pts[1] : (liveMouseGeo || centerGeo);
                 const rNM = getDistanceNM(centerGeo.lat, centerGeo.lon, edgeGeo.lat, edgeGeo.lon);
                 const cx = getX(centerGeo.lon), cy = getY(centerGeo.lat); const ex = getX(edgeGeo.lon), ey = getY(edgeGeo.lat); const rPx = Math.sqrt(Math.pow(ex-cx, 2) + Math.pow(ey-cy, 2));
                 ctx.beginPath(); ctx.arc(cx, cy, rPx, 0, 2*Math.PI); ctx.fill(); ctx.setLineDash([6 / mapScale, 4 / mapScale]); ctx.stroke();
                 ctx.beginPath(); ctx.arc(cx, cy, 4/mapScale, 0, 2 * Math.PI); ctx.fillStyle = '#facc15'; ctx.fill();
                 if (rPx > 0) {
                     ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
-                    if (isMeasuring || (!isMeasuring && isHoveringShape && liveMouseGeo)) {
-                        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const activeGeo = isMeasuring ? edgeGeo : liveMouseGeo; const liveX = (getX(activeGeo.lon) * mapScale) + mapOffsetX, liveY = (getY(activeGeo.lat) * mapScale) + mapOffsetY;
-                        ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 130, 60); ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif'; 
-                        ctx.fillText(`Radius: ${rNM.toFixed(1)} NM`, liveX + 20, liveY - 35); ctx.fillStyle = '#fff'; ctx.fillText(`Area: ${(Math.PI * rNM * rNM).toFixed(1)} NM²`, liveX + 20, liveY - 20); ctx.fillStyle = '#facc15'; ctx.fillText(`Diam: ${(rNM * 2).toFixed(1)} NM`, liveX + 20, liveY - 5); ctx.restore();
+                    if ((isActiveShape && isMeasuring) || (!isMeasuring && isHovered)) {
+                        const anchor = (isActiveShape && isMeasuring) ? toScreenPt(edgeGeo.lon, edgeGeo.lat) : shapeScreenBBox(type, pts);
+                        const ax = (isActiveShape && isMeasuring) ? anchor.x + 130 : anchor.minX; const ay = (isActiveShape && isMeasuring) ? anchor.y : anchor.minY - 4;
+                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`Radius: ${rNM.toFixed(1)} NM`,c:'#38bdf8'},{t:`Area: ${(Math.PI * rNM * rNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${(rNM * 2).toFixed(1)} NM`,c:'#facc15'}]);
                     }
                 }
-            } else if (measureShape === 'rectangle') {
-                const p1 = measurePointsGeo[0]; const p2 = measurePointsGeo.length === 2 ? measurePointsGeo[1] : (liveMouseGeo || p1);
+            } else if (type === 'rectangle') {
+                const p1 = pts[0]; const p2 = pts.length === 2 ? pts[1] : (liveMouseGeo || p1);
                 const x1 = getX(p1.lon), y1 = getY(p1.lat); const x2 = getX(p2.lon), y2 = getY(p2.lat); const widthNM = getDistanceNM(p1.lat, p1.lon, p1.lat, p2.lon); const heightNM = getDistanceNM(p1.lat, p1.lon, p2.lat, p1.lon);
                 ctx.beginPath(); ctx.rect(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2-x1), Math.abs(y2-y1)); ctx.fill(); ctx.setLineDash([6 / mapScale, 4 / mapScale]); ctx.stroke();
                 if (Math.abs(x2-x1) > 0) {
-                    if (isMeasuring || (!isMeasuring && isHoveringShape && liveMouseGeo)) {
-                        ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); const activeGeo = isMeasuring ? p2 : liveMouseGeo; const liveX = (getX(activeGeo.lon) * mapScale) + mapOffsetX, liveY = (getY(activeGeo.lat) * mapScale) + mapOffsetY;
+                    if ((isActiveShape && isMeasuring) || (!isMeasuring && isHovered)) {
                         const diamNM = getDistanceNM(p1.lat, p1.lon, p2.lat, p2.lon);
-                        ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60); ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`, liveX + 20, liveY - 35); ctx.fillStyle = '#fff'; ctx.fillText(`Area: ${(widthNM * heightNM).toFixed(1)} NM²`, liveX + 20, liveY - 20); ctx.fillStyle = '#facc15'; ctx.fillText(`Diam: ${diamNM.toFixed(1)} NM`, liveX + 20, liveY - 5); ctx.restore();
+                        const anchor = (isActiveShape && isMeasuring) ? toScreenPt(p2.lon, p2.lat) : shapeScreenBBox(type, pts);
+                        const ax = (isActiveShape && isMeasuring) ? anchor.x + 130 : anchor.minX; const ay = (isActiveShape && isMeasuring) ? anchor.y : anchor.minY - 4;
+                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#38bdf8'},{t:`Area: ${(widthNM * heightNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${diamNM.toFixed(1)} NM`,c:'#facc15'}]);
                     }
                 }
             }
             ctx.restore();
-        }
+
+            // On-canvas buttons: ✓ to finish the active shape (any type, once 2+ points exist), ✕ to delete a committed shape.
+            if (isActiveShape && isMeasuring && pts.length >= 2) {
+                const bb = shapeScreenBBox(type, pts);
+                const fx = (bb.minX + bb.maxX) / 2; const fy = bb.minY - 16;
+                drawCanvasButton('finish', -1, fx, fy, '✓', '#16a34a');
+                // "Click ... to finish" caption around the checkmark.
+                ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.font = 'bold 11px sans-serif'; ctx.textBaseline = 'middle';
+                ctx.textAlign = 'right'; const lw = ctx.measureText('Click').width;
+                ctx.fillStyle = 'rgba(22,27,34,0.9)'; ctx.fillRect(fx - 18 - lw - 4, fy - 9, lw + 8, 18);
+                ctx.fillStyle = '#4ade80'; ctx.fillText('Click', fx - 18, fy + 1);
+                ctx.textAlign = 'left'; const rw = ctx.measureText('to finish').width;
+                ctx.fillStyle = 'rgba(22,27,34,0.9)'; ctx.fillRect(fx + 16, fy - 9, rw + 8, 18);
+                ctx.fillStyle = '#4ade80'; ctx.fillText('to finish', fx + 20, fy + 1);
+                ctx.restore();
+            }
+            if (!isActiveShape && !isMeasuring) {
+                const bb = shapeScreenBBox(type, pts);
+                drawCanvasButton('delete', shapeIndex, bb.maxX + 2, bb.minY - 2, '✕', '#b91c1c');
+            }
+        };
+
+        measureButtons = [];
+        drawnShapes.forEach((shape, i) => drawShapeGeometry(shape.type, shape.points, false, i, i === hoveredShapeIndex));
+        if (measurePointsGeo.length > 0) drawShapeGeometry(measureShape, measurePointsGeo, true, -1, false);
+
         ctx.restore();
     }
 
@@ -2584,34 +2844,39 @@
         if (availableMetrics.has('tempr')) h += addHUD('AMBIENT TEMP', tDisp, true);
         if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', tdDisp, true);
         
-        if (document.getElementById('toggleExtraHUD').checked) {
-            h += `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
-            
-            if (useGps) {
-                if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
-            } else {
-                if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
-            }
-            
-            if (availableMetrics.has('pitch')) h += addHUD('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'N/A'}`);
-            if (availableMetrics.has('roll')) h += addHUD('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'N/A'}`);
-            if (availableMetrics.has('driftAngle')) h += addHUD('DRIFT ANGLE', `${d.driftAngle !== null ? sf(d.driftAngle, 1) + '°' : 'N/A'}`);
-            if (availableMetrics.has('alpha')) h += addHUD('ALPHA (AOA)', `${d.alpha !== null ? sf(d.alpha, 2) + '°' : 'N/A'}`);
-            if (availableMetrics.has('beta')) h += addHUD('BETA (SLIP)', `${d.beta !== null ? sf(d.beta, 2) + '°' : 'N/A'}`);
-            if (availableMetrics.has('accZ')) h += addHUD('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'N/A'}`);
-            if (availableMetrics.has('radAlt')) h += addHUD('RADAR ALT', rAltDisp);
-            if (availableMetrics.has('dValue')) h += addHUD('D-VALUE', dValueDisp);
-            if (availableMetrics.has('tas')) h += addHUD('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'N/A'}`);
-            if (availableMetrics.has('ias')) h += addHUD('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'N/A'}`);
-            if (availableMetrics.has('th')) h += addHUD('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'N/A'}`);
-            if (availableMetrics.has('gTrack')) h += addHUD('GROUND TRACK', `${d.gTrack !== null ? sf(d.gTrack, 1) + '°' : 'N/A'}`);
-            if (availableMetrics.has('vtWnd')) h += addHUD('VERT WIND', `${d.vtWnd !== null ? sf(isImperial ? d.vtWnd * 2.23694 : d.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'N/A'}`);
-            if (availableMetrics.has('mixRate')) h += addHUD('MIXING RATIO', `${d.mixRate !== null ? sf(d.mixRate, 2) + ' g/kg' : 'N/A'}`);
-            if (availableMetrics.has('thetaE')) h += addHUD('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'N/A'}`, true);
-            if (availableMetrics.has('pressure')) h += addHUD('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'N/A'}`);
+        // Core metrics end here. Extra metrics are ALWAYS shown now (no toggle); they live below the
+        // fold and scroll into view, so the HUD stays pinned to its core size and never covers content above.
+        let coreHtml = h;
+        let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
+        const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
+
+        if (useGps) {
+            if (availableMetrics.has('pAlt')) addExtra('PRESS ALT', pAltDisp);
+        } else {
+            if (availableMetrics.has('gpsAlt')) addExtra('GPS ALT', gAltDisp);
         }
+
+        if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'N/A'}`);
+        if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'N/A'}`);
+        if (availableMetrics.has('driftAngle')) addExtra('DRIFT ANGLE', `${d.driftAngle !== null ? sf(d.driftAngle, 1) + '°' : 'N/A'}`);
+        if (availableMetrics.has('alpha')) addExtra('ALPHA (AOA)', `${d.alpha !== null ? sf(d.alpha, 2) + '°' : 'N/A'}`);
+        if (availableMetrics.has('beta')) addExtra('BETA (SLIP)', `${d.beta !== null ? sf(d.beta, 2) + '°' : 'N/A'}`);
+        if (availableMetrics.has('accZ')) addExtra('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'N/A'}`);
+        if (availableMetrics.has('radAlt')) addExtra('RADAR ALT', rAltDisp);
+        if (availableMetrics.has('dValue')) addExtra('D-VALUE', dValueDisp);
+        if (availableMetrics.has('tas')) addExtra('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'N/A'}`);
+        if (availableMetrics.has('ias')) addExtra('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'N/A'}`);
+        if (availableMetrics.has('th')) addExtra('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'N/A'}`);
+        if (availableMetrics.has('gTrack')) addExtra('GROUND TRACK', `${d.gTrack !== null ? sf(d.gTrack, 1) + '°' : 'N/A'}`);
+        if (availableMetrics.has('vtWnd')) addExtra('VERT WIND', `${d.vtWnd !== null ? sf(isImperial ? d.vtWnd * 2.23694 : d.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'N/A'}`);
+        if (availableMetrics.has('mixRate')) addExtra('MIXING RATIO', `${d.mixRate !== null ? sf(d.mixRate, 2) + ' g/kg' : 'N/A'}`);
+        if (availableMetrics.has('thetaE')) addExtra('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'N/A'}`, true);
+        if (availableMetrics.has('pressure')) addExtra('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'N/A'}`);
+
         const prevScroll = hud.scrollTop;
-        hud.innerHTML = h;
+        hud.innerHTML = `<div id="hudCore">${coreHtml}</div><div id="hudExtra">${extraHtml}</div>`;
+        const coreEl = document.getElementById('hudCore');
+        if (coreEl) hud.style.maxHeight = (coreEl.offsetHeight + 28) + 'px';  // pin to core height; extra scrolls below
         hud.scrollTop = prevScroll;
     }
 
@@ -2877,8 +3142,8 @@
         }
     }
 
-    document.getElementById('toggleExtraHUD').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
     
+
     ['startTimeInput', 'endTimeInput', 'videoStartInput'].forEach(id => { 
         const el = document.getElementById(id);
         const handleChange = () => {

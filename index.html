@@ -661,7 +661,9 @@
     let satImage = new Image();
     let satImageLoaded = false;
     let lastSatFetchTime = "";
-    let satLoadedInfo = null;  // { layerLabel, imageTimeMs, isModis } — for the time badge
+    let satLoadedInfo = null;  // { layerLabel, imageTimeMs, isModis, ... } — for the time badge.
+                               // isModis here means "polar-orbiter swath layer (MODIS or VIIRS)
+                               // with a real overpass time to look up", as opposed to a static basemap.
     let satImageBox = null;    // geographic extent {minLon,minLat,maxLon,maxLat} the sat image covers
     let satDebounceTimer = null;
     let slideSyncTimer = null;  // Delays video jump-sync after slider scrub
@@ -743,14 +745,27 @@
         badge.classList.remove('hidden');
     }
 
-    // ── Satellite catalog (MODIS true-color, NASA GIBS — verified working) ──────
+    // ── Satellite catalog (true-color daily mosaics, NASA GIBS — verified working) ──
     // GOES via GIBS WMTS was removed: tiles never rendered reliably in-browser and
-    // could not be verified. MODIS daily true-color works for any date back to 2000.
-    // two satellites (Terra ~10:30 AM, Aqua ~1:30 PM local overpass) give two looks
-    // per day; with multi-day stepping you can also view the day before / after.
+    // could not be verified. All layers below are 250 m true colour and work for any
+    // date in their coverage window; with multi-day stepping you can also view the day
+    // before / after. `label` is what shows in the dropdown and the time badge.
+    //
+    // MODIS gives the two looks the user thinks of as "1st pass" (Terra, ~10:30 local)
+    // and "2nd pass" (Aqua, ~13:30 local), back to 2000/2002. VIIRS is the newer sensor
+    // (Suomi-NPP from 2015, NOAA-20 from 2018): SAME 250 m imagery grid as MODIS — not
+    // finer — but a wider swath means fewer between-orbit gaps, so the daily mosaics are
+    // usually cleaner. VIIRS overpasses sit in the early afternoon, near Aqua. The exact
+    // acquisition time always comes from the CMR lookup below, not from the label.
+    //   `swath`   = polar-orbiter swath imagery → has a real overpass time to look up.
+    //   `shortName` = CMR product for the overpass-time lookup (falls back to date if it
+    //                 returns nothing).
+    //   `minDate` = first date the satellite has imagery; options are hidden before it.
     const GIBS_LAYERS = [
-        { value:'MODIS-TERRA', label:'MODIS Terra True Color', wmsLayer:'MODIS_Terra_CorrectedReflectance_TrueColor', shortName:'MOD09', ext:'jpg', localPassHr:10.5 },
-        { value:'MODIS-AQUA',  label:'MODIS Aqua True Color',  wmsLayer:'MODIS_Aqua_CorrectedReflectance_TrueColor',  shortName:'MYD09', ext:'jpg', localPassHr:13.5 },
+        { value:'MODIS-TERRA',  label:'MODIS 1st pass (Terra)',   wmsLayer:'MODIS_Terra_CorrectedReflectance_TrueColor', shortName:'MOD09', swath:true },
+        { value:'MODIS-AQUA',   label:'MODIS 2nd pass (Aqua)',    wmsLayer:'MODIS_Aqua_CorrectedReflectance_TrueColor',  shortName:'MYD09', swath:true },
+        { value:'VIIRS-SNPP',   label:'VIIRS (Suomi-NPP)',        wmsLayer:'VIIRS_SNPP_CorrectedReflectance_TrueColor',   shortName:'VNP09', swath:true, minDate:'2015-11-24' },
+        { value:'VIIRS-NOAA20', label:'VIIRS (NOAA-20)',          wmsLayer:'VIIRS_NOAA20_CorrectedReflectance_TrueColor', shortName:'VJ109', swath:true, minDate:'2018-01-05' },
     ];
 
     // how many days on each side of the flight date to make selectable (0 = flight day only)
@@ -805,29 +820,18 @@
         return Y+'-'+M+'-'+D;
     }
 
-    // approximate utc overpass time = local solar pass time minus longitude/15.
-    // gives a useful per-flight estimate so the dropdown shows when each satellite passed.
-    function approxUtcPassLabel(localPassHr) {
-        let centerLon = -75;
-        if (filteredData.length > 0) centerLon = filteredData.reduce((s,d) => s + d.lon, 0) / filteredData.length;
-        let utc = (localPassHr - centerLon / 15) % 24;
-        if (utc < 0) utc += 24;
-        let h = Math.floor(utc), m = Math.round((utc - h) * 60);
-        if (m === 60) { m = 0; h = (h + 1) % 24; }
-        return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + 'Z';
-    }
-
     function updateSatelliteOptions() {
         const satSelect = document.getElementById('satelliteSelect');
         if (!satSelect) return;
         const prevVal = satSelect.value;
         satSelect.innerHTML = '<option value="none">Sat: Off</option>';
+        const fDate = flightMetaData.date;  // 'YYYY-MM-DD' or 'Unknown'
         GIBS_LAYERS.forEach(def => {
+            // skip a satellite that hadn't launched yet on the flight date (e.g. VIIRS for a 2008 flight)
+            if (def.minDate && fDate !== 'Unknown' && fDate < def.minDate) return;
             const el = document.createElement('option');
             el.value = def.value;
-            // label by approximate utc pass time instead of terra/aqua names
-            const passStr = approxUtcPassLabel(def.localPassHr);
-            el.textContent = 'MODIS ~' + passStr + ' pass';
+            el.textContent = def.label;   // e.g. "MODIS 1st pass (Terra)" — actual overpass time shows in the badge
             satSelect.appendChild(el);
         });
         const opts = [...satSelect.options].map(o => o.value);
@@ -969,12 +973,20 @@
         const dateStr = satDateForOffset(satDayOffset);
         if (!dateStr) return;
 
-        // output pixel size proportional to the widened bbox aspect ratio (cap for perf)
+        // output pixel size: request up to the imagery's native resolution so large areas
+        // come back sharp instead of downscaled. MODIS & VIIRS true colour are served at
+        // 250 m, which in the EPSG:4326 grid is ~445 px per degree — that's the ceiling,
+        // since asking for more just upscales (blurry) and wastes bandwidth. We also keep
+        // at least enough pixels to fill the current canvas, and cap the longest side so a
+        // basin-wide view doesn't allocate a huge canvas in the browser.
         const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
         const aspect = boxLonSpan / boxLatSpan;
-        let pxW = Math.min(1600, Math.round(canvas.width  * (1 + 2*SAT_BBOX_MARGIN)));
+        const NATIVE_PX_PER_DEG = 111320 / 250;   // ≈445 px/deg at 250 m native
+        const SAT_PX_CAP = 4096;                   // tool-side limit for browser perf (not a GIBS limit)
+        const nativeW = Math.round(boxLonSpan * NATIVE_PX_PER_DEG);
+        let pxW = Math.min(SAT_PX_CAP, Math.max(canvas.width, nativeW));
         let pxH = Math.round(pxW / aspect);
-        if (pxH > 1600) { pxH = 1600; pxW = Math.round(pxH * aspect); }
+        if (pxH > SAT_PX_CAP) { pxH = SAT_PX_CAP; pxW = Math.round(pxH * aspect); }
 
         const fetchId = layerDef.value + '||' + dateStr + '||' +
             box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
@@ -993,7 +1005,7 @@
                     satImageLoaded = true;
                     bgNeedsUpdate = true;
                     satLoadedInfo = {
-                        layerLabel: 'MODIS ~' + approxUtcPassLabel(layerDef.localPassHr) + ' pass',
+                        layerLabel: layerDef.label,
                         imageTimeMs: new Date(dateStr + 'T00:00:00Z').getTime(),
                         isModis: true,
                         modisTimePending: true,

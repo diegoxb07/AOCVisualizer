@@ -4,8 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Toolkit</title>
-    
+
+    <!-- silence the cosmetic tailwind cdn production warning (intentional for a single-file tool) -->
+    <script>
+        // silence the cosmetic "cdn.tailwindcss.com should not be used in production" notice.
+        // this is a self-contained single-file tool, not a build pipeline, so the cdn is intentional.
+        (function(){
+            const _w = console.warn;
+            console.warn = function(){
+                const m = arguments[0];
+                if (typeof m === 'string' && m.indexOf('cdn.tailwindcss.com') !== -1) return;
+                return _w.apply(console, arguments);
+            };
+        })();
+    </script>
+
+    <!-- type system: Space Grotesk (UI) + JetBrains Mono (telemetry) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- external libraries: tailwind (styling), chart.js (+zoom), three.js (3d), netcdfjs (.nc parsing), tesseract.js (ocr) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- design system remap: graphite-neutral shell + crisp sky-cyan accent + custom type -->
+    <script>
+        tailwind.config = {
+            theme: { extend: {
+                colors: {
+                    slate: {50:'#eef1f4',100:'#dce1e7',200:'#c8d0d8',300:'#aab4be',400:'#7c8794',500:'#5d6773',600:'#454e58',700:'#343c46',800:'#20262f',900:'#161b22',950:'#0b0e13'},
+                    blue:  {300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e'}
+                },
+                fontFamily: {
+                    sans: ['Space Grotesk','ui-sans-serif','system-ui','sans-serif'],
+                    mono: ['JetBrains Mono','ui-monospace','SFMono-Regular','monospace']
+                }
+            }}
+        };
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -13,103 +48,280 @@
     <script src="https://cdn.jsdelivr.net/npm/netcdfjs/dist/netcdfjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     
+    <!-- all styles: dark slate theme, panels, overlays, pfd, modal -->
     <style>
-        /* Base and Tailwind overrides */
-        body { background-color: #020617; padding-bottom: 80px; } 
-        ::-webkit-backdrop { background-color: #020617; }
+        /* base and tailwind overrides */
+        body { background-color: #0b0e13; padding-bottom: 140px; } 
+        ::-webkit-backdrop { background-color: #0b0e13; }
 
-        /* Fullscreen structural overrides */
-        :fullscreen { background-color: #020617; overflow-y: auto; padding: 24px; padding-bottom: 80px; }
-        #mapPanel:fullscreen, #videoPanel:fullscreen { padding: 0; border: none; border-radius: 0; background-color: #0f172a; display: flex; flex-direction: column; }
-        #mapPanel:fullscreen .panel-title, #videoPanel:fullscreen .panel-title { padding: 16px; background-color: rgba(15, 23, 42, 0.9); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid #1e293b; }
+        /* fullscreen structural overrides */
+        :fullscreen { background-color: #0b0e13; overflow-y: auto; padding: 24px; padding-bottom: 140px; }
+        #mapPanel:fullscreen, #videoPanel:fullscreen { padding: 0; border: none; border-radius: 0; background-color: #161b22; display: flex; flex-direction: column; }
+        #mapPanel:fullscreen { height: 100vh !important; }
+        #mapPanel:fullscreen .panel-title, #videoPanel:fullscreen .panel-title { padding: 16px; background-color: rgba(22, 27, 34, 0.9); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid #20262f; }
         #mapPanel:fullscreen .media-container, #videoPanel:fullscreen .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
-        #mapPanel:fullscreen .overlays-wrapper { bottom: 120px; max-height: calc(100% - 140px); }
+        /* in fullscreen the hud goes back to full size; leaving fullscreen restores the resized scale via the base rule */
+        #mapPanel:fullscreen .overlays-wrapper { top: 80px; bottom: 120px; transform: scale(1) !important; transform-origin: bottom left; }
         #mapPanel:fullscreen #pfdOverlay { bottom: 120px; width: 250px; height: 250px; }
         
-        /* Execution and control buttons baseline */
+        /* execution and control buttons baseline */
         button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
         
-        /* Media block containers */
-        .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: #020617; padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid #1e293b; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); }
+        /* media block containers */
+        .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: #0b0e13; padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid #20262f; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); }
         .media-content-wrapper { max-height: 1000px; transition: max-height 0.5s ease-in-out, opacity 0.3s ease; overflow: hidden; }
         .media-content-wrapper.collapsed { max-height: 0px; opacity: 0; }
-        .collapse-lip { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); width: 40px; height: 20px; background-color: #0f172a; border: 1px solid #1e293b; border-top: none; border-radius: 0 0 8px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #3da5ff; font-size: 10px; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); z-index: 1001; transition: 0.2s; }
-        .collapse-lip:hover { background-color: #1e293b; color: #fff; }
+        .collapse-lip { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); width: 40px; height: 20px; background-color: #161b22; border: 1px solid #20262f; border-top: none; border-radius: 0 0 8px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #38bdf8; font-size: 10px; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); z-index: 1001; transition: 0.2s; }
+        .collapse-lip:hover { background-color: #20262f; color: #fff; }
+
+        /* drag the bottom edge of the media bar to resize the tracker + video (up = smaller, down = larger) */
+        .media-resize-handle { position: absolute; bottom: -5px; left: 0; width: 100%; height: 12px; cursor: ns-resize; z-index: 1000; touch-action: none; }
+        .media-resize-handle::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; background: #2c3a47; transition: background 0.15s, height 0.15s; }
+        .media-resize-handle .grip { position: absolute; top: 50%; transform: translate(-50%, -50%); color: #5d6773; font-size: 16px; line-height: 0; letter-spacing: 3px; transition: color 0.15s; background: var(--ink); padding: 0 6px; }
+        .media-resize-handle .grip-left { left: 25%; }
+        .media-resize-handle .grip-right { left: 75%; }
+        .media-resize-handle:hover::before, .sticky-media-bar.resizing .media-resize-handle::before { background: var(--sig); height: 5px; }
+        .media-resize-handle:hover .grip, .sticky-media-bar.resizing .media-resize-handle .grip { color: var(--sig); }
+        .sticky-media-bar.resizing { user-select: none; }
+        .media-content-wrapper.collapsed ~ .media-resize-handle { display: none; }
         
-        /* Map container specific */
-        #mapPanel { height: 450px; }
-        #mapPanel .media-container { flex-grow: 1; width: 100%; position: relative; background-color: #0f172a; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+        /* map container specific */
+        #mapPanel { height: var(--media-h); }
+        #mapPanel .media-container { flex-grow: 1; width: 100%; position: relative; background-color: #161b22; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         canvas#mapCanvas { width: 100%; height: 100%; display: block; cursor: grab; z-index: 1; }
         canvas#mapCanvas:active { cursor: grabbing; }
         
-        /* Video container specific */
-        #videoPanel { height: auto; min-height: auto; display: flex; flex-direction: column; }
-        #videoPanel .media-container { width: 100%; height: auto; position: relative; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: transparent; }
-        video#radarVideo { width: 100%; height: auto; display: block; object-fit: contain; pointer-events: none; transform: translate3d(0,0,0); backface-visibility: hidden; background-color: #000; border-radius: 8px; }
+        /* video container specific */
+        #videoPanel { height: var(--media-h); display: flex; flex-direction: column; }
+        #videoPanel #videoPanel .media-container { width: 100%; flex-grow: 1; min-height: 0; position: relative; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #000; }
+        video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; transform: translate3d(0,0,0); backface-visibility: hidden; background-color: #000; border-radius: 8px; }
         #videoPanel:fullscreen { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
         
-        /* Analytical metric overlays */
-        .overlays-wrapper { position: absolute; bottom: 30px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; max-height: calc(100% - 60px); transition: bottom 0.2s; }
-        #hudOverlay { background-color: rgba(15, 23, 42, 0.9); border: 1px solid #3da5ff; border-radius: 8px; padding: 14px; font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); position: relative; pointer-events: auto; max-height: 300px; overflow-y: auto; }
+        /* analytical metric overlays */
+        .overlays-wrapper { position: absolute; top: 44px; bottom: 30px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
+        #hudOverlay { background-color: rgba(22, 27, 34, 0.9); border: 1px solid #38bdf8; border-radius: 8px; padding: 14px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
         #hudOverlay::-webkit-scrollbar { width: 6px; }
         #hudOverlay::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 3px; }
-        #hudOverlay::-webkit-scrollbar-thumb { background: #3da5ff; border-radius: 3px; }
-        #hudOverlay::-webkit-scrollbar-thumb:hover { background: #1e87e3; }
+        #hudOverlay::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 3px; }
+        #hudOverlay::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
         #hudOverlay d { display: block; white-space: pre; }
         #hudOverlay span { color: #00ffcc; font-weight: bold; float: right; margin-left: 12px; }
         #hudOverlay span.temp-val { color: #ff9933; }
 
-        /* Dynamic Cockpit Instrument Panel */
-        #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0,0,0,0.9); border: 1px solid #3da5ff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; pointer-events: auto; overflow: hidden; width: 170px; height: 170px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; }
+        /* dynamic cockpit instrument panel */
+        #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0,0,0,0.9); border: 1px solid #38bdf8; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; pointer-events: auto; overflow: hidden; width: 170px; height: 170px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; }
         #pfdCanvas { width: 100%; height: 100%; display: block; }
 
-        /* Interface dropdowns */
-        .dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.7); width: 220px; z-index: 100; max-height: 350px; overflow-y: auto; }
+        /* interface dropdowns */
+        .dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background-color: #161b22; border: 1px solid #20262f; border-radius: 6px; padding: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.7); width: 220px; z-index: 100; max-height: 350px; overflow-y: auto; }
         .dropdown-menu.show { display: block; }
-        .dropdown-item { font-size: 13px; color: #cbd5e1; padding: 8px 12px; cursor: pointer; border-radius: 4px; text-transform: none; font-weight: 500; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;}
-        .dropdown-item:hover { background-color: #1e293b; color: #fff; }
-        .dropdown-item.active { background-color: #3da5ff22; color: #3da5ff; font-weight: 700; }
+        .dropdown-item { font-size: 13px; color: #aab4be; padding: 8px 12px; cursor: pointer; border-radius: 4px; text-transform: none; font-weight: 500; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;}
+        .dropdown-item:hover { background-color: #20262f; color: #fff; }
+        .dropdown-item.active { background-color: #38bdf822; color: #38bdf8; font-weight: 700; }
         .dropdown-item.active::after { content: '✓'; font-size: 12px; }
         
-        /* Modal analysis module */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(15, 23, 42, 0.85); z-index: 5000; align-items: center; justify-content: center; padding: 20px; }
-        .modal-card { background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; max-width: 650px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.8); position: relative; display: flex; flex-direction: column; gap: 16px; }
+        /* modal analysis module */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(22, 27, 34, 0.85); z-index: 5000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-card { background-color: #161b22; border: 1px solid #20262f; border-radius: 12px; padding: 24px; max-width: 650px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.8); position: relative; display: flex; flex-direction: column; gap: 16px; }
 
-        /* UI notifications */
-        .toast-notification { position: fixed; top: 20px; right: 20px; background-color: rgba(30, 41, 59, 0.95); border-left: 4px solid #3da5ff; color: #fff; padding: 16px 20px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
+        /* ui notifications */
+        .toast-notification { position: fixed; top: 20px; right: 20px; background-color: rgba(32, 38, 47, 0.95); border-left: 4px solid #38bdf8; color: #fff; padding: 16px 20px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
         .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
-        /* Media timeline controls */
-        .sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background-color: rgba(15, 23, 42, 0.95); border-top: 1px solid #1e293b; padding: 12px 24px; z-index: 2000; box-shadow: 0 -10px 20px rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        input[type="range"] { -webkit-appearance: none; width: 100%; background: #1e293b; height: 8px; border-radius: 4px; outline: none; border: 1px solid #334155; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #3da5ff; cursor: pointer; transition: 0.2s; }
+        /* media timeline controls */
+        .sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background-color: rgba(22, 27, 34, 0.95); border-top: 1px solid #20262f; padding: 12px 24px; z-index: 2000; box-shadow: 0 -10px 20px rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        input[type="range"] { -webkit-appearance: none; width: 100%; background: #20262f; height: 8px; border-radius: 4px; outline: none; border: 1px solid #343c46; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; transition: 0.2s; }
         input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
         /* 3D Tracker Context */
-        #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: #0f172a; cursor: grab; z-index: 2; }
+        /* satellite tile loading overlay */
+        #satLoadingOverlay { display: none; position: absolute; inset: 0; background: rgba(11,14,19,0.82); z-index: 50; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; }
+        #satLoadingOverlay.show { display: flex; }
+        #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: #161b22; cursor: grab; z-index: 2; }
+
+        /* ============================================================
+           REDESIGN LAYER — "Aerographer" console
+           graphite-neutral shell · sky-cyan signal · instrument type
+           ============================================================ */
+        :root { --sig:#38bdf8; --sig-soft:rgba(56,189,248,0.14); --ink:#0b0e13; --panel:#161b22; --line:#20262f; --media-h: clamp(420px, 48vh, 520px); }
+
+        html, body { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; }
+        body {
+            background-color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+        }
+        .font-mono, [class*="font-mono"], #timelineTimeDisplay, #detectedRangeText { font-family: 'JetBrains Mono', ui-monospace, monospace !important; }
+
+        /* eyebrow / section labels read as instrument legends */
+        .uppercase.tracking-wider { letter-spacing: 0.12em; }
+
+        /* Panel cards — flat matte surface, hairline border */
+        #mainContainer .bg-slate-900 {
+            background: #14191f;
+            border-color: #232b35;
+        }
+
+        /* Header — flat surface, solid accent edge (no glow) */
+        #mainContainer > header {
+            background: #12161c;
+            border: 1px solid #232b35;
+            border-left: 3px solid var(--sig);
+            border-radius: 10px;
+            padding: 18px 22px;
+            position: relative;
+        }
+        #mainContainer > header h1 { font-weight: 700; letter-spacing: -0.01em; }
+
+        /* Mission status chips — flat, solid accent tick when lit */
+        .status-chip {
+            display: flex; flex-direction: column; gap: 3px;
+            background: #11151b;
+            border: 1px solid #232b35; border-left: 2px solid #2f3a47;
+            border-radius: 6px; padding: 8px 12px; min-width: 0;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .status-chip .chip-k {
+            font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.16em;
+            text-transform: uppercase; color: #5d6773;
+        }
+        .status-chip .chip-v {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700;
+            color: #5d6773; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .status-chip .chip-v.on { color: #e6edf3; }
+        .status-chip.lit { border-left-color: var(--sig); background: #131922; }
+        .status-chip.lit .chip-v.on { color: var(--sig); }
+
+        /* Range track — solid fill, flat thumb */
+        input[type="range"] { border-color: #2a323d; }
+
+        /* Bottom command bar — flat top hairline */
+        .sticky-bottom-bar { border-top: 1px solid #2a323d; }
+
+        /* Overlays / HUD — crisp instrument framing, no glow */
+        #hudOverlay, #pfdOverlay { border-color: rgba(56,189,248,0.55); }
+
+        /* Chart-grid card headers — solid accent rule + tight underline */
+        [id^="title-"] {
+            position: relative;
+            padding: 4px 0 9px 13px;
+            margin-bottom: 12px !important;
+            border-bottom: 1px solid #20262f;
+            color: #aab4be !important;
+        }
+        [id^="title-"]::before {
+            content: ""; position: absolute; left: 0; top: 3px; bottom: 10px; width: 3px;
+            background: var(--sig); border-radius: 2px;
+        }
+
+        /* green "laser" scan bar that pans up and down the video while autosync hunts for a timestamp */
+        #autoSyncLaser .laser-beam {
+            position: absolute; left: 0; right: 0; top: 0; height: 3px;
+            background: linear-gradient(90deg, transparent, rgba(34,197,94,0.9) 18%, #4ade80 50%, rgba(34,197,94,0.9) 82%, transparent);
+            box-shadow: 0 0 12px 2px rgba(34,197,94,0.85), 0 0 28px 6px rgba(34,197,94,0.4);
+            animation: laserScan 1.7s cubic-bezier(0.45,0,0.55,1) infinite alternate;
+        }
+        @keyframes laserScan { 0% { top: 2%; } 100% { top: 98%; } }
+
+        /* Setup panel — pre-flight checklist step badges */
+        .step-num {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 18px; height: 18px; flex-shrink: 0;
+            font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700;
+            color: var(--sig); background: #131922;
+            border: 1px solid #2c3a47; border-radius: 4px; letter-spacing: 0;
+        }
+
+        /* Command bar — labeled clusters */
+        .sticky-bottom-bar { align-items: flex-end; row-gap: 10px; }
+        .cmd-group { display: flex; flex-direction: column; gap: 5px; }
+        .cmd-group + .cmd-group { border-left: 1px solid #262e38; padding-left: 12px; }
+        .cmd-group > .cmd-label {
+            font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700;
+            letter-spacing: 0.2em; text-transform: uppercase; color: #5d6773; padding-left: 1px;
+        }
+        .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
+
+        /* Bottom bar: the timeline is the headline tool — it takes its own full-width row and is enlarged,
+           while the playback/sync/marker/color clusters sit compacted on the row above it. */
+        #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
+        #cmdTimelineGroup > .cmd-row { gap: 16px; }
+        #cmdTimelineGroup > .cmd-label { font-size: 9px; color: var(--sig); }
+        #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
+        #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
+        #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
+        #timelineTimeDisplay { font-size: 0.9rem; }
+        .sticky-bottom-bar > .cmd-group:not(#cmdTimelineGroup) { order: 1; }
+        .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) button,
+        .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select {
+            height: 32px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; font-size: 11px !important;
+        }
+        .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) .cmd-row { gap: 6px; }
+        .sticky-bottom-bar { row-gap: 10px; }
+        /* Sync cluster only present when the sync button is active */
+        #cmdSyncGroup { display: none; }
+        #cmdSyncGroup:has(#forceSyncBtn[style*="inline-block"]) { display: flex; }
+
+        /* Custom scrollbars throughout */
+        *::-webkit-scrollbar { width: 10px; height: 10px; }
+        *::-webkit-scrollbar-track { background: #0d1116; }
+        *::-webkit-scrollbar-thumb { background: #2a323d; border-radius: 6px; border: 2px solid #0d1116; }
+        *::-webkit-scrollbar-thumb:hover { background: #38516a; }
     </style>
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
+<!-- standalone-export splash / no-JS fallback -->
+<template id="__bundler_thumbnail" data-bg-color="#0b0e13">
+    <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1200" height="800" fill="#0b0e13"/>
+        <g fill="none" stroke="#38bdf8" stroke-width="14" stroke-linecap="round">
+            <circle cx="600" cy="400" r="120" opacity="0.25"/>
+            <path d="M600 280 C690 300 720 360 700 430 C685 380 640 360 600 360"/>
+            <path d="M600 520 C510 500 480 440 500 370 C515 420 560 440 600 440"/>
+        </g>
+        <circle cx="600" cy="400" r="26" fill="#38bdf8"/>
+        <g stroke="#7c8794" stroke-width="6" opacity="0.5">
+            <line x1="180" y1="640" x2="1020" y2="640"/>
+            <line x1="180" y1="640" x2="180" y2="180"/>
+        </g>
+        <polyline points="180,560 360,500 520,540 700,360 880,420 1020,300" fill="none" stroke="#5eead4" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+</template>
+
+<!-- full-screen processing spinner shown while parsing flight data -->
 <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/85 z-[10000] hidden flex-col items-center justify-center backdrop-blur-md">
     <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-5"></div>
     <h2 class="text-white text-xl md:text-2xl font-bold tracking-widest">PROCESSING FLIGHT DATA</h2>
-    <p class="text-blue-400 text-sm mt-2 font-mono opacity-80">Extracting...</p>
+    <p class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling the variables for you now!</p>
 </div>
 
+<!-- top-right whole-page fullscreen toggle -->
 <button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
 
-<section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-6" id="mainContainer">
+<section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4" id="mainContainer">
+    <!-- main app container: all panels live here -->
     
-    <header class="relative flex flex-col items-center justify-center mb-6 border-b border-slate-800 pb-5"> 
-        <div class="text-left pr-24 pl-24"> <h1 class="text-white text-xl md:text-2xl font-bold tracking-tight">Multifunctional Mission Visualizer</h1>
-            <p class="text-slate-400 text-xs md:text-sm mt-1 font-medium">- Video Telemetry Tool</p>
-        </div>
-        <div class="absolute right-0 top-0 hidden md:flex gap-4 items-center h-full pr-4">
-            <div class="text-[11px] text-slate-400 text-right leading-tight">
-                AOC Science<br>Branch
+    <!-- page header: mission-status strip with live flight metadata chips -->
+    <header class="relative mb-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+                <div class="min-w-0">
+                    <h1 class="text-white text-xl md:text-2xl font-bold tracking-tight truncate">Mission Visualizer</h1>
+                </div>
             </div>
-            <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg" alt="NOAA Logo" class="h-9 object-contain">
+            <div class="flex items-center gap-4 shrink-0">
+                <div class="text-[11px] text-slate-400 text-right leading-tight hidden sm:block">AOC Science<br>Branch</div>
+                <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg" alt="NOAA Logo" class="h-9 object-contain">
+            </div>
+        </div>
+        <!-- live status readout: populated on flight-data load -->
+        <div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
+            <div class="status-chip"><span class="chip-k">Flight ID</span><span class="chip-v" id="hdrFlightId">—</span></div>
+            <div class="status-chip"><span class="chip-k">Aircraft</span><span class="chip-v" id="hdrAircraft">—</span></div>
+            <div class="status-chip"><span class="chip-k">Flight Date</span><span class="chip-v" id="hdrDate">—</span></div>
+            <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
         </div>
     </header>
 
@@ -118,12 +330,14 @@
             
             <div class="lg:col-span-4 flex flex-col justify-center gap-6">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">1. Upload Flight-Level Data (.txt or .nc) <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span></label>
+                    <!-- step 1: flight-level data file input (.txt or .nc) -->
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">1</span> Upload Flight-Level Data (.txt or .nc) <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span></label>
                     <input type="file" id="fileInput" accept=".txt,.nc" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
                 </div>
                 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">2. Upload MMR to Sync (.mp4)</label>
+                    <!-- step 2: optional mmr video file input (.mp4) -->
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">2</span> Upload MMR to Sync (.mp4)</label>
                     <input type="file" id="videoInput" accept="video/mp4" class="block w-full text-xs text-slate-500 italic file:mr-3 file:px-3 file:py-1.5 file:bg-slate-800 file:text-slate-200 file:font-medium file:rounded file:border file:border-slate-700 file:hover:bg-slate-700 file:transition-colors file:shadow-sm file:cursor-pointer transition-colors" />
                 </div>
             </div>
@@ -143,10 +357,10 @@
                         <div class="relative">
                             <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate">Video Sync Mode</label>
                             <select id="videoSyncMode" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none transition-colors shadow-sm">
-                                <option value="manual">Manual Time Inputs</option>
+                                <option value="manual">Manual Time Input</option>
                                 <option value="auto">Auto-Sync (MMR)</option>
                             </select>
-                            <div class="absolute top-[100%] left-0 w-full text-[10px] text-purple-400 font-serif mt-1 leading-tight">*Use 'Sync Now' Button to start Auto-Sync.</div>
+                            <div class="absolute top-[100%] left-0 w-full text-[10px] text-purple-400 italic mt-0.5 leading-tight">*Use 'Sync Now' Button to start Auto-Sync.</div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate" title="Video Start UTC (Only in Manual Mode) (HHMMSS)">MMR Start Time (Manual)</label>
@@ -161,7 +375,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">3. Filters</label>
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider"><span class="step-num">3</span> Filters</label>
                     <div class="flex flex-wrap gap-x-5 gap-y-3 bg-slate-800/50 p-3 rounded-lg border border-slate-800 items-start">
                         <label class="flex items-center gap-2 text-xs text-blue-400 font-bold cursor-pointer select-none mt-1"><input type="checkbox" id="toggleExtraHUD" class="accent-blue-500 w-4 h-4 cursor-pointer" /> HUD Extra Metrics</label>
                         
@@ -178,44 +392,79 @@
         </div>
     </div>
 
+    <!-- sticky media bar: map tracker (left) + mmr video (right) -->
     <div class="sticky-media-bar" id="stickyMediaBar">
         <div id="mediaBarContent" class="media-content-wrapper">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 
+                <!-- left panel: 2d/3d flight-level data map tracker + toolbar -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="mapPanel">
-                    <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
+                    <div class="flex flex-wrap justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20 gap-y-1">
                         <span>Flight-Level Data Player</span>
-                        <div class="flex items-center gap-2">
-                            <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px] mr-2">
+                        <div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-grow ml-auto">
+                            <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px]">
                                 Barb Period (s)
                                 <input type="number" id="barbIntervalInput" value="30" min="1" max="999" class="w-12 bg-slate-800 text-slate-200 border border-slate-700 rounded px-1 py-0.5 text-[11px] text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                             </label>
                             
-                            <button id="measureBtn" class="px-2 py-1 bg-blue-800 hover:bg-blue-700 text-white text-[11px] rounded border border-blue-800 transition-colors shadow-sm">📏 Measure</button>
-                            <select id="measureShapeSelect" class="hidden bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-0.5 text-[11px] outline-none cursor-pointer">
-                                <option value="polygon">Polygon</option>
-                                <option value="circle">Circle</option>
-                                <option value="rectangle">Rectangle</option>
-                            </select>
-                            <span id="measureTip" class="hidden text-[11px] text-purple-400 normal-case font-bold italic ml-2">*Right-click/Slide-out to finish</span>
-                            <button id="clearMeasureBtn" class="hidden px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-[11px] rounded border border-red-900 transition-colors shadow-sm">✕ Clear</button>
+                            <!-- measure tool: the shape selector + Clear pop out below the button (like the satellite
+                                 day selector) so they float over the map instead of taking up toolbar width -->
+                            <div id="measureCluster" class="relative flex items-center flex-none">
+                                <button id="measureBtn" class="px-2 py-1 bg-blue-800 hover:bg-blue-700 text-white text-[11px] rounded border border-blue-800 transition-colors shadow-sm whitespace-nowrap" title="Measure distance / area">📏 Measure</button>
+                                <div id="measureGroup" class="hidden absolute left-0 top-full mt-1 z-30 items-center gap-2 bg-slate-900/95 border border-slate-700 border-l-2 border-l-blue-500/60 rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
+                                    <select id="measureShapeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-0.5 text-[11px] outline-none cursor-pointer">
+                                        <option value="polygon">Polygon</option>
+                                        <option value="circle">Circle</option>
+                                        <option value="rectangle">Rectangle</option>
+                                    </select>
+                                    <button id="clearMeasureBtn" class="hidden px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-[11px] rounded border border-red-900 transition-colors shadow-sm whitespace-nowrap">✕ Clear</button>
+                                </div>
+                            </div>
                             
-                            <select id="trackerModeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer ml-1">
+                            <!-- switch between 2d canvas map and 3d webgl globe -->
+                            <select id="trackerModeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                                 <option value="2d">2D Map Tracker</option>
                                 <option value="3d">3D WebGL Tracker</option>
                             </select>
-                            <label class="flex items-center normal-case text-blue-400 font-bold text-[10px] cursor-pointer mr-1">
-                                <input type="checkbox" id="toggle8Hz" class="accent-blue-500 w-3 h-3 mr-1"> 8Hz Smoothing
-                            </label>
-                            <button id="fullscreenMapBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
+                            <!-- 8Hz toggle, satellite selector, and map fullscreen are locked together on one line (no-wrap) so the
+                                 day stepper, which drops down when a satellite is active, lands in the open map area below instead of
+                                 covering these controls. 8Hz sits to the LEFT of the selector and fullscreen to the RIGHT, so the
+                                 stepper falls cleanly between/below them. -->
+                            <div class="flex items-center gap-2.5 flex-none">
+                                <label class="flex items-center normal-case text-blue-400 font-bold text-[10px] cursor-pointer whitespace-nowrap">
+                                    <input type="checkbox" id="toggle8Hz" class="accent-blue-500 w-3 h-3 mr-1"> 8Hz Smoothing
+                                </label>
+                                <!-- modis satellite overlay selector; day stepper floats below it without growing the toolbar -->
+                                <div id="satControlGroup" class="relative">
+                                    <select id="satelliteSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer" title="Satellite overlay (auto-populated by date/location after data loads)">
+                                        <option value="none">Sat: Off</option>
+                                    </select>
+                                    <!-- drops directly below the dropdown and extends leftward (right-0) so it never overlaps the
+                                         fullscreen button to its right; the map keeps its height because this is absolutely positioned -->
+                                    <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-slate-900/95 border border-slate-700 border-l-2 border-l-blue-500/60 rounded px-1.5 py-1 shadow-lg">
+                                        <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">◀</button>
+                                        <span id="satDayLabel" class="text-[10px] font-mono text-blue-300 min-w-[78px] text-center leading-tight"></span>
+                                        <button id="satDayNext" title="Next day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">▶</button>
+                                    </div>
+                                </div>
+                                <button id="fullscreenMapBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
+                            </div>
                         </div>
                     </div>
                     <div class="media-container" id="mapContainer">
-                        <div id="mapPlaceholder" class="absolute text-slate-500 text-sm font-medium text-center w-4/5 pointer-events-none z-10">Awaiting flight log data extraction...</div>
+                        <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Awaiting flight log data extraction...</div>
                         <canvas id="mapCanvas"></canvas>
                         <div id="threeDContainer">
                             <div id="attitudeHud" class="absolute top-[75px] left-4 bg-slate-950/80 border border-slate-700 rounded-md p-2.5 font-mono text-xs text-blue-400 z-[2500]"></div>
                         </div>
+                        <!-- satellite tile loading overlay -->
+                        <div id="satLoadingOverlay">
+                            <div class="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mb-3"></div>
+                            <span class="text-blue-300 text-xs font-bold tracking-widest">FETCHING SATELLITE TILE</span>
+                            <span class="text-slate-400 text-[10px] mt-1 font-mono">Connecting to NASA GIBS...</span>
+                        </div>
+                        <!-- satellite acquisition-time badge -->
+                        <div id="satTimeBadge" class="hidden absolute top-3 left-3 bg-slate-950/85 border border-blue-500/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-200 z-[2400] pointer-events-none leading-tight"></div>
                         <div class="overlays-wrapper">
                             <div id="hudOverlay"></div>
                         </div>
@@ -225,138 +474,183 @@
                     </div>
                 </div>
 
+                <!-- right panel: mmr video player with ocr-sync indicator -->
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
                     <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
                         <span>MMR Media Display</span>
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
-                        <div id="videoPlaceholder" class="absolute text-slate-500 text-sm font-medium text-center w-4/5 pointer-events-none z-10">Optional: Load an MP4 video clip & it can sync.</div>
+                        <div id="videoPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Optional: Load an MMR Video & it can sync.</div>
                         <video id="radarVideo"></video>
-                        <div id="ocrIndicator" class="hidden absolute top-3 right-3 bg-slate-950/70 border border-emerald-500 rounded px-2 py-1 text-[10px] text-emerald-500 font-bold pointer-events-none">
-                            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> OCR SYNC ACTIVE
+                        <div id="ocrIndicator" class="hidden absolute top-2 right-3 pointer-events-none z-30" title="OCR sync active">
+                            <span class="block w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.85)]"></span>
+                        </div>
+                        <!-- green laser bar that pans up/down the video while autosync hunts for the timestamp -->
+                        <div id="autoSyncLaser" class="hidden absolute inset-0 overflow-hidden pointer-events-none z-20 rounded-lg">
+                            <div class="laser-beam"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        <!-- drag this bottom edge up/down to resize the tracker + video panels -->
+        <div class="media-resize-handle" id="mediaResizeHandle" title="Drag to resize the tracker & video"><span class="grip grip-left">⋯</span><span class="grip grip-right">⋯</span></div>
         <div class="collapse-lip" id="collapseLip">▲</div>
     </div>
 
-    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col mb-6">
-        <div class="flex flex-col items-start gap-2.5 mb-0 text-xs font-semibold text-slate-400 uppercase tracking-wider z-20">
-            <div class="flex justify-between w-full">
-                <span>Master Timeline Analytics Grid <span class="text-slate-500 font-normal normal-case">(Build Your Own Graph)</span></span>
-            </div>
-            <div id="masterGraphToggles" class="flex flex-wrap gap-2 mb-0"></div>
-        </div>
-        <div id="masterGraphWrapper" class="w-full flex-grow relative hidden h-full max-h-[280px] mt-2.5">
-            <div id="autosyncLabel" class="absolute top-2.5 left-1/2 -translate-x-1/2 bg-red-500/95 text-white px-3.5 py-1.5 rounded-md font-bold text-xs z-10 opacity-0 pointer-events-none transition-opacity tracking-wider shadow-md">AUTOSYNC: JUMP DETECTED</div>
-            <canvas id="parameterChart"></canvas>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+    <!-- nine preset telemetry charts, each with an add-metric dropdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-tempChart">
                 Temperature Profiles (°C)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tempChart')">➕</button><div id="menu-tempChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tempChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tempChart')">＋</button><div id="menu-tempChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="tempChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-navChart">
                 Navigation Angles (Deg)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-navChart')">➕</button><div id="menu-navChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('navChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-navChart')">＋</button><div id="menu-navChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="navChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-attChart">
                 Flow Angles (Deg)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-attChart')">➕</button><div id="menu-attChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('attChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-attChart')">＋</button><div id="menu-attChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="attChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-altChart">
                 Altitude Profile (m)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-altChart')">➕</button><div id="menu-altChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('altChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-altChart')">＋</button><div id="menu-altChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="altChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-tasChart">
                 Speed Profiles (kt)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tasChart')">➕</button><div id="menu-tasChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tasChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tasChart')">＋</button><div id="menu-tasChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="tasChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-vertWindChart">
                 Vertical Speeds & Accel
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-vertWindChart')">➕</button><div id="menu-vertWindChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('vertWindChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-vertWindChart')">＋</button><div id="menu-vertWindChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="vertWindChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-sfcChart">
                 Pressure Profiles (mb)
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-sfcChart')">➕</button><div id="menu-sfcChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('sfcChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-sfcChart')">＋</button><div id="menu-sfcChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="sfcChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-thermoChart">
                 Thermodynamics & Moisture
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-thermoChart')">➕</button><div id="menu-thermoChart" class="dropdown-menu"></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('thermoChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-thermoChart')">＋</button><div id="menu-thermoChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="thermoChart"></canvas></div>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
-            <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-sfmrChart">
-                SFMR Surface Data
-                <div class="relative"><button class="text-blue-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-sfmrChart')">➕</button><div id="menu-sfmrChart" class="dropdown-menu"></div></div>
+    </div>
+
+    <!-- build-your-own master chart: a clear "Create Graph" entry point at the very bottom.
+         The big dashed plus is shown until at least one variable is picked; after that the chart
+         renders here and the header ＋ lets you add/remove more variables. -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col mt-4 mb-2 min-h-[300px]">
+        <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-masterChart">
+            <span>Create Your Own Graph <span class="text-slate-500 font-normal normal-case">: You can use this to compare any variables you'd like!</span></span>
+            <div class="flex items-center gap-2">
+                <button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('masterChart')" title="Reset zoom / scale">↺</button>
+                <div class="relative">
+                    <button id="masterAddBtn" class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-masterChart')" title="Choose variables to plot">＋</button>
+                    <div id="menu-masterChart" class="dropdown-menu"></div>
+                </div>
             </div>
-            <div class="w-full flex-grow relative h-full"><canvas id="sfmrChart"></canvas></div>
+        </div>
+
+        <!-- big, non-tacky call-to-action shown while no variables are selected -->
+        <button id="masterCreatePrompt" type="button" onclick="toggleMenu(event, 'menu-masterChart')"
+            class="group w-full flex-grow min-h-[250px] flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500/70 hover:bg-slate-800/40 transition-colors cursor-pointer">
+            <span class="text-sky-400 text-6xl font-light leading-none group-hover:scale-110 transition-transform">＋</span>
+            <span class="text-slate-200 text-base font-bold tracking-[0.25em] uppercase">Create Graph</span>
+            <span class="text-slate-500 text-[11px] normal-case font-normal">Click to choose the variables you want to plot</span>
+        </button>
+
+        <!-- the chart itself, hidden until variables are picked -->
+        <div id="masterGraphWrapper" class="w-full flex-grow relative hidden h-full max-h-[300px] mt-1">
+            <div id="autosyncLabel" class="absolute top-2.5 left-1/2 -translate-x-1/2 bg-red-500/95 text-white px-3.5 py-1.5 rounded-md font-bold text-xs z-10 opacity-0 pointer-events-none transition-opacity tracking-wider shadow-md">AUTOSYNC: JUMP DETECTED</div>
+            <canvas id="parameterChart"></canvas>
         </div>
     </div>
 </section>
 
+<!-- fixed bottom bar: playback controls + timeline slider, grouped into labeled clusters -->
 <div class="sticky-bottom-bar" id="stickyBottomBar">
-    <button id="runBtn" disabled class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">Apply & Run</button>
-    <button id="playPauseBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">▶ Play</button>
-    
-    <div class="flex items-center bg-slate-800 border border-slate-700 rounded-md overflow-hidden">
-        <button id="speedDownBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏪</button>
-        <button id="speedDisplayBtn" class="px-2 py-2 bg-slate-800 text-slate-300 font-medium pointer-events-none h-9 w-[45px] text-center text-xs">1x</button>
-        <button id="speedUpBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏩</button>
+    <div class="cmd-group">
+        <span class="cmd-label">Playback</span>
+        <div class="cmd-row">
+            <button id="runBtn" disabled class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">Apply & Run</button>
+            <!-- play/pause toggle -->
+            <button id="playPauseBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">▶ Play</button>
+            <div class="flex items-center bg-slate-800 border border-slate-700 rounded-md overflow-hidden">
+                <button id="speedDownBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏪</button>
+                <button id="speedDisplayBtn" class="px-2 py-2 bg-slate-800 text-slate-300 font-medium pointer-events-none h-9 w-[45px] text-center text-xs">1x</button>
+                <button id="speedUpBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏩</button>
+            </div>
+            <button id="replayBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">↻ Reset</button>
+        </div>
     </div>
-    
-    <button id="replayBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">↻ Reset</button>
-    
-    <div class="w-[2px] h-6 bg-slate-700 mx-1"></div>
-    
-    <button id="forceSyncBtn" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="Tip: Click a few times if sync fails. Hide other timestamps to avoid OCR errors.">🔄 Sync Now</button>
-    <button id="markBtn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">📌 Mark Point</button> 
-    <button id="clearMarksBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">❌ Clear</button>
-    
-    <div class="w-[2px] h-6 bg-slate-700 mx-1"></div>
-    
-    <select id="pathColorSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-md px-2 py-1.5 text-xs font-semibold outline-none cursor-pointer h-9 shadow-sm focus:border-blue-500 transition-colors">
-        <option value="wind">Track: Wind Speed</option>
-        <option value="temp">Track: Warming/Cooling</option>
-    </select>
 
-    <input type="range" id="timelineSlider" min="0" max="100" value="0" disabled class="mx-4 flex-grow" />
-    <div id="timelineTimeDisplay" class="text-sm text-blue-400 font-bold font-mono min-w-[185px] text-right">00:00:00 UTC</div>
+    <!-- manual ocr re-sync trigger (auto-sync mode); whole cluster hides when sync unavailable -->
+    <div class="cmd-group" id="cmdSyncGroup">
+        <span class="cmd-label">Sync</span>
+        <div class="cmd-row">
+            <button id="forceSyncBtn" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="Tip: Click a few times if sync fails. Hide other timestamps to avoid OCR errors.">🔄 Sync Now</button>
+        </div>
+    </div>
+
+    <div class="cmd-group">
+        <span class="cmd-label">Markers</span>
+        <div class="cmd-row">
+            <!-- drop a numbered marker at the current point -->
+            <button id="markBtn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">📌 Mark Point</button> 
+            <button id="clearMarksBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">❌ Clear</button>
+        </div>
+    </div>
+
+    <div class="cmd-group">
+        <span class="cmd-label">Track Color</span>
+        <div class="cmd-row">
+            <!-- color the flight path by wind speed or temperature -->
+            <select id="pathColorSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-md px-2 py-1.5 text-xs font-semibold outline-none cursor-pointer h-9 shadow-sm focus:border-blue-500 transition-colors">
+                <option value="wind">Track: Wind Speed</option>
+                <option value="temp">Track: Warming/Cooling</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="cmd-group" id="cmdTimelineGroup">
+        <div class="cmd-row">
+            <!-- scrubbable timeline; syncs video + charts -->
+            <input type="range" id="timelineSlider" min="0" max="100" value="0" disabled class="flex-grow" />
+            <div id="timelineTimeDisplay" class="text-sm text-blue-400 font-bold font-mono min-w-[185px] text-right">00:00:00 UTC</div>
+        </div>
+    </div>
 </div>
 
+<!-- floating toast notification (top-right) -->
 <div id="toastNotification" class="toast-notification">
     <div class="font-bold mb-1 text-blue-400 text-sm">Attention</div>
     <div id="toastMessage"></div>
 </div>
 
+<!-- point-analysis modal: detailed station report for marked points -->
 <div id="pointAnalysisModal" class="modal-overlay">
     <div class="modal-card">
         <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('pointAnalysisModal').style.display='none'">✕</button>
@@ -368,7 +662,7 @@
 </div>
 
 <script>
-    // State management for raw uploaded data and timeline positioning
+    // state management for raw uploaded data and timeline positioning
     let allParsedData = [];
     let filteredData = [];
     let availableMetrics = new Set();
@@ -376,18 +670,379 @@
     let isPlaying = false;
     let isNcFile = false;
     
-    // Geographical rendering variables
+    // geographical rendering variables
+    // satellite State
+    let satImage = new Image();
+    let satImageLoaded = false;
+    let lastSatFetchTime = "";
+    let satLoadedInfo = null;  // { layerLabel, imageTimeMs, isModis } — for the time badge
+    let satImageBox = null;    // geographic extent {minLon,minLat,maxLon,maxLat} the sat image covers
+    let satDebounceTimer = null;
+    let slideSyncTimer = null;  // Delays video jump-sync after slider scrub
+
     let mapFeatures = [];
     let customMarkers = [];
     let flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
     let currentPointAnalysisData = null; 
     let tempBaseline = [];
     
-    // Performance canvases for off-screen terrain buffering
+    // hidden canvases used to pre-draw the map background so the visible map stays smooth
     let bgNeedsUpdate = true;
     let bgCanvas = document.createElement('canvas');
     let bgCtx = bgCanvas.getContext('2d');
     
+        // ── Satellite loader / tile fetching ────────────────────────────────────
+    function showSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.add('show'); }
+    function hideSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.remove('show'); }
+
+    // renders the badge showing WHEN the loaded satellite image was taken,
+    // and how far that is from the current flight playhead time.
+    function updateSatTimeBadge() {
+        const badge = document.getElementById('satTimeBadge');
+        if (!badge) return;
+        const satSel = document.getElementById('satelliteSelect');
+        if (!satLoadedInfo || !satImageLoaded || !satSel || satSel.value === 'none') {
+            badge.classList.add('hidden');
+            return;
+        }
+        // current flight playhead time (UTC)
+        const row = filteredData[currentIdx];
+        if (!row || flightMetaData.date === 'Unknown') { badge.classList.add('hidden'); return; }
+        const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
+
+        const imgMs = satLoadedInfo.imageTimeMs;
+        const fmt = (ms, withTime) => {
+            const d = new Date(ms);
+            const Y=d.getUTCFullYear(), M=String(d.getUTCMonth()+1).padStart(2,'0'), D=String(d.getUTCDate()).padStart(2,'0'),
+                  h=String(d.getUTCHours()).padStart(2,'0'), m=String(d.getUTCMinutes()).padStart(2,'0');
+            return withTime ? `${Y}-${M}-${D} ${h}:${m}Z` : `${Y}-${M}-${D}`;
+        };
+
+        // MODIS: show the actual overpass time once CMR returns it
+        let imgLabel;
+        if (satLoadedInfo.isModis) {
+            if (satLoadedInfo.modisTimePending) {
+                imgLabel = fmt(imgMs, false) + ' (looking up overpass time…)';
+            } else if (satLoadedInfo.modisExact) {
+                imgLabel = fmt(imgMs, true) + ' (actual overpass)';
+            } else {
+                imgLabel = fmt(imgMs, false) + ' (daily composite)';
+            }
+        } else {
+            imgLabel = fmt(imgMs, true);
+        }
+
+        // offset between image acquisition time and current flight playhead
+        const diffMs = imgMs - flightMs;
+        const absMin = Math.abs(diffMs) / 60000;
+        let offStr;
+        if (satLoadedInfo.isModis && satLoadedInfo.modisTimePending) {
+            offStr = '';
+        } else if (absMin < 1) {
+            offStr = 'matches flight time';
+        } else if (absMin < 60) {
+            offStr = `${Math.round(absMin)} min ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
+        } else if (absMin < 1440) {
+            offStr = `${(absMin/60).toFixed(1)} hr ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
+        } else {
+            offStr = `${Math.round(absMin/1440)} day(s) ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
+        }
+
+        // green if image is close in time to the flight point, yellow if far
+        const closeThresh = satLoadedInfo.isModis ? 90 : 15; // minutes
+        const within = absMin <= closeThresh;
+        badge.innerHTML = `🛰 ${satLoadedInfo.layerLabel}<br>`
+            + `Image: <b>${imgLabel}</b><br>`
+            + (offStr ? `<span style="color:${within ? '#4ade80' : '#fbbf24'}">${offStr}</span>` : '');
+        badge.classList.remove('hidden');
+    }
+
+    // ── Satellite catalog (MODIS true-color, NASA GIBS — verified working) ──────
+    // GOES via GIBS WMTS was removed: tiles never rendered reliably in-browser and
+    // could not be verified. MODIS daily true-color works for any date back to 2000.
+    // two satellites (Terra ~10:30 AM, Aqua ~1:30 PM local overpass) give two looks
+    // per day; with multi-day stepping you can also view the day before / after.
+    const GIBS_LAYERS = [
+        { value:'MODIS-TERRA', label:'MODIS Terra True Color', wmsLayer:'MODIS_Terra_CorrectedReflectance_TrueColor', shortName:'MOD09', ext:'jpg', localPassHr:10.5 },
+        { value:'MODIS-AQUA',  label:'MODIS Aqua True Color',  wmsLayer:'MODIS_Aqua_CorrectedReflectance_TrueColor',  shortName:'MYD09', ext:'jpg', localPassHr:13.5 },
+    ];
+
+    // how many days on each side of the flight date to make selectable (0 = flight day only)
+    const SAT_DAY_RANGE = 2;
+    // extra margin around the flight bounding box, as a fraction of span, so panning
+    // beyond the flight track still shows already-fetched imagery (no blank edges).
+    const SAT_BBOX_MARGIN = 0.6;
+
+    let satDayOffset = 0; // currently selected day offset (−SAT_DAY_RANGE .. +SAT_DAY_RANGE)
+
+    // the widened geographic bbox used for satellite fetches (superset of the plot bbox)
+    let satFetchBox = null; // { minLon, minLat, maxLon, maxLat }
+    function computeSatFetchBox() {
+        const lonSpan = plotMaxLon - plotMinLon;
+        const latSpan = plotMaxLat - plotMinLat;
+        const mx = lonSpan * SAT_BBOX_MARGIN, my = latSpan * SAT_BBOX_MARGIN;
+        satFetchBox = {
+            minLon: Math.max(-180, plotMinLon - mx),
+            maxLon: Math.min(180,  plotMaxLon + mx),
+            minLat: Math.max(-90,  plotMinLat - my),
+            maxLat: Math.min(90,   plotMaxLat + my),
+        };
+    }
+
+    // small offscreen canvas for empty-image detection
+    const _satChk = document.createElement('canvas');
+    _satChk.width = _satChk.height = 32;
+    const _satChkCtx = _satChk.getContext('2d', { willReadFrequently: true });
+    function satImageHasContent(src) {
+        try {
+            _satChkCtx.clearRect(0, 0, 32, 32);
+            _satChkCtx.drawImage(src, 0, 0, 32, 32);
+            const d = _satChkCtx.getImageData(0, 0, 32, 32).data;
+            let alphaHits = 0, lumSum = 0, lumMin = 255, lumMax = 0, n = 0;
+            for (let i = 0; i < d.length; i += 4) {
+                if (d[i+3] > 10) alphaHits++;
+                const lum = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+                lumSum += lum; if (lum < lumMin) lumMin = lum; if (lum > lumMax) lumMax = lum;
+                n++;
+            }
+            return alphaHits > 4 && ((lumMax - lumMin) > 8 || (lumSum / n) > 6);
+        } catch(e) {}
+        return false;
+    }
+
+    // the date string for a given day offset from the flight date
+    function satDateForOffset(offset) {
+        if (flightMetaData.date === 'Unknown') return null;
+        const d = new Date(flightMetaData.date + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() + offset);
+        const Y=d.getUTCFullYear(), M=String(d.getUTCMonth()+1).padStart(2,'0'), D=String(d.getUTCDate()).padStart(2,'0');
+        return Y+'-'+M+'-'+D;
+    }
+
+    // approximate utc overpass time = local solar pass time minus longitude/15.
+    // gives a useful per-flight estimate so the dropdown shows when each satellite passed.
+    function approxUtcPassLabel(localPassHr) {
+        let centerLon = -75;
+        if (filteredData.length > 0) centerLon = filteredData.reduce((s,d) => s + d.lon, 0) / filteredData.length;
+        let utc = (localPassHr - centerLon / 15) % 24;
+        if (utc < 0) utc += 24;
+        let h = Math.floor(utc), m = Math.round((utc - h) * 60);
+        if (m === 60) { m = 0; h = (h + 1) % 24; }
+        return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + 'Z';
+    }
+
+    function updateSatelliteOptions() {
+        const satSelect = document.getElementById('satelliteSelect');
+        if (!satSelect) return;
+        const prevVal = satSelect.value;
+        satSelect.innerHTML = '<option value="none">Sat: Off</option>';
+        GIBS_LAYERS.forEach(def => {
+            const el = document.createElement('option');
+            el.value = def.value;
+            // label by approximate utc pass time instead of terra/aqua names
+            const passStr = approxUtcPassLabel(def.localPassHr);
+            el.textContent = 'MODIS ~' + passStr + ' pass';
+            satSelect.appendChild(el);
+        });
+        const opts = [...satSelect.options].map(o => o.value);
+        satSelect.value = opts.includes(prevVal) ? prevVal : 'MODIS-TERRA';
+
+        // reset / populate the day-stepper UI
+        satDayOffset = 0;
+        buildSatDayStepper();
+        // hide the satellite dropdown entirely if we're in 3d mode
+        const in2dMode = !trackerModeSelect || trackerModeSelect.value === '2d';
+        satSelect.style.display = in2dMode ? '' : 'none';
+
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+    }
+
+    // ── Day stepper UI (◀ Day  label  Day ▶) shown only while a MODIS layer is active ──
+    let _satStepperWired = false;
+    function buildSatDayStepper() {
+        const wrap = document.getElementById('satDayStepper');
+        const satSelect = document.getElementById('satelliteSelect');
+        if (!wrap || !satSelect) return;
+        // wire the prev/next buttons once (the element now lives in the html)
+        if (!_satStepperWired) {
+            const prev = document.getElementById('satDayPrev');
+            const next = document.getElementById('satDayNext');
+            if (prev) prev.addEventListener('click', () => stepSatDay(-1));
+            if (next) next.addEventListener('click', () => stepSatDay(1));
+            _satStepperWired = true;
+        }
+        // show the stepper directly under the satellite dropdown only when a satellite is
+        // selected, data is loaded, and we're in 2d (satellite imagery is 2d-only).
+        const in2d = !trackerModeSelect || trackerModeSelect.value === '2d';
+        const active = in2d && satSelect.value !== 'none' && flightMetaData.date !== 'Unknown';
+        if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
+        else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
+        updateSatDayLabel();
+    }
+    function updateSatDayLabel() {
+        const lbl = document.getElementById('satDayLabel');
+        if (!lbl) return;
+        const ds = satDateForOffset(satDayOffset) || '';
+        const tag = satDayOffset === 0 ? 'flight day' : (satDayOffset < 0 ? satDayOffset + 'd' : '+' + satDayOffset + 'd');
+        lbl.innerHTML = ds + '<br>' + tag;
+        const prev = document.getElementById('satDayPrev'), next = document.getElementById('satDayNext');
+        if (prev) prev.disabled = satDayOffset <= -SAT_DAY_RANGE;
+        if (next) next.disabled = satDayOffset >=  SAT_DAY_RANGE;
+    }
+    function stepSatDay(dir) {
+        const n = satDayOffset + dir;
+        if (n < -SAT_DAY_RANGE || n > SAT_DAY_RANGE) return;
+        satDayOffset = n;
+        updateSatDayLabel();
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+        }
+    }
+
+    // ── MODIS WMS fetch over the widened bbox ───────────────────────────────────
+    // returns { canvas, box } where box is the geographic extent the image covers,
+    // so the renderer can place it correctly even when it extends past the map edges.
+    function fetchModisWMS(layerDef, dateStr, box, pxW, pxH) {
+        const url = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi'
+            + '?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1'
+            + '&LAYERS=' + encodeURIComponent(layerDef.wmsLayer)
+            + '&FORMAT=image%2Fjpeg&TRANSPARENT=false'
+            + '&WIDTH=' + pxW + '&HEIGHT=' + pxH
+            + '&SRS=EPSG:4326'
+            + '&BBOX=' + box.minLon + ',' + box.minLat + ',' + box.maxLon + ',' + box.maxLat
+            + '&TIME=' + encodeURIComponent(dateStr);
+        return new Promise(res => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = pxW; c.height = pxH;
+                c.getContext('2d').drawImage(img, 0, 0);
+                res(c);
+            };
+            img.onerror = () => res(null);
+            img.src = url;
+        });
+    }
+
+    // CMR granule overpass-time lookup (CORS-enabled), for the time badge.
+    let _cmrCache = {};
+    async function lookupModisGranuleTime(shortName, dateStr, pointLon, pointLat) {
+        if (!dateStr) return null;
+        // tiny bounding box (~0.2°) right around the flight point — finds the granule
+        // whose swath actually covered THIS location, not a distant part of the orbit.
+        const pad = 0.1;
+        const bbox = (pointLon - pad).toFixed(3) + ',' + (pointLat - pad).toFixed(3) + ','
+                   + (pointLon + pad).toFixed(3) + ',' + (pointLat + pad).toFixed(3);
+        const cacheKey = shortName + '|' + dateStr + '|' + bbox;
+        if (_cmrCache[cacheKey] !== undefined) return _cmrCache[cacheKey];
+        const url = 'https://cmr.earthdata.nasa.gov/search/granules.json'
+            + '?short_name=' + shortName
+            + '&temporal=' + dateStr + 'T00:00:00Z,' + dateStr + 'T23:59:59Z'
+            + '&bounding_box=' + bbox
+            + '&page_size=20&sort_key=start_date';
+        try {
+            const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!resp.ok) { _cmrCache[cacheKey] = null; return null; }
+            const data = await resp.json();
+            const entries = (data.feed && data.feed.entry) || [];
+            if (!entries.length) { _cmrCache[cacheKey] = null; return null; }
+            // a point query already restricts to granules overlapping the flight spot.
+            // if more than one overlaps (orbit-edge overlap), pick whichever granule's
+            // footprint center is closest to the flight point.
+            let best = null, bestDist = Infinity;
+            entries.forEach(e => {
+                if (!e.time_start) return;
+                let gLon = pointLon, gLat = pointLat;
+                if (e.boxes && e.boxes[0]) {
+                    const p = e.boxes[0].split(' ').map(parseFloat);
+                    if (p.length === 4) { gLat = (p[0]+p[2])/2; gLon = (p[1]+p[3])/2; }
+                }
+                const dist = Math.abs(gLon - pointLon) + Math.abs(gLat - pointLat);
+                if (dist < bestDist) { bestDist = dist; best = e; }
+            });
+            const result = best ? { timeStart: best.time_start, timeEnd: best.time_end || best.time_start } : null;
+            _cmrCache[cacheKey] = result;
+            return result;
+        } catch(e) { _cmrCache[cacheKey] = null; return null; }
+    }
+
+    // ── Main entry: fetch MODIS for the selected day over the widened bbox ───────
+    function fetchSatelliteImage(absSeconds) {
+        const satSelect = document.getElementById('satelliteSelect');
+        if (!satSelect || satSelect.value === 'none') return;
+        if (flightMetaData.date === 'Unknown') return;
+        if (!canvas.width || !canvas.height) return;
+
+        const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
+        if (!layerDef) return;
+
+        computeSatFetchBox();
+        const box = satFetchBox;
+        const dateStr = satDateForOffset(satDayOffset);
+        if (!dateStr) return;
+
+        // output pixel size proportional to the widened bbox aspect ratio (cap for perf)
+        const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
+        const aspect = boxLonSpan / boxLatSpan;
+        let pxW = Math.min(1600, Math.round(canvas.width  * (1 + 2*SAT_BBOX_MARGIN)));
+        let pxH = Math.round(pxW / aspect);
+        if (pxH > 1600) { pxH = 1600; pxW = Math.round(pxH * aspect); }
+
+        const fetchId = layerDef.value + '||' + dateStr + '||' +
+            box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
+        if (lastSatFetchTime === fetchId && satImageLoaded) return;
+
+        clearTimeout(satDebounceTimer);
+        satDebounceTimer = setTimeout(async () => {
+            lastSatFetchTime = fetchId;
+            showSatLoader();
+            try {
+                const result = await fetchModisWMS(layerDef, dateStr, box, pxW, pxH);
+                hideSatLoader();
+                if (result && satImageHasContent(result)) {
+                    satImage = result;
+                    satImageBox = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
+                    satImageLoaded = true;
+                    bgNeedsUpdate = true;
+                    satLoadedInfo = {
+                        layerLabel: 'MODIS ~' + approxUtcPassLabel(layerDef.localPassHr) + ' pass',
+                        imageTimeMs: new Date(dateStr + 'T00:00:00Z').getTime(),
+                        isModis: true,
+                        modisTimePending: true,
+                        dayOffset: satDayOffset
+                    };
+                    updateSatTimeBadge();
+                    console.log('[SAT] MODIS OK:', layerDef.value, dateStr);
+                    if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+
+                    // refine badge with the actual overpass time from CMR
+                    lookupModisGranuleTime(layerDef.shortName, dateStr, filteredData[currentIdx].lon, filteredData[currentIdx].lat).then(g => {
+                        if (g && g.timeStart && satLoadedInfo && satLoadedInfo.isModis) {
+                            const s = new Date(g.timeStart).getTime(), e = new Date(g.timeEnd).getTime();
+                            satLoadedInfo.imageTimeMs = s + (e - s) / 2;
+                            satLoadedInfo.modisTimePending = false;
+                            satLoadedInfo.modisExact = true;
+                            updateSatTimeBadge();
+                            console.log('[SAT] overpass:', g.timeStart);
+                        } else if (satLoadedInfo) {
+                            satLoadedInfo.modisTimePending = false;
+                            updateSatTimeBadge();
+                        }
+                    });
+                } else {
+                    satImageLoaded = false; bgNeedsUpdate = true;
+                    satLoadedInfo = null; updateSatTimeBadge();
+                    showToast('Satellite: No MODIS imagery for ' + dateStr + ' over this area. Try the other satellite or an adjacent day.', 6000);
+                }
+            } catch(e) {
+                hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
+                console.error('[SAT]', e);
+            }
+        }, 350);
+    }
+
     // 3D mapping engine context variables
     let scene3D, camera3D, renderer3D, controls3D;
     let planeGroup3D, trackArrow3D;
@@ -395,13 +1050,13 @@
     let threeMarkersGroup = new THREE.Group();
     let threeDInitialized = false;
 
-    // Schema dictionary linking short keys to chart labels, axes, and UI colors
+    // master list of every variable: its short key, the label shown on charts, which axis it uses, and its color
     const METRIC_DEFS = {
         'pAlt': { label: 'Press Altitude (m)', color: '#d946ef', yAxisID: 'y' },
         'gpsAlt': { label: 'GPS Altitude (m)', color: '#a855f7', yAxisID: 'y' },
         'radAlt': { label: 'Radar Altitude (m)', color: '#14b8a6', yAxisID: 'y' },
         'dValue': { label: 'D-Value (m)', color: '#8b5cf6', yAxisID: 'y' },
-        'sfcPr': { label: 'Surface Press (mb)', color: '#3da5ff', yAxisID: 'y' },
+        'sfcPr': { label: 'Surface Press (mb)', color: '#38bdf8', yAxisID: 'y' },
         'tempr': { label: 'Ambient Temp (°C)', color: '#ff5555', yAxisID: 'y1' },
         'dewpt': { label: 'Dew Point (°C)', color: '#ffaa00', yAxisID: 'y1' },
         'tas': { label: 'TAS (kt)', color: '#f59e0b', yAxisID: 'y1' },
@@ -409,7 +1064,7 @@
         'windSpd': { label: 'Wind Speed (kt)', color: '#f43f5e', yAxisID: 'y1' },
         'driftAngle': { label: 'Drift Angle (Deg)', color: '#ec4899', yAxisID: 'y1' },
         'th': { label: 'True Heading (Deg)', color: '#3b82f6', yAxisID: 'y1' },
-        'gTrack': { label: 'Ground Track (Deg)', color: '#3da5ff', yAxisID: 'y1' },
+        'gTrack': { label: 'Ground Track (Deg)', color: '#38bdf8', yAxisID: 'y1' },
         'pitch': { label: 'Pitch (°)', color: '#ef4444', yAxisID: 'y1' },
         'roll': { label: 'Roll (°)', color: '#3b82f6', yAxisID: 'y1' },
         'alpha': { label: 'Alpha (AOA °)', color: '#10b981', yAxisID: 'y1' },
@@ -418,12 +1073,10 @@
         'accZ': { label: 'Vertical Accel (m/s²)', color: '#f43f5e', yAxisID: 'y1' },
         'mixRate': { label: 'Mixing Ratio (g/kg)', color: '#fbbf24', yAxisID: 'y1' },
         'thetaE': { label: 'Theta E (K)', color: '#c084fc', yAxisID: 'y1' },
-        'pressure': { label: 'Static Press (mb)', color: '#00ffcc', yAxisID: 'y' },
-        'sfmrWs': { label: 'SFMR Sfc Wind (kt)', color: '#0ea5e9', yAxisID: 'y1' },
-        'sfmrRain': { label: 'SFMR Rain (mm/hr)', color: '#6366f1', yAxisID: 'y' }
+        'pressure': { label: 'Static Press (mb)', color: '#00ffcc', yAxisID: 'y' }
     };
 
-    // Subchart state trackers
+    // subchart state trackers
     let customCharts = {}; 
     let masterChartInstance = null;
     let animationFrameId = null;
@@ -432,7 +1085,7 @@
     let lastTickTime = 0;
     let videoPlaybackAccumulator = 0;
 
-    // Viewport panning and temporal playback scaling matrices
+    // map pan/zoom position and the current playback speed
     let mapScale = 1;
     let mapOffsetX = 0;
     let mapOffsetY = 0;
@@ -441,19 +1094,19 @@
     let dragStartY = 0;
     let playbackAccumulator = 0;
     
-    // Temporal sync modifiers
+    // flags that control how the video and tracker stay time-aligned
     let speeds = [1, 2, 4, 8, 16, 32, 64, 128]; 
     let currentSpeedIdx = 0;
     let plotMinLon, plotMaxLon, plotMinLat, plotMaxLat, deltaLon, deltaLat;
 
-    // Shape tracing utility structures
+    // shape tracing utility structures
     let isMeasuring = false;
     let measureShape = 'polygon';
     let measurePointsGeo = [];
     let liveMouseGeo = null;
     const EARTH_RADIUS_NM = 3440.065;
 
-    // Synchronization scrubbers to throttle performance hits when dragging the timeline
+    // timers that limit how often we redraw while the timeline is being dragged
     let isScrubbing = false;
     let activeScrubChart = null; // Tracks which graph is currently being dragged
     let wasPlayingBeforeScrub = false;
@@ -466,7 +1119,7 @@
     let isDraggingShape = false;
     let lastDragGeo = null;
 
-    // Extracts geospatial distance computed by the Haversine formula
+    // distance in nautical miles between two lat/lon points (haversine formula)
     function getDistanceNM(lat1, lon1, lat2, lon2) {
         const dLat = (lat2 - lat1) * Math.PI / 180;
         const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -476,7 +1129,7 @@
         return EARTH_RADIUS_NM * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
     }
 
-    // Projects localized canvas screen pixels to longitudinal/latitudinal geometries
+    // turns a pixel position on the map into a lat/lon coordinate
     function screenToGeo(screenX, screenY) {
         const rect = canvas.getBoundingClientRect();
         const x = screenX - rect.left;
@@ -490,7 +1143,7 @@
         return { lat, lon };
     }
     
-    // Establishes if an arbitrary click intersects mapped geometry constructs
+    // checks whether a click landed inside a drawn shape
     function isPointInShape(geoPt) {
         if (measurePointsGeo.length === 0) return false;
         
@@ -516,7 +1169,7 @@
     }
 
     // 8Hz Interpolation Function - Smoothly derives tracker data 
-    // Uses cubic (Catmull-Rom) interpolation and injects mechanical jitter
+    // smoothly fills in positions between data points, plus a tiny wobble so the icon looks alive
     function getInterpolatedRow() {
         if (!filteredData || filteredData.length === 0) return null;
         
@@ -527,7 +1180,7 @@
             exactSec = filteredData[currentIdx].absSeconds + playbackAccumulator;
         }
         
-        // Find strictly bounding data points
+        // find strictly bounding data points
         let idx1 = currentIdx;
         
         // FIX: Correct idx1 if it's ahead of exactSec (happens during video sync findIndex)
@@ -544,13 +1197,13 @@
         let dt = d2.absSeconds - d1.absSeconds;
         let t = 0;
         
-        // Perfectly smooth continuous progression
+        // perfectly smooth continuous progression
         if (dt > 0) {
             let tRaw = (exactSec - d1.absSeconds) / dt;
             t = Math.max(0, Math.min(1, tRaw));
         }
 
-        // Fetch surrounding points for cubic spline context
+        // fetch surrounding points for cubic spline context
         let idx0 = Math.max(idx1 - 1, 0);
         let idx3 = Math.min(idx2 + 1, filteredData.length - 1);
         let d0 = filteredData[idx0];
@@ -561,7 +1214,7 @@
             return v0 + (v1 - v0) * t;
         };
 
-        // Catmull-Rom Spline core
+        // catmull-Rom Spline core
         const cubic = (v0, v1, v2, v3, t) => {
             if (v0 === null || v1 === null || v2 === null || v3 === null) {
                 if (v1 !== null && v2 !== null) return lerp(v1, v2, t);
@@ -577,7 +1230,7 @@
             );
         };
 
-        // Ensure rotation vectors don't swing wildly across 360/0 borders
+        // ensure rotation vectors don't swing wildly across 360/0 borders
         const unwrap = (val, ref) => {
             if (val === null || ref === null) return val;
             let diff = val - ref;
@@ -596,8 +1249,8 @@
             return ((res % 360) + 360) % 360;
         };
 
-        // Deterministic Pseudo-Random Jitter Generator based on exact time step
-        // Seeding to 8Hz steps gives realistic mechanical pulsing
+        // deterministic Pseudo-Random Jitter Generator based on exact time step
+        // tying the wobble to 8 steps per second makes it look like real instrument vibration
         const s = Math.round(exactSec * 8); 
         const seededRandom = (seed) => {
             let x = Math.sin(seed) * 10000;
@@ -608,7 +1261,7 @@
         let u2 = seededRandom(s + 1);
         if (u1 < 0.0001) u1 = 0.0001; // Avoid log(0)
         
-        // Box-Muller transform mapping to normal distribution
+        // box-Muller transform mapping to normal distribution
         let z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
         let z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(2.0 * Math.PI * u2);
 
@@ -616,7 +1269,7 @@
         let pitch_jitter = z1 * 0.20;
         let roll_jitter = z0 * 0.10; 
 
-        // Safely cache base cubic reads to avoid doing math on missing telemetry
+        // safely cache base cubic reads to avoid doing math on missing telemetry
         let p_val = cubic(d0.pitch, d1.pitch, d2.pitch, d3.pitch, t);
         let r_val = cubic(d0.roll, d1.roll, d2.roll, d3.roll, t);
         let pa_val = cubic(d0.pAlt, d1.pAlt, d2.pAlt, d3.pAlt, t);
@@ -644,8 +1297,10 @@
     let lastOcrVideoTime = 0;
     let ocrHistory = []; // Tracks temporal progression {vTime, ocrSecs}
     
+    let ocrAvailable = false;
     async function initOCR() {
         if (ocrWorker) return;
+        if (typeof Tesseract === 'undefined') { ocrAvailable = false; return; }
         try {
             ocrWorker = await Tesseract.createWorker();
             await ocrWorker.loadLanguage('eng');
@@ -656,11 +1311,19 @@
                 tessjs_create_tsv: '0',
                 tessjs_create_osd: '0',
             });
-        } catch(e) { console.error("OCR Init Error:", e); }
+            ocrAvailable = true;
+        } catch(e) {
+            // some sandboxes block Web Workers from blob URLs (SecurityError).
+            // the tool stays fully usable; only OCR auto-sync is disabled — manual
+            // time entry still works. Don't spam the console with a scary error.
+            ocrAvailable = false;
+            ocrWorker = null;
+            console.warn("Auto-sync OCR unavailable in this environment (Web Worker blocked). Manual time sync still works.");
+        }
     }
     window.addEventListener('load', initOCR);
 
-    // Binds collapsible bar
+    // binds collapsible bar
     document.getElementById('collapseLip').addEventListener('click', function() {
         const content = document.getElementById('mediaBarContent');
         content.classList.toggle('collapsed');
@@ -676,7 +1339,7 @@
         }
     });
 
-    // Caches interface elements globally to minimize lookup latency inside frame ticks
+    // grab these page elements once and reuse them, instead of searching the page every frame
     const canvas = document.getElementById('mapCanvas');
     const ctx = canvas.getContext('2d');
     const video = document.getElementById('radarVideo');
@@ -704,7 +1367,7 @@
     const attitudeHud = document.getElementById('attitudeHud');
     const stickyBottomBar = document.getElementById('stickyBottomBar');
 
-    // Defaults to Auto-Sync if video and valid dataset is detected to ease workflow
+    // turn auto-sync on by default once both a video and flight data are loaded, to save the user a step
     function evaluateAutoSyncDefault() {
         if (videoLoaded && allParsedData.length > 0) {
             videoSyncMode.value = 'auto';
@@ -732,8 +1395,34 @@
         label.classList.add('show');
         setTimeout(() => { label.classList.remove('show'); }, 4000);
     }
+
+    // fills the little summary boxes at the top (aircraft, date, etc.) from the loaded flight data
+    function updateMissionHeader() {
+        const set = (id, val) => {
+            const el = document.getElementById(id); if (!el) return;
+            const ok = val && val !== 'Unknown' && val !== '';
+            el.textContent = ok ? val : '—';
+            el.classList.toggle('on', !!ok);
+            const chip = el.closest('.status-chip'); if (chip) chip.classList.toggle('lit', !!ok);
+        };
+        set('hdrFlightId', flightMetaData.id);
+        // show the tail number / short aircraft id, full name on hover
+        let ac = flightMetaData.aircraft;
+        const acEl = document.getElementById('hdrAircraft');
+        if (acEl) acEl.title = (ac && ac !== 'Unknown') ? ac : '';
+        if (ac && ac !== 'Unknown') { const m = ac.match(/^(NOAA\d+)/); ac = m ? m[1] : ac; }
+        set('hdrAircraft', ac);
+        set('hdrDate', flightMetaData.date);
+        // data window from the parsed range
+        let range = '';
+        if (allParsedData && allParsedData.length) {
+            const a = allParsedData[0].time, b = allParsedData[allParsedData.length-1].time;
+            range = `${a.slice(0,2)}:${a.slice(2,4)} → ${b.slice(0,2)}:${b.slice(2,4)}Z`;
+        }
+        set('hdrRange', range);
+    }
     
-    // Normalizes measurements to proper user locale settings
+    // converts a value to the chosen units (metric or imperial)
     function getConvertedVal(val, key, isImperial) {
         if (val === null || val === undefined) return null;
         if (!isImperial) return val;
@@ -744,7 +1433,7 @@
         return val;
     }
     
-    // Adjusts graph axis tags dynamically to reflect current unit states
+    // updates the axis labels when the user switches between metric and imperial
     function getMetricLabel(key, isImperial) {
         let label = METRIC_DEFS[key].label;
         if (!isImperial) return label;
@@ -755,7 +1444,7 @@
         return label;
     }
 
-    // Plots the vector graphic for a WP-3D Orion aircraft map overlay
+    // draws the little wp-3d orion plane shape that marks the aircraft on the map
     function drawP3Orion(c) {
         c.fillStyle = '#ffffff'; 
         c.strokeStyle = '#222222'; 
@@ -806,7 +1495,7 @@
         c.fillStyle = '#222222'; c.fill();
     }
 
-    // Initializes the 3D scene using WebGL for a 3-dimensional trajectory view
+    // sets up the 3d view of the flight path
     function init3D() {
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width;
@@ -1058,27 +1747,50 @@
         const measureBtn = document.getElementById('measureBtn');
         const clearMeasureBtn = document.getElementById('clearMeasureBtn');
 
+        const satSelect = document.getElementById('satelliteSelect');
+
         if (e.target.value === '3d') {
             canvas.style.display = 'none'; threeDContainer.style.display = 'block';
             
             if (isMeasuring) stopMeasuringState();
-            measureBtn.style.display = 'none';
-            document.getElementById('measureShapeSelect').style.display = 'none';
-            clearMeasureBtn.style.display = 'none';
+            document.getElementById('measureCluster').style.display = 'none';
             document.getElementById('barbIntervalInput').parentElement.style.display = 'none';
+
+            // satellite imagery only renders on the 2d map, so hide its controls in 3d
+            if (satSelect) satSelect.style.display = 'none';
+            buildSatDayStepper();   // hides the day stepper (in2d check fails)
+            const satBadge = document.getElementById('satTimeBadge');
+            if (satBadge) satBadge.classList.add('hidden');
 
             setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (!threeDInitialized) build3DScene(); updateVisualComponents(currentIdx); } }, 50);
         } else {
             canvas.style.display = 'block'; threeDContainer.style.display = 'none';
             
+            document.getElementById('measureCluster').style.display = 'flex';
             measureBtn.style.display = 'inline-block';
-            if (measurePointsGeo.length > 0) clearMeasureBtn.style.display = 'inline-block';
+            updateMeasureUI();
             document.getElementById('barbIntervalInput').parentElement.style.display = 'flex';
+
+            // restore satellite controls when returning to 2d
+            if (satSelect) satSelect.style.display = '';
+            buildSatDayStepper();   // re-shows the day stepper if a satellite is selected
 
             setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { updateVisualComponents(currentIdx); } }, 50);
         }
     });
 
+    // satellite band change: reset cache and trigger fresh fetch
+    document.getElementById('satelliteSelect').addEventListener('change', () => {
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        satLoadedInfo = null; satImageBox = null;
+        satDayOffset = 0;            // reset to flight day when switching satellite
+        buildSatDayStepper();        // show/hide the ◀ Day ▶ control
+        updateSatTimeBadge();
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+            renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+        }
+    });
     document.getElementById('pathColorSelect').addEventListener('change', () => {
         if (filteredData.length > 0) {
             if (threeDInitialized) build3DScene();
@@ -1090,10 +1802,10 @@
         if (filteredData.length > 0) updateVisualComponents(currentIdx);
     });
 
-    // Binds shortcut placement for custom tracking dots
+    // lets the user drop their own marker dots on the map
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
-            const palette = ['#fbbf24', '#ef4444', '#3da5ff', '#10b981', '#a855f7', '#f472b6', '#0ea5e9'];
+            const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#10b981', '#a855f7', '#f472b6', '#0ea5e9'];
             const assignedColor = palette[customMarkers.length % palette.length];
             customMarkers.push({ idx: currentIdx, color: assignedColor });
             if (threeDInitialized) sync3DMarkers();
@@ -1152,14 +1864,22 @@
         }
     });
 
-    // DIRECT SYNC FIX: Forcibly halts playback to capture a crisp native crop pass
-    document.getElementById('forceSyncBtn').addEventListener('click', async () => {
-        if (!videoLoaded || !ocrWorker) return;
+    // pauses the video to grab one sharp frame, reads the clock shown in it, and locks the sync to the first readable
+    // timestamp. Shared by the "Sync Now" button and by the instant auto-sync that runs the moment a
+    // freshly uploaded video has a decodable frame. Pass { silent: true } to suppress the chatty
+    // status toasts for the automatic path.
+    async function performImmediateOcrLock({ silent = false, gateGapSeconds = null } = {}) {
+        if (!videoLoaded) return;
+        if (!ocrWorker || !ocrAvailable) {
+            if (!silent) showToast("Auto-sync (OCR) isn't available in this browser/sandbox. Use Manual time inputs to sync the video.", 6000);
+            return;
+        }
+        if (isOcrRunning) return; // never stack OCR passes on top of each other
         
-        // Force manual takeover
+        // force manual takeover
         isOcrRunning = true; 
         
-        // Pause video to guarantee an unblurred frame for Tesseract
+        // pause video to guarantee an unblurred frame for Tesseract
         let wasPlaying = !video.paused;
         if (wasPlaying) video.pause();
         
@@ -1167,7 +1887,10 @@
         document.getElementById('ocrIndicator').style.display = 'block';
         document.getElementById('videoStartInput').disabled = true;
         
-        showToast("Scanning frame at native resolution... Please wait.", 4000);
+        if (!silent) showToast("Scanning frame at native resolution... Please wait.", 4000);
+        // show the transient "auto-syncing..." hint while we hunt for the timestamp
+        const _autoSyncEl = document.getElementById('autoSyncLaser');
+        if (_autoSyncEl) _autoSyncEl.style.display = 'block';
         
         if (!window.ocrCanvas) {
             window.ocrCanvas = document.createElement('canvas');
@@ -1178,13 +1901,14 @@
         const maxAttempts = 4;
         const originalVideoTime = video.currentTime;
 
-        // Recursive retry function
+        // recursive retry function
         async function attemptSync() {
             if (attempts >= maxAttempts) {
                 isOcrRunning = false;
+                if (_autoSyncEl) _autoSyncEl.style.display = 'none';
                 video.currentTime = originalVideoTime; // Reset to start if failed
                 if (wasPlaying) video.play().catch(e=>{});
-                showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
+                if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
                 return;
             }
 
@@ -1194,29 +1918,29 @@
             
             if (vw === 0 || vh === 0) { attemptSync(); return; }
 
-            // Scan completely at native 1:1 scale to maximize bottom-right corner clarity
+            // scan completely at native 1:1 scale to maximize bottom-right corner clarity
             const scanW = vw; 
             const scanH = vh * 0.40;
             
             window.ocrCanvas.width = scanW; 
             window.ocrCanvas.height = scanH;
             
-            // Crop technique: Black out center screen and only process top/bottom 20%
+            // crop technique: Black out center screen and only process top/bottom 20%
             window.ocrCtx.fillStyle = "black";
             window.ocrCtx.fillRect(0, 0, scanW, scanH);
             
             const sliceH = scanH * 0.20;
-            // Draw Top 15%
+            // draw Top 15%
             window.ocrCtx.drawImage(video, 0, 0, vw, vh * 0.15, 0, 0, scanW, vh * 0.15);
-            // Draw Bottom 25% (Catches timestamps living in bottom corners natively)
+            // draw Bottom 25% (Catches timestamps living in bottom corners natively)
             window.ocrCtx.drawImage(video, 0, vh * 0.75, vw, vh * 0.25, 0, vh * 0.15, scanW, vh * 0.25);
             
             const imgData = window.ocrCtx.getImageData(0, 0, scanW, scanH);
             const data = imgData.data;
 
-            // Apply Dynamic Processing based on attempt number
-            // Attempt 1 & 3: Standard Grayscale
-            // Attempt 2 & 4: Aggressive High-Contrast Binarization
+            // apply Dynamic Processing based on attempt number
+            // attempt 1 & 3: Standard Grayscale
+            // attempt 2 & 4: Aggressive High-Contrast Binarization
             const isAggressive = (attempts % 2 === 0);
             
             for(let i = 0; i < data.length; i += 4) {
@@ -1231,7 +1955,7 @@
             try {
                 const { data: { text } } = await ocrWorker.recognize(window.ocrCanvas);
                 
-                // Aggressive character cleanup
+                // aggressive character cleanup
                 let cleanText = text.replace(/[Oo]/g, '0')
                                     .replace(/[Il|]/g, '1')
                                     .replace(/[Z]/g, '2')
@@ -1255,23 +1979,35 @@
                         
                         if (hasTelemetry) {
                             if (minSecs > 43200 && ocrSecs < 43200 && maxSecs > 86400) ocrSecs += 86400;
-                            // Sanity Check: Must be within 4 hours of telemetry window
+                            // sanity Check: Must be within 4 hours of telemetry window
                             if (ocrSecs < minSecs - 14400 || ocrSecs > maxSecs + 14400) continue;
                         }
                         
+                        // we successfully READ a timestamp this frame — stop hunting regardless of
+                        // whether we end up applying a correction.
+                        validLock = true;
+                        isOcrRunning = false;
+                        if (_autoSyncEl) _autoSyncEl.style.display = 'none';
+                        // gated mode (used after the timeline slider): only re-sync when the video is
+                        // actually misaligned from the tracker by gateGapSeconds or more. Otherwise leave
+                        // the existing offset untouched so a good sync isn't nudged.
+                        const currentGap = Math.abs(ocrSecs - (videoStartSeconds + video.currentTime));
+                        if (gateGapSeconds != null && currentGap < gateGapSeconds) {
+                            if (wasPlaying) video.play().catch(e=>{});
+                            break;
+                        }
+
                         const dynamicBase = ocrSecs - video.currentTime;
                         videoStartSeconds = dynamicBase;
                         document.getElementById('videoStartInput').value = toHHMMSS(dynamicBase);
                         
                         flashAutoSyncLabel(); 
                         updateEndWindowFromVideo(true); 
-                        showToast("Sync Locked Successfully!", 2000);
+                        if (!silent) showToast("Sync Locked Successfully!", 2000);
                         
                         ocrHistory = [];
                         forceOcrSyncNextTick = false; 
                         isManualSyncRequest = false;
-                        validLock = true;
-                        isOcrRunning = false;
                         
                         if (wasPlaying) video.play().catch(e=>{});
                         break;
@@ -1279,19 +2015,23 @@
                 }
                 
                 if (!validLock) {
-                    // If failed, step the video forward 0.5 seconds and try again
+                    // if failed, step the video forward 0.5 seconds and try again
                     video.currentTime += 0.5;
                     video.addEventListener('seeked', attemptSync, { once: true });
                 }
             } catch(e) { 
                 console.error(e);
                 isOcrRunning = false;
+                if (_autoSyncEl) _autoSyncEl.style.display = 'none';
                 if (wasPlaying) video.play().catch(e=>{});
             }
         }
 
         attemptSync(); // Start the loop
-    });
+    }
+
+    // "Sync Now" button → immediate single-frame OCR lock (with user-facing toasts)
+    document.getElementById('forceSyncBtn').addEventListener('click', () => performImmediateOcrLock({ silent: false }));
 
     document.getElementById('exportKmlBtn').addEventListener('click', () => {
         if (filteredData.length === 0) return;
@@ -1340,12 +2080,28 @@
     
     function toggleMenu(event, menuId) { event.stopPropagation(); document.querySelectorAll('.dropdown-menu').forEach(m => { if(m.id !== menuId) m.classList.remove('show'); }); document.getElementById(menuId).classList.toggle('show'); }
 
+    // reset zoom/scale on a single graph back to its default fit
+    function resetChartScale(chartId) {
+        const c = (chartId === 'masterChart') ? masterChartInstance : customCharts[chartId];
+        if (c) { try { c.resetZoom(); } catch(e){} c.draw(); }
+    }
+
     document.getElementById('measureShapeSelect').addEventListener('change', (e) => {
         measureShape = e.target.value;
         measurePointsGeo = [];
         liveMouseGeo = null;
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     });
+
+    // centralized measure-tool UI state: the popout (shape selector + Clear) floats below the button while
+    // measuring or when a measurement exists; the selector shows only while measuring, Clear when points exist.
+    function updateMeasureUI() {
+        const hasPoints = measurePointsGeo.length > 0;
+        const showPopout = isMeasuring || hasPoints;
+        document.getElementById('measureGroup').style.display = showPopout ? 'flex' : 'none';
+        document.getElementById('measureShapeSelect').style.display = isMeasuring ? 'inline-block' : 'none';
+        document.getElementById('clearMeasureBtn').style.display = hasPoints ? 'inline-block' : 'none';
+    }
 
     function stopMeasuringState() {
         isMeasuring = false;
@@ -1354,8 +2110,7 @@
         btn.innerText = '📏 Measure';
         btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
         btn.classList.add('bg-blue-800', 'hover:bg-blue-700');
-        document.getElementById('measureShapeSelect').style.display = 'none';
-        document.getElementById('measureTip').style.display = 'none';
+        updateMeasureUI();
     }
 
     document.getElementById('measureBtn').addEventListener('click', () => {
@@ -1372,10 +2127,8 @@
             btn.innerText = '📏 Measure';
         }
 
-        document.getElementById('measureShapeSelect').style.display = isMeasuring ? 'inline-block' : 'none';
-        document.getElementById('measureTip').style.display = isMeasuring ? 'inline-block' : 'none';
-        
         if (isMeasuring) measurePointsGeo = []; else liveMouseGeo = null;
+        updateMeasureUI();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     });
 
@@ -1383,11 +2136,11 @@
         measurePointsGeo = [];
         isHoveringShape = false;
         isDraggingShape = false;
-        document.getElementById('clearMeasureBtn').style.display = 'none';
+        updateMeasureUI();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     });
 
-    // Pauses timeline scrubbing and playback during timeline dragging interactions
+    // pauses timeline scrubbing and playback during timeline dragging interactions
     timelineSlider.addEventListener('mousedown', () => { 
         isScrubbing = true; 
         wasPlayingBeforeScrub = isPlaying;
@@ -1399,7 +2152,7 @@
         if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
     }, {passive: true});
 
-    // Global Graph Interaction Bindings
+    // global Graph Interaction Bindings
     window.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'CANVAS') {
             const chart = Chart.getChart(e.target);
@@ -1476,21 +2229,32 @@
     window.addEventListener('mousemove', (e) => { if (isScrubbing && activeScrubChart) handleChartDrag(e.clientX); });
     window.addEventListener('touchmove', (e) => { if (isScrubbing && activeScrubChart) handleChartDrag(e.touches[0].clientX); }, {passive: true});
 
-    // Resumes timeline sequence once dragging is released
+    // on scrub release: ALWAYS sync video to tracker position, THEN resume play.
+    // the 60-second threshold gates only the expensive OCR re-sync, not video.currentTime.
     const commitScrub = () => {
         if(isScrubbing) {
-            isScrubbing = false; 
-            activeScrubChart = null; // Clear active graph constraint
+            isScrubbing = false;
+            activeScrubChart = null;
+            clearTimeout(slideSyncTimer);
+
             if (videoLoaded && filteredData[currentIdx]) {
-                video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
-                if (videoSyncMode.value === 'auto') {
+                let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+                if (video.duration) targetVT = Math.min(targetVT, video.duration);
+
+                // always land video at the new tracker position before resuming play
+                video.currentTime = targetVT;
+
+                // after the timeline is used, ALWAYS scan the video frame with OCR to check whether the
+                // video and tracker have drifted apart. We only actually re-sync when that misalignment is
+                // 30 seconds or more — small differences are left alone so a good sync isn't disturbed.
+                if (videoLoaded && ocrAvailable && videoSyncMode.value === 'auto') {
                     clearTimeout(scrubSyncTimeout);
                     scrubSyncTimeout = setTimeout(() => {
-                        forceOcrSyncNextTick = true;
-                        if (!isPlaying) syncTelemetryToVideoClock();
-                    }, 2000);
+                        performImmediateOcrLock({ silent: true, gateGapSeconds: 30 });
+                    }, 650);
                 }
             }
+
             if (wasPlayingBeforeScrub) {
                 isPlaying = true;
                 if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
@@ -1503,27 +2267,31 @@
     window.addEventListener('mouseup', commitScrub);
     window.addEventListener('touchend', commitScrub);
 
-    // Updates visual components smoothly during a scrubbing operation.
+    // timeline slider input: tracker and video update together (video is already paused from mousedown).
+    // debounce video seeks at 80 ms so fast drags don't flood the media element.
+    // after sliding, commitScrub handles the final sync and play-resume.
     timelineSlider.addEventListener('input', function(e) {
         if (filteredData.length === 0) return;
         currentIdx = parseInt(e.target.value, 10);
-        if (videoLoaded && filteredData[currentIdx]) {
-            let targetVideoTime = filteredData[currentIdx].absSeconds - videoStartSeconds;
-            // Safer clamping prevents the player from locking up if forced out of bounds
-            if (targetVideoTime < 0) targetVideoTime = 0;
-            if (video.duration && targetVideoTime > video.duration) targetVideoTime = video.duration;
-            video.currentTime = targetVideoTime;
-        }
+
+        // update map/charts immediately
         if (!scrubDebounceTimer) {
-            requestAnimationFrame(() => {
-                updateVisualComponents(currentIdx, true); // Temporarily skip heavy chart re-renders while sliding to limit lag
-                scrubDebounceTimer = null;
-            });
+            requestAnimationFrame(() => { updateVisualComponents(currentIdx, true); scrubDebounceTimer = null; });
             scrubDebounceTimer = true;
+        }
+
+        // debounced video seek — video is paused so this is safe to call often
+        if (videoLoaded && filteredData[currentIdx]) {
+            clearTimeout(slideSyncTimer);
+            slideSyncTimer = setTimeout(() => {
+                let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+                if (video.duration) targetVT = Math.min(targetVT, video.duration);
+                video.currentTime = targetVT;
+            }, 80);
         }
     });
     
-    // Arrow key step-thru mechanics
+    // arrow key step-thru mechanics
     let arrowSkipSpeed = 1;
     document.addEventListener('keydown', (e) => {
         if (!filteredData || filteredData.length === 0) return;
@@ -1550,7 +2318,7 @@
 
     function resetMapView() { mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
 
-    // Map click and measurement bindings
+    // map click and measurement bindings
     canvas.addEventListener('mousedown', (e) => { 
         if (trackerModeSelect.value === '3d') return; 
         
@@ -1573,7 +2341,7 @@
                 if (measurePointsGeo.length === 0 || measurePointsGeo.length === 2) measurePointsGeo = [geo];
                 else if (measurePointsGeo.length === 1) { measurePointsGeo.push(geo); stopMeasuringState(); }
             }
-            document.getElementById('clearMeasureBtn').style.display = 'inline-block';
+            updateMeasureUI();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             return;
         }
@@ -1591,7 +2359,7 @@
         canvas.dataset.downY = e.clientY; 
     });
     
-    // Smooth geometry panning execution
+    // smooth geometry panning execution
     canvas.addEventListener('mousemove', (e) => { 
         if (trackerModeSelect.value === '3d') return;
         
@@ -1667,7 +2435,7 @@
         mapScale = newScale; bgNeedsUpdate = true; if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }, { passive: false });
 
-    // Handles the intersection checks when a user explicitly taps a custom dropped pin
+    // handles the intersection checks when a user explicitly taps a custom dropped pin
     function handleTrackerCoordinatesClick(e) {
         if (filteredData.length === 0 || isMeasuring) return;
         const rect = canvas.getBoundingClientRect(); const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
@@ -1678,7 +2446,7 @@
         }
     }
 
-    // Modal data dump for specific marker coordinate requests
+    // modal data dump for specific marker coordinate requests
     function processPointAnalysisPlotting(dataRow) {
         document.getElementById('pointAnalysisModal').style.display = 'flex'; currentPointAnalysisData = dataRow; 
         const targetPr = dataRow.pressure !== null ? dataRow.pressure : (dataRow.sfcPr !== null ? dataRow.sfcPr : 850);
@@ -1698,7 +2466,7 @@
         const sf = (val, dec=1) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
 
         let statsHTML = `
-            <div style="color:#3da5ff; font-weight:bold; font-size:15px; border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:14px; font-family:monospace; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
+            <div style="color:#38bdf8; font-weight:bold; font-size:15px; border-bottom:1px solid #20262f; padding-bottom:8px; margin-bottom:14px; font-family:monospace; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
             <div style="font-family:monospace; font-size:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; line-height: 1.5;">
                 <p>COORD LAT   : <span style="color:#fff; font-weight:bold;">${sf(dataRow.lat, 3)}° N</span></p>
                 <p>COORD LON   : <span style="color:#fff; font-weight:bold;">${sf(Math.abs(dataRow.lon), 3)}° W</span></p>`;
@@ -1729,7 +2497,7 @@
         }
         
         if (availableMetrics.has('accZ')) statsHTML += `<p>VERT ACCEL  : <span style="color:#f43f5e; font-weight:bold;">${sf(dataRow.accZ, 2)} m/s²</span></p>`;
-        if (availableMetrics.has('pitch') || availableMetrics.has('roll')) statsHTML += `<p>PITCH / ROLL: <span style="color:#3da5ff; font-weight:bold;">${sf(dataRow.pitch, 1)}° / ${sf(dataRow.roll, 1)}°</span></p>`;
+        if (availableMetrics.has('pitch') || availableMetrics.has('roll')) statsHTML += `<p>PITCH / ROLL: <span style="color:#38bdf8; font-weight:bold;">${sf(dataRow.pitch, 1)}° / ${sf(dataRow.roll, 1)}°</span></p>`;
         if (availableMetrics.has('driftAngle')) statsHTML += `<p>DRIFT ANGLE : <span style="color:#ec4899; font-weight:bold;">${sf(dataRow.driftAngle, 1)}°</span></p>`;
         if (availableMetrics.has('tas')) statsHTML += `<p>TRUE AIRSPD : <span style="color:#f59e0b; font-weight:bold;">${sf(dataRow.tas, 1)} kt</span></p>`;
         if (availableMetrics.has('ias')) statsHTML += `<p>IND AIRSPD  : <span style="color:#a3e635; font-weight:bold;">${sf(dataRow.ias, 1)} kt</span></p>`;
@@ -1743,7 +2511,7 @@
         document.getElementById('pointAnalysisStats').innerHTML = statsHTML;
     }
 
-    // Compiles active modal data and triggers the native download blob
+    // compiles active modal data and triggers the native download blob
     function downloadPointAnalysis() {
         if (!currentPointAnalysisData) return;
         const d = currentPointAnalysisData; 
@@ -1791,7 +2559,7 @@
         a.download = `NOAA_PointAnalysis_${flightMetaData.id}_${d.time}.txt`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    // Handles the responsive scaling logic for multiple canvas contexts
+    // handles the responsive scaling logic for multiple canvas contexts
     function resizeCanvasLayout() { 
         const rect = canvas.parentElement.getBoundingClientRect(); 
         if (rect.width === 0 || rect.height === 0) return; 
@@ -1820,12 +2588,73 @@
     window.addEventListener('resize', () => { 
         if (filteredData.length > 0) { 
             resizeCanvasLayout(); 
-            if(trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); 
+            if(trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
             if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
         } 
     });
 
-    // Utilities to swap formatted clock strings for raw elapsed tracking bounds
+    // drag the bottom edge of the sticky media bar to resize the tracker + video panels.
+    // dragging up shrinks them, dragging down grows them; the minimize lip still works independently.
+    (function setupMediaResize() {
+        const handle = document.getElementById('mediaResizeHandle');
+        const bar = document.getElementById('stickyMediaBar');
+        if (!handle || !bar) return;
+        const MIN_H = 240, MAX_H = 900;
+        let dragging = false, startY = 0, startH = 0, rafPending = false;
+
+        const pointerY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+
+        function onDown(e) {
+            dragging = true;
+            startY = pointerY(e);
+            startH = document.getElementById('mapPanel').getBoundingClientRect().height;
+            bar.classList.add('resizing');
+            e.preventDefault();
+        }
+        function onMove(e) {
+            if (!dragging) return;
+            const h = Math.max(MIN_H, Math.min(MAX_H, startH + (pointerY(e) - startY)));
+            document.documentElement.style.setProperty('--media-h', h + 'px');
+            // shrink the HUD overlay alongside the panel so it keeps fitting as the tracker gets smaller
+            document.documentElement.style.setProperty('--hud-scale', Math.max(0.55, Math.min(1, h / 480)).toFixed(3));
+            if (!rafPending) {
+                rafPending = true;
+                requestAnimationFrame(() => {
+                    rafPending = false;
+                    resizeCanvasLayout();
+                    // re-fit the projection to the new canvas aspect ratio so the map keeps scale (no stretch)
+                    if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+                        calculateMapScales();
+                        bgNeedsUpdate = true;
+                        renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                    }
+                });
+            }
+            if (e.cancelable) e.preventDefault();
+        }
+        function onUp() {
+            if (!dragging) return;
+            dragging = false;
+            bar.classList.remove('resizing');
+            resizeCanvasLayout();
+            if (filteredData.length > 0) {
+                if (trackerModeSelect.value === '2d') {
+                    calculateMapScales();
+                    bgNeedsUpdate = true;
+                    renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                }
+                if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
+            }
+        }
+        handle.addEventListener('mousedown', onDown);
+        handle.addEventListener('touchstart', onDown, { passive: false });
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
+    })();
+
+    // utilities to swap formatted clock strings for raw elapsed tracking bounds
     function timeToSeconds(timeStr) {
         if (!timeStr) return 0; 
         let cleanStr = String(timeStr).replace(/[^0-9]/g, ''); 
@@ -1842,7 +2671,7 @@
         return String(h).padStart(2,'0') + String(m).padStart(2,'0') + String(s).padStart(2,'0');
     }
     
-    // Aligns the internal start/end window telemetry boundaries against the synced video length natively
+    // aligns the internal start/end window telemetry boundaries against the synced video length natively
     function updateEndWindowFromVideo(preservePlayback = false) {
         if (videoLoaded && video.duration && !isNaN(video.duration)) {
             let startSecs = timeToSeconds(document.getElementById('videoStartInput').value);
@@ -1880,12 +2709,14 @@
         }
     }
 
-    // Media element listener to prepare external media layers
+    // media element listener to prepare external media layers
     document.getElementById('videoInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true; 
         
-        speeds = [1, 4, 8, 16, 32];
+        // cap playback at 16x while an MMR video is loaded — 32x makes the media element stutter/stall
+        // because it can't decode fast enough to keep up with the tracker.
+        speeds = [1, 4, 8, 16];
         currentSpeedIdx = 0; // forces a reset to 1x 
         updateSpeedDisplay();
         
@@ -1895,26 +2726,36 @@
         if (allParsedData.length > 0) document.getElementById('videoStartInput').value = allParsedData[0].time;
         
         video.addEventListener('loadedmetadata', () => {
-            updateEndWindowFromVideo(false);
-            // Snap the panel's aspect ratio to the native video size to remove empty space
-            document.getElementById('videoPanel').classList.add('auto-fit');
+            updateEndWindowFromVideo(true);
         }, { once: true });
         
         video.addEventListener('seeking', syncTelemetryToVideoClock);
         
         evaluateAutoSyncDefault();
+
+        // FAST PATH: as soon as the freshly uploaded video has a decodable frame, immediately try to
+        // lock onto whatever timestamp it shows — no 2s/3s wait — so the sync feels instant.
+        video.addEventListener('loadeddata', () => {
+            if (videoSyncMode.value === 'auto' && ocrAvailable) performImmediateOcrLock({ silent: true });
+        }, { once: true });
+
+        // SAFETY NET: re-run the lock ~3s after upload (as it did before) to correct any haphazard
+        // first read. This second pass only runs if the video is sitting still (not actively playing).
+        setTimeout(() => {
+            if (videoSyncMode.value === 'auto' && ocrAvailable && !isPlaying) performImmediateOcrLock({ silent: true });
+        }, 3000);
     });
 
-    // Primary entry point for ingesting either raw NetCDF or TSV plain text file variants
+    // primary entry point for ingesting either raw NetCDF or TSV plain text file variants
     document.getElementById('fileInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
         
-        // Show loading screen immediately
+        // show loading screen immediately
         const loader = document.getElementById('loadingOverlay');
         loader.classList.remove('hidden');
         loader.classList.add('flex');
 
-        // Yield to browser render loop before synchronous parsing blocks the main thread
+        // yield to browser render loop before synchronous parsing blocks the main thread
         setTimeout(() => {
             currentSpeedIdx = 0;
             updateSpeedDisplay();
@@ -1984,7 +2825,7 @@
                             if (varsData[name].length > numRows) numRows = varsData[name].length;
                         });
                         
-                        // Time interval validation parser
+                        // time interval validation parser
                         let startSecs = -1;
                         let endSecs = -1;
 
@@ -2015,7 +2856,7 @@
                             if (endSecs < startSecs) endSecs += 86400; // handle midnight rollover
                             let totalDuration = endSecs - startSecs;
 
-                            // Swap standard timeline constructs logically
+                            // swap standard timeline constructs logically
                             finalVarNames = varNames.filter(n => n.toLowerCase() !== 'time');
                             finalVarNames.unshift('time');
 
@@ -2034,7 +2875,7 @@
                             varsData['time'] = timeArr;
                         }
 
-                        // Export internal state back down to TSV framework
+                        // export internal state back down to TSV framework
                         let tsvStr = finalVarNames.join('\t') + '\n';
                         
                         for (let i = 0; i < numRows; i++) {
@@ -2048,7 +2889,7 @@
                         parseEntireFile(tsvStr);
                         
                     } catch (err) { 
-                        // Hide loading overlay on error
+                        // hide loading overlay on error
                         document.getElementById('loadingOverlay').classList.add('hidden');
                         document.getElementById('loadingOverlay').classList.remove('flex');
                     }
@@ -2064,7 +2905,7 @@
         }, 50); // Small 50ms delay to guarantee UI render
     });
 
-    // Main parser execution: normalizes raw rows into predictable data properties
+    // main parser execution: normalizes raw rows into predictable data properties
     function parseEntireFile(rawText) {
         const lines = rawText.split('\n');
         if (lines.length < 2) {
@@ -2086,7 +2927,7 @@
             return null; 
         };
 
-        // Identifies the primary time architecture (UNIX, HMS, or continuous sec string)
+        // identifies the primary time architecture (UNIX, HMS, or continuous sec string)
         let timeMax = -1;
         const tIdx = hMap['time'];
         if (tIdx !== undefined) {
@@ -2164,7 +3005,7 @@
                 let tasKt = getVal(parts, 'TASkt.d') ?? getVal(parts, 'TASkt.1') ?? (rawTas !== null ? rawTas * 1.94384 : null);
                 let iasKt = getVal(parts, 'IASkt.d') ?? getVal(parts, 'CasADDUkt.1') ?? (getVal(parts, 'IAS.d') !== null ? getVal(parts, 'IAS.d') * 1.94384 : null);
                 
-                // Normalizes the unit context for mixture thresholds
+                // normalizes the unit context for mixture thresholds
                 let rawMixRate = getVal(parts, 'MRkg.d') ?? getVal(parts, 'MR.d') ?? null;
                 let finalMixRate = (rawMixRate !== null && rawMixRate < 0.5) ? rawMixRate * 1000 : rawMixRate;
 
@@ -2192,8 +3033,6 @@
                     vtWnd: rawVz, 
                     mixRate: finalMixRate, 
                     thetaE: getVal(parts, 'THETAE.d') ?? null, 
-                    sfmrWs: getVal(parts, 'SfmrWS.1') ?? getVal(parts, 'ASfmrWS.1') ?? null,
-                    sfmrRain: getVal(parts, 'SfmrRainRate.1') ?? getVal(parts, 'ASfmrRainRate.1') ?? null, 
                     accZ: getVal(parts, 'ACCZref') ?? getVal(parts, 'AccZI.1') ?? null
                 });
             } catch (err) { continue; }
@@ -2211,7 +3050,7 @@
         for (let i = 0; i < tempParsedData.length; i++) {
             let current = tempParsedData[i];
             
-            // Drop invalid anomalies
+            // drop invalid anomalies
             if (current.tas !== null && current.tas < 60) continue; 
             
             if (allParsedData.length === 0) {
@@ -2229,7 +3068,7 @@
             let latSpeed = Math.abs(current.lat - prev.lat) / dt;
             let lonSpeed = Math.abs(current.lon - prev.lon) / dt;
 
-            // Discard erratic coordinates jumping while resting on runway
+            // discard erratic coordinates jumping while resting on runway
             if (latSpeed < 0.00001 && lonSpeed < 0.00001 && current.gpsAlt !== null && current.gpsAlt < 500) continue;
             if (latSpeed > 0.02 || lonSpeed > 0.02) continue;
 
@@ -2255,6 +3094,7 @@
         });
 
         document.getElementById('detectedRangeText').innerText = `[ Detected: ${allParsedData[0].time.slice(0,2)}:${allParsedData[0].time.slice(2,4)} UTC → ${allParsedData[allParsedData.length-1].time.slice(0,2)}:${allParsedData[allParsedData.length-1].time.slice(2,4)} UTC ]`;
+        updateMissionHeader();
         
         ['startTimeInput', 'endTimeInput', 'runBtn', 'exportKmlBtn'].forEach(id => document.getElementById(id).disabled = false);
         document.getElementById('startTimeInput').value = allParsedData[0].time; 
@@ -2272,17 +3112,28 @@
         
         evaluateAutoSyncDefault();
 
-        // Data processing complete. Hide loading overlay gracefully.
+        // auto-start playback the moment the tracker (flight data) finishes loading, so the user sees it
+        // moving right away. If an mp4 is loaded afterward it stays playing (handled on video load).
+        if (filteredData.length > 0 && !isPlaying) {
+            isPlaying = true;
+            playPauseBtn.innerText = "⏸ Pause";
+            playbackAccumulator = 0;
+            lastTickTime = performance.now();
+            if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
+            masterSyncEngineTick();
+        }
+
+        // data processing complete. Hide loading overlay gracefully.
         document.getElementById('loadingOverlay').classList.add('hidden');
         document.getElementById('loadingOverlay').classList.remove('flex');
     }
 
-    // Handles user toggles for showing lines onto the top Master graph array
+    // handles adding/removing a metric line on the bottom "Create Graph" master chart
     function toggleMasterMetric(metricKey, isChecked) {
         if (isChecked) {
             const isImp = document.getElementById('toggleImperial').checked;
             const newDs = createDatasetConfig(metricKey, false); 
-            // Fills out the entire data array statically instead of constantly injecting indices
+            // fills out the entire data array statically instead of constantly injecting indices
             newDs.data = filteredData.map(d => getConvertedVal(d[metricKey], metricKey, isImp));
             masterChartInstance.data.datasets.push(newDs);
         } else {
@@ -2291,17 +3142,77 @@
         }
         updateMasterGraphVisibility();
         masterChartInstance.update('none');
+        buildMasterMenu();
+    }
+
+    // builds the variable list shown when the "Create Graph" ＋ (or the big prompt) is clicked.
+    // mirrors the per-chart dropdown pattern so it feels familiar.
+    // softens a metric's graph color for the menu list so it reads cleanly (not neon-bright),
+    // while keeping the hue recognizable so it matches what's drawn on the graphs.
+    function mutedMetricColor(hex) {
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+        if (!m) return '#aab4be';
+        const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+        const mix = 0.42; // blend toward a light slate
+        const t = (c, target) => Math.round(c * (1 - mix) + target * mix);
+        return `rgb(${t(r, 0xc9)}, ${t(g, 0xd2)}, ${t(b, 0xdc)})`;
+    }
+
+    function buildMasterMenu() {
+        const menu = document.getElementById('menu-masterChart');
+        if (!menu) return;
+        menu.innerHTML = '';
+        const isImp = document.getElementById('toggleImperial').checked;
+        const activeKeys = masterChartInstance ? masterChartInstance.data.datasets.map(ds => ds.metricKey) : [];
+
+        const clearAllItem = document.createElement('div');
+        clearAllItem.className = 'dropdown-item';
+        clearAllItem.style.color = '#ef4444';
+        clearAllItem.style.fontWeight = 'bold';
+        clearAllItem.innerText = '✕ Clear All';
+        clearAllItem.onclick = (e) => {
+            e.stopPropagation();
+            if (masterChartInstance) { masterChartInstance.data.datasets = []; masterChartInstance.update('none'); }
+            updateMasterGraphVisibility();
+            buildMasterMenu();
+        };
+        menu.appendChild(clearAllItem);
+
+        const breakHr = document.createElement('div');
+        breakHr.style.borderTop = '1px solid #20262f';
+        breakHr.style.margin = '4px 0';
+        menu.appendChild(breakHr);
+
+        Object.keys(METRIC_DEFS).forEach(key => {
+            const isAvail = availableMetrics.has(key);
+            const div = document.createElement('div');
+            div.className = `dropdown-item ${activeKeys.includes(key) ? 'active' : ''}`;
+            div.innerText = getMetricLabel(key, isImp);
+            // color-code each variable to (a softened version of) the color it uses on the graphs
+            div.style.color = mutedMetricColor(METRIC_DEFS[key].color);
+            if (isAvail) {
+                div.onclick = (e) => { e.stopPropagation(); toggleMasterMetric(key, !activeKeys.includes(key)); };
+            } else {
+                div.style.opacity = '0.3';
+                div.style.cursor = 'not-allowed';
+            }
+            menu.appendChild(div);
+        });
     }
 
     function updateMasterGraphVisibility() {
         const wrapper = document.getElementById('masterGraphWrapper');
-        if (masterChartInstance && masterChartInstance.data.datasets.length > 0) {
+        const prompt = document.getElementById('masterCreatePrompt');
+        const hasData = masterChartInstance && masterChartInstance.data.datasets.length > 0;
+        if (hasData) {
             wrapper.classList.remove('hidden');
             wrapper.classList.add('block');
+            if (prompt) prompt.classList.add('hidden');
             masterChartInstance.resize();
         } else {
             wrapper.classList.remove('block');
             wrapper.classList.add('hidden');
+            if (prompt) prompt.classList.remove('hidden');
         }
     }
 
@@ -2316,7 +3227,7 @@
         }
     }
 
-    // Main routine wrapper executing user modifications and building canvas spaces natively
+    // main routine wrapper executing user modifications and building canvas spaces natively
     function applyFiltersAndInit(shouldPlay = false) {
         isPlaying = false; playPauseBtn.innerText = "▶ Play"; if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
@@ -2338,7 +3249,7 @@
         timelineSlider.min = 0; timelineSlider.max = filteredData.length - 1; timelineSlider.value = 0;
         resizeCanvasLayout(); calculateMapScales(); resetMapView(); lastRenderedIdx = -1; buildChartLayout();
         
-        document.querySelectorAll('#masterGraphToggles input').forEach(el => el.checked = false); masterChartInstance.data.datasets = [];
+        masterChartInstance.data.datasets = []; buildMasterMenu();
         updateMasterGraphVisibility();
         
         if (trackerModeSelect.value === '3d') build3DScene();
@@ -2348,6 +3259,10 @@
         hasInitialSyncOccurred = false;
         clearTimeout(scrubSyncTimeout);
         lastOcrVideoTime = 0;
+
+        // update satellite dropdown & reset tile cache for new flight data
+        updateSatelliteOptions();
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
         if (videoLoaded) { 
             video.pause(); 
@@ -2373,13 +3288,13 @@
         const mode = videoSyncMode.value;
         const now = performance.now();
         
-        // Triggers automated re-sync via worker processing when clock desync is substantial
+        // triggers automated re-sync via worker processing when clock desync is substantial
         if (mode === 'auto' && !isOcrRunning) {
             if (Math.abs(video.currentTime - lastOcrVideoTime) >= 60) forceOcrSyncNextTick = true;
         }
         
-        // Routine to analyze visual time stamps across the entire camera element
-        if (mode === 'auto' && !isOcrRunning && forceOcrSyncNextTick && (now - lastOcrTime > 500 || lastOcrTime === 0)) {
+        // routine to analyze visual time stamps across the entire camera element
+        if (mode === 'auto' && ocrAvailable && ocrWorker && !isOcrRunning && forceOcrSyncNextTick && (now - lastOcrTime > 500 || lastOcrTime === 0)) {
             isOcrRunning = true; 
             lastOcrTime = now;
             
@@ -2392,24 +3307,24 @@
             const vh = video.videoHeight;
             
             if (vw > 0 && vh > 0 && ocrWorker) {
-                // Downscale frame slightly (max 1280px wide) to prevent Tesseract from locking up the browser
+                // downscale frame slightly (max 1280px wide) to prevent Tesseract from locking up the browser
                 const scanW = vw; 
                 const scanH = vh * 0.40;
                 
                 window.ocrCanvas.width = scanW; 
                 window.ocrCanvas.height = scanH;
 
-                // Crop technique: Black out center screen and only process top/bottom 20%
+                // crop technique: Black out center screen and only process top/bottom 20%
                 window.ocrCtx.fillStyle = "black";
                 window.ocrCtx.fillRect(0, 0, scanW, scanH);
                 
                 const sliceH = scanH * 0.20;
-                // Draw Top 15%
+                // draw Top 15%
                 window.ocrCtx.drawImage(video, 0, 0, vw, vh * 0.15, 0, 0, scanW, vh * 0.15);
-                // Draw Bottom 25%
+                // draw Bottom 25%
                 window.ocrCtx.drawImage(video, 0, vh * 0.75, vw, vh * 0.25, 0, vh * 0.15, scanW, vh * 0.25);
                 
-                // Soft Grayscale filter (preserves anti-aliasing better than pure binarization)
+                // soft Grayscale filter (preserves anti-aliasing better than pure binarization)
                 const imgData = window.ocrCtx.getImageData(0, 0, scanW, scanH);
                 const data = imgData.data;
                 for(let i = 0; i < data.length; i += 4) {
@@ -2421,7 +3336,7 @@
                 try {
                     const { data: { text } } = await ocrWorker.recognize(window.ocrCanvas);
                     
-                    // Sanitize common OCR errors before executing the regex search
+                    // sanitize common OCR errors before executing the regex search
                     let cleanText = text.replace(/[Oo]/g, '0')
                                         .replace(/[Il|]/g, '1')
                                         .replace(/[Z]/g, '2')
@@ -2440,23 +3355,23 @@
                         const s = parseInt(match[3], 10);
                         let ocrSecs = h * 3600 + m * 60 + s;
 
-                        // Validate against flight boundaries to ignore relative mission timers (e.g. 00:01:03)
+                        // validate against flight boundaries to ignore relative mission timers (e.g. 00:01:03)
                         if (allParsedData.length > 0) {
                             const minSecs = allParsedData[0].absSeconds;
                             const maxSecs = allParsedData[allParsedData.length - 1].absSeconds;
                             if (minSecs > 43200 && ocrSecs < 43200 && maxSecs > 86400) ocrSecs += 86400;
                             
-                            // Reject if outside a 4-hour window of the telemetry bounds
+                            // reject if outside a 4-hour window of the telemetry bounds
                             if (ocrSecs < minSecs - 14400 || ocrSecs > maxSecs + 14400) continue; 
                         }
 
-                        // Check current string against history to find a linear time progression
+                        // check current string against history to find a linear time progression
                         for (let i = 0; i < ocrHistory.length; i++) {
                             const hist = ocrHistory[i];
                             const vTimeDelta = currentVTime - hist.vTime;
                             const ocrDelta = ocrSecs - hist.ocrSecs;
 
-                            // Reduced requirement: Verify temporal progression (allow 1.0s margin of error for lag and desync)
+                            // reduced requirement: Verify temporal progression (allow 1.0s margin of error for lag and desync)
                             if (vTimeDelta >= 1.0 && Math.abs(ocrDelta - vTimeDelta) <= 1.0) {
                                 
                                 const dynamicBase = ocrSecs - currentVTime;
@@ -2484,11 +3399,11 @@
                         
                         if (timeFoundAndVerified) break;
 
-                        // If not verified yet, add it to the stack
+                        // if not verified yet, add it to the stack
                         ocrHistory.push({ vTime: currentVTime, ocrSecs: ocrSecs });
                     }
 
-                    // Memory cleanup: Remove historical candidates older than 10 seconds
+                    // memory cleanup: Remove historical candidates older than 10 seconds
                     ocrHistory = ocrHistory.filter(h => (currentVTime - h.vTime) <= 10.0);
 
                 } catch(e) { 
@@ -2511,7 +3426,7 @@
             currentIdx = newIdx; 
             updateVisualComponents(currentIdx); 
         } else if (force8HzUpdate && !video.paused) {
-            // Force redraw logic for continuous smooth 8Hz mode
+            // force redraw logic for continuous smooth 8Hz mode
             updateVisualComponents(currentIdx, true);
         }
     }
@@ -2568,7 +3483,7 @@
         return getSpdColor(d.windSpd);
     }
 
-    // Plots classical windbarb SVG equivalents based strictly on coordinates/angles
+    // plots classical windbarb SVG equivalents based strictly on coordinates/angles
     function drawWindBarbFrame(x, y, dir, spd, scale, isDynamic = false) {
         ctx.save(); ctx.translate(x, y); 
         let mult = isDynamic ? 1.4 : 1;
@@ -2604,14 +3519,31 @@
         ctx.restore();
     }
     
-    // Core mapping engine background layer: isolates physical environment away from telemetry
+    // core mapping engine background layer: isolates physical environment away from telemetry
     function renderBackground() {
         if (!bgCanvas.width || !bgCanvas.height) return; 
-        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#0f172a'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#161b22'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
+        const satSel2 = document.getElementById('satelliteSelect');
+        const isSatOn = satSel2 && satSel2.value !== 'none';
+        if (satImageLoaded && isSatOn && satImage.width > 0) {
+            bgCtx.globalAlpha = 0.92;
+            if (satImageBox) {
+                // place the image by its true geographic extent (it extends past the map edges,
+                // so panning reveals already-fetched imagery instead of blank borders).
+                const dx = getX(satImageBox.minLon);
+                const dy = getY(satImageBox.maxLat);
+                const dw = getX(satImageBox.maxLon) - getX(satImageBox.minLon);
+                const dh = getY(satImageBox.minLat) - getY(satImageBox.maxLat);
+                bgCtx.drawImage(satImage, dx, dy, dw, dh);
+            } else {
+                bgCtx.drawImage(satImage, 0, 0, canvas.width, canvas.height);
+            }
+            bgCtx.globalAlpha = 1.0;
+        }
         if (mapFeatures.length > 0) {
-            bgCtx.fillStyle = '#15803d'; bgCtx.strokeStyle = '#000000'; bgCtx.lineWidth = 1.5 / mapScale; 
+            bgCtx.fillStyle = isSatOn ? 'rgba(21,128,61,0.25)' : '#15803d'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale; 
             mapFeatures.forEach(feature => {
                 if (!isBoxInFlightBounds(feature.properties.bbox)) return; 
                 const geom = feature.geometry; if (!geom) return;
@@ -2631,7 +3563,7 @@
         bgCtx.restore(); bgNeedsUpdate = false;
     }
 
-    // Core mapping engine overlay: handles dynamically scaling coordinate reprojection and plane overlaying
+    // core mapping engine overlay: handles dynamically scaling coordinate reprojection and plane overlaying
     function renderMapEngineFrame(idx, visualRow) {
         if (!canvas.width || !canvas.height) return; 
         
@@ -2642,8 +3574,8 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(bgCanvas, 0, 0);
         ctx.save(); ctx.translate(mapOffsetX, mapOffsetY); ctx.scale(mapScale, mapScale);
         
-        // Decimates/drops points clustered beneath 1-pixel resolution differences.
-        // Doing this limits huge flight vectors from causing massive rendering lag natively.
+        // decimates/drops points clustered beneath 1-pixel resolution differences.
+        // doing this limits huge flight vectors from causing massive rendering lag natively.
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
         let lastX = getX(filteredData[0].lon), lastY = getY(filteredData[0].lat);
         for (let i = 1; i <= idx; i++) { 
@@ -2692,22 +3624,22 @@
                 ctx.save(); 
                 ctx.rotate((t_track - 90) * Math.PI/180); 
                 
-                // Draw shaft (a simple crisp line)
+                // draw shaft (a simple crisp line)
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(25 * zoomFactor, 0); 
-                ctx.strokeStyle = '#3da5ff';
+                ctx.strokeStyle = '#38bdf8';
                 ctx.lineWidth = 2 * zoomFactor;
                 ctx.stroke();
 
-                // Draw tiny pointy triangle exactly at the end
+                // draw tiny pointy triangle exactly at the end
                 ctx.beginPath();
                 ctx.moveTo(32 * zoomFactor, 0); // Pointy tip exactly at the end
                 ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); // Back left
                 ctx.lineTo(24 * zoomFactor, 3 * zoomFactor);  // Back right
                 ctx.closePath();
                 
-                ctx.fillStyle = '#3da5ff';
+                ctx.fillStyle = '#38bdf8';
                 ctx.fill();
                 
                 ctx.restore();
@@ -2720,12 +3652,12 @@
             }
             ctx.restore(); 
 
-            // Draw the live 1-sec wind barb right at the nose of the plane icon based on TRUE HEADING
+            // draw the live 1-sec wind barb right at the nose of the plane icon based on TRUE HEADING
             if (d.windDir !== null && d.windSpd !== null) {
-                // Calculate the nose offset based on heading (not the track arrow)
+                // calculate the nose offset based on heading (not the track arrow)
                 let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
                 
-                // Push the barb coordinates forward to align exactly with the visual nose of the plane
+                // push the barb coordinates forward to align exactly with the visual nose of the plane
                 const noseDist = 8 * zoomFactor / mapScale; 
                 let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist;
                 let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
@@ -2734,7 +3666,7 @@
             }
         }
 
-        // Draw custom markers AFTER the plane so they layer properly on top
+        // draw custom markers AFTER the plane so they layer properly on top
         customMarkers.forEach(marker => {
             if (marker.idx <= idx && filteredData[marker.idx]) {
                 const mx = getX(filteredData[marker.idx].lon); const my = getY(filteredData[marker.idx].lat);
@@ -2788,7 +3720,7 @@
                     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); 
                     const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX;
                     const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
-                    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(liveX + 15, liveY - 45, 100, 55);
+                    ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 45, 100, 55);
                     ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif';
                     ctx.fillText(`Seg: ${liveSegDist.toFixed(1)} NM`, liveX + 20, liveY - 30);
                     ctx.fillStyle = '#fff'; ctx.fillText(`Tot: ${totalDist.toFixed(1)} NM`, liveX + 20, liveY - 15);
@@ -2811,7 +3743,7 @@
                     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); 
                     const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX;
                     const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
-                    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60);
+                    ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60);
                     ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif';
                     ctx.fillText(`Bounds:`, liveX + 20, liveY - 35);
                     ctx.fillStyle = '#fff'; ctx.fillText(`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`, liveX + 20, liveY - 20);
@@ -2840,7 +3772,7 @@
                         ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); 
                         const activeGeo = isMeasuring ? edgeGeo : liveMouseGeo;
                         const liveX = (getX(activeGeo.lon) * mapScale) + mapOffsetX, liveY = (getY(activeGeo.lat) * mapScale) + mapOffsetY;
-                        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 130, 60);
+                        ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 130, 60);
                         ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif'; 
                         ctx.fillText(`Radius: ${rNM.toFixed(1)} NM`, liveX + 20, liveY - 35);
                         ctx.fillStyle = '#fff'; ctx.fillText(`Area: ${(Math.PI * rNM * rNM).toFixed(1)} NM²`, liveX + 20, liveY - 20);
@@ -2868,7 +3800,7 @@
                         
                         const diamNM = getDistanceNM(p1.lat, p1.lon, p2.lat, p2.lon);
                         
-                        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60);
+                        ctx.fillStyle = 'rgba(22, 27, 34, 0.85)'; ctx.fillRect(liveX + 15, liveY - 50, 120, 60);
                         ctx.fillStyle = '#38bdf8'; ctx.font = 'bold 11px sans-serif';
                         ctx.fillText(`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`, liveX + 20, liveY - 35);
                         ctx.fillStyle = '#fff'; ctx.fillText(`Area: ${(widthNM * heightNM).toFixed(1)} NM²`, liveX + 20, liveY - 20);
@@ -2883,7 +3815,7 @@
         ctx.restore();
     }
 
-    // Plots the heads up graphical representation of pilot instrumentation
+    // plots the heads up graphical representation of pilot instrumentation
     function renderPFD(d) {
         const c = document.getElementById('pfdCanvas');
         if (!c || !c.getContext) return;
@@ -3024,7 +3956,7 @@
             }
         }
         
-        ctx.fillStyle = '#3da5ff';
+        ctx.fillStyle = '#38bdf8';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.font = 'bold ' + (fSize) + 'px sans-serif';
@@ -3074,7 +4006,7 @@
             }
         }
         
-        ctx.fillStyle = '#3da5ff';
+        ctx.fillStyle = '#38bdf8';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         ctx.font = 'bold ' + (fSize) + 'px sans-serif';
@@ -3100,7 +4032,7 @@
         ctx.strokeStyle = '#888'; 
         ctx.stroke();
         
-        ctx.fillStyle = '#3da5ff';
+        ctx.fillStyle = '#38bdf8';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
         let vsiFontSize = Math.max(8, fSize - 3);
@@ -3189,7 +4121,7 @@
         ctx.fillText(hdg !== null ? ((hdg % 360 + 360) % 360).toFixed(0) + '°' : '---', centerHdgX, botY + 4);
     }
 
-    // Maps text tags reflecting the core parameters on hover or directly onto UI space
+    // builds the text shown in the on-map readout box (the hud)
     function renderHUD(d) {
         const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
@@ -3221,7 +4153,7 @@
         if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', tdDisp, true);
         
         if (document.getElementById('toggleExtraHUD').checked) {
-            h += `<div style="border-top:1px solid #3da5ff; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
+            h += `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
             
             if (useGps) {
                 if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
@@ -3237,8 +4169,6 @@
             if (availableMetrics.has('accZ')) h += addHUD('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'N/A'}`);
             if (availableMetrics.has('radAlt')) h += addHUD('RADAR ALT', rAltDisp);
             if (availableMetrics.has('dValue')) h += addHUD('D-VALUE', dValueDisp);
-            if (availableMetrics.has('sfmrWs')) h += addHUD('SFMR SFC WIND', `${d.sfmrWs !== null ? sf(d.sfmrWs, 1) + ' kt' : 'N/A'}`);
-            if (availableMetrics.has('sfmrRain')) h += addHUD('SFMR RAIN', `${d.sfmrRain !== null ? sf(d.sfmrRain, 1) + ' mm/hr' : 'N/A'}`);
             if (availableMetrics.has('tas')) h += addHUD('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'N/A'}`);
             if (availableMetrics.has('ias')) h += addHUD('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'N/A'}`);
             if (availableMetrics.has('th')) h += addHUD('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'N/A'}`);
@@ -3248,10 +4178,14 @@
             if (availableMetrics.has('thetaE')) h += addHUD('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'N/A'}`, true);
             if (availableMetrics.has('pressure')) h += addHUD('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'N/A'}`);
         }
+        // the hud text is rebuilt every frame; remember how far it's scrolled so the user can scroll
+        // down to the extra metrics and stay there instead of jumping back to the top each frame
+        const prevScroll = hud.scrollTop;
         hud.innerHTML = h;
+        hud.scrollTop = prevScroll;
     }
 
-    // Charting Configuration Framework
+    // charting Configuration Framework
     function createDatasetConfig(metricKey, hidden = false) { 
         const isImp = document.getElementById('toggleImperial').checked;
         const def = METRIC_DEFS[metricKey]; 
@@ -3289,7 +4223,7 @@
         };
     }
 
-    // Global marker overlay system: Draws the playhead and custom marks over the charts directly
+    // global marker overlay system: Draws the playhead and custom marks over the charts directly
     const markerPlugin = { 
         id: 'markerPlugin', 
         afterDraw: (chart) => { 
@@ -3297,7 +4231,7 @@
             const ctx = chart.ctx; const xAxis = chart.scales.x; 
             ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); 
             
-            // Render user dropped markers
+            // render user dropped markers
             customMarkers.forEach(marker => { 
                 const x = xAxis.getPixelForValue(marker.idx); 
                 if (x >= xAxis.left && x <= xAxis.right) { 
@@ -3305,7 +4239,7 @@
                 } 
             }); 
             
-            // Render the live timeline playhead cursor
+            // render the live timeline playhead cursor
             if (currentIdx >= 0 && currentIdx < filteredData.length) {
                 const px = xAxis.getPixelForValue(currentIdx);
                 if (px >= xAxis.left && px <= xAxis.right) {
@@ -3319,7 +4253,7 @@
         } 
     };
 
-    // Establishes physical chart instances and populates data pipelines
+    // establishes physical chart instances and populates data pipelines
     function buildChartLayout() {
         if (masterChartInstance) masterChartInstance.destroy(); Object.values(customCharts).forEach(c => c.destroy()); customCharts = {};
         const labelsTimeline = filteredData.map(d => `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
@@ -3327,22 +4261,10 @@
 
         masterChartInstance = new Chart(document.getElementById('parameterChart').getContext('2d'), { type: 'line', data: { labels: labelsTimeline, datasets: [] }, options: getBaseChartOptions('Master Scale Comparison', { enforceIntegers: false, minRange: 2, isMaster: true }), plugins: [markerPlugin] });
         
-        const toggleContainer = document.getElementById('masterGraphToggles'); toggleContainer.innerHTML = '';
-        Object.keys(METRIC_DEFS).forEach(key => {
-            const def = METRIC_DEFS[key]; 
-            const isAvail = availableMetrics.has(key);
-            const labelEl = document.createElement('label'); 
-            labelEl.className = 'flex items-center gap-1.5 text-xs font-semibold cursor-pointer select-none'; 
-            labelEl.style.color = def.color; 
-            labelEl.style.opacity = isAvail ? '1' : '0.3';
-            labelEl.innerHTML = `<input type="checkbox" value="${key}" class="w-3 h-3 cursor-pointer" ${isAvail ? '' : 'disabled'} style="accent-color: ${def.color};"> ${getMetricLabel(key, isImp)}`; 
-            if (isAvail) {
-                labelEl.querySelector('input').addEventListener('change', (e) => toggleMasterMetric(key, e.target.checked)); 
-            }
-            toggleContainer.appendChild(labelEl);
-        });
+        // populate the "Create Graph" variable picker (replaces the old always-visible checkbox row)
+        buildMasterMenu();
 
-        // Factory wrapper for plotting the lower sub-metrics directly
+        // factory wrapper for plotting the lower sub-metrics directly
         const buildSubChart = (id, keys, title, config) => { 
             const activeKeys = keys.filter(k => availableMetrics.has(k.key));
             const chartCanvas = document.getElementById(id);
@@ -3356,7 +4278,7 @@
                 document.getElementById(`title-${id}`).childNodes[0].nodeValue = title + " ";
             }
             
-            // Mass-inject datasets. This prevents performance thrashing during playback loops
+            // mass-inject datasets. This prevents performance thrashing during playback loops
             const datasets = activeKeys.map(k => {
                 const ds = createDatasetConfig(k.key, k.hidden);
                 ds.data = filteredData.map(d => getConvertedVal(d[k.key], k.key, isImp));
@@ -3379,7 +4301,6 @@
         buildSubChart('vertWindChart', [{key:'vtWnd'}, {key:'accZ', hidden:true}], `Vertical Speeds & Accel (${isImp ? 'mph' : 'm/s'})`, { enforceIntegers: false, minRange: 2 });
         buildSubChart('sfcChart', [{key:'sfcPr'}, {key:'pressure', hidden:true}], 'Pressure Profiles (mb)', { enforceIntegers: false, minRange: 1 });
         buildSubChart('thermoChart', [{key:'thetaE'}, {key:'mixRate', hidden:true}], 'Thermodynamics & Moisture', { enforceIntegers: false, minRange: 2 });
-        buildSubChart('sfmrChart', [{key:'sfmrWs'}, {key:'sfmrRain', hidden:true}], 'SFMR Surface Data', { enforceIntegers: true, minRange: 10 });
         buildDropdownMenus();
         updateMasterGraphVisibility();
     }
@@ -3390,27 +4311,17 @@
             const menu = document.getElementById(`menu-${id}`); if(!menu) return; menu.innerHTML = ''; const chart = customCharts[id]; if(!chart) return;
             const activeKeys = chart.data.datasets.map(ds => ds.metricKey);
             
-            const selectAllItem = document.createElement('div'); selectAllItem.className = 'dropdown-item'; selectAllItem.style.color = '#3da5ff'; selectAllItem.style.fontWeight = 'bold'; selectAllItem.innerText = '✓ Select All';
-            selectAllItem.onclick = (e) => { 
-                e.stopPropagation(); 
-                chart.data.datasets = Array.from(availableMetrics).map(key => { 
-                    const dSet = createDatasetConfig(key); 
-                    dSet.data = filteredData.map(d => getConvertedVal(d[key], key, isImp));
-                    return dSet; 
-                }); 
-                chart.update('none'); buildDropdownMenus(); 
-            };
-            menu.appendChild(selectAllItem);
-            
             const unselectAllItem = document.createElement('div'); unselectAllItem.className = 'dropdown-item'; unselectAllItem.style.color = '#ef4444'; unselectAllItem.style.fontWeight = 'bold'; unselectAllItem.innerText = '✕ Unselect All';
             unselectAllItem.onclick = (e) => { e.stopPropagation(); chart.data.datasets = []; chart.update('none'); buildDropdownMenus(); }; menu.appendChild(unselectAllItem);
-            const breakHr = document.createElement('div'); breakHr.style.borderTop = '1px solid #1e293b'; breakHr.style.margin = '4px 0'; menu.appendChild(breakHr);
+            const breakHr = document.createElement('div'); breakHr.style.borderTop = '1px solid #20262f'; breakHr.style.margin = '4px 0'; menu.appendChild(breakHr);
             
             Object.keys(METRIC_DEFS).forEach(key => { 
                 const isAvail = availableMetrics.has(key);
                 const div = document.createElement('div'); 
                 div.className = `dropdown-item ${activeKeys.includes(key) ? 'active' : ''}`; 
                 div.innerText = getMetricLabel(key, isImp); 
+                // color-code each variable to (a softened version of) the color it uses on the graphs
+                div.style.color = mutedMetricColor(METRIC_DEFS[key].color);
                 if (isAvail) {
                     div.onclick = (e) => { e.stopPropagation(); toggleMetricInSubChart(id, key); }; 
                 } else {
@@ -3422,7 +4333,7 @@
         });
     }
 
-    // Handles dynamically adding or removing trace metrics without flushing entire layout grids
+    // handles dynamically adding or removing trace metrics without flushing entire layout grids
     function toggleMetricInSubChart(chartId, metricKey) {
         const isImp = document.getElementById('toggleImperial').checked;
         const chart = customCharts[chartId]; const existIdx = chart.data.datasets.findIndex(ds => ds.metricKey === metricKey);
@@ -3435,7 +4346,7 @@
         chart.update('none'); buildDropdownMenus(); 
     }
 
-    // Throttled UI updater: updates the map, 3D model, PFD, and charts to the current playhead
+    // throttled UI updater: updates the map, 3D model, PFD, and charts to the current playhead
     function updateVisualComponents(idx, skipCharts = false) {
         const currentRow = filteredData[idx]; if (!currentRow) return;
         
@@ -3461,7 +4372,17 @@
         }
         timelineTimeDisplay.innerText = displayStr;
 
-        // Execute fast re-renders (draw) to ensure the white playhead line moves smoothly during dragging
+        // ── SATELLITE: trigger fetch + refresh time badge offset ───────────
+        const satSel = document.getElementById('satelliteSelect');
+        if (satSel && satSel.value !== 'none' && trackerModeSelect.value === '2d') {
+            fetchSatelliteImage(currentRow.absSeconds);
+            updateSatTimeBadge();  // refresh the "X min before/after flight" offset
+        } else {
+            const b = document.getElementById('satTimeBadge');
+            if (b) b.classList.add('hidden');
+        }
+
+        // execute fast re-renders (draw) to ensure the white playhead line moves smoothly during dragging
         if (masterChartInstance) masterChartInstance.draw(); 
         Object.values(customCharts).forEach(c => {
             if(c) c.draw();
@@ -3480,7 +4401,7 @@
         }
     }
 
-    // Main animation engine tick loop (controls video linking / spatial movement rates)
+    // main animation engine tick loop (controls video linking / spatial movement rates)
     function masterSyncEngineTick() {
         if (!isPlaying) return;
         const now = performance.now(); 
@@ -3496,7 +4417,7 @@
             } else {
                 if (!video.paused) video.pause();
                 
-                // Throttle manual seeking at extremely high speeds to prevent the browser dropping frames
+                // throttle manual seeking at extremely high speeds to prevent the browser dropping frames
                 videoPlaybackAccumulator += (deltaMs / 1000) * curSpeed;
                 if (videoPlaybackAccumulator > 0.25 || !window.lastVideoSeek) {
                     video.currentTime += videoPlaybackAccumulator;
@@ -3547,7 +4468,7 @@
 
     document.getElementById('toggleExtraHUD').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
     
-    // Updates components dynamically when the telemetry boundaries shift visually
+    // updates components dynamically when the telemetry boundaries shift visually
     ['startTimeInput', 'endTimeInput', 'videoStartInput'].forEach(id => { 
         const el = document.getElementById(id);
         const handleChange = () => {
@@ -3592,22 +4513,27 @@
     replayBtn.addEventListener('click', function() {
         if (filteredData.length === 0) return;
         isPlaying = false; playPauseBtn.innerText = "▶ Play"; currentSpeedIdx = 0; updateSpeedDisplay();
+        // update satellite dropdown for this flight's date + location
+        updateSatelliteOptions();
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+
         if (videoLoaded) { video.pause(); video.playbackRate = speeds[currentSpeedIdx]; } if (animationFrameId) cancelAnimationFrame(animationFrameId);
         
         ctx.clearRect(0,0, canvas.width, canvas.height); 
         [masterChartInstance, ...Object.values(customCharts)].forEach(c => { if(c) { c.resetZoom(); c.draw(); } });
         
-        document.querySelectorAll('#masterGraphToggles input').forEach(el => el.checked = false); resetMapView(); if (trackerModeSelect.value === '3d') build3DScene(); updateMasterGraphVisibility();
+        resetMapView(); if (trackerModeSelect.value === '3d') build3DScene(); updateMasterGraphVisibility();
         
         const pfdC = document.getElementById('pfdCanvas'); if(pfdC) { const pfdCtx = pfdC.getContext('2d'); pfdCtx.clearRect(0,0, pfdC.width, pfdC.height); }
 
-        hasInitialSyncOccurred = false; clearTimeout(scrubSyncTimeout);
+        hasInitialSyncOccurred = false; clearTimeout(scrubSyncTimeout); clearTimeout(slideSyncTimer);
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
         if (videoLoaded) { video.currentTime = 0; currentIdx = 0; syncTelemetryToVideoClock(); } 
         else { setTimeout(() => { currentIdx = 0; isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); masterSyncEngineTick(); }, 30); }
     });
 
-    // Validates spatial constraints inside multi-layered polygons
+    // validates spatial constraints inside multi-layered polygons
     function calculateFeatureBBox(feature) {
         let minX = 180, maxX = -180, minY = 90, maxY = -90;
         const checkCoord = (c) => {
@@ -3621,7 +4547,7 @@
         return [minX, minY, maxX, maxY];
     }
 
-    // Fetches spatial context boundaries natively mapped locally behind lines
+    // fetches spatial context boundaries natively mapped locally behind lines
     Promise.all([
         fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson').then(r => r.json()),
         fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json').then(r => r.json())

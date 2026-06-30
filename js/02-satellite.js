@@ -38,6 +38,8 @@
             } else {
                 imgLabel = fmt(imgMs, false) + ' (daily composite)';
             }
+        } else if (satLoadedInfo.isReconApi) {
+            imgLabel = fmt(imgMs, true) + ' (archive GOES — nearest scan)';
         } else if (satLoadedInfo.isGoes) {
             imgLabel = fmt(imgMs, true) + ` (new frame every ${satLoadedInfo.cadenceMin || 10} minutes)`;
         } else {
@@ -102,29 +104,19 @@
               {id:'Brightness_Temp_Band31_Night', name:'Infrared (Band 31, Night)'}
           ]
         },
-        // GOES geostationary imagery (NASA GIBS, EPSG:4326 WMS). Listed LAST. Unlike the polar
-        // swaths above, GOES updates ~every 10 min, so its TIME dimension is a full timestamp tied
-        // to the playback clock (rounded down to the cadence). Each "band" id is a full GIBS layer
-        // name. `subLon` = the satellite's sub-point longitude, used for the in-view coverage test.
-        // GIBS only archives a rolling ~90 days, so the labels say so.
-        { value:'GOES-EAST', baseLabel:'GOES-East (<90 days)', isGoes:true, cadenceMin:10, minDate:'2018-01-01', subLon:-75.2,
+        // GOES geostationary imagery — ARCHIVE, via the noaa-recon-api (https://joshmurdock.net/api).
+        // Listed LAST. Unlike NASA GIBS (which only keeps a rolling ~90 days), this server renders
+        // GOES-16/19 ABI tiles from NOAA's S3 archive for ANY historical date — the right source for
+        // recon playback. `isReconApi:true` routes it through fetchReconApiSat; each "band" carries the
+        // API's `band`+`cmap`. It still rides the generic GOES machinery: a 10-min `cadenceMin` bucket
+        // tied to the playback clock, and `subLon` for the Earth-disk coverage test (GOES-East only —
+        // the API doesn't yet implement goes-west).
+        { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
+          satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
           bands: [
-              {id:'GOES-East_ABI_Band13_Clean_Infrared',        name:'Clean IR — Band 13'},
-              {id:'GOES-East_ABI_GeoColor',                     name:'GeoColor (Day/Night)'},
-              {id:'GOES-East_ABI_Band2_Red_Visible_1km',        name:'Red Visible — Band 2'},
-              {id:'GOES-East_ABI_Air_Mass',                     name:'Air Mass RGB'},
-              {id:'GOES-East_ABI_Dust',                         name:'Dust / Saharan Air Layer'},
-              {id:'GOES-East_ABI_FireTemp',                     name:'Fire Temperature'}
-          ]
-        },
-        { value:'GOES-WEST', baseLabel:'GOES-West (<90 days)', isGoes:true, cadenceMin:10, minDate:'2018-01-01', subLon:-137.0,
-          bands: [
-              {id:'GOES-West_ABI_Band13_Clean_Infrared',        name:'Clean IR — Band 13'},
-              {id:'GOES-West_ABI_GeoColor',                     name:'GeoColor (Day/Night)'},
-              {id:'GOES-West_ABI_Band2_Red_Visible_1km',        name:'Red Visible — Band 2'},
-              {id:'GOES-West_ABI_Air_Mass',                     name:'Air Mass RGB'},
-              {id:'GOES-West_ABI_Dust',                         name:'Dust / Saharan Air Layer'},
-              {id:'GOES-West_ABI_FireTemp',                     name:'Fire Temperature'}
+              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR — Band 13'},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)'},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor — Band 9'}
           ]
         }
     ];
@@ -153,13 +145,7 @@
         const ms = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + absSeconds * 1000;
         return Math.floor(ms / cadMs) * cadMs;
     }
-    // NASA GIBS only keeps a rolling ~3-month archive of GOES; older imagery isn't served
-    // (a blank tile comes back). Historical flights fall outside this, so we detect it up front.
-    const GIBS_GOES_WINDOW_DAYS = 90;
-    function goesOutsideGibsWindow(goesMs) {
-        return (Date.now() - goesMs) > GIBS_GOES_WINDOW_DAYS * 86400000;
-    }
-    // When set, the sat time-badge shows this note instead of imagery info (e.g. "out of GIBS window").
+    // When set, the sat time-badge shows this note instead of imagery info (e.g. "out of view").
     let satUnavailableNote = null;
     let _goesLabelMs = null;  // last 10-min bucket reflected in the GOES dropdown label
 
@@ -253,7 +239,7 @@
             const layerDef = GIBS_LAYERS.find(d => d.value === opt.value);
             if (!layerDef) continue;
             // GOES has no polar overpass to look up — label it with coverage + ~scan time instead.
-            if (layerDef.isGoes) { setGoesOptionState(opt, layerDef); continue; }
+            if (layerDef.isGoes || layerDef.isReconApi) { setGoesOptionState(opt, layerDef); continue; }
 
             opt.textContent = `${layerDef.baseLabel} (Searching...)`;
 
@@ -297,7 +283,7 @@
             const el = document.createElement('option');
             el.value = def.value;
             el.textContent = def.baseLabel;
-            if (def.isGoes && !goesInCoverage(def)) el.disabled = true;  // out of this sat's Earth-disk view
+            if ((def.isGoes || def.isReconApi) && !goesInCoverage(def)) el.disabled = true;  // out of this sat's Earth-disk view
             satSelect.appendChild(el);
         });
         // Keep the previous choice only if it's still selectable (present and not disabled).
@@ -358,17 +344,17 @@
         }
         const in2d = !trackerModeSelect || trackerModeSelect.value === '2d';
         const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
-        const isGoes = !!(layerDef && layerDef.isGoes);
+        const isGoesLike = !!(layerDef && (layerDef.isGoes || layerDef.isReconApi));
         const satOn = satSelect.value !== 'none';
         // Band picker is shown for any active 2D layer (including GOES); the day-stepper is
         // for browsing polar-orbiter calendar days, so it stays hidden for GOES.
         bandSelect.style.display = (in2d && satOn) ? '' : 'none';
-        const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoes;
+        const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
         // The ⏪/⏩ 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
         const stepCluster = document.getElementById('satStepCluster');
-        if (stepCluster) stepCluster.style.display = (in2d && satOn && isGoes) ? '' : 'none';
+        if (stepCluster) stepCluster.style.display = (in2d && satOn && isGoesLike) ? '' : 'none';
         updateSatDayLabel();
     }
     
@@ -419,6 +405,50 @@
         });
     }
 
+    // --- Archive GOES via the noaa-recon-api (https://joshmurdock.net/api): server-side renders of
+    // NOAA's S3 GOES NetCDF, so historical dates work (NASA GIBS only keeps ~90 days). The /tile
+    // request is an async job — it returns a key, then we poll /status until the PNG is ready.
+    const RECON_API_BASE = 'https://joshmurdock.net/api';
+
+    // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
+    function loadImageToCanvas(url) {
+        return new Promise(res => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth; c.height = img.naturalHeight;
+                c.getContext('2d').drawImage(img, 0, 0);
+                res(c);
+            };
+            img.onerror = () => res(null);
+            img.src = url;
+        });
+    }
+
+    // Request a recon-api GOES tile and poll until it renders. Resolves to
+    // { canvas, box:{minLon,minLat,maxLon,maxLat}, scanStartMs } or { error }.
+    async function fetchReconApiTile({ band, cmap, timeIso, center, dims, unit, satellite }) {
+        const params = new URLSearchParams({ time: timeIso, band, cmap });
+        if (satellite) params.set('satellite', satellite);
+        if (center)    { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
+        try {
+            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`).then(r => r.json());
+            // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
+            for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
+                await new Promise(r => setTimeout(r, 3000));
+                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`).then(r => r.json());
+            }
+            if (!data || data.status !== 'ready') return { error: (data && (data.message || data.status)) || 'no response' };
+            // bounds come back as [[lat_s, lon_w], [lat_n, lon_e]] → our {minLon,minLat,maxLon,maxLat}.
+            const b = data.bounds;
+            const box = { minLat: b[0][0], minLon: b[0][1], maxLat: b[1][0], maxLon: b[1][1] };
+            const c = await loadImageToCanvas(RECON_API_BASE + data.png_url);
+            if (!c) return { error: 'image load failed' };
+            return { canvas: c, box, scanStartMs: data.scan_start ? new Date(data.scan_start).getTime() : null };
+        } catch (e) { return { error: String(e) }; }
+    }
+
     let _cmrCache = {};
     async function lookupModisGranuleTime(shortName, dateStr, pointLon, pointLat) {
         if (!dateStr) return null;
@@ -467,49 +497,20 @@
         if (!layerDef) return;
         const bandId = bandSelect.value;
 
+        // Archive GOES (noaa-recon-api) takes a separate async render+poll path.
+        if (layerDef.isReconApi) {
+            const bandObj = layerDef.bands.find(b => b.id === bandId) || layerDef.bands[0];
+            fetchReconApiSat(layerDef, bandObj, absSeconds);
+            return;
+        }
+
         computeSatFetchBox();
         const box = satFetchBox;
         const dateStr = satDateForOffset(satDayOffset);
         if (!dateStr) return;
 
-        const isGoes = !!layerDef.isGoes;
-        const bandName = (layerDef.bands.find(b => b.id === bandId) || {}).name || bandId;
-        // GOES tracks the playback clock (full timestamp rounded to its scan cadence);
-        // polar layers (MODIS/VIIRS) use the calendar day picked by the day-stepper.
-        const goesShortLabel = layerDef.baseLabel.replace(' (<90 days)', '');
-        let wmsLayer, wmsTime, idTimePart, goesMs = null;
-        if (isGoes) {
-            // Out of this satellite's Earth-disk view — bail with a clear note (option is also disabled).
-            if (!goesInCoverage(layerDef)) {
-                satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; bgNeedsUpdate = true;
-                satUnavailableNote = `🛰 ${goesShortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
-                updateSatTimeBadge();
-                if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-                return;
-            }
-            goesMs = goesBucketMs(layerDef, absSeconds);
-            if (goesMs == null) return;
-            // Keep the dropdown label's ~scan time in step with the playback clock.
-            if (goesMs !== _goesLabelMs) {
-                _goesLabelMs = goesMs;
-                const selOpt = satSelect.options[satSelect.selectedIndex];
-                if (selOpt) setGoesOptionState(selOpt, layerDef);
-            }
-            if (goesOutsideGibsWindow(goesMs)) {
-                // GIBS has no GOES this old — don't fire a request that just returns a blank tile.
-                satImageLoaded = false; satImage = new Image(); bgNeedsUpdate = true;
-                const firstTime = !satUnavailableNote;
-                satUnavailableNote = `🛰 GOES unavailable<br><span style="color:#fbbf24">Flight data older than 90 days</span>`;
-                satLoadedInfo = null;
-                updateSatTimeBadge();
-                if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-                if (firstTime) showToast('Flight Data is older than 90 days. Cannot do archival GOES satellites due to HTML limitations.', 8000);
-                return;
-            }
-            wmsLayer = bandId; wmsTime = goesTimeStr(goesMs); idTimePart = wmsTime;
-        } else {
-            wmsLayer = layerDef.wmsPrefix + bandId; wmsTime = dateStr; idTimePart = dateStr;
-        }
+        // Polar layers (MODIS/VIIRS) use the calendar day picked by the day-stepper.
+        const wmsLayer = layerDef.wmsPrefix + bandId, wmsTime = dateStr, idTimePart = dateStr;
         satUnavailableNote = null;  // a fetchable layer/date — clear any prior "unavailable" note
 
         const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
@@ -524,8 +525,8 @@
         const fetchId = layerDef.value + '||' + bandId + '||' + idTimePart + '||' +
             box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
         // Attempt each distinct target once. Mark it SYNCHRONOUSLY (not inside the debounce) so the
-        // per-frame calls during playback don't keep resetting the timer — that bug meant a new GOES
-        // 10-min bucket never actually loaded. Layer/band/day changes reset lastSatFetchTime to ''.
+        // per-frame calls during playback don't keep resetting the timer. Layer/band/day changes
+        // reset lastSatFetchTime to ''.
         if (lastSatFetchTime === fetchId) return;
         lastSatFetchTime = fetchId;
 
@@ -533,20 +534,8 @@
         satDebounceTimer = setTimeout(async () => {
             showSatLoader();
             try {
-                let result = await fetchGibsWMS(wmsLayer, wmsTime, box, pxW, pxH);
-                let usedMs = goesMs;
-                let ok = result && satImageHasContent(result);
-                // GOES: a given 10-min slot can be missing (housekeeping, eclipse season, a skipped
-                // scan). Step back up to 40 min to show the most recent scan that actually exists.
-                if (isGoes && !ok) {
-                    const cadMs = (layerDef.cadenceMin || 10) * 60000;
-                    for (let i = 1; i <= 4 && !ok; i++) {
-                        const tMs = goesMs - i * cadMs;
-                        if (goesOutsideGibsWindow(tMs)) break;
-                        const r = await fetchGibsWMS(wmsLayer, goesTimeStr(tMs), box, pxW, pxH);
-                        if (r && satImageHasContent(r)) { result = r; usedMs = tMs; ok = true; }
-                    }
-                }
+                const result = await fetchGibsWMS(wmsLayer, wmsTime, box, pxW, pxH);
+                const ok = result && satImageHasContent(result);
                 hideSatLoader();
                 if (ok) {
                     satImage = result;
@@ -554,39 +543,29 @@
                     satImageLoaded = true;
                     bgNeedsUpdate = true;
 
-                    if (isGoes) {
-                        satLoadedInfo = {
-                            layerLabel: goesShortLabel + ' · ' + bandName,
-                            imageTimeMs: usedMs,
-                            isModis: false,
-                            isGoes: true,
-                            cadenceMin: layerDef.cadenceMin || 10
-                        };
-                    } else {
-                        const opt = satSelect.options[satSelect.selectedIndex];
-                        let defaultTimeMs = new Date(dateStr + 'T00:00:00Z').getTime();
-                        let exact = false;
-                        let pending = true;
-                        const timeMatch = opt.textContent.match(/\[(\d{2}):(\d{2})Z\]/);
-                        if (timeMatch) {
-                            const d = new Date(dateStr + 'T00:00:00Z');
-                            d.setUTCHours(parseInt(timeMatch[1], 10));
-                            d.setUTCMinutes(parseInt(timeMatch[2], 10));
-                            defaultTimeMs = d.getTime();
-                            exact = true;
-                            pending = false;
-                        } else if (opt.textContent.includes('[Daily]')) {
-                            pending = false;
-                        }
-                        satLoadedInfo = {
-                            layerLabel: layerDef.baseLabel,
-                            imageTimeMs: defaultTimeMs,
-                            isModis: true,
-                            modisTimePending: pending,
-                            modisExact: exact,
-                            dayOffset: satDayOffset
-                        };
+                    const opt = satSelect.options[satSelect.selectedIndex];
+                    let defaultTimeMs = new Date(dateStr + 'T00:00:00Z').getTime();
+                    let exact = false;
+                    let pending = true;
+                    const timeMatch = opt.textContent.match(/\[(\d{2}):(\d{2})Z\]/);
+                    if (timeMatch) {
+                        const d = new Date(dateStr + 'T00:00:00Z');
+                        d.setUTCHours(parseInt(timeMatch[1], 10));
+                        d.setUTCMinutes(parseInt(timeMatch[2], 10));
+                        defaultTimeMs = d.getTime();
+                        exact = true;
+                        pending = false;
+                    } else if (opt.textContent.includes('[Daily]')) {
+                        pending = false;
                     }
+                    satLoadedInfo = {
+                        layerLabel: layerDef.baseLabel,
+                        imageTimeMs: defaultTimeMs,
+                        isModis: true,
+                        modisTimePending: pending,
+                        modisExact: exact,
+                        dayOffset: satDayOffset
+                    };
 
                     updateSatTimeBadge();
                     if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
@@ -594,9 +573,83 @@
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
                     satLoadedInfo = null; updateSatTimeBadge();
-                    showToast(isGoes
-                        ? `GOES ${bandName}: no scan near ${goesTimeStr(goesMs).slice(11,16)}Z (slot missing, or — for a visible band — no daylight here right now).`
-                        : 'Satellite: No imagery found for ' + idTimePart + ' in this band/area.', 6000);
+                    showToast('Satellite: No imagery found for ' + idTimePart + ' in this band/area.', 6000);
+                }
+            } catch(e) {
+                hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
+            }
+        }, 350);
+    }
+
+    // Archive GOES path: pick the playback-clock 10-min bucket, request a bbox tile centered on the
+    // flight from the recon-api, and place it by the API's returned bounds. Mirrors the polar path's
+    // synchronous-lastSatFetchTime debounce so per-frame playback calls don't reset the timer.
+    function fetchReconApiSat(layerDef, bandObj, absSeconds) {
+        const satSelect = document.getElementById('satelliteSelect');
+        const bandName = bandObj.name || bandObj.id;
+        const shortLabel = layerDef.baseLabel.replace(' (Archive)', ' Archive');
+
+        // Outside this satellite's Earth disk — bail with a clear note (the option is disabled too).
+        if (!goesInCoverage(layerDef)) {
+            satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true;
+            satUnavailableNote = `🛰 ${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
+            updateSatTimeBadge();
+            if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            return;
+        }
+
+        const bucketMs = goesBucketMs(layerDef, absSeconds);
+        if (bucketMs == null) return;
+        // Keep the dropdown label's ~scan time in step with the playback clock.
+        if (bucketMs !== _goesLabelMs) {
+            _goesLabelMs = bucketMs;
+            const selOpt = satSelect.options[satSelect.selectedIndex];
+            if (selOpt) setGoesOptionState(selOpt, layerDef);
+        }
+        satUnavailableNote = null;
+
+        // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
+        const cLon = (plotMinLon + plotMaxLon) / 2, cLat = (plotMinLat + plotMaxLat) / 2;
+        const latSpanKm = (plotMaxLat - plotMinLat) * 111;
+        const lonSpanKm = (plotMaxLon - plotMinLon) * 111 * Math.cos(cLat * Math.PI / 180);
+        const dimsKm = Math.round(Math.max(800, Math.min(4000, Math.max(latSpanKm, lonSpanKm) * 1.4 + 600)));
+        const centerStr = cLat.toFixed(3) + ',' + cLon.toFixed(3);
+        const timeIso = goesTimeStr(bucketMs);
+
+        // One request per distinct target; mark SYNCHRONOUSLY (like the polar path) so per-frame
+        // playback calls don't keep resetting the debounce timer.
+        const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
+        if (lastSatFetchTime === fetchId) return;
+        lastSatFetchTime = fetchId;
+
+        clearTimeout(satDebounceTimer);
+        satDebounceTimer = setTimeout(async () => {
+            showSatLoader();
+            try {
+                const r = await fetchReconApiTile({
+                    band: bandObj.band, cmap: bandObj.cmap, timeIso,
+                    center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite
+                });
+                hideSatLoader();
+                // User may have changed layer/band, or the clock crossed a new bucket, while we polled.
+                if (lastSatFetchTime !== fetchId) return;
+                if (r && r.canvas) {
+                    satImage = r.canvas;
+                    satImageBox = r.box;
+                    satImageLoaded = true; bgNeedsUpdate = true;
+                    satLoadedInfo = {
+                        layerLabel: shortLabel + ' · ' + bandName,
+                        imageTimeMs: r.scanStartMs || bucketMs,
+                        isModis: false,
+                        isReconApi: true,
+                        cadenceMin: layerDef.cadenceMin || 10
+                    };
+                    updateSatTimeBadge();
+                    if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                } else {
+                    satImageLoaded = false; bgNeedsUpdate = true; satLoadedInfo = null;
+                    updateSatTimeBadge();
+                    showToast(`GOES Archive ${bandName}: ${(r && r.error) || 'no scan'} near ${timeIso.slice(11,16)}Z.`, 6000);
                 }
             } catch(e) {
                 hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;

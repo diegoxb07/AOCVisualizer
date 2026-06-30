@@ -47,7 +47,7 @@
             hintEl.textContent = measureShape === 'polygon' ? '✓ to finish' : 'click two points';
             hintEl.style.display = hintEl.textContent ? 'inline-block' : 'none';
         } else if (drawnShapes.length > 0) {
-            hintEl.textContent = 'drag to move · ✕ to delete';
+            hintEl.textContent = 'drag to move · Clear to delete';
             hintEl.style.display = 'inline-block';
         } else {
             hintEl.style.display = 'none';
@@ -166,11 +166,10 @@
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         const geo = screenToGeo(e.clientX, e.clientY);
 
-        // On-canvas buttons take priority (✓ finish on the active polygon, ✕ delete on a shape).
+        // On-canvas ✓ button takes priority (finish the active shape). Deletion is via the Clear button.
         const btn = measureButtonAt(mx, my);
         if (btn) {
             if (btn.kind === 'finish') { stopMeasuringState(); }  // commits the polygon AND exits measure mode
-            else if (btn.kind === 'delete') { drawnShapes.splice(btn.shapeIndex, 1); hoveredShapeIndex = -1; }
             measureClickHandled = true;
             updateMeasureUI(); if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
         }

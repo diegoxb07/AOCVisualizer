@@ -39,7 +39,7 @@
                 imgLabel = fmt(imgMs, false) + ' (daily composite)';
             }
         } else if (satLoadedInfo.isGoes) {
-            imgLabel = fmt(imgMs, true) + ` (${satLoadedInfo.cadenceMin || 10}-min scan)`;
+            imgLabel = fmt(imgMs, true) + ` (new frame every ${satLoadedInfo.cadenceMin || 10} minutes)`;
         } else {
             imgLabel = fmt(imgMs, true);
         }
@@ -70,30 +70,36 @@
     const GIBS_LAYERS = [
         { value:'MODIS-TERRA',  baseLabel:'Terra Pass', wmsPrefix:'MODIS_Terra_', shortName:'MOD09', swath:true,
           bands: [
-              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'},
               {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'},
-              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31)'}
-          ] 
+              {id:'CorrectedReflectance_Bands367', name:'False Color (Bands 3-6-7)'},
+              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31, Day)'},
+              {id:'Brightness_Temp_Band31_Night', name:'Infrared (Band 31, Night)'}
+          ]
         },
         { value:'VIIRS-SNPP',   baseLabel:'SNPP Pass', wmsPrefix:'VIIRS_SNPP_', shortName:'VNP09', swath:true, minDate:'2015-11-24',
           bands: [
-              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'},
               {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'},
-              {id:'Brightness_Temp_BandM15_Day', name:'Infrared (Band M15)'}
-          ] 
+              {id:'CorrectedReflectance_BandsM3-I3-M11', name:'False Color (M3-I3-M11)'},
+              {id:'Brightness_Temp_BandM15_Day', name:'Infrared (Band M15)'},
+              {id:'DayNightBand_ENCC', name:'Day/Night Band (Night Lights)'}
+          ]
         },
         { value:'VIIRS-NOAA20', baseLabel:'NOAA20 Pass', wmsPrefix:'VIIRS_NOAA20_', shortName:'VJ109', swath:true, minDate:'2018-01-05',
           bands: [
-              {id:'CorrectedReflectance_TrueColor', name:'True Color'}, 
+              {id:'CorrectedReflectance_TrueColor', name:'True Color'},
               {id:'CorrectedReflectance_BandsM11-I2-I1', name:'False Color (M11-I2-I1)'},
+              {id:'CorrectedReflectance_BandsM3-I3-M11', name:'False Color (M3-I3-M11)'},
               {id:'Brightness_Temp_BandM15_Day', name:'Infrared (Band M15)'}
-          ] 
+          ]
         },
         { value:'MODIS-AQUA',   baseLabel:'Aqua Pass', wmsPrefix:'MODIS_Aqua_', shortName:'MYD09', swath:true,
           bands: [
               {id:'CorrectedReflectance_TrueColor', name:'True Color'},
               {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'},
-              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31)'}
+              {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31, Day)'},
+              {id:'Brightness_Temp_Band31_Night', name:'Infrared (Band 31, Night)'}
           ]
         },
         // GOES geostationary imagery (NASA GIBS, EPSG:4326 WMS). Listed LAST. Unlike the polar
@@ -103,20 +109,22 @@
         // GIBS only archives a rolling ~90 days, so the labels say so.
         { value:'GOES-EAST', baseLabel:'GOES-East (<90 days)', isGoes:true, cadenceMin:10, minDate:'2018-01-01', subLon:-75.2,
           bands: [
-              {id:'GOES-East_ABI_Band13_Clean_Infrared', name:'Clean IR — Band 13'},
-              {id:'GOES-East_ABI_GeoColor',              name:'GeoColor (Day/Night)'},
-              {id:'GOES-East_ABI_Band2_Red_Visible_1km', name:'Red Visible — Band 2'},
-              {id:'GOES-East_ABI_Air_Mass',              name:'Air Mass RGB'},
-              {id:'GOES-East_ABI_Dust',                  name:'Dust / Saharan Air Layer'}
+              {id:'GOES-East_ABI_Band13_Clean_Infrared',        name:'Clean IR — Band 13'},
+              {id:'GOES-East_ABI_GeoColor',                     name:'GeoColor (Day/Night)'},
+              {id:'GOES-East_ABI_Band2_Red_Visible_1km',        name:'Red Visible — Band 2'},
+              {id:'GOES-East_ABI_Air_Mass',                     name:'Air Mass RGB'},
+              {id:'GOES-East_ABI_Dust',                         name:'Dust / Saharan Air Layer'},
+              {id:'GOES-East_ABI_FireTemp',                     name:'Fire Temperature'}
           ]
         },
         { value:'GOES-WEST', baseLabel:'GOES-West (<90 days)', isGoes:true, cadenceMin:10, minDate:'2018-01-01', subLon:-137.0,
           bands: [
-              {id:'GOES-West_ABI_Band13_Clean_Infrared', name:'Clean IR — Band 13'},
-              {id:'GOES-West_ABI_GeoColor',              name:'GeoColor (Day/Night)'},
-              {id:'GOES-West_ABI_Band2_Red_Visible_1km', name:'Red Visible — Band 2'},
-              {id:'GOES-West_ABI_Air_Mass',              name:'Air Mass RGB'},
-              {id:'GOES-West_ABI_Dust',                  name:'Dust / Saharan Air Layer'}
+              {id:'GOES-West_ABI_Band13_Clean_Infrared',        name:'Clean IR — Band 13'},
+              {id:'GOES-West_ABI_GeoColor',                     name:'GeoColor (Day/Night)'},
+              {id:'GOES-West_ABI_Band2_Red_Visible_1km',        name:'Red Visible — Band 2'},
+              {id:'GOES-West_ABI_Air_Mass',                     name:'Air Mass RGB'},
+              {id:'GOES-West_ABI_Dust',                         name:'Dust / Saharan Air Layer'},
+              {id:'GOES-West_ABI_FireTemp',                     name:'Fire Temperature'}
           ]
         }
     ];
@@ -186,12 +194,15 @@
     }
 
     function computeSatFetchBox() {
-        // Always fetch a wide synoptic composite (~90°×60°) centered on the flight — good for
-        // planetary/synoptic context; capped resolution keeps it to a single image.
+        // Fetch a region sized to the flight (its extent + a margin) rather than a whole-hemisphere
+        // composite. Clamped so it's never tiny (keeps synoptic context) nor huge (one fast image):
+        // ~18°×14° min, ~44°×30° max. Smaller area + the lower pixel cap below = faster GIBS loads.
         const cLon = (plotMinLon + plotMaxLon) / 2, cLat = (plotMinLat + plotMaxLat) / 2;
+        const halfLon = Math.min(22, Math.max(9, (plotMaxLon - plotMinLon) / 2 + 6));
+        const halfLat = Math.min(15, Math.max(7, (plotMaxLat - plotMinLat) / 2 + 5));
         satFetchBox = {
-            minLon: Math.max(-180, cLon - 45), maxLon: Math.min(180, cLon + 45),
-            minLat: Math.max(-85,  cLat - 30), maxLat: Math.min(85,  cLat + 30),
+            minLon: Math.max(-180, cLon - halfLon), maxLon: Math.min(180, cLon + halfLon),
+            minLat: Math.max(-85,  cLat - halfLat), maxLat: Math.min(85,  cLat + halfLat),
         };
     }
 
@@ -355,6 +366,9 @@
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoes;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
+        // The ⏪/⏩ 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
+        const stepCluster = document.getElementById('satStepCluster');
+        if (stepCluster) stepCluster.style.display = (in2d && satOn && isGoes) ? '' : 'none';
         updateSatDayLabel();
     }
     
@@ -500,8 +514,8 @@
 
         const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
         const aspect = boxLonSpan / boxLatSpan;
-        const NATIVE_PX_PER_DEG = 111320 / 250;   
-        const SAT_PX_CAP = 4096;                   
+        const NATIVE_PX_PER_DEG = 111320 / 250;
+        const SAT_PX_CAP = 3072;                   // capped lower than before (was 4096) — fewer pixels to fetch/decode per frame
         const nativeW = Math.round(boxLonSpan * NATIVE_PX_PER_DEG);
         let pxW = Math.min(SAT_PX_CAP, Math.max(canvas.width, nativeW));
         let pxH = Math.round(pxW / aspect);

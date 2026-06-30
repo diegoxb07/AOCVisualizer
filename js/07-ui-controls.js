@@ -109,7 +109,7 @@
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x0f172a);
         camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000); camera3D.position.set(0, 10, 20);
-        renderer3D = new THREE.WebGLRenderer({ antialias: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
+        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
         planeGroup3D = new THREE.Group(); const matWhite = new THREE.MeshPhongMaterial({color: 0xffffff}), matBlue = new THREE.MeshPhongMaterial({color: 0x3da5ff});
@@ -124,7 +124,7 @@
     function get3DCoord(lon, lat, altMeters) {
         if (isNaN(lon) || isNaN(lat)) return new THREE.Vector3(0,0,0);
         const centerLon = (plotMinLon + plotMaxLon) / 2 || 0, centerLat = (plotMinLat + plotMaxLat) / 2 || 0, scaleMult = 20; 
-        const x = (lon - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 200; return new THREE.Vector3(x, y, z);
+        const x = (lon - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 250; return new THREE.Vector3(x, y, z);
     }
 
     function sync3DMarkers() {
@@ -196,7 +196,9 @@
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
     }
 
-    const triggerFullscreen = (element) => { if (!document.fullscreenElement) element.requestFullscreen().catch(err => { }); else document.exitFullscreen(); };
+    // Toggle off only when this exact element is already fullscreen; if a DIFFERENT element is
+    // fullscreen, requesting fullscreen on the new one switches directly (no exit-then-re-enter click).
+    const triggerFullscreen = (element) => { if (document.fullscreenElement === element) document.exitFullscreen(); else element.requestFullscreen().catch(err => { }); };
     fullscreenBtn.addEventListener('click', () => triggerFullscreen(document.documentElement));
     fullscreenMapBtn.addEventListener('click', () => triggerFullscreen(mapPanel));
     fullscreenVideoBtn.addEventListener('click', () => triggerFullscreen(videoPanel));
@@ -204,8 +206,9 @@
     document.addEventListener('fullscreenchange', () => {
         const text = !document.fullscreenElement ? "⛶ Fullscreen" : "⛶ Exit Fullscreen";
         fullscreenBtn.innerText = text; fullscreenMapBtn.innerText = "⛶"; fullscreenVideoBtn.innerText = "⛶";
-        if (document.fullscreenElement === mapPanel || document.fullscreenElement === videoPanel) { document.fullscreenElement.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'absolute'; } 
-        else { document.body.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'fixed'; }
+        const recEl = document.getElementById('recordProgress');
+        if (document.fullscreenElement === mapPanel || document.fullscreenElement === videoPanel) { document.fullscreenElement.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'absolute'; if (recEl) document.fullscreenElement.appendChild(recEl); }
+        else { document.body.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'fixed'; if (recEl) document.body.appendChild(recEl); }
         setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
     });
 

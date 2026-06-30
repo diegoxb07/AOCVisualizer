@@ -281,7 +281,7 @@
             }
             ctx.restore();
 
-            // On-canvas buttons: ✓ to finish the active shape (any type, once 2+ points exist), ✕ to delete a committed shape.
+            // On-canvas button: ✓ to finish the active shape (any type, once 2+ points exist). Deletion is via the Clear button.
             if (isActiveShape && isMeasuring && pts.length >= 2) {
                 const bb = shapeScreenBBox(type, pts);
                 const fx = (bb.minX + bb.maxX) / 2; const fy = bb.minY - 16;
@@ -295,10 +295,6 @@
                 ctx.fillStyle = 'rgba(22,27,34,0.92)'; ctx.fillRect(fx + 16, fy - 11, rw + 10, 22);
                 ctx.fillStyle = '#4ade80'; ctx.fillText('to finish', fx + 20, fy + 1);
                 ctx.restore();
-            }
-            if (!isActiveShape && !isMeasuring) {
-                const bb = shapeScreenBBox(type, pts);
-                drawCanvasButton('delete', shapeIndex, bb.maxX + 2, bb.minY - 2, '✕', '#b91c1c');
             }
         };
 

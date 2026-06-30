@@ -157,10 +157,6 @@
                     <div class="flex flex-wrap justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20 gap-y-1">
                         <div class="flex items-center gap-2.5 flex-none">
                             <span>Flight-Level Data Player</span>
-                            <div id="satStepCluster" class="flex items-center gap-1 normal-case">
-                                <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
-                                <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
-                            </div>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-grow ml-auto">
                             <label class="flex items-center gap-1.5 text-slate-400 normal-case font-bold text-[10px]">
@@ -200,6 +196,11 @@
                                     <button id="satDayNext" title="Next day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">▶</button>
                                 </div>
                             </div>
+                        </div>
+                        <div class="w-full"></div>
+                        <div id="satStepCluster" class="flex items-center gap-1 normal-case flex-none mr-auto">
+                            <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
+                            <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
                         </div>
                     </div>
                     <div class="media-container" id="mapContainer">

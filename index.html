@@ -196,10 +196,11 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="satStepCluster" style="display:none;" class="flex items-center gap-1 normal-case">
-                            <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
-                            <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
-                        </div>
+                    </div>
+                    <!-- Direct child of #mapPanel (not #mapHeader) so its z-index competes with the bottom bar in fullscreen; #mapHeader's z-20 stacking context would otherwise trap it under the bar's shadow. -->
+                    <div id="satStepCluster" style="display:none;" class="flex items-center gap-1 normal-case">
+                        <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
+                        <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
                     </div>
                     <div class="media-container" id="mapContainer">
                         <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Awaiting flight log data extraction...</div>

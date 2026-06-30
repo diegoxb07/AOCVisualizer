@@ -7,6 +7,13 @@
         #mapPanel:fullscreen .media-container, #videoPanel:fullscreen .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
         #mapPanel:fullscreen .overlays-wrapper { top: 80px; bottom: 120px; transform: scale(1) !important; transform-origin: bottom left; }
         #mapPanel:fullscreen #pfdOverlay { bottom: 120px; width: 250px; height: 250px; }
+        /* 10-min satellite/playhead stepper: float it at the bottom-center of the map, above the timeline bar (it used to overlap the panel title in fullscreen) */
+        #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
+        #mapPanel:fullscreen #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its upward shadow gradient doesn't darken the buttons */
+        /* Fullscreen header: nudge the controls down off the top edge, and pin the fullscreen toggle to the very top-right corner */
+        #mapPanel:fullscreen #mapHeader { padding: 16px 16px 0 16px; }
+        #mapPanel:fullscreen .map-controls { padding-right: 44px; }
+        #mapPanel:fullscreen #fullscreenMapBtn { position: absolute; top: 14px; right: 16px; z-index: 200; }
         button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
         
         .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: #0b0e13; padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid #20262f; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); }
@@ -71,6 +78,16 @@
         #syncingIndicator .sync-sub { color: #fde9b8; font-weight: 500; }
         @keyframes syncSpin { to { transform: rotate(360deg); } }
         @media (max-width: 900px) { #syncingIndicator .sync-sub { display: none; } }
+
+        /* Recording progress pill — non-blocking, floats top-center; the Stop button stays clickable while the clip records */
+        #recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: rgba(11,14,19,0.95); border: 1px solid rgba(168,85,247,0.7); color: #e9d5ff; padding: 8px 14px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+        #recordProgress.show { display: flex; }
+        #recordProgress .rec-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.9); animation: recPulse 1s ease-in-out infinite; }
+        @keyframes recPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        #recordProgress .rec-bar { width: 160px; height: 7px; background: #2a2140; border-radius: 4px; overflow: hidden; }
+        #recordProgress #recordProgressFill { width: 0%; height: 100%; background: linear-gradient(90deg,#a855f7,#38bdf8); transition: width 0.15s linear; }
+        #recordProgress #recordStopBtn { background: #7e22ce; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+        #recordProgress #recordStopBtn:hover { background: #9333ea; }
 
         .sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background-color: rgba(22, 27, 34, 0.95); border-top: 1px solid #20262f; padding: 12px 24px; z-index: 2000; box-shadow: 0 -10px 20px rgba(0,0,0,0.8); backdrop-filter: blur(5px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         input[type="range"] { -webkit-appearance: none; width: 100%; background: #20262f; height: 8px; border-radius: 4px; outline: none; border: 1px solid #343c46; }

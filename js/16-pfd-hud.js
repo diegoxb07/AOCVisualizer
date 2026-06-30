@@ -91,7 +91,6 @@
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
         
         const isImperial = document.getElementById('toggleImperial').checked;
-        const useGps = document.getElementById('toggleGpsAlt').checked;
 
         let h = addHUD('TIME (UTC)', `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
         h += addHUD('LATITUDE', `${sf(d.lat, 3)}°N`);
@@ -105,11 +104,10 @@
         let tDisp = d.tempr !== null ? sf(isImperial ? (d.tempr * 9/5 + 32) : d.tempr, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
         let tdDisp = d.dewpt !== null ? sf(isImperial ? (d.dewpt * 9/5 + 32) : d.dewpt, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
         
-        if (useGps) {
-            if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
-        } else {
-            if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
-        }
+        // Core altitude line prefers pressure altitude; GPS altitude is always relegated to the extra
+        // metrics below (it only surfaces here as a fallback when there is no pressure altitude at all).
+        if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
+        else if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
         
         if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', `${d.sfcPr !== null ? sf(d.sfcPr, 1) + ' mb' : 'N/A'}`);
         if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', `${d.windSpd !== null ? sf(d.windSpd, 1) + ' kt' : 'N/A'}`);
@@ -122,11 +120,8 @@
         let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
 
-        if (useGps) {
-            if (availableMetrics.has('pAlt')) addExtra('PRESS ALT', pAltDisp);
-        } else {
-            if (availableMetrics.has('gpsAlt')) addExtra('GPS ALT', gAltDisp);
-        }
+        // GPS altitude always lives in the extra metrics (skipped only if it was the core fallback above).
+        if (availableMetrics.has('gpsAlt') && availableMetrics.has('pAlt')) addExtra('GPS ALT', gAltDisp);
 
         if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'N/A'}`);
         if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'N/A'}`);

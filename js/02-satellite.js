@@ -5,6 +5,21 @@
     function showSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.add('show'); }
     function hideSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.remove('show'); }
 
+    // --- Tile cache (LRU) --------------------------------------------------------------
+    // Re-use a tile we already rendered instead of re-fetching it. On a hit we re-insert the
+    // key so it counts as most-recently-used; on insert we evict the oldest entry past the cap.
+    function satCacheGet(id) {
+        const e = satTileCache.get(id);
+        if (e) { satTileCache.delete(id); satTileCache.set(id, e); }
+        return e || null;
+    }
+    function satCacheSet(id, entry) {
+        if (satTileCache.has(id)) satTileCache.delete(id);
+        satTileCache.set(id, entry);
+        while (satTileCache.size > SAT_CACHE_MAX) satTileCache.delete(satTileCache.keys().next().value);
+    }
+    function clearSatTileCache() { satTileCache.clear(); }
+
     function updateSatTimeBadge() {
         const badge = document.getElementById('satTimeBadge');
         if (!badge) return;
@@ -106,13 +121,24 @@
         },
         // GOES geostationary imagery — ARCHIVE, via the noaa-recon-api (https://joshmurdock.net/api).
         // Listed LAST. Unlike NASA GIBS (which only keeps a rolling ~90 days), this server renders
-        // GOES-16/19 ABI tiles from NOAA's S3 archive for ANY historical date — the right source for
-        // recon playback. `isReconApi:true` routes it through fetchReconApiSat; each "band" carries the
-        // API's `band`+`cmap`. It still rides the generic GOES machinery: a 10-min `cadenceMin` bucket
-        // tied to the playback clock, and `subLon` for the Earth-disk coverage test (GOES-East only —
-        // the API doesn't yet implement goes-west).
+        // GOES ABI tiles from NOAA's S3 archive for ANY historical date — the right source for recon
+        // playback. `isReconApi:true` routes it through fetchReconApiSat; each "band" carries the API's
+        // `band`+`cmap`. It rides the generic GOES machinery: a 10-min `cadenceMin` bucket tied to the
+        // playback clock, and `subLon` for the Earth-disk coverage test (which greys the layer out when
+        // the flight sits outside that satellite's disk). The API auto-resolves the actual spacecraft
+        // from the date (East: GOES-16/19; West: GOES-17/18), so we just pass `satellite`.
         { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
+          bands: [
+              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR — Band 13'},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)'},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor — Band 9'}
+          ]
+        },
+        // GOES-West (GOES-17/18, sub-point ~137°W) — added once the recon-api gained `goes-west`.
+        // Covers east/central-Pacific recon (greyed out for Atlantic flights via the coverage test).
+        { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
+          satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
           bands: [
               {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR — Band 13'},
               {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)'},
@@ -299,7 +325,7 @@
         satSelect.style.display = in2dMode ? '' : 'none';
         bandSelect.style.display = (in2dMode && satSelect.value !== 'none') ? '' : 'none';
 
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
 
         updateSatelliteDropdownTimes();
     }
@@ -340,6 +366,10 @@
             const next = document.getElementById('satDayNext');
             if (prev) prev.addEventListener('click', () => stepSatDay(-1));
             if (next) next.addEventListener('click', () => stepSatDay(1));
+            const cacheBtn = document.getElementById('satCacheAllBtn');
+            if (cacheBtn) cacheBtn.addEventListener('click', toggleSatPrefetch);
+            const cancelBtn = document.getElementById('satPrefetchCancel');
+            if (cancelBtn) cancelBtn.addEventListener('click', () => { satPrefetchCancel = true; });
             _satStepperWired = true;
         }
         const in2d = !trackerModeSelect || trackerModeSelect.value === '2d';
@@ -349,6 +379,9 @@
         // Band picker is shown for any active 2D layer (including GOES); the day-stepper is
         // for browsing polar-orbiter calendar days, so it stays hidden for GOES.
         bandSelect.style.display = (in2d && satOn) ? '' : 'none';
+        // "Cache flight" pre-download button rides alongside the band picker (any active 2D layer).
+        const cacheBtn = document.getElementById('satCacheAllBtn');
+        if (cacheBtn) cacheBtn.style.display = (in2d && satOn) ? '' : 'none';
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
@@ -375,7 +408,7 @@
         satDayOffset = n;
         updateSatDayLabel();
         updateSatelliteDropdownTimes();
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
         }
@@ -426,6 +459,30 @@
         });
     }
 
+    // The recon-api returns PNGs in Web Mercator (EPSG:3857) — rows spaced linearly in Mercator Y,
+    // NOT in latitude. Our 2D map is equirectangular (getY is linear in lat), so drawing the tile as-is
+    // mispositions it vertically (worse toward the edges / higher latitudes). Reproject Mercator→equirect
+    // ONCE here so it flows correctly through the renderer/cache. Longitude is linear in both projections,
+    // so only the rows (Y) need resampling; columns (X) are copied straight across.
+    function reprojectMercatorToEquirect(src, box) {
+        const W = src.width, H = src.height;
+        if (!W || !H) return src;
+        const mercY = lat => Math.log(Math.tan(Math.PI/4 + (Math.max(-85.05, Math.min(85.05, lat)) * Math.PI/180) / 2));
+        const yTop = mercY(box.maxLat), yBot = mercY(box.minLat), span = yTop - yBot;
+        if (!isFinite(span) || span === 0) return src;
+        const out = document.createElement('canvas');
+        out.width = W; out.height = H;
+        const octx = out.getContext('2d');
+        const dLat = box.maxLat - box.minLat;
+        for (let j = 0; j < H; j++) {
+            const lat = box.maxLat - ((j + 0.5) / H) * dLat;          // equirect: row j is linear in latitude
+            let srcRow = Math.floor(((yTop - mercY(lat)) / span) * H); // matching Mercator-Y source row
+            if (srcRow < 0) srcRow = 0; else if (srcRow > H - 1) srcRow = H - 1;
+            octx.drawImage(src, 0, srcRow, W, 1, 0, j, W, 1);
+        }
+        return out;
+    }
+
     // Request a recon-api GOES tile and poll until it renders. Resolves to
     // { canvas, box:{minLon,minLat,maxLon,maxLat}, scanStartMs } or { error }.
     async function fetchReconApiTile({ band, cmap, timeIso, center, dims, unit, satellite }) {
@@ -445,8 +502,31 @@
             const box = { minLat: b[0][0], minLon: b[0][1], maxLat: b[1][0], maxLon: b[1][1] };
             const c = await loadImageToCanvas(RECON_API_BASE + data.png_url);
             if (!c) return { error: 'image load failed' };
-            return { canvas: c, box, scanStartMs: data.scan_start ? new Date(data.scan_start).getTime() : null };
+            // Reproject the Mercator PNG to equirectangular so it aligns with our lat-linear map.
+            const eq = reprojectMercatorToEquirect(c, box);
+            return { canvas: eq, box, scanStartMs: data.scan_start ? new Date(data.scan_start).getTime() : null };
         } catch (e) { return { error: String(e) }; }
+    }
+
+    // Cache-first, deduped fetch for one recon tile. Used by the live display, the background
+    // preloader, AND the "Cache flight" pass so a given tile is only ever pulled from the server
+    // ONCE even if all three want it at the same moment. Resolves to { canvas, box, scanStartMs }
+    // (cached on success) or { error }.
+    function getOrFetchReconTile(fetchId, params) {
+        const cached = satCacheGet(fetchId);
+        if (cached) return Promise.resolve(cached);
+        if (satFetchInFlight.has(fetchId)) return satFetchInFlight.get(fetchId);
+        const p = fetchReconApiTile(params).then(r => {
+            satFetchInFlight.delete(fetchId);
+            if (r && r.canvas) {
+                const entry = { canvas: r.canvas, box: r.box, scanStartMs: r.scanStartMs };
+                satCacheSet(fetchId, entry);
+                return entry;
+            }
+            return { error: (r && r.error) || 'no scan' };
+        }).catch(e => { satFetchInFlight.delete(fetchId); return { error: String(e) }; });
+        satFetchInFlight.set(fetchId, p);
+        return p;
     }
 
     let _cmrCache = {};
@@ -530,6 +610,10 @@
         if (lastSatFetchTime === fetchId) return;
         lastSatFetchTime = fetchId;
 
+        // Already pulled this exact tile? Re-show it without touching the network.
+        const cached = satCacheGet(fetchId);
+        if (cached) { applyPolarSatResult(cached.canvas, cached.box, layerDef, dateStr); return; }
+
         clearTimeout(satDebounceTimer);
         satDebounceTimer = setTimeout(async () => {
             showSatLoader();
@@ -538,38 +622,9 @@
                 const ok = result && satImageHasContent(result);
                 hideSatLoader();
                 if (ok) {
-                    satImage = result;
-                    satImageBox = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
-                    satImageLoaded = true;
-                    bgNeedsUpdate = true;
-
-                    const opt = satSelect.options[satSelect.selectedIndex];
-                    let defaultTimeMs = new Date(dateStr + 'T00:00:00Z').getTime();
-                    let exact = false;
-                    let pending = true;
-                    const timeMatch = opt.textContent.match(/\[(\d{2}):(\d{2})Z\]/);
-                    if (timeMatch) {
-                        const d = new Date(dateStr + 'T00:00:00Z');
-                        d.setUTCHours(parseInt(timeMatch[1], 10));
-                        d.setUTCMinutes(parseInt(timeMatch[2], 10));
-                        defaultTimeMs = d.getTime();
-                        exact = true;
-                        pending = false;
-                    } else if (opt.textContent.includes('[Daily]')) {
-                        pending = false;
-                    }
-                    satLoadedInfo = {
-                        layerLabel: layerDef.baseLabel,
-                        imageTimeMs: defaultTimeMs,
-                        isModis: true,
-                        modisTimePending: pending,
-                        modisExact: exact,
-                        dayOffset: satDayOffset
-                    };
-
-                    updateSatTimeBadge();
-                    if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-
+                    const boxCopy = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
+                    satCacheSet(fetchId, { canvas: result, box: boxCopy });
+                    applyPolarSatResult(result, boxCopy, layerDef, dateStr);
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
                     satLoadedInfo = null; updateSatTimeBadge();
@@ -579,6 +634,54 @@
                 hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
             }
         }, 350);
+    }
+
+    // Place a (freshly fetched OR cached) polar tile and refresh the badge/map. The image time is
+    // derived from the dropdown option's [HH:MMZ]/[Daily] label, same as a live fetch.
+    function applyPolarSatResult(canvasImg, box, layerDef, dateStr) {
+        const satSelect = document.getElementById('satelliteSelect');
+        satImage = canvasImg;
+        satImageBox = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
+        satImageLoaded = true;
+        bgNeedsUpdate = true;
+
+        const opt = satSelect.options[satSelect.selectedIndex];
+        let defaultTimeMs = new Date(dateStr + 'T00:00:00Z').getTime();
+        let exact = false;
+        let pending = true;
+        const timeMatch = opt ? opt.textContent.match(/\[(\d{2}):(\d{2})Z\]/) : null;
+        if (timeMatch) {
+            const d = new Date(dateStr + 'T00:00:00Z');
+            d.setUTCHours(parseInt(timeMatch[1], 10));
+            d.setUTCMinutes(parseInt(timeMatch[2], 10));
+            defaultTimeMs = d.getTime();
+            exact = true;
+            pending = false;
+        } else if (opt && opt.textContent.includes('[Daily]')) {
+            pending = false;
+        }
+        satLoadedInfo = {
+            layerLabel: layerDef.baseLabel,
+            imageTimeMs: defaultTimeMs,
+            isModis: true,
+            modisTimePending: pending,
+            modisExact: exact,
+            dayOffset: satDayOffset
+        };
+
+        updateSatTimeBadge();
+        if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+
+    // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
+    // Shared by the live recon path and the pre-cache pass so both build the SAME fetchId (= cache hit).
+    function computeReconTileGeom() {
+        const cLon = (plotMinLon + plotMaxLon) / 2, cLat = (plotMinLat + plotMaxLat) / 2;
+        const latSpanKm = (plotMaxLat - plotMinLat) * 111;
+        const lonSpanKm = (plotMaxLon - plotMinLon) * 111 * Math.cos(cLat * Math.PI / 180);
+        const dimsKm = Math.round(Math.max(800, Math.min(4000, Math.max(latSpanKm, lonSpanKm) * 1.4 + 600)));
+        const centerStr = cLat.toFixed(3) + ',' + cLon.toFixed(3);
+        return { centerStr, dimsKm };
     }
 
     // Archive GOES path: pick the playback-clock 10-min bucket, request a bbox tile centered on the
@@ -608,12 +711,11 @@
         }
         satUnavailableNote = null;
 
+        // Warm the buckets around the playhead in the background so scrubbing stays smooth.
+        preloadSatAround(absSeconds);
+
         // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
-        const cLon = (plotMinLon + plotMaxLon) / 2, cLat = (plotMinLat + plotMaxLat) / 2;
-        const latSpanKm = (plotMaxLat - plotMinLat) * 111;
-        const lonSpanKm = (plotMaxLon - plotMinLon) * 111 * Math.cos(cLat * Math.PI / 180);
-        const dimsKm = Math.round(Math.max(800, Math.min(4000, Math.max(latSpanKm, lonSpanKm) * 1.4 + 600)));
-        const centerStr = cLat.toFixed(3) + ',' + cLon.toFixed(3);
+        const { centerStr, dimsKm } = computeReconTileGeom();
         const timeIso = goesTimeStr(bucketMs);
 
         // One request per distinct target; mark SYNCHRONOUSLY (like the polar path) so per-frame
@@ -622,11 +724,18 @@
         if (lastSatFetchTime === fetchId) return;
         lastSatFetchTime = fetchId;
 
+        // Already pulled this exact scan? Re-show it INSTANTLY from the local cache — no network,
+        // no debounce. This is what makes scrubbing across pre-cached/preloaded buckets smooth.
+        const cached = satCacheGet(fetchId);
+        if (cached) { applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
+
+        // Cache miss: fetch from the API (deduped, then cached). Debounced so rapid scrubbing doesn't
+        // fire a display fetch for every bucket it flies past — only the one it settles on.
         clearTimeout(satDebounceTimer);
         satDebounceTimer = setTimeout(async () => {
             showSatLoader();
             try {
-                const r = await fetchReconApiTile({
+                const r = await getOrFetchReconTile(fetchId, {
                     band: bandObj.band, cmap: bandObj.cmap, timeIso,
                     center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite
                 });
@@ -634,18 +743,7 @@
                 // User may have changed layer/band, or the clock crossed a new bucket, while we polled.
                 if (lastSatFetchTime !== fetchId) return;
                 if (r && r.canvas) {
-                    satImage = r.canvas;
-                    satImageBox = r.box;
-                    satImageLoaded = true; bgNeedsUpdate = true;
-                    satLoadedInfo = {
-                        layerLabel: shortLabel + ' · ' + bandName,
-                        imageTimeMs: r.scanStartMs || bucketMs,
-                        isModis: false,
-                        isReconApi: true,
-                        cadenceMin: layerDef.cadenceMin || 10
-                    };
-                    updateSatTimeBadge();
-                    if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                    applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs);
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true; satLoadedInfo = null;
                     updateSatTimeBadge();
@@ -655,4 +753,185 @@
                 hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
             }
         }, 350);
+    }
+
+    // --- Background preloader ----------------------------------------------------------
+    // As the playhead moves, queue the surrounding 10-min buckets (forward-weighted) and warm any
+    // that aren't already local. Cache-first: cached buckets are skipped; the rest are pulled from
+    // the API ONE AT A TIME (gentle on the server) and stored, so by the time the slider reaches
+    // them they re-show instantly. GOES only — polar layers are a single image per day.
+    const SAT_PRELOAD_AHEAD = 6, SAT_PRELOAD_BEHIND = 2;
+    function resetSatPreload() { satPreloadQueue = []; _satPreloadBucket = null; }
+
+    function preloadSatAround(absSeconds) {
+        const satSelect = document.getElementById('satelliteSelect');
+        const bandSelect = document.getElementById('satBandSelect');
+        if (!satSelect || satSelect.value === 'none' || !bandSelect) return;
+        if (flightMetaData.date === 'Unknown' || filteredData.length === 0) return;
+        if (!trackerModeSelect || trackerModeSelect.value !== '2d') return;
+        const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
+        if (!layerDef || !layerDef.isReconApi || !goesInCoverage(layerDef)) return;
+
+        const baseBucket = goesBucketMs(layerDef, absSeconds);
+        if (baseBucket == null || baseBucket === _satPreloadBucket) return;  // same neighborhood already queued
+        _satPreloadBucket = baseBucket;
+
+        const bandObj = layerDef.bands.find(b => b.id === bandSelect.value) || layerDef.bands[0];
+        const { centerStr, dimsKm } = computeReconTileGeom();
+        const cadMs = (layerDef.cadenceMin || 10) * 60000;
+        const flightStart = goesBucketMs(layerDef, filteredData[0].absSeconds);
+        const flightEnd   = goesBucketMs(layerDef, filteredData[filteredData.length - 1].absSeconds);
+
+        const order = [];
+        for (let k = 0; k <= SAT_PRELOAD_AHEAD; k++)  order.push(baseBucket + k * cadMs);  // current + ahead first
+        for (let k = 1; k <= SAT_PRELOAD_BEHIND; k++) order.push(baseBucket - k * cadMs);  // then behind
+
+        const q = [], seen = new Set();
+        order.forEach(ms => {
+            if (ms < flightStart || ms > flightEnd) return;
+            const timeIso = goesTimeStr(ms);
+            const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
+            if (seen.has(fetchId)) return; seen.add(fetchId);
+            if (satTileCache.has(fetchId)) return;   // already local — nothing to preload
+            q.push({ fetchId, params: { band: bandObj.band, cmap: bandObj.cmap, timeIso,
+                                        center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite } });
+        });
+        satPreloadQueue = q;   // replace: the worker always drains toward the newest neighborhood
+        runSatPreloadWorker();
+    }
+
+    async function runSatPreloadWorker() {
+        if (satPreloadActive) return;
+        satPreloadActive = true;
+        try {
+            while (satPreloadQueue.length) {
+                const t = satPreloadQueue.shift();
+                if (satTileCache.has(t.fetchId)) continue;
+                await getOrFetchReconTile(t.fetchId, t.params);  // caches on success; dedupes vs live/prefetch
+            }
+        } finally { satPreloadActive = false; }
+    }
+
+    // Place a (freshly fetched OR cached) archive-GOES tile and refresh the badge/map.
+    function applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs) {
+        satImage = r.canvas;
+        satImageBox = r.box;
+        satImageLoaded = true; bgNeedsUpdate = true;
+        satLoadedInfo = {
+            layerLabel: shortLabel + ' · ' + bandName,
+            imageTimeMs: r.scanStartMs || bucketMs,
+            isModis: false,
+            isReconApi: true,
+            cadenceMin: layerDef.cadenceMin || 10
+        };
+        updateSatTimeBadge();
+        if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+
+    // --- Pre-cache the whole flight ----------------------------------------------------
+    // Build the list of every distinct tile playback will request for the current layer+band over
+    // the flight's time range (using the SAME box/bucket math as the live paths so the fetchIds
+    // match) and pull them once, up front, into satTileCache. Then playback re-shows from memory
+    // and never re-hits the server. A progress bar reports the pass and a Cancel stops it.
+
+    // Each target: { fetchId, run:()=>Promise<{canvas,box,scanStartMs}|null> }. null = nothing fetched.
+    function buildSatPrefetchTargets() {
+        const satSelect = document.getElementById('satelliteSelect');
+        const bandSelect = document.getElementById('satBandSelect');
+        if (!satSelect || satSelect.value === 'none' || !bandSelect) return null;
+        if (flightMetaData.date === 'Unknown' || filteredData.length === 0) return null;
+        const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
+        if (!layerDef) return null;
+        const bandId = bandSelect.value;
+
+        const targets = [];
+        if (layerDef.isReconApi) {
+            if (!goesInCoverage(layerDef)) return null;
+            const bandObj = layerDef.bands.find(b => b.id === bandId) || layerDef.bands[0];
+            const { centerStr, dimsKm } = computeReconTileGeom();
+            const cadMs = (layerDef.cadenceMin || 10) * 60000;
+            const startMs = goesBucketMs(layerDef, filteredData[0].absSeconds);
+            const endMs   = goesBucketMs(layerDef, filteredData[filteredData.length - 1].absSeconds);
+            const seen = new Set();
+            for (let ms = startMs; ms <= endMs; ms += cadMs) {
+                const timeIso = goesTimeStr(ms);
+                const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
+                if (seen.has(fetchId)) continue;
+                seen.add(fetchId);
+                targets.push({ fetchId, run: () => getOrFetchReconTile(fetchId, {
+                    band: bandObj.band, cmap: bandObj.cmap, timeIso,
+                    center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite
+                }) });
+            }
+        } else {
+            // Polar layers don't change over the flight — the playback path uses one image per
+            // calendar day. Pre-cache the day currently selected in the day-stepper.
+            computeSatFetchBox();
+            const box = satFetchBox;
+            const dateStr = satDateForOffset(satDayOffset);
+            if (!dateStr) return null;
+            const boxCopy = { minLon: box.minLon, minLat: box.minLat, maxLon: box.maxLon, maxLat: box.maxLat };
+            const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
+            const aspect = boxLonSpan / boxLatSpan;
+            const NATIVE_PX_PER_DEG = 111320 / 250, SAT_PX_CAP = 3072;
+            let pxW = Math.min(SAT_PX_CAP, Math.max(canvas.width, Math.round(boxLonSpan * NATIVE_PX_PER_DEG)));
+            let pxH = Math.round(pxW / aspect);
+            if (pxH > SAT_PX_CAP) { pxH = SAT_PX_CAP; pxW = Math.round(pxH * aspect); }
+            const wmsLayer = layerDef.wmsPrefix + bandId;
+            const fetchId = layerDef.value + '||' + bandId + '||' + dateStr + '||' +
+                box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
+            targets.push({ fetchId, run: () => fetchGibsWMS(wmsLayer, dateStr, box, pxW, pxH)
+                .then(c => (c && satImageHasContent(c)) ? { canvas: c, box: boxCopy } : null) });
+        }
+        return targets;
+    }
+
+    function showSatPrefetchBar() { const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden'); }
+    function hideSatPrefetchBar() { const b = document.getElementById('satPrefetchBar'); if (b) b.classList.add('hidden'); }
+    function setSatPrefetchProgress(done, total, note) {
+        const fill = document.getElementById('satPrefetchFill');
+        const lbl = document.getElementById('satPrefetchLabel');
+        const pct = total ? Math.round((done / total) * 100) : 0;
+        if (fill) fill.style.width = pct + '%';
+        if (lbl) lbl.textContent = note || `Caching satellite imagery… ${done}/${total} (${pct}%)`;
+    }
+
+    async function prefetchAllSatellite() {
+        if (satPrefetching) return;
+        const targets = buildSatPrefetchTargets();
+        if (!targets || targets.length === 0) {
+            showToast('Pick a satellite layer (in 2D, flight loaded) before caching.', 5000);
+            return;
+        }
+        satPrefetching = true; satPrefetchCancel = false;
+        const btn = document.getElementById('satCacheAllBtn');
+        if (btn) { btn.textContent = '■ Stop'; btn.title = 'Stop caching'; }
+        showSatPrefetchBar();
+        setSatPrefetchProgress(0, targets.length);
+
+        let done = 0, fetched = 0, failed = 0;
+        for (const t of targets) {
+            if (satPrefetchCancel) break;
+            if (satCacheGet(t.fetchId)) { done++; setSatPrefetchProgress(done, targets.length); continue; }
+            try {
+                const r = await t.run();
+                if (satPrefetchCancel) break;
+                if (r && r.canvas) { satCacheSet(t.fetchId, r); fetched++; }
+                else failed++;
+            } catch(e) { failed++; }
+            done++;
+            setSatPrefetchProgress(done, targets.length);
+        }
+
+        const cancelled = satPrefetchCancel;
+        satPrefetching = false; satPrefetchCancel = false;
+        if (btn) { btn.textContent = '⤓ Cache flight'; btn.title = 'Pre-download all satellite imagery for this flight'; }
+        hideSatPrefetchBar();
+        if (cancelled) showToast(`Satellite caching stopped — ${fetched} cached so far.`, 5000);
+        else showToast(`Satellite caching done — ${fetched} new tile(s) cached${failed ? `, ${failed} unavailable` : ''}.`, 6000);
+    }
+
+    function toggleSatPrefetch() {
+        if (satPrefetching) { satPrefetchCancel = true; return; }
+        prefetchAllSatellite();
     }

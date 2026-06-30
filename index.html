@@ -31,7 +31,7 @@
     <script src="https://cdn.jsdelivr.net/npm/netcdfjs/dist/netcdfjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     
-    <link rel="stylesheet" href="css/app.css">
+    <link rel="stylesheet" href="css/app.css?v=20260630">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -464,24 +464,26 @@
 /* Application logic is split across js/*.js (loaded below) so one broken part
    cannot take down the whole page. They are classic scripts sharing one global scope. */
 </script>
-    <script src="js/01-state.js"></script>
-    <script src="js/02-satellite.js"></script>
-    <script src="js/03-metrics.js"></script>
-    <script src="js/04-geo-measure.js"></script>
-    <script src="js/05-interpolation.js"></script>
-    <script src="js/06-ocr.js"></script>
-    <script src="js/07-ui-controls.js"></script>
-    <script src="js/08-ocr-lock-export.js"></script>
-    <script src="js/09-interaction.js"></script>
-    <script src="js/10-point-analysis.js"></script>
-    <script src="js/11-layout.js"></script>
-    <script src="js/12-file-parsing.js"></script>
-    <script src="js/13-charts-master.js"></script>
-    <script src="js/14-filters-sync.js"></script>
-    <script src="js/15-map-render.js"></script>
-    <script src="js/16-pfd-hud.js"></script>
-    <script src="js/17-charts.js"></script>
-    <script src="js/18-engine.js"></script>
-    <script src="js/19-bootstrap.js"></script>
+    <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
+         port-preview) fetch the new files instead of a stale cached copy. -->
+    <script src="js/01-state.js?v=20260630"></script>
+    <script src="js/02-satellite.js?v=20260630"></script>
+    <script src="js/03-metrics.js?v=20260630"></script>
+    <script src="js/04-geo-measure.js?v=20260630"></script>
+    <script src="js/05-interpolation.js?v=20260630"></script>
+    <script src="js/06-ocr.js?v=20260630"></script>
+    <script src="js/07-ui-controls.js?v=20260630"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260630"></script>
+    <script src="js/09-interaction.js?v=20260630"></script>
+    <script src="js/10-point-analysis.js?v=20260630"></script>
+    <script src="js/11-layout.js?v=20260630"></script>
+    <script src="js/12-file-parsing.js?v=20260630"></script>
+    <script src="js/13-charts-master.js?v=20260630"></script>
+    <script src="js/14-filters-sync.js?v=20260630"></script>
+    <script src="js/15-map-render.js?v=20260630"></script>
+    <script src="js/16-pfd-hud.js?v=20260630"></script>
+    <script src="js/17-charts.js?v=20260630"></script>
+    <script src="js/18-engine.js?v=20260630"></script>
+    <script src="js/19-bootstrap.js?v=20260630"></script>
 </body>
 </html>

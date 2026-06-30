@@ -80,12 +80,21 @@
     timelineSlider.addEventListener('mousedown', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
     timelineSlider.addEventListener('touchstart', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
 
+    // Only treat a click as a scrub if it lands inside the chart's plotting area.
+    // The legend strip above chartArea acts as the per-variable filter toggles, so
+    // clicking a variable there must NOT jump the playhead (start a drag).
+    const pointInChartPlotArea = (chart, xPixel, yPixel) => {
+        const a = chart.chartArea; if (!a) return false;
+        return xPixel >= a.left && xPixel <= a.right && yPixel >= a.top && yPixel <= a.bottom;
+    };
+
     window.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'CANVAS') {
             const chart = Chart.getChart(e.target);
             if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
+                const rect = e.target.getBoundingClientRect(); const xPixel = e.clientX - rect.left; const yPixel = e.clientY - rect.top;
+                if (!pointInChartPlotArea(chart, xPixel, yPixel)) return;
                 isScrubbing = true; activeScrubChart = chart; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
-                const rect = e.target.getBoundingClientRect(); const xPixel = e.clientX - rect.left;
                 let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel)); clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
                 if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx, true); }
             }
@@ -96,8 +105,9 @@
         if (e.target.tagName === 'CANVAS') {
             const chart = Chart.getChart(e.target);
             if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
+                const rect = e.target.getBoundingClientRect(); const xPixel = e.touches[0].clientX - rect.left; const yPixel = e.touches[0].clientY - rect.top;
+                if (!pointInChartPlotArea(chart, xPixel, yPixel)) return;
                 isScrubbing = true; activeScrubChart = chart; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
-                const rect = e.target.getBoundingClientRect(); const xPixel = e.touches[0].clientX - rect.left;
                 let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel)); clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
                 if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx, true); }
             }

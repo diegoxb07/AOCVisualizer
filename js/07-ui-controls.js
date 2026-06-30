@@ -248,7 +248,7 @@
 
     document.getElementById('satelliteSelect').addEventListener('change', () => {
         updateBandOptions();
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         satLoadedInfo = null; satImageBox = null;
         satDayOffset = 0;            
         buildSatDayStepper();        
@@ -260,7 +260,7 @@
     });
 
     document.getElementById('satBandSelect').addEventListener('change', () => {
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);

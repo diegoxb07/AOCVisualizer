@@ -92,6 +92,9 @@
     function parseEntireFile(rawText) {
         const lines = rawText.split('\n');
         if (lines.length < 2) { document.getElementById('loadingOverlay').classList.add('hidden'); document.getElementById('loadingOverlay').classList.remove('flex'); return; }
+        // New flight → drop any satellite tiles cached for the previous one (different box/dates anyway).
+        if (typeof clearSatTileCache === 'function') clearSatTileCache();
+        if (typeof resetSatPreload === 'function') resetSatPreload();
         
         const headers = lines[0].replace(/\r/g, '').split('\t').map(h => h.trim());
         const hMap = {}; headers.forEach((h, idx) => { if (h) hMap[h.toLowerCase()] = idx; });

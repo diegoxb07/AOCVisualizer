@@ -179,6 +179,19 @@
             const pathGeom = new THREE.BufferGeometry().setFromPoints(pathPts); pathGeom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             const trackMat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); const coloredTrack3D = new THREE.Line(pathGeom, trackMat); threeMapGroup.add(coloredTrack3D);
         }
+        // Storm best-track overlay (js/12b-recon-archive.js) - same points as the 2D layer, flattened to
+        // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
+        // flight's altitude profile.
+        if (showStormTrack && stormTrackPoints.length > 1) {
+            const stormPts = [], stormColors = [];
+            stormTrackPoints.forEach(p => {
+                stormPts.push(get3DCoord(p.lon, p.lat, 0));
+                const hex = stormWindColor(p.windKt); const c = new THREE.Color(hex); stormColors.push(c.r, c.g, c.b);
+            });
+            const stormGeom = new THREE.BufferGeometry().setFromPoints(stormPts); stormGeom.setAttribute('color', new THREE.Float32BufferAttribute(stormColors, 3));
+            const stormMat = new THREE.LineDashedMaterial({ vertexColors: true, linewidth: 2, dashSize: 0.3, gapSize: 0.2 });
+            const stormTrack3D = new THREE.Line(stormGeom, stormMat); stormTrack3D.computeLineDistances(); threeMapGroup.add(stormTrack3D);
+        }
         sync3DMarkers();
     }
 
@@ -254,16 +267,13 @@
         buildSatDayStepper();
         updateSatTimeBadge();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
-            // Archived (recon-api) satellites stream a tile per 10-min scan from the API, which can
-            // pause playback. Offer to pre-cache the whole flight up front for smooth playback first.
-            const layerDef = GIBS_LAYERS.find(d => d.value === document.getElementById('satelliteSelect').value);
-            const bandId = (document.getElementById('satBandSelect') || {}).value;
-            if (layerDef && layerDef.isReconApi && allParsedData.length && !batchCaching &&
-                confirm('Pre-cache this archived satellite\'s imagery for the loaded flight now?\n\nThis downloads every 10-minute scan up front so playback is smooth (no pauses to fetch from the API). Click Cancel to stream it on the fly instead.')) {
-                precacheCurrentFlight(layerDef.value, bandId ? [bandId] : (layerDef.bands || []).map(b => b.id));
-            } else {
-                fetchSatelliteImage(filteredData[currentIdx].absSeconds);
-            }
+            // For archive-GOES layers, updateBandOptions() just reset satBandSelect to its blank
+            // "Choose a product…" placeholder - fetchSatelliteImage/maybeAutoPrecacheSatellite both
+            // no-op on an empty product, so nothing fetches or builds until the satBandSelect handler
+            // below fires with an actual pick. Polar (MODIS/VIIRS) layers have no placeholder and fetch
+            // their single daily image immediately, same as always.
+            fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+            maybeAutoPrecacheSatellite();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
     });
@@ -271,7 +281,12 @@
     document.getElementById('satBandSelect').addEventListener('change', () => {
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            // Archived (recon-api) satellites stream a tile per 10-min scan from the API, which can
+            // pause playback - so picking a bbox-capable product auto-builds its whole timeframe up
+            // front (maybeAutoPrecacheSatellite) instead of trickling in during playback. A full-disk-
+            // only composite (sandwich/geocolor) skips that and just streams per-frame like a polar layer.
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+            maybeAutoPrecacheSatellite();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
     });

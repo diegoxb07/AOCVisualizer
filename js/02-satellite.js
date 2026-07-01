@@ -144,16 +144,19 @@
         // Listed LAST. Unlike NASA GIBS (which only keeps a rolling ~90 days), this server renders
         // GOES ABI tiles from NOAA's S3 archive for ANY historical date - the right source for recon
         // playback. `isReconApi:true` routes it through fetchReconApiSat; each "band" carries the API's
-        // `band`+`cmap`. It rides the generic GOES machinery: a 10-min `cadenceMin` bucket tied to the
-        // playback clock, and `subLon` for the Earth-disk coverage test (which greys the layer out when
-        // the flight sits outside that satellite's disk). The API auto-resolves the actual spacecraft
-        // from the date (East: GOES-16/19; West: GOES-17/18), so we just pass `satellite`.
+        // `band`+`cmap` (or `product` for a composite). It rides the generic GOES machinery: a 10-min
+        // `cadenceMin` bucket tied to the playback clock, and `subLon` for the Earth-disk coverage test
+        // (which greys the layer out when the flight sits outside that satellite's disk). The API
+        // auto-resolves the actual spacecraft from the date (East: GOES-16/19; West: GOES-17/18), so we
+        // just pass `satellite`. The `bands` list below is a fallback shown until loadSatelliteProducts()
+        // (below) replaces it with the live list from GET /v1/satellite/products - don't hardcode new
+        // bands/products here going forward, that discovery endpoint is the source of truth now.
         { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
           bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13'},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)'},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9'}
+              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13',    bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)',     bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9',  bboxSupported:true}
           ]
         },
         // GOES-West (GOES-17/18, sub-point ~137°W) - added once the recon-api gained `goes-west`.
@@ -161,9 +164,9 @@
         { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
           bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13'},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)'},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9'}
+              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13',    bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)',     bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9',  bboxSupported:true}
           ]
         }
     ];
@@ -366,6 +369,7 @@
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
 
         updateSatelliteDropdownTimes();
+        maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected - build its full timeframe now
     }
 
     function updateBandOptions() {
@@ -383,6 +387,14 @@
         const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
         if (layerDef && layerDef.bands) {
             bandSelect.innerHTML = '';
+            // Archive-GOES layers can trigger a full-timeframe cache build (maybeAutoPrecacheSatellite) -
+            // force an explicit pick via a blank placeholder rather than silently defaulting to the first
+            // product, so caching never starts before the user has actually chosen what to build.
+            if (layerDef.isReconApi) {
+                const ph = document.createElement('option');
+                ph.value = ''; ph.textContent = 'Choose a product…';
+                bandSelect.appendChild(ph);
+            }
             layerDef.bands.forEach(b => {
                 const opt = document.createElement('option');
                 opt.value = b.id;
@@ -474,6 +486,36 @@
     // request is an async job - it returns a key, then we poll /status until the PNG is ready.
     const RECON_API_BASE = 'https://joshmurdock.net/api';
 
+    // Discovery endpoint (GET /v1/satellite/products): every band/composite product the API can render,
+    // plus each spacecraft's active date range - so this client doesn't have to hardcode that knowledge
+    // and picks up new products (e.g. new bands, new composites) without a code change. Fetched once at
+    // startup; replaces the two archive-GOES layers' `bands` fallback in GIBS_LAYERS above and refines
+    // their `minDate`. If the fetch fails, the hardcoded fallback just keeps working.
+    async function loadSatelliteProducts() {
+        try {
+            const data = await fetch(`${RECON_API_BASE}/v1/satellite/products`).then(r => r.json());
+            const bandDefs = (data.bands || []).map(b => ({
+                id: 'band' + b.band, band: b.band, cmap: b.default_cmap, name: b.name,
+                bboxSupported: b.bbox_supported !== false
+            }));
+            const productDefs = (data.products || []).map(p => ({
+                id: p.product, product: p.product, name: p.name,
+                bboxSupported: p.bbox_supported === true
+            }));
+            const allProducts = bandDefs.concat(productDefs);
+            if (!allProducts.length) return;   // malformed/empty response - keep the hardcoded fallback
+            GIBS_LAYERS.forEach(layerDef => {
+                if (!layerDef.isReconApi) return;
+                layerDef.bands = allProducts;
+                const spacecraft = data.satellites && data.satellites[layerDef.satellite];
+                if (spacecraft && spacecraft.length && spacecraft[0].start) layerDef.minDate = spacecraft[0].start;
+            });
+            // A dropdown may already be open/populated from the hardcoded fallback - refresh it in place.
+            if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
+        } catch (e) { /* keep the hardcoded fallback bands already in GIBS_LAYERS */ }
+    }
+    loadSatelliteProducts();
+
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {
         return new Promise(res => {
@@ -527,10 +569,13 @@
 
     // Request a recon-api GOES tile and poll until it renders. Resolves to
     // { canvas, box:{minLon,minLat,maxLon,maxLat}, scanStartMs } or { error }.
-    async function fetchReconApiTile({ band, cmap, timeIso, center, dims, unit, satellite }) {
-        const params = new URLSearchParams({ time: timeIso, band, cmap });
+    // `product` (e.g. 'sandwich'/'geocolor') is a composite - when given, band/cmap are ignored
+    // server-side and bbox (center/dims) isn't supported yet, so it's always a slower full-disk render.
+    async function fetchReconApiTile({ band, cmap, product, timeIso, center, dims, unit, satellite }) {
+        const params = new URLSearchParams({ time: timeIso });
+        if (product) { params.set('product', product); } else { params.set('band', band); params.set('cmap', cmap); }
         if (satellite) params.set('satellite', satellite);
-        if (center)    { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
+        if (center && !product) { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
         try {
             let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`).then(r => r.json());
             // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
@@ -628,9 +673,13 @@
         if (!layerDef) return;
         const bandId = bandSelect.value;
 
-        // Archive GOES (noaa-recon-api) takes a separate async render+poll path.
+        // Archive GOES (noaa-recon-api) takes a separate async render+poll path. bandId is '' until the
+        // user explicitly picks a product from the placeholder-first dropdown (updateBandOptions) - don't
+        // fall back to a default product, or caching/fetching would start before they've actually chosen.
         if (layerDef.isReconApi) {
-            const bandObj = layerDef.bands.find(b => b.id === bandId) || layerDef.bands[0];
+            if (!bandId) return;
+            const bandObj = layerDef.bands.find(b => b.id === bandId);
+            if (!bandObj) return;
             fetchReconApiSat(layerDef, bandObj, absSeconds);
             return;
         }
@@ -818,17 +867,24 @@
         satUnavailableNote = null;
 
         // Warm the buckets around the playhead in the background so scrubbing stays smooth.
-        preloadSatAround(absSeconds);
+        // Composite products (sandwich/geocolor) don't support bbox yet - full-disk only.
+        const bboxSupported = bandObj.bboxSupported !== false;
+        if (bboxSupported) preloadSatAround(absSeconds);
 
         // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
-        const { centerStr, dimsKm } = computeReconTileGeom();
+        // Composites skip this entirely and render the whole disk.
+        const geom = bboxSupported ? computeReconTileGeom() : null;
+        const centerStr = geom ? geom.centerStr : null, dimsKm = geom ? geom.dimsKm : null;
         const timeIso = goesTimeStr(bucketMs);
 
         // One request per distinct target; mark SYNCHRONOUSLY (like the polar path) so per-frame
         // playback calls don't keep resetting the debounce timer.
-        const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
+        const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + (centerStr || 'fulldisk') + '||' + (dimsKm || '');
         if (lastSatFetchTime === fetchId) return;
         lastSatFetchTime = fetchId;
+
+        const fetchParams = { band: bandObj.band, cmap: bandObj.cmap, product: bandObj.product, timeIso,
+            center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite };
 
         // Already decoded in the HOT cache? Re-show it INSTANTLY - no network, no decode, no debounce.
         // This is what makes scrubbing across preloaded buckets smooth.
@@ -838,10 +894,8 @@
         // Not hot, but present in the local COLD blob store (pre-cached / seen earlier this session)?
         // Decode it (~ms, no network) and show - no debounce needed.
         if (satBlobStore.has(fetchId)) {
-            getOrFetchReconTile(fetchId, {
-                band: bandObj.band, cmap: bandObj.cmap, timeIso,
-                center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite
-            }).then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs); });
+            getOrFetchReconTile(fetchId, fetchParams)
+                .then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs); });
             return;
         }
 
@@ -853,10 +907,7 @@
             // pulled into the local cache - the background pill covers that and playback stays quiet.
             if (!batchCaching && !satFetchInFlight.has(fetchId)) showSatLoader();
             try {
-                const r = await getOrFetchReconTile(fetchId, {
-                    band: bandObj.band, cmap: bandObj.cmap, timeIso,
-                    center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite
-                });
+                const r = await getOrFetchReconTile(fetchId, fetchParams);
                 hideSatLoader();
                 // User may have changed layer/band, or the clock crossed a new bucket, while we polled.
                 if (lastSatFetchTime !== fetchId) return;
@@ -1017,6 +1068,10 @@
             if (startMs == null || endMs == null) return [];
             for (const bandId of bandIds) {
                 const bandObj = layerDef.bands.find(b => b.id === bandId); if (!bandObj) continue;
+                // Composite products (sandwich/geocolor) don't support bbox - a full-timeframe build
+                // would mean a slow full-disk render per bucket, which isn't what "cache this flight's
+                // area" is for. They're still viewable live (fetchReconApiSat), just not pre-built here.
+                if (bandObj.bboxSupported === false) continue;
                 for (let ms = startMs; ms <= endMs; ms += cadMs) {
                     const timeIso = goesTimeStr(ms);
                     const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
@@ -1050,7 +1105,8 @@
     // Pre-cache the CURRENTLY loaded flight's tiles for a satellite/bands using the in-memory parsed
     // rows (no file re-read). It builds the SAME deterministic tile list the live playback path will
     // request, so once this finishes playback hits the cache and never pauses on the API mid-flight.
-    // Offered as a confirm() prompt the moment an archived (recon-api) satellite is picked.
+    // Triggered automatically by maybeAutoPrecacheSatellite() below (also reachable from the manual
+    // multi-flight "Locally Cache Satellites" modal via batchCacheFlights).
     async function precacheCurrentFlight(layerValue, bandIds) {
         if (batchCaching) { showToast('A cache pass is already running.', 4000); return; }
         if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
@@ -1077,6 +1133,41 @@
         showToast(msg, 6000);
         // Tiles are warm now: draw the current frame's imagery straight from cache.
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+    }
+
+    // Auto-trigger the full-timeframe pre-cache (no confirm() prompt) whenever an archive-GOES layer
+    // is active - so imagery is fully ready BEFORE playback needs it instead of trickling in one scan
+    // at a time as the playhead crosses each bucket. Called after a flight (re)loads
+    // (updateSatelliteOptions) and whenever the satellite/band pick changes.
+    //
+    // RECHECKS THE ACTUAL COLD CACHE every call, not a one-shot session flag: if every tile this
+    // flight/layer/band needs is already in satBlobStore (e.g. this exact mission was already fully
+    // built earlier this session, or a previous pass finished), there is nothing to do - stay
+    // completely silent, no toast, no progress pill, no network requests. A CANCELLED or partial pass
+    // is therefore retried automatically the next time this fires, since "missing" is recomputed fresh
+    // rather than remembered.
+    function maybeAutoPrecacheSatellite() {
+        const satSelect = document.getElementById('satelliteSelect');
+        const bandSelect = document.getElementById('satBandSelect');
+        if (!satSelect || satSelect.value === 'none' || !allParsedData.length) return;
+        if (batchCaching) return;   // a pass (this combo or another) is already running - let it finish, don't pile on
+        const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
+        if (!layerDef || !layerDef.isReconApi) return;   // polar (MODIS/VIIRS) is a single daily image - nothing to build ahead
+        if (!goesInCoverage(layerDef)) return;           // out of this satellite's Earth-disk view
+
+        // bandId is '' until the user explicitly picks a product from the placeholder-first dropdown
+        // (updateBandOptions) - no fallback to "all bands"; caching is scoped to exactly what they chose.
+        const bandId = bandSelect ? bandSelect.value : '';
+        if (!bandId) return;
+        const bandObj = (layerDef.bands || []).find(b => b.id === bandId);
+        if (!bandObj || bandObj.bboxSupported === false) return;   // unknown product, or a full-disk-only composite (streams live instead, see fetchReconApiSat)
+
+        const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, [bandId], layerDef.value);
+        if (targets.length === 0) return;                            // out of view / before this satellite's data
+        if (targets.every(t => satBlobStore.has(t.fetchId))) return;  // already cached locally - don't prompt, don't submit new queries
+
+        showToast(`Building ${layerDef.baseLabel} - ${bandObj.name} imagery for the full flight timeframe…`, 4000);
+        precacheCurrentFlight(layerDef.value, [bandId]);
     }
 
     async function batchCacheFlights(files, bandIds, layerValue) {
@@ -1143,7 +1234,9 @@
         const wrap = document.getElementById('batchBandChecks'); if (!wrap) return;
         const satVal = (document.getElementById('batchSatSelect') || {}).value;
         const layerDef = GIBS_LAYERS.find(d => d.value === satVal);
-        const bands = (layerDef && layerDef.bands) ? layerDef.bands : [];
+        // Full-disk-only composites (sandwich/geocolor) can't be cached by area like everything else
+        // here - batch caching is always a bbox around each flight. They're still viewable live.
+        const bands = ((layerDef && layerDef.bands) ? layerDef.bands : []).filter(b => b.bboxSupported !== false);
         const curBand = (document.getElementById('satBandSelect') || {}).value;
         wrap.innerHTML = '';
         bands.forEach((b, i) => {

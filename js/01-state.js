@@ -37,6 +37,14 @@
     let mapFeatures = [];
     let customMarkers = [];
     let flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
+
+    // --- NOAA Recon Archive (noaa-recon-api: https://joshmurdock.net/api) -----------------------
+    // Year/storm/mission browser + best-track overlay, so a flight can be loaded straight from the
+    // archive instead of a manual file upload. See js/12b-recon-archive.js.
+    let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null
+    let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
+    let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
+    let showStormTrack = true;        // "Show Storm Track" toggle
     let currentPointAnalysisData = null; 
     let tempBaseline = [];
     

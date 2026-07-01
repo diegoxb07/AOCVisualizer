@@ -32,14 +32,20 @@
         document.getElementById('batchCacheCloseX').addEventListener('click', closeModal);
         const satSelect = document.getElementById('batchSatSelect');
         if (satSelect) satSelect.addEventListener('change', populateBatchBandChecks);   // bands differ per satellite
+        // Set the cancel flag AND abort whatever request/poll is currently in flight, so the pass
+        // actually stops within a tick instead of finishing out its current (up to 30s) poll wait.
+        const requestCacheCancel = () => {
+            batchCacheCancel = true;
+            if (batchCacheAbortController) batchCacheAbortController.abort();
+        };
         const pillCancel = document.getElementById('satPrefetchCancel');
-        if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) batchCacheCancel = true; });
+        if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) requestCacheCancel(); });
         fileInput.addEventListener('change', (e) => {
             picked = Array.from(e.target.files || []);
             document.getElementById('batchCacheStatus').textContent = picked.length ? `${picked.length} file(s) selected.` : 'No files selected.';
         });
         startBtn.addEventListener('click', () => {
-            if (batchCaching) { batchCacheCancel = true; return; }
+            if (batchCaching) { requestCacheCancel(); return; }
             const bands = Array.from(document.querySelectorAll('#batchBandChecks input:checked')).map(c => c.value);
             batchCacheFlights(picked, bands, satSelect ? satSelect.value : '');
         });

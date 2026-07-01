@@ -71,7 +71,7 @@
         .toast-notification { position: fixed; top: 20px; right: 20px; background-color: rgba(32, 38, 47, 0.95); border-left: 4px solid #38bdf8; color: #fff; padding: 16px 20px; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
         .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
-        /* Auto-Sync "Syncing…" indicator — anchored in the MMR video panel, non-blocking (no screen lock, unlike #loadingOverlay) */
+        /* Auto-Sync "Syncing…" indicator - anchored in the MMR video panel, non-blocking (no screen lock, unlike #loadingOverlay) */
         #syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: rgba(11,14,19,0.9); border: 1px solid rgba(251,191,36,0.75); color: #fcd34d; padding: 6px 12px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0,0,0,0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
         #syncingIndicator.show { opacity: 1; transform: translateY(0); }
         #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid #fbbf24; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
@@ -79,7 +79,7 @@
         @keyframes syncSpin { to { transform: rotate(360deg); } }
         @media (max-width: 900px) { #syncingIndicator .sync-sub { display: none; } }
 
-        /* Recording progress pill — non-blocking, floats top-center; the Stop button stays clickable while the clip records */
+        /* Recording progress pill - non-blocking, floats top-center; the Stop button stays clickable while the clip records */
         #recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: rgba(11,14,19,0.95); border: 1px solid rgba(168,85,247,0.7); color: #e9d5ff; padding: 8px 14px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
         #recordProgress.show { display: flex; }
         #recordProgress .rec-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.9); animation: recPulse 1s ease-in-out infinite; }
@@ -94,7 +94,7 @@
         input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; transition: 0.2s; }
         input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-        /* Non-invasive satellite fetch status — a small pill (NOT a full-screen cover) */
+        /* Non-invasive satellite fetch status - a small pill (NOT a full-screen cover) */
         #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(11,14,19,0.9); border: 1px solid rgba(56,189,248,0.6); color: #bae6fd; padding: 6px 12px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0,0,0,0.5); pointer-events: none; }
         #satLoadingOverlay.show { display: flex; }
         #satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }

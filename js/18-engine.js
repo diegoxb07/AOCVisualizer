@@ -1,4 +1,4 @@
-/* Mission Visualizer — speed display + master playback loop
+/* Mission Visualizer - speed display + master playback loop
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 

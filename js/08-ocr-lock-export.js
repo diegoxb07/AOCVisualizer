@@ -1,4 +1,4 @@
-/* Mission Visualizer — OCR sync lock + KML export
+/* Mission Visualizer - OCR sync lock + KML export
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -87,14 +87,14 @@
                             const skipTo = minSecs - videoStartSeconds;
                             if (skipTo > 0.1 && video.currentTime < skipTo && (!video.duration || skipTo < video.duration - 0.05)) {
                                 video.currentTime = skipTo;
-                                if (!silent) showToast("Video started before flight data — skipped ahead to data start.", 3500);
+                                if (!silent) showToast("Video started before flight data - skipped ahead to data start.", 3500);
                             }
                         }
 
                         if (!silent) showToast("Sync Locked Successfully!", 2000);
                         
                         ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
-                        refreshSyncingIndicator();  // lock settled — clear the badge even when paused
+                        refreshSyncingIndicator();  // lock settled - clear the badge even when paused
                         if (wasPlaying) video.play().catch(e=>{});
                         break;
                     }

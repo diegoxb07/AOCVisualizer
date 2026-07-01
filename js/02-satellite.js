@@ -1043,6 +1043,38 @@
         return out;
     }
 
+    // Pre-cache the CURRENTLY loaded flight's tiles for a satellite/bands using the in-memory parsed
+    // rows (no file re-read). It builds the SAME deterministic tile list the live playback path will
+    // request, so once this finishes playback hits the cache and never pauses on the API mid-flight.
+    // Offered as a confirm() prompt the moment an archived (recon-api) satellite is picked.
+    async function precacheCurrentFlight(layerValue, bandIds) {
+        if (batchCaching) { showToast('A cache pass is already running.', 4000); return; }
+        if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
+        const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
+        if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
+        batchCaching = true; batchCacheCancel = false;
+        showSatPrefetchBar();   // background pill (has its own Cancel) so playback stays usable
+        const total = targets.length;
+        let done = 0, fetched = 0;
+        for (const t of targets) {
+            if (batchCacheCancel) break;
+            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`); continue; }
+            try { const r = await t.run(); if (r && r.canvas) fetched++; } catch (e) {}
+            done++;
+            setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
+        }
+        const cancelled = batchCacheCancel;
+        batchCaching = false; batchCacheCancel = false;
+        const msg = cancelled
+            ? `Pre-cache stopped - ${fetched} tile(s) cached.`
+            : `Pre-cache done - ${fetched} new tile(s) cached for smooth playback.`;
+        setBatchProgress(done, total || 1, msg);
+        setTimeout(hideSatPrefetchBar, 2500);
+        showToast(msg, 6000);
+        // Tiles are warm now: draw the current frame's imagery straight from cache.
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+    }
+
     async function batchCacheFlights(files, bandIds, layerValue) {
         if (batchCaching) return;
         if (!files || !files.length) { showToast('Pick one or more flight files first.', 5000); return; }

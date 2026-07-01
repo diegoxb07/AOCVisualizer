@@ -154,6 +154,9 @@
         .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { height: 32px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; font-size: 11px !important; }
         .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) .cmd-row { gap: 6px; }
         .sticky-bottom-bar { row-gap: 10px; }
+        /* Filters live on the far right of the top row (order:1), packed 2x2 so the bar height is unchanged. */
+        #cmdFiltersGroup { order: 1; margin-left: auto; }
+        #filtersGrid { display: grid !important; grid-template-columns: auto auto; gap: 2px 14px; align-items: center; }
         #cmdSyncGroup { display: none; }
         #cmdSyncGroup:has(#forceSyncBtn[style*="inline-block"]) { display: flex; }
 

@@ -1,4 +1,4 @@
-/* Mission Visualizer — 2D map projection + render engine
+/* Mission Visualizer - 2D map projection + render engine
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -17,7 +17,7 @@
     function getY(lat) { return cssH - ((lat - plotMinLat) / deltaLat) * cssH; }
 
     // Geographic bounds currently visible (depends on pan/zoom). Used to draw the WHOLE world map
-    // but only the parts on screen — so Africa etc. appear when you zoom out, with no perf hit when
+    // but only the parts on screen - so Africa etc. appear when you zoom out, with no perf hit when
     // zoomed into the flight.
     function getVisibleGeoBounds() {
         if (!cssW || !cssH || !deltaLon) return null;
@@ -188,11 +188,11 @@
         };
         const statBox = (sx, sy, lines) => {
             ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
-            const w = 164, h = 16 + lines.length * 18;
+            const w = 124, h = 14 + lines.length * 15;
             let bx = sx - w - 6, by = sy; if (bx < 4) bx = sx + 6; if (by < 4) by = 4;
-            ctx.fillStyle = 'rgba(22, 27, 34, 0.92)'; ctx.fillRect(bx, by, w, h);
-            ctx.font = '700 14px sans-serif';
-            lines.forEach((ln, i) => { ctx.fillStyle = ln.c; ctx.fillText(ln.t, bx + 8, by + 21 + i * 18); });
+            ctx.fillStyle = 'rgba(22, 27, 34, 0.9)'; ctx.fillRect(bx, by, w, h);
+            ctx.font = 'bold 11px sans-serif';
+            lines.forEach((ln, i) => { ctx.fillStyle = ln.c; ctx.fillText(ln.t, bx + 6, by + 18 + i * 15); });
             ctx.restore();
         };
 
@@ -200,8 +200,8 @@
             if (pts.length === 0) return;
             const stroke = isHovered ? '#7dd3fc' : '#38bdf8';
             const fill = isHovered ? 'rgba(56, 189, 248, 0.38)' : 'rgba(56, 189, 248, 0.25)';
-            // Thicker strokes so a plain 2-point distance line is easy to see and hover over.
-            ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = (type === 'polygon' ? 7 : 5) / mapScale;
+            // Measurement/preview line widths (original sizes - the DPR transform, not a fatter line, is what keeps them crisp).
+            ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = (type === 'polygon' ? 5 : 3) / mapScale;
             if (type === 'polygon') {
                 const P = pts.map(p => ({ x: getX(p.lon), y: getY(p.lat) }));
                 // Filled area for a closed polygon (3+ points).
@@ -211,7 +211,7 @@
                     ctx.closePath(); ctx.fill();
                 }
                 // Connecting line: build the WHOLE path, THEN stroke once. (Previously the vertex dots
-                // were drawn inside this loop and each ctx.beginPath() wiped the line — which is why a
+                // were drawn inside this loop and each ctx.beginPath() wiped the line - which is why a
                 // plain 2-point distance line, having no fill to mask it, showed nothing.)
                 let totalDist = 0, liveSegDist = 0;
                 ctx.setLineDash([9 / mapScale, 5 / mapScale]); ctx.beginPath();
@@ -229,7 +229,7 @@
                 // Vertex dots, drawn AFTER the line so their own paths can't clobber it.
                 P.forEach(p => {
                     ctx.save(); ctx.translate(p.x, p.y); ctx.scale(1/mapScale, 1/mapScale);
-                    ctx.beginPath(); ctx.arc(0, 0, 6, 0, 2 * Math.PI); ctx.fillStyle = '#facc15'; ctx.fill();
+                    ctx.beginPath(); ctx.arc(0, 0, 5, 0, 2 * Math.PI); ctx.fillStyle = '#facc15'; ctx.fill();
                     ctx.strokeStyle = '#0b0e13'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
                 });
                 // Readout boxes.
@@ -287,12 +287,12 @@
                 const fx = (bb.minX + bb.maxX) / 2; const fy = bb.minY - 16;
                 drawCanvasButton('finish', -1, fx, fy, '✓', '#16a34a');
                 // "Click ... to finish" caption around the checkmark.
-                ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '700 14px sans-serif'; ctx.textBaseline = 'middle';
+                ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = 'bold 11px sans-serif'; ctx.textBaseline = 'middle';
                 ctx.textAlign = 'right'; const lw = ctx.measureText('Click').width;
-                ctx.fillStyle = 'rgba(22,27,34,0.92)'; ctx.fillRect(fx - 18 - lw - 5, fy - 11, lw + 10, 22);
+                ctx.fillStyle = 'rgba(22,27,34,0.9)'; ctx.fillRect(fx - 18 - lw - 4, fy - 9, lw + 8, 18);
                 ctx.fillStyle = '#4ade80'; ctx.fillText('Click', fx - 18, fy + 1);
                 ctx.textAlign = 'left'; const rw = ctx.measureText('to finish').width;
-                ctx.fillStyle = 'rgba(22,27,34,0.92)'; ctx.fillRect(fx + 16, fy - 11, rw + 10, 22);
+                ctx.fillStyle = 'rgba(22,27,34,0.9)'; ctx.fillRect(fx + 16, fy - 9, rw + 8, 18);
                 ctx.fillStyle = '#4ade80'; ctx.fillText('to finish', fx + 20, fy + 1);
                 ctx.restore();
             }

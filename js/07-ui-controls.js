@@ -1,4 +1,4 @@
-/* Mission Visualizer — DOM refs, sync-mode, 3D scene, control wiring
+/* Mission Visualizer - DOM refs, sync-mode, 3D scene, control wiring
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -67,7 +67,7 @@
     function updateMissionHeader() {
         const set = (id, val) => {
             const el = document.getElementById(id); if (!el) return;
-            const ok = val && val !== 'Unknown' && val !== ''; el.textContent = ok ? val : '—'; el.classList.toggle('on', !!ok);
+            const ok = val && val !== 'Unknown' && val !== ''; el.textContent = ok ? val : '-'; el.classList.toggle('on', !!ok);
             const chip = el.closest('.status-chip'); if (chip) chip.classList.toggle('lit', !!ok);
         };
         set('hdrFlightId', flightMetaData.id);

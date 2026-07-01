@@ -1,4 +1,4 @@
-/* Mission Visualizer — remaining wiring, map geojson fetch, clip recorder
+/* Mission Visualizer - remaining wiring, map geojson fetch, clip recorder
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -14,6 +14,36 @@
     
     document.getElementById('barbIntervalInput').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); else build3DScene(); } });
     document.getElementById('runBtn').addEventListener('click', function() { applyFiltersAndInit(true); });
+
+    // Batch satellite cache modal (works across many storms without loading each flight into the app).
+    (function wireBatchCache() {
+        const btn = document.getElementById('batchCacheBtn');
+        const modal = document.getElementById('batchCacheModal');
+        const fileInput = document.getElementById('batchFileInput');
+        const startBtn = document.getElementById('batchCacheStartBtn');
+        if (!btn || !modal || !fileInput || !startBtn) return;
+        let picked = [];
+        // Closing the modal only HIDES it - caching keeps running in the background (progress shows on
+        // the on-map pill), so the user can close it and keep working. Stopping is explicit (Stop button
+        // or the pill's Cancel).
+        const closeModal = () => { modal.style.display = 'none'; };
+        btn.addEventListener('click', () => { populateBatchSatSelect(); populateBatchBandChecks(); modal.style.display = 'flex'; });
+        document.getElementById('batchCacheCloseBtn').addEventListener('click', closeModal);
+        document.getElementById('batchCacheCloseX').addEventListener('click', closeModal);
+        const satSelect = document.getElementById('batchSatSelect');
+        if (satSelect) satSelect.addEventListener('change', populateBatchBandChecks);   // bands differ per satellite
+        const pillCancel = document.getElementById('satPrefetchCancel');
+        if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) batchCacheCancel = true; });
+        fileInput.addEventListener('change', (e) => {
+            picked = Array.from(e.target.files || []);
+            document.getElementById('batchCacheStatus').textContent = picked.length ? `${picked.length} file(s) selected.` : 'No files selected.';
+        });
+        startBtn.addEventListener('click', () => {
+            if (batchCaching) { batchCacheCancel = true; return; }
+            const bands = Array.from(document.querySelectorAll('#batchBandChecks input:checked')).map(c => c.value);
+            batchCacheFlights(picked, bands, satSelect ? satSelect.value : '');
+        });
+    })();
 
     // Jump the playhead by N flight-minutes (10-min steps line up with the GOES scan cadence).
     function skipFlightMinutes(mins) {
@@ -189,7 +219,7 @@
 
     // --- Composite Clip Recorder ---------------------------------------------------------------
     // Records a single 1080p WebM by compositing the live tracker (2D/3D + satellite) on the left and
-    // the user-selected graphs stacked down the right onto an offscreen canvas — no screen sharing.
+    // the user-selected graphs stacked down the right onto an offscreen canvas - no screen sharing.
     // The recorder drives playback through the chosen segment; the user can keep adjusting the view.
     const recordCanvas = document.getElementById('recordCanvas');
     let clipGraphEntries = [];   // graphs offered in the modal this open
@@ -217,7 +247,7 @@
         });
         if (masterChartInstance && masterChartInstance.data.datasets.length > 0) clipGraphEntries.push('parameterChart');
         if (clipGraphEntries.length === 0) {
-            list.innerHTML = '<div class="text-[11px] text-slate-500 italic col-span-2 py-1">No graphs with data yet — the clip will record just the tracker.</div>';
+            list.innerHTML = '<div class="text-[11px] text-slate-500 italic col-span-2 py-1">No graphs with data yet - the clip will record just the tracker.</div>';
             return;
         }
         list.innerHTML = clipGraphEntries.map((id, i) =>
@@ -291,7 +321,7 @@
         rctx.restore();
     }
 
-    // Static per-graph stats (min/max of the first visible series over the clip range) — computed once at capture start.
+    // Static per-graph stats (min/max of the first visible series over the clip range) - computed once at capture start.
     function computeGraphStats(ch, startIdx, endIdx) {
         if (!ch || !ch.data || !ch.data.datasets.length) return null;
         let dsIdx = -1;

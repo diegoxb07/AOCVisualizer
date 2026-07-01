@@ -268,11 +268,78 @@
         const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
         const near = nearestStormPoint(flightMs); if (!near) { card.classList.add('hidden'); return; }
         const p = near.point;
-        const hrsOff = near.diffMs / 3600000;
         const windTxt = p.windKt != null ? `${p.windKt}kt` : '—';
         const presTxt = p.pressureMb != null ? `${p.pressureMb}mb` : '—';
+        // Direction relative to the aircraft's current playback time: positive = observation is in the
+        // past (ago), negative = the nearest best-track fix is still ahead of the flight clock (from now).
+        const rawDiffMs = flightMs - p.ms;
+        const totalMin = Math.round(Math.abs(rawDiffMs) / 60000);
+        const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
+        const mm = String(totalMin % 60).padStart(2, '0');
+        const dirTxt = rawDiffMs >= 0 ? 'ago' : 'from now';
+        const hrsOff = near.diffMs / 3600000;
         body.innerHTML = `${stormTrackMeta.name} - <b>${p.category || p.status || ''}</b><br>`
             + `${windTxt} / ${presTxt}<br>`
-            + `<span style="color:${hrsOff <= 3 ? '#4ade80' : '#fbbf24'}">best-track fix ${hrsOff.toFixed(1)}h away</span>`;
+            + `<span style="color:${hrsOff <= 3 ? '#4ade80' : '#fbbf24'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
         card.classList.remove('hidden');
     }
+
+    // Hover tooltip for individual best-track points on the 2D map. Uses ONLY the storm-track fix's
+    // own fields (category/status, wind, pressure, observation time) - never anything flight-level.
+    // Hit-tested in SCREEN space (constant pixel radius) so the target size doesn't shrink when zoomed out.
+    function stormPointIndexAt(mx, my) {
+        if (!showStormTrack || stormTrackPoints.length === 0 || trackerModeSelect.value !== '2d') return -1;
+        const HIT_R = 7, hitR2 = HIT_R * HIT_R;
+        let best = -1, bestD2 = hitR2;
+        for (let i = 0; i < stormTrackPoints.length; i++) {
+            const p = stormTrackPoints[i];
+            const sx = mapOffsetX + mapScale * getX(p.lon);
+            const sy = mapOffsetY + mapScale * getY(p.lat);
+            const dx = sx - mx, dy = sy - my, d2 = dx * dx + dy * dy;
+            if (d2 <= bestD2) { bestD2 = d2; best = i; }
+        }
+        return best;
+    }
+
+    function formatStormPointTooltip(p) {
+        const timeStr = isFinite(p.ms) ? new Date(p.ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z' : '—';
+        const windTxt = p.windKt != null ? `${p.windKt} kt` : '—';
+        const presTxt = p.pressureMb != null ? `${p.pressureMb} mb` : '—';
+        const catTxt = p.category || p.status || '—';
+        return `<div class="font-bold" style="color:${stormWindColor(p.windKt)}">${catTxt}</div>`
+            + `<div>Time: ${timeStr}</div>`
+            + `<div>Wind: ${windTxt}</div>`
+            + `<div>Pressure: ${presTxt}</div>`;
+    }
+
+    (function wireStormTrackHover() {
+        const tooltip = document.getElementById('stormTrackTooltip');
+        if (!tooltip || !canvas) return;
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDraggingMap || isDraggingShape || isMeasuring) { tooltip.classList.add('hidden'); return; }
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            const idx = stormPointIndexAt(mx, my);
+            if (idx !== hoveredStormIdx) {
+                hoveredStormIdx = idx;
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            }
+            if (idx >= 0) {
+                tooltip.innerHTML = formatStormPointTooltip(stormTrackPoints[idx]);
+                tooltip.style.left = (e.clientX + 14) + 'px';
+                tooltip.style.top = (e.clientY + 14) + 'px';
+                tooltip.classList.remove('hidden');
+                canvas.style.cursor = 'pointer';
+            } else {
+                tooltip.classList.add('hidden');
+                if (drawnShapes.length === 0) canvas.style.cursor = '';
+            }
+        });
+        canvas.addEventListener('mouseleave', () => {
+            tooltip.classList.add('hidden');
+            if (hoveredStormIdx !== -1) {
+                hoveredStormIdx = -1;
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            }
+        });
+    })();

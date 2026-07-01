@@ -5,8 +5,11 @@
         #mapPanel:fullscreen { height: 100vh !important; }
         #mapPanel:fullscreen .panel-title, #videoPanel:fullscreen .panel-title { padding: 16px; background-color: rgba(22, 27, 34, 0.9); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid #20262f; }
         #mapPanel:fullscreen .media-container, #videoPanel:fullscreen .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
-        #mapPanel:fullscreen .overlays-wrapper { top: 80px; bottom: 120px; transform: scale(1) !important; transform-origin: bottom left; }
-        #mapPanel:fullscreen #pfdOverlay { bottom: 120px; width: 250px; height: 250px; }
+        #mapPanel:fullscreen .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
+        #mapPanel:fullscreen #pfdOverlay { bottom: 170px; width: 250px; height: 250px; }
+        /* In fullscreen the map is tall enough that the HUD (bottom-anchored, left) no longer collides
+           with this stack, so put the storm card back on the left, under the satellite badge. */
+        #mapPanel:fullscreen #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
         /* 10-min satellite/playhead stepper: float it at the bottom-center of the map, above the timeline bar (it used to overlap the panel title in fullscreen) */
         #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
         #mapPanel:fullscreen #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its upward shadow gradient doesn't darken the buttons */
@@ -17,27 +20,21 @@
         button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
         
         .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: #0b0e13; padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid #20262f; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); }
-        .media-content-wrapper { max-height: 1000px; transition: max-height 0.5s ease-in-out, opacity 0.3s ease; overflow: hidden; }
-        .media-content-wrapper.collapsed { max-height: 0px; opacity: 0; }
-        .collapse-lip { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); width: 40px; height: 20px; background-color: #161b22; border: 1px solid #20262f; border-top: none; border-radius: 0 0 8px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #38bdf8; font-size: 10px; box-shadow: 0 10px 20px -10px rgba(0,0,0,0.8); z-index: 1001; transition: 0.2s; }
-        .collapse-lip:hover { background-color: #20262f; color: #fff; }
+        .media-content-wrapper { overflow: hidden; }
 
-        .media-resize-handle { position: absolute; bottom: -5px; left: 0; width: 100%; height: 12px; cursor: ns-resize; z-index: 1000; touch-action: none; }
-        .media-resize-handle::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; background: #2c3a47; transition: background 0.15s, height 0.15s; }
-        .media-resize-handle .grip { position: absolute; top: 50%; transform: translate(-50%, -50%); color: #5d6773; font-size: 16px; line-height: 0; letter-spacing: 3px; transition: color 0.15s; background: var(--ink); padding: 0 6px; }
-        .media-resize-handle .grip-left { left: 25%; }
-        .media-resize-handle .grip-right { left: 75%; }
-        .media-resize-handle:hover::before, .sticky-media-bar.resizing .media-resize-handle::before { background: var(--sig); height: 5px; }
+        .media-resize-handle { position: absolute; bottom: -7px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
+        .media-resize-handle::before { content: ""; position: absolute; left: 35%; right: 35%; top: 50%; transform: translateY(-50%); height: 5px; border-radius: 3px; background: #445162; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); transition: background 0.15s, height 0.15s, left 0.15s, right 0.15s; }
+        .media-resize-handle .grip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: #8b97a5; font-size: 18px; font-weight: 700; line-height: 0; letter-spacing: 3px; transition: color 0.15s; background: var(--ink); padding: 0 6px; }
+        .media-resize-handle:hover::before, .sticky-media-bar.resizing .media-resize-handle::before { background: var(--sig); height: 6px; left: 20%; right: 20%; }
         .media-resize-handle:hover .grip, .sticky-media-bar.resizing .media-resize-handle .grip { color: var(--sig); }
         .sticky-media-bar.resizing { user-select: none; }
-        .media-content-wrapper.collapsed ~ .media-resize-handle { display: none; }
         
-        #mapPanel { height: var(--media-h); }
+        #mapPanel { height: var(--media-h); overflow: hidden; }
         #mapPanel .media-container { flex-grow: 1; width: 100%; position: relative; background-color: #161b22; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
         canvas#mapCanvas { width: 100%; height: 100%; display: block; cursor: grab; z-index: 1; }
         canvas#mapCanvas:active { cursor: grabbing; }
-        
-        #videoPanel { height: var(--media-h); display: flex; flex-direction: column; }
+
+        #videoPanel { height: var(--media-h); display: flex; flex-direction: column; overflow: hidden; }
         #videoPanel #videoPanel .media-container { width: 100%; flex-grow: 1; min-height: 0; position: relative; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #000; }
         video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; background-color: #000; border-radius: 8px; }
         #videoPanel:fullscreen { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
@@ -98,7 +95,7 @@
         #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(11,14,19,0.9); border: 1px solid rgba(56,189,248,0.6); color: #bae6fd; padding: 6px 12px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0,0,0,0.5); pointer-events: none; }
         #satLoadingOverlay.show { display: flex; }
         #satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
-        #satPrefetchBar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(11,14,19,0.94); border: 1px solid rgba(56,189,248,0.6); color: #bae6fd; padding: 7px 12px; border-radius: 10px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0,0,0,0.55); }
+        #satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(11,14,19,0.94); border: 1px solid rgba(56,189,248,0.6); color: #bae6fd; padding: 7px 12px; border-radius: 10px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0,0,0,0.55); }
         #satPrefetchBar.hidden { display: none; }
         #mapPanel:fullscreen #satPrefetchBar { z-index: 2002; }
         #satPrefetchLabel { white-space: nowrap; }
@@ -108,7 +105,7 @@
         #satPrefetchCancel:hover { background: rgba(239,68,68,0.3); color: #fff; }
         #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: #161b22; cursor: grab; z-index: 2; }
 
-        :root { --sig:#38bdf8; --sig-soft:rgba(56,189,248,0.14); --ink:#0b0e13; --panel:#161b22; --line:#20262f; --media-h: clamp(420px, 48vh, 520px); }
+        :root { --sig:#38bdf8; --sig-soft:rgba(56,189,248,0.14); --ink:#0b0e13; --panel:#161b22; --line:#20262f; --media-h: clamp(480px, 56vh, 620px); }
 
         html, body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
         body { background-color: var(--ink); -webkit-font-smoothing: antialiased; }
@@ -134,7 +131,6 @@
         [id^="title-"] { position: relative; padding: 4px 0 9px 13px; margin-bottom: 12px !important; border-bottom: 1px solid #20262f; color: #aab4be !important; }
         [id^="title-"]::before { content: ""; position: absolute; left: 0; top: 3px; bottom: 10px; width: 3px; background: var(--sig); border-radius: 2px; }
 
-        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: var(--sig); background: #131922; border: 1px solid #2c3a47; border-radius: 4px; letter-spacing: 0; }
 
         .sticky-bottom-bar { align-items: flex-end; row-gap: 10px; }
         .cmd-group { display: flex; flex-direction: column; gap: 5px; }
@@ -155,8 +151,10 @@
         .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) .cmd-row { gap: 6px; }
         .sticky-bottom-bar { row-gap: 10px; }
         /* Filters live on the far right of the top row (order:1), packed 2x2 so the bar height is unchanged. */
-        #cmdFiltersGroup { order: 1; margin-left: auto; }
-        #filtersGrid { display: grid !important; grid-template-columns: auto auto; gap: 2px 14px; align-items: center; }
+        #cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 28px; padding: 4px 0; }
+        #filtersGrid { display: grid !important; grid-template-columns: auto auto; gap: 6px 22px; align-items: center; }
+        #filtersGrid label { font-size: 13px !important; gap: 6px !important; }
+        #filtersGrid input[type="checkbox"] { width: 16px !important; height: 16px !important; }
         #cmdSyncGroup { display: none; }
         #cmdSyncGroup:has(#forceSyncBtn[style*="inline-block"]) { display: flex; }
 

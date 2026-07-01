@@ -26,6 +26,7 @@
     const SAT_BLOB_MAX = 1500;               // ≈ 30 storm-bands of 10-min tiles (LRU-evicted)
     let batchCaching = false;                // a multi-flight local sat-cache pass is running
     let batchCacheCancel = false;            // user asked to stop the current pass
+    let batchCacheAbortController = null;    // aborts the in-flight recon-api request/poll on Cancel
     // Smooth scrubbing: a background preloader warms the buckets around the playhead into the cache.
     const satFetchInFlight = new Map();      // fetchId -> in-flight Promise (dedupe live + preload + prefetch)
     let satPreloadQueue = [];                // upcoming buckets queued to warm around the playhead
@@ -45,6 +46,7 @@
     let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
     let showStormTrack = true;        // "Show Storm Track" toggle
+    let hoveredStormIdx = -1;         // index into stormTrackPoints currently under the mouse (2D map hover), -1 = none
     let currentPointAnalysisData = null; 
     let tempBaseline = [];
     

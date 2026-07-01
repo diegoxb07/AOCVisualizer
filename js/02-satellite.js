@@ -675,7 +675,9 @@
 
         clearTimeout(satDebounceTimer);
         satDebounceTimer = setTimeout(async () => {
-            showSatLoader();
+            // Don't flash "Fetching satellite…" when we're caching locally / the tile is already being
+            // pulled into the local cache - the background pill covers that and playback stays quiet.
+            if (!batchCaching && !satFetchInFlight.has(fetchId)) showSatLoader();
             try {
                 const r = await getOrFetchPolarTile(fetchId, { wmsLayer, dateStr, box, pxW, pxH });
                 hideSatLoader();
@@ -847,7 +849,9 @@
         // fire a display fetch for every bucket it flies past - only the one it settles on.
         clearTimeout(satDebounceTimer);
         satDebounceTimer = setTimeout(async () => {
-            showSatLoader();
+            // Don't flash "Fetching satellite…" when we're caching locally / the tile is already being
+            // pulled into the local cache - the background pill covers that and playback stays quiet.
+            if (!batchCaching && !satFetchInFlight.has(fetchId)) showSatLoader();
             try {
                 const r = await getOrFetchReconTile(fetchId, {
                     band: bandObj.band, cmap: bandObj.cmap, timeIso,

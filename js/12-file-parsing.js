@@ -187,7 +187,14 @@
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.
         if (typeof resetSatPreload === 'function') resetSatPreload();
-        
+        // New flight: any storm best-track / archive-mission metadata belonged to the PREVIOUS flight
+        // (set after this function returns, by js/12b-recon-archive.js's loadReconMission for an
+        // archive-loaded flight) - clear it here so a manual upload after an archive load doesn't keep
+        // showing a stale storm's track, and so a fresh archive load starts from a clean slate too.
+        stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;
+        const stormToggleLabel = document.getElementById('stormTrackToggleLabel'); if (stormToggleLabel) stormToggleLabel.style.display = 'none';
+        const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
+
         const headers = lines[0].replace(/\r/g, '').split('\t').map(h => h.trim());
         const hMap = {}; headers.forEach((h, idx) => { if (h) hMap[h.toLowerCase()] = idx; });
         const getVal = (row, key) => { let k = key.toLowerCase(); if (hMap[k] !== undefined && row[hMap[k]] !== undefined && row[hMap[k]].trim() !== '') { const val = parseFloat(row[hMap[k]]); if (isNaN(val) || val <= -990) return null; return val; } return null; };

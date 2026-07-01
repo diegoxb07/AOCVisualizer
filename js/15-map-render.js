@@ -56,6 +56,27 @@
     
     function getSpdColor(spd) { const [r, g, b] = getSpdColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
 
+    // Best-track overlay for the storm the loaded mission belongs to (js/12b-recon-archive.js), spanning
+    // its whole life - not just the flight's window. Drawn UNDER the flight track/plane so the flight
+    // stays the visually dominant element; getX/getY project it exactly like everything else on this
+    // map (they're linear in lon/lat, not tied to the flight's own bounds).
+    function drawStormTrack2D() {
+        if (!showStormTrack || stormTrackPoints.length < 2) return;
+        ctx.save();
+        ctx.lineWidth = 2 / mapScale; ctx.globalAlpha = 0.85; ctx.setLineDash([6 / mapScale, 4 / mapScale]);
+        for (let i = 1; i < stormTrackPoints.length; i++) {
+            const a = stormTrackPoints[i - 1], b = stormTrackPoints[i];
+            ctx.beginPath(); ctx.strokeStyle = stormWindColor(b.windKt); ctx.moveTo(getX(a.lon), getY(a.lat)); ctx.lineTo(getX(b.lon), getY(b.lat)); ctx.stroke();
+        }
+        ctx.setLineDash([]); ctx.globalAlpha = 1.0;
+        stormTrackPoints.forEach(p => {
+            ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
+            ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
+            ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+        });
+        ctx.restore();
+    }
+
     function getPathColorHex(d, idx) {
         const mode = document.getElementById('pathColorSelect').value;
         if (mode === 'temp') { const [r,g,b] = getPathColorRGB(d, idx); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
@@ -116,7 +137,9 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(bgCanvas, 0, 0);   // bgCanvas is already device-res
         // Base transform = devicePixelRatio, then the map pan/zoom. Everything below draws in logical px.
         ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.translate(mapOffsetX, mapOffsetY); ctx.scale(mapScale, mapScale);
-        
+
+        drawStormTrack2D();
+
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
         let lastX = getX(filteredData[0].lon), lastY = getY(filteredData[0].lat);
         for (let i = 1; i <= idx; i++) { 

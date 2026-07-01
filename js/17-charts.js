@@ -183,8 +183,9 @@
             const b = document.getElementById('satTimeBadge');
             if (b) b.classList.add('hidden');
         }
+        updateStormTrackBadge();
 
-        if (masterChartInstance) masterChartInstance.draw(); 
+        if (masterChartInstance) masterChartInstance.draw();
         Object.values(customCharts).forEach(c => {
             if(c) c.draw();
         });

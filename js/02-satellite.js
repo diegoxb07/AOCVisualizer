@@ -576,12 +576,19 @@
         if (product) { params.set('product', product); } else { params.set('band', band); params.set('cmap', cmap); }
         if (satellite) params.set('satellite', satellite);
         if (center && !product) { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
+        // While a batch/precache pass is running, ride its AbortController so a Cancel click kills any
+        // in-flight request immediately instead of waiting out the current poll tick.
+        const signal = (batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined;
+        if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
         try {
-            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`).then(r => r.json());
+            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal }).then(r => r.json());
             // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
+            // Checked both before AND after the sleep so a mid-batch Cancel is noticed within ~3s.
             for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
+                if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
                 await new Promise(r => setTimeout(r, 3000));
-                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`).then(r => r.json());
+                if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
+                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`, { signal }).then(r => r.json());
             }
             if (!data || data.status !== 'ready') return { error: (data && (data.message || data.status)) || 'no response' };
             // bounds come back as [[lat_s, lon_w], [lat_n, lon_e]] → our {minLon,minLat,maxLon,maxLat}.
@@ -1102,6 +1109,15 @@
         return out;
     }
 
+    // Lock/unlock the satellite + band pickers while a cache pass owns them, so the user can't switch
+    // products mid-build (which would orphan the in-progress fetch/poll) - they must Cancel first.
+    function setSatelliteControlsLocked(locked) {
+        const satSelect = document.getElementById('satelliteSelect');
+        const bandSelect = document.getElementById('satBandSelect');
+        if (satSelect) satSelect.disabled = locked;
+        if (bandSelect) bandSelect.disabled = locked;
+    }
+
     // Pre-cache the CURRENTLY loaded flight's tiles for a satellite/bands using the in-memory parsed
     // rows (no file re-read). It builds the SAME deterministic tile list the live playback path will
     // request, so once this finishes playback hits the cache and never pauses on the API mid-flight.
@@ -1112,7 +1128,8 @@
         if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
-        batchCaching = true; batchCacheCancel = false;
+        batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
+        setSatelliteControlsLocked(true);
         showSatPrefetchBar();   // background pill (has its own Cancel) so playback stays usable
         const total = targets.length;
         let done = 0, fetched = 0;
@@ -1124,7 +1141,8 @@
             setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
         }
         const cancelled = batchCacheCancel;
-        batchCaching = false; batchCacheCancel = false;
+        batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
+        setSatelliteControlsLocked(false);
         const msg = cancelled
             ? `Pre-cache stopped - ${fetched} tile(s) cached.`
             : `Pre-cache done - ${fetched} new tile(s) cached for smooth playback.`;
@@ -1175,7 +1193,8 @@
         if (!files || !files.length) { showToast('Pick one or more flight files first.', 5000); return; }
         if (!layerValue) { showToast('Pick a satellite to cache.', 5000); return; }
         if (!bandIds || !bandIds.length) { showToast('Pick at least one band to cache.', 5000); return; }
-        batchCaching = true; batchCacheCancel = false;
+        batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
+        setSatelliteControlsLocked(true);
         const startBtn = document.getElementById('batchCacheStartBtn');
         if (startBtn) { startBtn.textContent = 'Stop'; }
         showSatPrefetchBar();   // background pill so progress is visible even if the modal is closed
@@ -1207,7 +1226,8 @@
         }
 
         const cancelled = batchCacheCancel;
-        batchCaching = false; batchCacheCancel = false;
+        batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
+        setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';
         const msg = cancelled
             ? `Local cache stopped - ${fetched} tiles cached.`

@@ -73,64 +73,58 @@
                 <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg" alt="NOAA Logo" class="h-9 object-contain">
             </div>
         </div>
-        <div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
-            <div class="status-chip"><span class="chip-k">Flight ID</span><span class="chip-v" id="hdrFlightId">-</span></div>
-            <div class="status-chip"><span class="chip-k">Aircraft</span><span class="chip-v" id="hdrAircraft">-</span></div>
-            <div class="status-chip"><span class="chip-k">Flight Date</span><span class="chip-v" id="hdrDate">-</span></div>
-            <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
-        </div>
     </header>
 
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm relative">        
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8">
             <div class="lg:col-span-4 flex flex-col justify-center gap-4">
-                <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                        <span class="step-num">1</span> Upload Flight-Level Data (.txt or .nc)
-                        <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span>
-                    </label>
-                    <div id="dataDropZone" class="relative flex items-center justify-center w-full h-10 bg-slate-800 border-2 border-dashed border-slate-600 rounded-md hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
-                        <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                        <span id="dataDropLabel" class="text-xs text-slate-300 font-medium group-hover:text-blue-300 transition-colors px-2 truncate">Choose File/Drag &amp; Drop</span>
+                    <div class="flex items-center gap-2 mb-2">
+                        <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">
+                            <span class="text-emerald-400">Load Flight-Level Data</span>
+                            <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span>
+                        </label>
+                        <div id="dataDropZone" title="Manual upload (.txt or .nc)" class="relative flex items-center gap-1 shrink-0 bg-slate-800 border border-dashed border-slate-600 rounded px-2 py-1 hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
+                            <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                            <span class="text-[10px] text-slate-400 normal-case group-hover:text-blue-300 transition-colors whitespace-nowrap">or upload:</span>
+                            <span id="dataDropLabel" class="text-[10px] text-slate-300 font-medium normal-case group-hover:text-blue-300 transition-colors truncate max-w-[70px]">Choose File</span>
+                        </div>
+                    </div>
+
+                    <div id="archiveLoadBlock">
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <select id="reconYearSelect" class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer">
+                                <option value="">Year…</option>
+                            </select>
+                            <select id="reconStormSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                <option value="">Storm…</option>
+                            </select>
+                            <select id="reconMissionSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                <option value="">Flight…</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-emerald-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-emerald-300">⤓ Load Flight + Storm Track</button>
+                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail - richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">⬇ .nc</a>
+                        </div>
+                        <span id="reconArchiveStatus" class="block text-[10px] text-slate-500 leading-tight mt-1"></span>
                     </div>
                 </div>
+
+                <div class="grid grid-cols-2 gap-3 border-t border-slate-800 pt-3">
                 <div>
                     <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                        <span class="step-num">2</span> Upload MMR to Sync (.mp4)
+                        <span class="text-purple-400">Upload MMR to Sync (.mp4)</span>
                     </label>
                     <div id="videoDropZone" class="relative flex items-center justify-center w-full h-10 bg-slate-800 border-2 border-dashed border-slate-600 rounded-md hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
                         <input type="file" id="videoInput" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                         <span id="videoDropLabel" class="text-xs text-slate-300 font-medium group-hover:text-blue-300 transition-colors px-2 truncate">Choose File/Drag &amp; Drop</span>
                     </div>
                 </div>
+                <div class="flex flex-col items-center justify-center gap-0.5 pt-2">
+                    <button id="batchCacheBtn" title="Pre-download satellite imagery to the local cache for one or more flights" class="w-full bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors">⤓ Locally Cache Satellites</button>
+                    <span class="text-[10px] text-slate-400 text-center leading-snug">can pre-load satellite images for multiple flights at a time! ^</span>
                 </div>
-
-                <div class="border-t border-slate-800 pt-3">
-                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                        <span class="step-num">⛈</span> Or Load From NOAA Recon Archive
-                    </label>
-                    <div class="grid grid-cols-3 gap-1.5">
-                        <select id="reconYearSelect" class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer">
-                            <option value="">Year…</option>
-                        </select>
-                        <select id="reconStormSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                            <option value="">Storm…</option>
-                        </select>
-                        <select id="reconMissionSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                            <option value="">Flight…</option>
-                        </select>
-                    </div>
-                    <div class="flex items-center gap-2 mt-2">
-                        <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-emerald-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-emerald-300">⤓ Load Flight + Storm Track</button>
-                        <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full-resolution NetCDF from NOAA (for full flight-level detail - richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">⬇ .nc</a>
-                    </div>
-                    <span id="reconArchiveStatus" class="block text-[10px] text-slate-500 leading-tight mt-1"></span>
-                </div>
-
-                <div class="flex flex-col items-center gap-0.5 border-t border-slate-800 pt-3">
-                    <button id="batchCacheBtn" title="Pre-download satellite imagery to the local cache for one or more flights" class="bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors mt-1.5">⤓ Locally Cache Satellites</button>
-                    <span class="text-[10px] text-slate-500 leading-none">can do more than one flight at a time</span>
                 </div>
             </div>
 
@@ -161,6 +155,12 @@
                         <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded border border-purple-800 transition-colors shadow-sm whitespace-nowrap">🎥 Record Clip</button>
                         <button id="exportKmlBtn" disabled class="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap">🌍 Export KML</button>
                     </div>
+                </div>
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
+                    <div class="status-chip"><span class="chip-k">Flight ID</span><span class="chip-v" id="hdrFlightId">-</span></div>
+                    <div class="status-chip"><span class="chip-k">Aircraft</span><span class="chip-v" id="hdrAircraft">-</span></div>
+                    <div class="status-chip"><span class="chip-k">Flight Date</span><span class="chip-v" id="hdrDate">-</span></div>
+                    <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
                 </div>
             </div>
         </div>
@@ -218,8 +218,8 @@
                     </div>
                     <!-- Direct child of #mapPanel (not #mapHeader) so its z-index competes with the bottom bar in fullscreen; #mapHeader's z-20 stacking context would otherwise trap it under the bar's shadow. -->
                     <div id="satStepCluster" style="display:none;" class="flex items-center gap-1 normal-case">
-                        <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
-                        <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
+                        <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-3.5 py-2 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-sm font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
+                        <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-3.5 py-2 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-sm font-mono transition-colors whitespace-nowrap">10m ⏩</button>
                     </div>
                     <div class="media-container" id="mapContainer">
                         <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Awaiting flight log data extraction...</div>
@@ -231,10 +231,10 @@
                             <span class="spin"></span>
                             <span>Fetching satellite&hellip;</span>
                         </div>
-                        <div id="mapInfoStack" class="absolute top-12 left-3 z-[2400] flex flex-col gap-1.5 pointer-events-none">
+                        <div id="mapInfoStack" class="absolute top-14 right-3 z-[2400] flex flex-col items-end gap-1.5 pointer-events-none text-right">
                             <div id="satTimeBadge" class="hidden bg-slate-950/85 border border-blue-500/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-200 leading-tight"></div>
                             <div id="stormStatusCard" class="hidden bg-slate-950/85 border border-pink-500/60 rounded px-2.5 py-1 text-[10px] font-mono text-pink-200 leading-tight">
-                                <div class="text-pink-400 font-bold mb-0.5">🌀 Storm Status</div>
+                                <div class="text-pink-400 font-bold mb-0.5">🌀 Last Storm Observation</div>
                                 <div id="stormStatusBody"></div>
                             </div>
                         </div>
@@ -249,6 +249,7 @@
                         <div id="pfdOverlay">
                             <canvas id="pfdCanvas"></canvas>
                         </div>
+                        <div id="stormTrackTooltip" class="hidden fixed z-[3000] bg-slate-950/95 border border-pink-500/60 rounded px-2.5 py-1.5 text-[10px] font-mono text-pink-200 leading-snug pointer-events-none"></div>
                     </div>
                 </div>
 
@@ -272,8 +273,7 @@
                 </div>
             </div>
         </div>
-        <div class="media-resize-handle" id="mediaResizeHandle" title="Drag to resize the tracker & video"><span class="grip grip-left">⋯</span><span class="grip grip-right">⋯</span></div>
-        <div class="collapse-lip" id="collapseLip">▲</div>
+        <div class="media-resize-handle" id="mediaResizeHandle" title="Drag to resize the tracker & video (drag all the way down to collapse)"><span class="grip">⋯</span></div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">

@@ -44,7 +44,7 @@
     (function setupMediaResize() {
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');
         if (!handle || !bar) return;
-        const MIN_H = 240, MAX_H = 900;
+        const MIN_H = 44, MAX_H = 900;  // stops at just enough height to keep the panel titles visible, not fully gone
         let dragging = false, startY = 0, startH = 0, rafPending = false;
         const pointerY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
 

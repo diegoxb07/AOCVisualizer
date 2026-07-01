@@ -69,10 +69,11 @@
             ctx.beginPath(); ctx.strokeStyle = stormWindColor(b.windKt); ctx.moveTo(getX(a.lon), getY(a.lat)); ctx.lineTo(getX(b.lon), getY(b.lat)); ctx.stroke();
         }
         ctx.setLineDash([]); ctx.globalAlpha = 1.0;
-        stormTrackPoints.forEach(p => {
+        stormTrackPoints.forEach((p, i) => {
+            const hovered = i === hoveredStormIdx;
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            ctx.beginPath(); ctx.arc(0, 0, 3.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
-            ctx.strokeStyle = '#000000'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore();
+            ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 3.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
+            ctx.strokeStyle = hovered ? '#ffffff' : '#000000'; ctx.lineWidth = hovered ? 2 : 1; ctx.stroke(); ctx.restore();
         });
         ctx.restore();
     }

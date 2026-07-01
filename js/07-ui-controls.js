@@ -251,10 +251,19 @@
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         satLoadedInfo = null; satImageBox = null;
         satDayOffset = 0;            
-        buildSatDayStepper();        
+        buildSatDayStepper();
         updateSatTimeBadge();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
-            fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+            // Archived (recon-api) satellites stream a tile per 10-min scan from the API, which can
+            // pause playback. Offer to pre-cache the whole flight up front for smooth playback first.
+            const layerDef = GIBS_LAYERS.find(d => d.value === document.getElementById('satelliteSelect').value);
+            const bandId = (document.getElementById('satBandSelect') || {}).value;
+            if (layerDef && layerDef.isReconApi && allParsedData.length && !batchCaching &&
+                confirm('Pre-cache this archived satellite\'s imagery for the loaded flight now?\n\nThis downloads every 10-minute scan up front so playback is smooth (no pauses to fetch from the API). Click Cancel to stream it on the fly instead.')) {
+                precacheCurrentFlight(layerDef.value, bandId ? [bandId] : (layerDef.bands || []).map(b => b.id));
+            } else {
+                fetchSatelliteImage(filteredData[currentIdx].absSeconds);
+            }
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
     });

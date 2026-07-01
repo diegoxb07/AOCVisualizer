@@ -1,4 +1,4 @@
-/* Mission Visualizer — PFD attitude indicator + HUD text
+/* Mission Visualizer - PFD attitude indicator + HUD text
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 

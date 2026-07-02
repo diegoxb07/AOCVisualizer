@@ -274,8 +274,8 @@
         const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
         const near = nearestStormPoint(flightMs); if (!near) { card.classList.add('hidden'); return; }
         const p = near.point;
-        const windTxt = p.windKt != null ? `${p.windKt}kt` : '—';
-        const presTxt = p.pressureMb != null ? `${p.pressureMb}mb` : '—';
+        const windTxt = p.windKt != null ? `${p.windKt}kt` : '-';
+        const presTxt = p.pressureMb != null ? `${p.pressureMb}mb` : '-';
         // Direction relative to the aircraft's current playback time: positive = observation is in the
         // past (ago), negative = the nearest best-track fix is still ahead of the flight clock (from now).
         const rawDiffMs = flightMs - p.ms;
@@ -310,10 +310,10 @@
     }
 
     function formatStormPointTooltip(p) {
-        const timeStr = isFinite(p.ms) ? new Date(p.ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z' : '—';
-        const windTxt = p.windKt != null ? `${p.windKt} kt` : '—';
-        const presTxt = p.pressureMb != null ? `${p.pressureMb} mb` : '—';
-        const catTxt = p.category || p.status || '—';
+        const timeStr = isFinite(p.ms) ? new Date(p.ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z' : '-';
+        const windTxt = p.windKt != null ? `${p.windKt} kt` : '-';
+        const presTxt = p.pressureMb != null ? `${p.pressureMb} mb` : '-';
+        const catTxt = p.category || p.status || '-';
         return `<div class="font-bold" style="color:${stormWindColor(p.windKt)}">${catTxt}</div>`
             + `<div>Time: ${timeStr}</div>`
             + `<div>Wind: ${windTxt}</div>`

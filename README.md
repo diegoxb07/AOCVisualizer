@@ -32,15 +32,15 @@ flowchart TD
     LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
-    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>(<b>🔄 Sync Now</b> forces a lock, or use Manual)"]
-    MMR -- "No" --> SAT{"Want satellite imagery<br>behind the track?"}
+    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br>(<b>🔄 Sync Now</b> forces a lock, or use Manual)"]
+    MMR -- "No" --> WINDOW{"Replay only part<br>of the flight?"}
+    WINDOW -- "Yes" --> TRIM["Set <b>Start / End</b> times (HHMMSS)<br>then click <b>Apply & Run</b>"]
+    WINDOW -- "No" --> SAT{"Want satellite imagery<br>behind the track?"}
+    TRIM --> SAT
     VIDEO --> SAT
     SAT -- "Yes" --> SATPICK["<b>Sat:</b> dropdown → GOES East/West (archive)<br>or a MODIS/VIIRS pass<br>GOES: pick a product to pre-cache the flight"]
-    SAT -- "No" --> WINDOW{"Replay only part<br>of the flight?"}
-    SATPICK --> WINDOW
-    WINDOW -- "Yes" --> TRIM["Set <b>Start / End</b> times (HHMMSS)<br>then click <b>Apply & Run</b>"]
-    WINDOW -- "No" --> PLAY["<b>▶ Play</b>, scrub the timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
-    TRIM --> PLAY
+    SAT -- "No" --> PLAY["<b>▶ Play</b>, scrub the timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
+    SATPICK --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
     EXPORT -- "Google Earth" --> KML["🌍 Export KML"]
     EXPORT -- "Briefing video" --> CLIP["🎥 Record Clip (.webm)"]
@@ -64,6 +64,8 @@ Both paths feed the **same** parser, so the map, charts, PFD, and export behave 
 ## 2. Time window & replay controls
 
 Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment, and everything downstream (map, charts, PFD, timeline) renders only that window. Leave the detected range alone to replay the whole flight. **After changing the window, click `Apply & Run`.**
+
+With a synced MMR video loaded, the window auto-adjusts to the video's timeframe, so manual trimming mainly applies to data-only replay (or Manual sync mode).
 
 All playback lives in the sticky bottom bar:
 

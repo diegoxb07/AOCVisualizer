@@ -10,16 +10,6 @@ Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser,
 
 ---
 
-## What it's for
-
-| Use case | What the tool gives you |
-| --- | --- |
-| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside. You can also record clips in advance for presentations. |
-| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and export the track to KML. |
-| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
-
----
-
 ## Decision Flowchart
 
 You can use this flowchart in case you are unsure of what to do:
@@ -48,7 +38,33 @@ flowchart TD
     EXPORT -- "Google Earth" --> KML["🌍 Export KML"]
     EXPORT -- "Briefing video" --> CLIP["🎥 Record Clip (.webm)"]
     EXPORT -- "No, just analyzing" --> DONE(["Done: measure, mark & compare freely"])
+
+    classDef decision fill:#fef3c7,stroke:#d97706,color:#78350f
+    classDef data fill:#d1fae5,stroke:#059669,color:#064e3b
+    classDef mmr fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef sat fill:#cffafe,stroke:#0891b2,color:#164e63
+    classDef playback fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef term fill:#e2e8f0,stroke:#475569,color:#0f172a
+    class ARCHIVE,MMR,WINDOW,SAT,FROMARC,EXPORT decision
+    class LOADARC,UPLOAD,LOADED,KML data
+    class VIDEO,CLIP mmr
+    class SATGOES,SATPOLAR sat
+    class TRIM,PLAY playback
+    class START,DONE term
+    %% linkStyle numbers = edge definition order above; update them if edges are added or reordered
+    linkStyle 1,6,8,12,13 stroke:#059669,stroke-width:2px
+    linkStyle 2,7,9,14,15,21 stroke:#dc2626,stroke-width:2px
 ```
+
+---
+
+## What it's for
+
+| Use case | What the tool gives you |
+| --- | --- |
+| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside. You can also record clips in advance for presentations. |
+| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and export the track to KML. |
+| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
 
 ---
 

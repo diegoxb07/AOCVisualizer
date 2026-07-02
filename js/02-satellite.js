@@ -200,6 +200,102 @@
     // When set, the sat time-badge shows this note instead of imagery info (e.g. "out of view").
     let satUnavailableNote = null;
     let _goesLabelMs = null;  // last 10-min bucket reflected in the GOES dropdown label
+    let reconApiHealthChecked = false;
+    let reconApiHealthOk = true;
+    let reconApiHealthReason = '';
+
+    function isReconApiDown() {
+        return reconApiHealthChecked ? !reconApiHealthOk : false;
+    }
+
+    function updateReconApiUiState() {
+        const reconBtn = document.getElementById('reconLoadBtn');
+        const reconMissionSelect = document.getElementById('reconMissionSelect');
+        const reconStormSelect = document.getElementById('reconStormSelect');
+        const reconYearSelect = document.getElementById('reconYearSelect');
+        const loadFlightDataGroup = document.getElementById('loadFlightDataGroup');
+        const loadFlightDataLabel = document.getElementById('loadFlightDataLabel');
+        const uploadZone = document.getElementById('dataDropZone');
+        const uploadLabel = document.getElementById('dataDropLabel');
+        const uploadApiOfflineToastWrapper = document.getElementById('uploadApiOfflineToastWrapper');
+        const apiDown = isReconApiDown();
+
+        if (reconBtn) {
+            if (!reconBtn.dataset.defaultTitle) reconBtn.dataset.defaultTitle = reconBtn.title;
+            reconBtn.classList.toggle('grayscale', apiDown);
+            reconBtn.classList.toggle('opacity-60', apiDown);
+            reconBtn.classList.toggle('saturate-0', apiDown);
+            reconBtn.classList.toggle('pointer-events-none', apiDown);
+            reconBtn.disabled = apiDown || (reconMissionSelect ? !reconMissionSelect.value : false);
+            reconBtn.title = apiDown ? 'Archive flight loading is unavailable while the API is offline' : reconBtn.dataset.defaultTitle;
+        }
+        if (loadFlightDataGroup) {
+            loadFlightDataGroup.classList.toggle('opacity-70', apiDown);
+        }
+        if (loadFlightDataLabel) {
+            loadFlightDataLabel.classList.toggle('text-emerald-400', !apiDown);
+            loadFlightDataLabel.classList.toggle('text-slate-500', apiDown);
+        }
+        [reconYearSelect, reconStormSelect, reconMissionSelect].forEach(sel => {
+            if (!sel) return;
+            // Remember whatever disabled state the cascading Year->Storm->Mission handlers had already
+            // set (e.g. Storm/Mission legitimately disabled because no options are loaded yet) so
+            // recovery restores that instead of force-enabling an empty select.
+            if (apiDown) {
+                if (sel.dataset.apiDownForced === undefined) sel.dataset.apiDownForced = sel.disabled ? '0' : '1';
+                sel.disabled = true;
+            } else if (sel.dataset.apiDownForced === '1') {
+                sel.disabled = false;
+                delete sel.dataset.apiDownForced;
+            } else {
+                delete sel.dataset.apiDownForced;
+            }
+            sel.classList.toggle('grayscale', apiDown);
+            sel.classList.toggle('saturate-0', apiDown);
+            sel.classList.toggle('opacity-60', apiDown);
+        });
+        if (uploadZone) {
+            uploadZone.classList.toggle('border-blue-400', apiDown);
+            uploadZone.classList.toggle('border-2', apiDown);
+            uploadZone.classList.toggle('bg-blue-950/65', apiDown);
+            uploadZone.classList.toggle('bg-slate-800', !apiDown);
+            uploadZone.classList.toggle('shadow-[0_0_0_2px_rgba(59,130,246,0.65)]', apiDown);
+            uploadZone.classList.toggle('ring-1', apiDown);
+            uploadZone.classList.toggle('ring-blue-400/80', apiDown);
+            uploadZone.classList.toggle('scale-[1.01]', apiDown);
+            uploadZone.classList.toggle('grayscale-0', apiDown);
+            uploadZone.classList.toggle('grayscale', !apiDown);
+        }
+        if (uploadLabel) {
+            uploadLabel.classList.toggle('text-blue-100', apiDown);
+            uploadLabel.classList.toggle('text-slate-300', !apiDown);
+            uploadLabel.classList.toggle('font-semibold', apiDown);
+            uploadLabel.classList.toggle('font-medium', !apiDown);
+        }
+        if (uploadApiOfflineToastWrapper) {
+            uploadApiOfflineToastWrapper.classList.toggle('hidden', !apiDown);
+        }
+        // The batch modal, if already open, has its own satellite dropdown/band checks/Start button
+        // that need the same API-down treatment - refresh them in place rather than waiting for the
+        // user to close and reopen the modal.
+        const batchCacheModal = document.getElementById('batchCacheModal');
+        if (batchCacheModal && batchCacheModal.style.display === 'flex') {
+            if (typeof populateBatchSatSelect === 'function') populateBatchSatSelect();
+            if (typeof populateBatchBandChecks === 'function') populateBatchBandChecks();
+        }
+    }
+
+    function setReconApiHealth(healthy, reason) {
+        reconApiHealthChecked = true;
+        reconApiHealthOk = !!healthy;
+        reconApiHealthReason = reason || '';
+        updateReconApiUiState();
+        if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
+    }
+
+    function isReconApiAvailable() {
+        return !isReconApiDown();
+    }
 
     // --- GOES Earth-disk coverage: a geostationary sat at `subLon` can only usefully see points
     // within ~65° (geocentric angle) of its sub-point; past that it's extreme limb / no data.
@@ -226,6 +322,15 @@
     // Label a GOES dropdown option: disable + "out of view" if the flight isn't in this sat's disk,
     // otherwise show the ~scan time for the current playback position (ticks as the clock advances).
     function setGoesOptionState(opt, layerDef) {
+        if (layerDef.isReconApi && !isReconApiAvailable()) {
+            opt.disabled = true;
+            opt.style.color = '#f87171';
+            opt.style.fontWeight = '600';
+            opt.textContent = `${layerDef.baseLabel} — API Offline`;
+            return;
+        }
+        opt.style.color = '';
+        opt.style.fontWeight = '';
         const inCov = goesInCoverage(layerDef);
         opt.disabled = !inCov;
         if (!inCov) { opt.textContent = `${layerDef.baseLabel} - out of view`; return; }
@@ -350,12 +455,22 @@
             const el = document.createElement('option');
             el.value = def.value;
             el.textContent = def.baseLabel;
-            if ((def.isGoes || def.isReconApi) && !goesInCoverage(def)) el.disabled = true;  // out of this sat's Earth-disk view
+            if (def.isGoes || def.isReconApi) {
+                setGoesOptionState(el, def);
+            } else {
+                el.disabled = false;
+            }
             satSelect.appendChild(el);
         });
         // Keep the previous choice only if it's still selectable (present and not disabled).
         const stillOk = [...satSelect.options].some(o => o.value === prevVal && !o.disabled);
         satSelect.value = stillOk ? prevVal : 'none';
+        if (satSelect.value !== 'none') {
+            const selectedLayer = GIBS_LAYERS.find(d => d.value === satSelect.value);
+            if (selectedLayer && selectedLayer.isReconApi && !isReconApiAvailable()) {
+                satSelect.value = 'none';
+            }
+        }
 
         updateBandOptions();
 
@@ -387,6 +502,10 @@
         const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
         if (layerDef && layerDef.bands) {
             bandSelect.innerHTML = '';
+            if (layerDef.isReconApi && !isReconApiAvailable()) {
+                bandSelect.style.display = 'none';
+                return;
+            }
             // Archive-GOES layers can trigger a full-timeframe cache build (maybeAutoPrecacheSatellite) -
             // force an explicit pick via a blank placeholder rather than silently defaulting to the first
             // product, so caching never starts before the user has actually chosen what to build.
@@ -493,7 +612,9 @@
     // their `minDate`. If the fetch fails, the hardcoded fallback just keeps working.
     async function loadSatelliteProducts() {
         try {
-            const data = await fetch(`${RECON_API_BASE}/v1/satellite/products`).then(r => r.json());
+            const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
             const bandDefs = (data.bands || []).map(b => ({
                 id: 'band' + b.band, band: b.band, cmap: b.default_cmap, name: b.name,
                 bboxSupported: b.bbox_supported !== false
@@ -503,18 +624,24 @@
                 bboxSupported: p.bbox_supported === true
             }));
             const allProducts = bandDefs.concat(productDefs);
-            if (!allProducts.length) return;   // malformed/empty response - keep the hardcoded fallback
+            if (!allProducts.length) throw new Error('empty payload');
             GIBS_LAYERS.forEach(layerDef => {
                 if (!layerDef.isReconApi) return;
                 layerDef.bands = allProducts;
                 const spacecraft = data.satellites && data.satellites[layerDef.satellite];
                 if (spacecraft && spacecraft.length && spacecraft[0].start) layerDef.minDate = spacecraft[0].start;
             });
+            setReconApiHealth(true, 'ok');
             // A dropdown may already be open/populated from the hardcoded fallback - refresh it in place.
             if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
-        } catch (e) { /* keep the hardcoded fallback bands already in GIBS_LAYERS */ }
+        } catch (e) {
+            setReconApiHealth(false, String(e));
+        }
     }
     loadSatelliteProducts();
+    setInterval(() => {
+        if (document.visibilityState === 'visible') loadSatelliteProducts();
+    }, 60000);
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {
@@ -684,6 +811,12 @@
         // user explicitly picks a product from the placeholder-first dropdown (updateBandOptions) - don't
         // fall back to a default product, or caching/fetching would start before they've actually chosen.
         if (layerDef.isReconApi) {
+            if (!isReconApiAvailable()) {
+                satUnavailableNote = 'GOES archive API unavailable';
+                satImageLoaded = false; bgNeedsUpdate = true;
+                satLoadedInfo = null; updateSatTimeBadge();
+                return;
+            }
             if (!bandId) return;
             const bandObj = layerDef.bands.find(b => b.id === bandId);
             if (!bandObj) return;
@@ -1126,6 +1259,10 @@
     async function precacheCurrentFlight(layerValue, bandIds) {
         if (batchCaching) { showToast('A cache pass is already running.', 4000); return; }
         if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
+        const layerDefForCheck = GIBS_LAYERS.find(d => d.value === layerValue);
+        if (layerDefForCheck && layerDefForCheck.isReconApi && !isReconApiAvailable()) {
+            showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
+        }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
         batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
@@ -1193,6 +1330,10 @@
         if (!files || !files.length) { showToast('Pick one or more flight files first.', 5000); return; }
         if (!layerValue) { showToast('Pick a satellite to cache.', 5000); return; }
         if (!bandIds || !bandIds.length) { showToast('Pick at least one band to cache.', 5000); return; }
+        const layerDefForCheck = GIBS_LAYERS.find(d => d.value === layerValue);
+        if (layerDefForCheck && layerDefForCheck.isReconApi && !isReconApiAvailable()) {
+            showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
+        }
         batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         const startBtn = document.getElementById('batchCacheStartBtn');
@@ -1243,22 +1384,38 @@
         const cur = satSel.value;
         const mapSat = (document.getElementById('satelliteSelect') || {}).value;
         satSel.innerHTML = '';
-        GIBS_LAYERS.forEach(d => { const o = document.createElement('option'); o.value = d.value; o.textContent = d.baseLabel; satSel.appendChild(o); });
-        // Keep the current pick if valid, else mirror the map's selected layer, else first.
-        if (cur && [...satSel.options].some(o => o.value === cur)) satSel.value = cur;
-        else if (mapSat && mapSat !== 'none' && [...satSel.options].some(o => o.value === mapSat)) satSel.value = mapSat;
+        GIBS_LAYERS.forEach(d => {
+            const o = document.createElement('option'); o.value = d.value; o.textContent = d.baseLabel;
+            // Archive-GOES options need the API to render any tile - gray them out (with an "API
+            // Offline" label, same as the main satellite dropdown) rather than letting a batch pass
+            // start against a satellite it can't actually fetch.
+            if (d.isReconApi && !isReconApiAvailable()) { o.disabled = true; o.textContent = `${d.baseLabel} — API Offline`; }
+            satSel.appendChild(o);
+        });
+        // Keep the current pick if valid and selectable, else mirror the map's selected layer, else first available.
+        const stillOk = cur && [...satSel.options].some(o => o.value === cur && !o.disabled);
+        if (stillOk) satSel.value = cur;
+        else if (mapSat && mapSat !== 'none' && [...satSel.options].some(o => o.value === mapSat && !o.disabled)) satSel.value = mapSat;
+        else { const firstOk = [...satSel.options].find(o => !o.disabled); if (firstOk) satSel.value = firstOk.value; }
     }
 
     // Band checkboxes for whichever satellite is chosen in the batch modal (defaults to all checked).
     function populateBatchBandChecks() {
         const wrap = document.getElementById('batchBandChecks'); if (!wrap) return;
+        const startBtn = document.getElementById('batchCacheStartBtn');
         const satVal = (document.getElementById('batchSatSelect') || {}).value;
         const layerDef = GIBS_LAYERS.find(d => d.value === satVal);
+        wrap.innerHTML = '';
+        if (layerDef && layerDef.isReconApi && !isReconApiAvailable()) {
+            wrap.innerHTML = '<span class="text-red-300 font-semibold">API Offline - archive GOES caching unavailable</span>';
+            if (startBtn) { startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
+            return;
+        }
+        if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
         // Full-disk-only composites (sandwich/geocolor) can't be cached by area like everything else
         // here - batch caching is always a bbox around each flight. They're still viewable live.
         const bands = ((layerDef && layerDef.bands) ? layerDef.bands : []).filter(b => b.bboxSupported !== false);
         const curBand = (document.getElementById('satBandSelect') || {}).value;
-        wrap.innerHTML = '';
         bands.forEach((b, i) => {
             const lbl = document.createElement('label'); lbl.className = 'flex items-center gap-1 cursor-pointer';
             const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-sky-500 w-3.5 h-3.5';

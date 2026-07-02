@@ -1,14 +1,11 @@
 # Mission Visualizer
 
-A client-only web app for **NOAA Aircraft Operations Center (AOC)** hurricane-hunter
-flight data. It replays flight-level instrument data together with synced cockpit / radar
-(**MMR**) video, and adds a live map tracker, a full chart suite, a Primary Flight Display
-(PFD), satellite imagery overlays, storm best-track overlays, and KML / video clip export.
+The **NOAA AOC** video telemetry tool replays flight-level instrument data together with synced cockpit / radar
+(**MMR**) video, and adds a live map tracker, a full customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, and KML / video clip export capabilities.
 
-Built for the **NOAA AOC Science Branch**. Runs entirely in the browser — no install, no
-server, no accounts.
+Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser, API-backend optional
 
-- **Live app:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages)
+- **Tool Link:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages)
 - **Repository:** https://github.com/diegoxb07/AOCVisualizer
 
 ---
@@ -17,31 +14,29 @@ server, no accounts.
 
 | Use case | What the tool gives you |
 | --- | --- |
-| **Training** | Replay a real mission at controlled speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) evolve on the map, PFD, and charts together — with the actual MMR cockpit/radar video synced alongside. Record narrated clips for briefings. |
-| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, colour the track by wind speed or temperature, drop measurement shapes, mark points, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and export the track to KML. |
-| **API-backed workflows** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
+| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside.You can also record clips in advance for presentations. |
+| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and export the track to KML. |
+| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
 
 ---
 
 ## Quick start
 
-1. **Open the app** — go to the live URL above, or open [index.html](index.html) directly in
-   a browser (or serve the folder with any static file server).
+1. **Open the app** — go to (https://diegoxb07.github.io/AOCVisualizer/).
 2. **Get a flight in.** Either:
-   - **Archive (needs API online):** pick **Year → Storm → Flight**, then click
+   - **Option 1: Server-side Archive (needs API to be up):** pick **Year → Storm → Flight**, then click
      **⤓ Load Flight + Storm Track**; or
-   - **Manual upload (always works):** drop a `.txt` (tab-separated AOC flight-level log) or
-     `.nc` (NetCDF) file on the **"or upload"** zone.
-3. **Set the window (optional).** Adjust **Flight-Data Start / End Time** (`HHMMSS`).
-4. **Click `Apply & Run`**, then **`▶ Play`**. Use the speed `⏪ / ⏩` buttons and the
-   timeline slider at the bottom to scrub.
+   - **Option 2: Manual upload (always works):** drop the raw flight-level data in `.nc` (ex. 20221028H1_A.nc) or
+     in the **"or upload"** zone.
+3. **Optional: If you want to see a set period within that data, set the window.** Do this by adjusting the **Flight-Data Start / End Time** (`HHMMSS`).
+4. **If window has been changed, Click `Apply & Run`**, then **`▶ Play`**. Use the speed `⏪ / ⏩` buttons and the
+   timeline slider at the bottom to scrub through the footage.
 5. **(Optional) Add MMR video, satellite, charts, export** — see the
    **[User & Training Guide](docs/USER_GUIDE.md)**.
 
 > **First stop for most users:** the **[User & Training Guide](docs/USER_GUIDE.md)** walks
 > through every panel step by step. If a satellite layer or the archive browser is greyed
-> out, read **[API & Connectivity](docs/CONNECTIVITY.md)** — it's almost always the API
-> being offline, and manual upload still works.
+> out, read **[API & Connectivity](docs/CONNECTIVITY.md)** , likely the case is the API is offline.
 
 ---
 
@@ -57,22 +52,21 @@ server, no accounts.
 
 ## Feature overview
 
-- **Two data paths:** one-click **archive** load (full-resolution NetCDF + storm best-track,
-  via the noaa-recon-api) or **manual** `.txt` / `.nc` upload — both go through the same
-  parser, so everything downstream is identical.
+- **Two data paths:** one-click **archive** load (NetCDF + storm best-track,
+  via the noaa-recon-api + 10-minute satellite data) or **manual** `.nc` upload (no 10-min satellite, no storm best-track)
 - **Replay engine:** single-clock playback of `filteredData`, variable speed, timeline
-  scrubbing, optional **8 Hz Catmull-Rom smoothing** for fluid motion between samples.
-- **MMR video sync:** load a `.mp4` and sync it either **Manually** (type the video's UTC
-  start) or via **Auto-Sync (OCR)**, which reads the timestamp burned into the video frame.
-- **Map tracker (2D & 3D):** hand-rolled 2D canvas map (whole world, coastlines/states) or a
-  Three.js **3D WebGL** scene, with the flight track coloured by wind speed or temperature,
-  wind barbs, hurricane wind-field colouring, and custom markers.
+  scrubbing, with the optional **8 Hz Catmull-Rom smoothing** for fluid motion filling between each 1s sample.
+- **MMR video sync:** load a `.mp4` and sync it on default via **Auto-Sync (OCR)**, which reads the timestamp burned into the video frame,
+- or it can be **Manually** (type the video's UTC start).
+- **Map tracker (2D & 3D):**2D canvas map (whole world, coastlines/states, satellite imagery, wind-barbs) or a
+  Three.js **3D WebGL** scene, both with the flight track coloured by wind speed or temperature,
+  hurricane wind-field colouring, and custom markers.
 - **Satellite overlays:** NASA GIBS **MODIS/VIIRS** (any date back to mission start) and
-  archive **GOES-East / GOES-West** (rendered server-side from NOAA's S3 archive for the
+  archive **GOES-East / GOES-West** (rendered server-side from NOAA's AWS S3 archive for the
   historical flight date). Imagery advances with the playback clock; **⏪10m / ⏩10m** step it.
 - **Storm best-track overlay:** the storm's whole-life intensity-coloured track (from the
   archive), with a "last observation" status card.
-- **Charts:** a fixed suite (temperature, nav angles, flow angles, altitude, speeds, vertical
+- **Charts:** a fixed collection (temperature, nav angles, flow angles, altitude, speeds, vertical
   winds/accel, pressure, thermodynamics) plus a **"Create Your Own Graph"** for arbitrary
   variable comparison.
 - **PFD / HUD:** cockpit-style attitude indicator and a text telemetry box, both synced.
@@ -87,22 +81,10 @@ server, no accounts.
 
 ## Running & deploying
 
-- **No build step, no dependencies to install.** Open [index.html](index.html) in a browser,
+- **No build step, no dependencies to install.** Open (https://diegoxb07.github.io/AOCVisualizer/) in a browser,
   or serve the directory statically (`python3 -m http.server`, etc.). All libraries load from
   CDNs (Tailwind, Chart.js, Three.js, netcdfjs, Tesseract.js).
 - **Deployment:** GitHub Pages via
-  [.github/workflows/static.yml](.github/workflows/static.yml) — pushing to `main` uploads
-  the repo as-is (no compile). The app is served from
-  `https://diegoxb07.github.io/AOCVisualizer/`.
-- **No lint/test suite.** Verify changes by opening the page and exercising the
+  [.github/workflows/static.yml](.github/workflows/static.yml) 
+- **No test suite.** Verify changes by opening the page and exercising the
   upload → play flow.
-
----
-
-## Data & privacy
-
-Everything runs **in your browser**. Uploaded files are parsed locally and never leave your
-machine. The only outbound requests are to public services: map geometry (GitHub-hosted
-GeoJSON), satellite imagery (NASA GIBS + the noaa-recon-api), and the archive endpoints. If
-you have no connectivity, manual upload and local replay still work — see
-**[API & Connectivity](docs/CONNECTIVITY.md)**.

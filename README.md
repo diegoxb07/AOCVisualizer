@@ -35,12 +35,12 @@ flowchart TD
     MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br>(<b>🔄 Sync Now</b> forces a lock, or use Manual)"]
     MMR -- "No" --> WINDOW{"Replay only part<br>of the flight?"}
     WINDOW -- "Yes" --> TRIM["Set <b>Start / End</b> times (HHMMSS)<br>then click <b>Apply & Run</b>"]
-    WINDOW -- "No" --> SAT{"Want satellite imagery<br>behind the track?"}
+    WINDOW -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
     TRIM --> SAT
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Was the flight loaded from<br>the archive in step 1?"}
     FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive)<br>pick a product to pre-cache the flight"]
-    FROMARC -- "In all cases" --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
+    FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
     SAT -- "No" --> PLAY["<b>▶ Play</b>, scrub the timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
     SATGOES --> PLAY
     SATPOLAR --> PLAY

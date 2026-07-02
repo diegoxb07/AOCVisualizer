@@ -229,7 +229,6 @@
             canvas.style.display = 'none'; threeDContainer.style.display = 'block';
             if (isMeasuring) stopMeasuringState();
             document.getElementById('measureCluster').style.display = 'none';
-            document.getElementById('barbIntervalInput').parentElement.style.display = 'none';
 
             if (satSelect) satSelect.style.display = 'none';
             if (satBandSelect) satBandSelect.style.display = 'none';
@@ -243,7 +242,6 @@
             document.getElementById('measureCluster').style.display = 'flex';
             measureBtn.style.display = 'inline-block';
             updateMeasureUI();
-            document.getElementById('barbIntervalInput').parentElement.style.display = 'flex';
 
             if (satSelect) satSelect.style.display = '';
             if (satBandSelect && satSelect.value !== 'none') satBandSelect.style.display = '';
@@ -286,6 +284,7 @@
     });
 
     document.getElementById('pathColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
+    document.getElementById('barbColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
     document.getElementById('toggle8Hz').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
 
     document.getElementById('markBtn').addEventListener('click', () => {

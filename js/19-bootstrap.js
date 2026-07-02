@@ -12,7 +12,6 @@
         el.addEventListener('keyup', (e) => { if (e.key === 'Enter') el.blur(); });
     });
     
-    document.getElementById('barbIntervalInput').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); else build3DScene(); } });
     document.getElementById('runBtn').addEventListener('click', function() { applyFiltersAndInit(true); });
 
     // Batch satellite cache modal (works across many storms without loading each flight into the app).

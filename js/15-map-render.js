@@ -35,13 +35,30 @@
         return !(bbox[0] > v.maxLon + m || bbox[2] < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
     }
 
+    function getHurricaneColorRGB(spd) {
+        if (spd === null || spd === undefined || spd < 0) spd = 0;
+        if (spd <= 63) return [0, 0, 0];
+        if (spd <= 82) return [1, 1, 0.8];
+        if (spd <= 95) return [1, 0.91, 0.46];
+        if (spd <= 112) return [1, 0.76, 0.25];
+        if (spd <= 136) return [1, 0.56, 0.13];
+        return [1, 0.38, 0.38];
+    }
+
+    function getBarbColorMode() {
+        const el = document.getElementById('barbColorSelect');
+        return el && el.value === 'hurricane' ? 'hurricane' : 'wind';
+    }
+
     function getPathColorRGB(d, idx) {
         const mode = document.getElementById('pathColorSelect').value;
         if (mode === 'temp') {
             let t = d.tempr; if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
             let delta = t - tempBaseline[idx]; let f = Math.min(Math.abs(delta) / 3.0, 1);
             if (delta > 0) return [1, 1 - f, 1 - f]; else return [1 - f, 1 - f, 1];
-        } else { return getSpdColorRGB(d.windSpd); }
+        }
+        if (getBarbColorMode() === 'hurricane') return getHurricaneColorRGB(d.windSpd);
+        return getSpdColorRGB(d.windSpd);
     }
 
     function getSpdColorRGB(spd) {
@@ -55,6 +72,21 @@
     }
     
     function getSpdColor(spd) { const [r, g, b] = getSpdColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
+
+    function getBarbColorRGB(spd) {
+        return getBarbColorMode() === 'hurricane' ? getHurricaneColorRGB(spd) : getSpdColorRGB(spd);
+    }
+
+    function getBarbColor(spd) { const [r, g, b] = getBarbColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
+
+    function getBarbSpacingPx() {
+        const zoom = Math.max(mapScale, 0.35);
+        return Math.min(30, Math.max(8, 30 / zoom));
+    }
+
+    function getBarbScale() {
+        return 1;
+    }
 
     // Best-track overlay for the storm the loaded mission belongs to (js/12b-recon-archive.js), spanning
     // its whole life - not just the flight's window. Drawn UNDER the flight track/plane so the flight
@@ -81,21 +113,27 @@
     function getPathColorHex(d, idx) {
         const mode = document.getElementById('pathColorSelect').value;
         if (mode === 'temp') { const [r,g,b] = getPathColorRGB(d, idx); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
-        return getSpdColor(d.windSpd);
+        const [r,g,b] = getPathColorRGB(d, idx);
+        return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
     }
 
     function drawWindBarbFrame(x, y, dir, spd, scale, isDynamic = false) {
-        ctx.save(); ctx.translate(x, y); let mult = isDynamic ? 1.4 : 1; ctx.scale(mult/scale, mult/scale); ctx.rotate((dir - 90) * Math.PI/180);
-        const strokeColor = getSpdColor(spd); 
+        const strokeColor = getBarbColor(spd); const barbScale = getBarbScale();
+        ctx.save(); ctx.translate(x, y); let mult = isDynamic ? 1.4 : 1; ctx.scale((mult * barbScale) / scale, (mult * barbScale) / scale); ctx.rotate((dir - 90) * Math.PI/180);
         const drawShapes = () => {
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(18, 0); ctx.stroke();
-            let k = Math.round(spd/5)*5; let hx = 18; const xa = Math.cos(60*Math.PI/180)*6; const ya = Math.sin(60*Math.PI/180)*6;
-            while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-3,0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4; k-=50; }
-            while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.stroke(); hx-=3; k-=10; }
+            const shaftLength = 18 * barbScale; const featherBase = 6 * barbScale; const featherSpread = 0.85 * barbScale;
+            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(shaftLength, 0); ctx.stroke();
+            let k = Math.round(spd/5)*5; let hx = shaftLength; const xa = Math.cos(60*Math.PI/180)*featherBase; const ya = Math.sin(60*Math.PI/180)*featherBase;
+            while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-(3 * featherSpread),0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4 * featherSpread; k-=50; }
+            while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.stroke(); hx-=3 * featherSpread; k-=10; }
             if (k >= 5) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa/2,ya/2); ctx.stroke(); }
         };
-        if (isDynamic) { ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 3.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes(); }
-        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.2; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; drawShapes();
+        const isBlackBarb = strokeColor === 'rgb(0, 0, 0)';
+        if (isBlackBarb) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.6 * barbScale; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes();
+        }
+        if (isDynamic) { ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 2.0 * barbScale; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes(); }
+        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.0 * barbScale; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; drawShapes();
         ctx.restore();
     }
     
@@ -159,8 +197,32 @@
         } 
         ctx.stroke(); ctx.globalAlpha = 1.0;
 
-        const stride = parseInt(document.getElementById('barbIntervalInput').value)||45;
-        for (let i=0; i<=idx; i++) { if (i%stride===0 || i===idx) { if (filteredData[i].windDir !== null && filteredData[i].windSpd !== null) { drawWindBarbFrame(getX(filteredData[i].lon), getY(filteredData[i].lat), filteredData[i].windDir, filteredData[i].windSpd, mapScale); } } }
+        const targetSpacing = getBarbSpacingPx();
+        let lastBarbIdx = -1;
+        let lastBarbX = null;
+        let lastBarbY = null;
+        for (let i = 0; i <= idx; i++) {
+            const d = filteredData[i];
+            if (d.windDir === null || d.windSpd === null) continue;
+            if (lastBarbIdx < 0) {
+                drawWindBarbFrame(getX(d.lon), getY(d.lat), d.windDir, d.windSpd, mapScale);
+                lastBarbIdx = i;
+                lastBarbX = getX(d.lon);
+                lastBarbY = getY(d.lat);
+                continue;
+            }
+            const x = getX(d.lon), y = getY(d.lat);
+            const distPx = Math.hypot((x - lastBarbX) * mapScale, (y - lastBarbY) * mapScale);
+            if (distPx >= targetSpacing) {
+                drawWindBarbFrame(x, y, d.windDir, d.windSpd, mapScale);
+                lastBarbIdx = i;
+                lastBarbX = x;
+                lastBarbY = y;
+            }
+        }
+        if (idx >= 0 && filteredData[idx] && filteredData[idx].windDir !== null && filteredData[idx].windSpd !== null && lastBarbIdx !== idx) {
+            const d = filteredData[idx]; drawWindBarbFrame(getX(d.lon), getY(d.lat), d.windDir, d.windSpd, mapScale);
+        }
 
         let dPlane = visualRow || filteredData[idx];
         if (dPlane) { 

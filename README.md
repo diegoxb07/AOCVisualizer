@@ -1,6 +1,6 @@
 # Mission Visualizer
 
-The **NOAA AOC** video telemetry tool replays flight-level instrument data together with synced radar
+This video telemetry tool replays flight-level instrument data together with synced radar
 (**MMR**) video, and adds a live map tracker, a full customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, and KML / video clip export capabilities.
 
 Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser, API-backend optional

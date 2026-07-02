@@ -295,7 +295,9 @@
     // Hit-tested in SCREEN space (constant pixel radius) so the target size doesn't shrink when zoomed out.
     function stormPointIndexAt(mx, my) {
         if (!showStormTrack || stormTrackPoints.length === 0 || trackerModeSelect.value !== '2d') return -1;
-        const HIT_R = 7, hitR2 = HIT_R * HIT_R;
+        // Generous radius: the dots are only ~9px wide and an arrow cursor's hotspot is at its very
+        // tip, so a tight radius forces pixel-perfect aiming ("hover just under the point" syndrome).
+        const HIT_R = 12, hitR2 = HIT_R * HIT_R;
         let best = -1, bestD2 = hitR2;
         for (let i = 0; i < stormTrackPoints.length; i++) {
             const p = stormTrackPoints[i];
@@ -332,8 +334,16 @@
             }
             if (idx >= 0) {
                 tooltip.innerHTML = formatStormPointTooltip(stormTrackPoints[idx]);
+                // Show the card ABOVE the point (not trailing under the cursor) so the data never
+                // sits beneath what you're pointing at; flip below only when clipped by the top edge.
                 tooltip.style.left = (e.clientX + 14) + 'px';
-                tooltip.style.top = (e.clientY + 14) + 'px';
+                if (e.clientY > 130) {
+                    tooltip.style.top = (e.clientY - 12) + 'px';
+                    tooltip.style.transform = 'translateY(-100%)';
+                } else {
+                    tooltip.style.top = (e.clientY + 18) + 'px';
+                    tooltip.style.transform = 'none';
+                }
                 tooltip.classList.remove('hidden');
                 canvas.style.cursor = 'pointer';
             } else {

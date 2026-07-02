@@ -104,7 +104,7 @@
         stormTrackPoints.forEach((p, i) => {
             const hovered = i === hoveredStormIdx;
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 3.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, hovered ? 7 : 4.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
             ctx.strokeStyle = hovered ? '#ffffff' : '#000000'; ctx.lineWidth = hovered ? 2 : 1; ctx.stroke(); ctx.restore();
         });
         ctx.restore();

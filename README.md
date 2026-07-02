@@ -41,7 +41,7 @@ flowchart TD
     SAT -- "Yes" --> FROMARC{"Was the flight loaded from<br>the archive in step 1?"}
     FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive)<br>pick a product to pre-cache the flight"]
     FROMARC -- "No --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
-    SAT -- "No" --> PLAY["<b>▶ Play</b>, scroll through the timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
+    SAT -- "No" --> PLAY["<b>▶ Play</b>, scroll through timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
     SATGOES --> PLAY
     SATPOLAR --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}

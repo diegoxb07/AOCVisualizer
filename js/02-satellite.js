@@ -514,12 +514,31 @@
                 ph.value = ''; ph.textContent = 'Choose a product…';
                 bandSelect.appendChild(ph);
             }
-            layerDef.bands.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.id;
-                opt.textContent = b.name;
-                bandSelect.appendChild(opt);
-            });
+            if (layerDef.isReconApi) {
+                // Spectral bands and multi-band composites in separate groups, so a blend like
+                // "IR/VIS Sandwich" can't be misread as just another band.
+                const addGroup = (label, defs) => {
+                    if (!defs.length) return;
+                    const og = document.createElement('optgroup');
+                    og.label = label;
+                    defs.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        opt.textContent = b.name;
+                        og.appendChild(opt);
+                    });
+                    bandSelect.appendChild(og);
+                };
+                addGroup('Spectral Bands', layerDef.bands.filter(b => !b.isComposite));
+                addGroup('Composites (multi-band)', layerDef.bands.filter(b => b.isComposite));
+            } else {
+                layerDef.bands.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = b.name;
+                    bandSelect.appendChild(opt);
+                });
+            }
             bandSelect.style.display = '';
         }
     }
@@ -615,13 +634,25 @@
             const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            const bandDefs = (data.bands || []).map(b => ({
-                id: 'band' + b.band, band: b.band, cmap: b.default_cmap, name: b.name,
-                bboxSupported: b.bbox_supported !== false
-            }));
+            // Label every spectral band as "Band N - …" (the API's names alone don't carry the
+            // band number) and keep them sorted by band, one entry per band - matching how the
+            // original hardcoded list read. Composites are tagged so the dropdown can group them
+            // separately instead of mixing multi-band blends in with the single-band products.
+            const bandDefs = (data.bands || [])
+                .slice().sort((a, b) => a.band - b.band)
+                .map(b => ({
+                    id: 'band' + b.band, band: b.band, cmap: b.default_cmap,
+                    name: 'Band ' + b.band + ' - ' + b.name,
+                    bboxSupported: b.bbox_supported !== false
+                }));
+            // The classic enhanced-IR curve was its own entry in the original list - keep it as a
+            // separate pick whenever the API says band 13 can render with the ir4 cmap.
+            const b13 = (data.bands || []).find(b => b.band === 13 && Array.isArray(b.cmaps) && b.cmaps.includes('ir4'));
+            if (b13) bandDefs.push({ id: 'band13_ir4', band: 13, cmap: 'ir4', name: 'Band 13 - IR Enhanced (ir4)', bboxSupported: b13.bbox_supported !== false });
             const productDefs = (data.products || []).map(p => ({
                 id: p.product, product: p.product, name: p.name,
-                bboxSupported: p.bbox_supported === true
+                bboxSupported: p.bbox_supported === true,
+                isComposite: true
             }));
             const allProducts = bandDefs.concat(productDefs);
             if (!allProducts.length) throw new Error('empty payload');

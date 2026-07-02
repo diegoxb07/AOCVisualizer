@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Toolkit</title>
+    <title>AOC Mission Visualizer</title>
+    <meta name="description" content="NOAA AOC hurricane-hunter mission playback: flight-level data, synced MMR video, satellite overlay, and charts.">
+    <meta name="theme-color" content="#070a10">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%80%3C/text%3E%3C/svg%3E">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +34,7 @@
     <script src="https://cdn.jsdelivr.net/npm/netcdfjs/dist/netcdfjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     
-    <link rel="stylesheet" href="css/app.css?v=20260701">
+    <link rel="stylesheet" href="css/app.css?v=20260702c">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -56,6 +59,7 @@
     <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-5"></div>
     <h2 class="text-white text-xl md:text-2xl font-bold tracking-widest">PROCESSING FLIGHT DATA</h2>
     <p id="loadingOverlaySubtext" class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling variables...</p>
+    <div class="loader-track" aria-hidden="true"><div class="loader-shimmer"></div></div>
 </div>
 
 <button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
@@ -66,6 +70,7 @@
             <div class="flex items-center gap-4 min-w-0">
                 <div class="min-w-0">
                     <h1 class="text-white text-xl md:text-2xl font-bold tracking-tight truncate">Mission Visualizer</h1>
+                    <p id="brandSub">NOAA Aircraft Operations Center &middot; Flight Data Playback</p>
                 </div>
             </div>
             <div class="flex items-center gap-4 shrink-0">
@@ -224,7 +229,13 @@
                         <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-3.5 py-2 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-sm font-mono transition-colors whitespace-nowrap">10m ⏩</button>
                     </div>
                     <div class="media-container" id="mapContainer">
-                        <div id="mapPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Awaiting flight log data extraction...</div>
+                        <div id="mapPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center px-6 pointer-events-none z-10">
+                            <div class="radar-idle" aria-hidden="true"><div class="radar-sweep"></div><div class="radar-blip"></div></div>
+                            <div>
+                                <span class="media-idle-title">Waiting for Flight Data</span>
+                                <span class="media-idle-sub">Load a mission from the NOAA archive above, or drop a .txt / .nc flight-level log</span>
+                            </div>
+                        </div>
                         <canvas id="mapCanvas"></canvas>
                         <div id="threeDContainer">
                             <div id="attitudeHud" class="absolute top-[75px] left-4 bg-slate-950/80 border border-slate-700 rounded-md p-2.5 font-mono text-xs text-blue-400 z-[2500]"></div>
@@ -261,7 +272,10 @@
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
-                        <div id="videoPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-500 text-sm font-medium text-center px-6 pointer-events-none z-10">Optional: Load an MMR Video & it can sync.</div>
+                        <div id="videoPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none z-10">
+                            <span class="media-idle-title">MMR Video Waiting</span>
+                            <span class="media-idle-sub">Optional: load an MMR .mp4 and it syncs to the flight clock</span>
+                        </div>
                         <video id="radarVideo"></video>
                         <div id="ocrIndicator" class="hidden absolute top-2 right-3 pointer-events-none z-30" title="OCR sync active">
                             <span class="block w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.85)]"></span>
@@ -532,25 +546,26 @@
 </script>
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/01-state.js?v=20260701"></script>
-    <script src="js/02-satellite.js?v=20260701"></script>
-    <script src="js/03-metrics.js?v=20260701"></script>
-    <script src="js/04-geo-measure.js?v=20260701"></script>
-    <script src="js/05-interpolation.js?v=20260701"></script>
-    <script src="js/06-ocr.js?v=20260701"></script>
-    <script src="js/07-ui-controls.js?v=20260701"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260701"></script>
-    <script src="js/09-interaction.js?v=20260701"></script>
-    <script src="js/10-point-analysis.js?v=20260701"></script>
-    <script src="js/11-layout.js?v=20260701"></script>
-    <script src="js/12-file-parsing.js?v=20260701"></script>
-    <script src="js/12b-recon-archive.js?v=20260701"></script>
-    <script src="js/13-charts-master.js?v=20260701"></script>
-    <script src="js/14-filters-sync.js?v=20260701"></script>
-    <script src="js/15-map-render.js?v=20260701"></script>
-    <script src="js/16-pfd-hud.js?v=20260701"></script>
-    <script src="js/17-charts.js?v=20260701"></script>
-    <script src="js/18-engine.js?v=20260701"></script>
-    <script src="js/19-bootstrap.js?v=20260701"></script>
+    <script src="js/01-state.js?v=20260702c"></script>
+    <script src="js/02-satellite.js?v=20260702c"></script>
+    <script src="js/03-metrics.js?v=20260702c"></script>
+    <script src="js/04-geo-measure.js?v=20260702c"></script>
+    <script src="js/05-interpolation.js?v=20260702c"></script>
+    <script src="js/06-ocr.js?v=20260702c"></script>
+    <script src="js/07-ui-controls.js?v=20260702c"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260702c"></script>
+    <script src="js/09-interaction.js?v=20260702c"></script>
+    <script src="js/10-point-analysis.js?v=20260702c"></script>
+    <script src="js/11-layout.js?v=20260702c"></script>
+    <script src="js/12-file-parsing.js?v=20260702c"></script>
+    <script src="js/12b-recon-archive.js?v=20260702c"></script>
+    <script src="js/13-charts-master.js?v=20260702c"></script>
+    <script src="js/14-filters-sync.js?v=20260702c"></script>
+    <script src="js/15-map-render.js?v=20260702c"></script>
+    <script src="js/16-pfd-hud.js?v=20260702c"></script>
+    <script src="js/17-charts.js?v=20260702c"></script>
+    <script src="js/18-engine.js?v=20260702c"></script>
+    <script src="js/19-bootstrap.js?v=20260702c"></script>
+    <script src="js/20-ui-polish.js?v=20260702c"></script>
 </body>
 </html>

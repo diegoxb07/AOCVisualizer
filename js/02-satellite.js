@@ -154,9 +154,9 @@
         { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
           bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13',    bboxSupported:true},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)',     bboxSupported:true},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9',  bboxSupported:true}
+              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13 - Clean IR',            bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13 - IR Enhanced (ir4)',   bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9 - Water Vapor',          bboxSupported:true}
           ]
         },
         // GOES-West (GOES-17/18, sub-point ~137°W) - added once the recon-api gained `goes-west`.
@@ -164,9 +164,9 @@
         { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
           bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Clean IR - Band 13',    bboxSupported:true},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'IR Enhanced (ir4)',     bboxSupported:true},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Water Vapor - Band 9',  bboxSupported:true}
+              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13 - Clean IR',            bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13 - IR Enhanced (ir4)',   bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9 - Water Vapor',          bboxSupported:true}
           ]
         }
     ];
@@ -326,7 +326,7 @@
             opt.disabled = true;
             opt.style.color = '#f87171';
             opt.style.fontWeight = '600';
-            opt.textContent = `${layerDef.baseLabel} — API Offline`;
+            opt.textContent = `${layerDef.baseLabel} (API Offline)`;
             return;
         }
         opt.style.color = '';
@@ -1420,7 +1420,7 @@
             // Archive-GOES options need the API to render any tile - gray them out (with an "API
             // Offline" label, same as the main satellite dropdown) rather than letting a batch pass
             // start against a satellite it can't actually fetch.
-            if (d.isReconApi && !isReconApiAvailable()) { o.disabled = true; o.textContent = `${d.baseLabel} — API Offline`; }
+            if (d.isReconApi && !isReconApiAvailable()) { o.disabled = true; o.textContent = `${d.baseLabel} (API Offline)`; }
             satSel.appendChild(o);
         });
         // Keep the current pick if valid and selectable, else mirror the map's selected layer, else first available.

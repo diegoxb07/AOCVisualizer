@@ -13,6 +13,12 @@
     const reconSourceLink = document.getElementById('reconSourceLink');
     const reconArchiveStatus = document.getElementById('reconArchiveStatus');
 
+    function syncReconLoadButtonState() {
+        if (!reconLoadBtn) return;
+        const apiDown = reconApiHealthChecked && !reconApiHealthOk;
+        reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
+    }
+
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
     let reconMissionsForStorm = [];   // last-fetched missions for the selected storm
 
@@ -44,7 +50,7 @@
     reconYearSelect.addEventListener('change', async () => {
         resetReconSelect(reconStormSelect, 'Storm…');
         resetReconSelect(reconMissionSelect, 'Flight…');
-        reconLoadBtn.disabled = true;
+        syncReconLoadButtonState();
         reconStormsForYear = []; reconMissionsForStorm = [];
         const year = reconYearSelect.value;
         if (!year) return;
@@ -64,7 +70,7 @@
 
     reconStormSelect.addEventListener('change', async () => {
         resetReconSelect(reconMissionSelect, 'Flight…');
-        reconLoadBtn.disabled = true;
+        syncReconLoadButtonState();
         reconMissionsForStorm = [];
         const year = reconYearSelect.value, stormName = reconStormSelect.value;
         if (!year || !stormName) return;
@@ -83,7 +89,7 @@
         } catch (e) { setReconStatus('Could not load flights for ' + stormName + ' (' + e.message + ').'); }
     });
 
-    reconMissionSelect.addEventListener('change', () => { reconLoadBtn.disabled = !reconMissionSelect.value; });
+    reconMissionSelect.addEventListener('change', () => { syncReconLoadButtonState(); });
 
     reconLoadBtn.addEventListener('click', () => {
         const missionId = reconMissionSelect.value;
@@ -131,7 +137,7 @@
     async function loadReconMission(missionId) {
         const loader = document.getElementById('loadingOverlay'); loader.classList.remove('hidden'); loader.classList.add('flex');
         const subtext = document.getElementById('loadingOverlaySubtext');
-        reconLoadBtn.disabled = true;
+        syncReconLoadButtonState();
         setReconStatus('Fetching mission ' + missionId + '…');
 
         let mission;
@@ -141,7 +147,7 @@
         } catch (e) {
             setReconStatus('Could not load mission ' + missionId + ' (' + e.message + ').');
             loader.classList.add('hidden'); loader.classList.remove('flex');
-            reconLoadBtn.disabled = false;
+            syncReconLoadButtonState();
             return;
         }
 
@@ -191,7 +197,7 @@
         else setReconStatus(`Loaded ${mission.obs_count} decimated pts for ${mission.mission_id}. Fetching storm track…`);
         loadStormTrackForMission(mission);
 
-        reconLoadBtn.disabled = false;
+        syncReconLoadButtonState();
     }
 
     // Best-track (every ~6-hourly fix) for the WHOLE storm life - not just the flight's window - so the

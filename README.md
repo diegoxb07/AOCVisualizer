@@ -22,7 +22,7 @@ Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser,
 
 ## Quick start
 
-1. **Open the app** — go to (https://diegoxb07.github.io/AOCVisualizer/).
+1. **Open the app**: go to (https://diegoxb07.github.io/AOCVisualizer/).
 2. **Get a flight in.** Either:
    - **Option 1: Server-side Archive (needs API to be up):** pick **Year → Storm → Flight**, then click
      **⤓ Load Flight + Storm Track**; or

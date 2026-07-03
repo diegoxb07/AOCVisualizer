@@ -27,7 +27,13 @@
     async function reconApiJson(path) {
         const resp = await fetch(RECON_API_BASE + path);
         const data = await resp.json().catch(() => null);
-        if (!resp.ok) { const err = new Error((data && data.detail) || resp.statusText); err.status = resp.status; err.data = data; throw err; }
+        if (!resp.ok) {
+            // detail can be a string OR structured (FastAPI validation errors) - stringify the
+            // latter so status messages never read "[object Object]".
+            let detail = (data && data.detail) || resp.statusText;
+            if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
+            const err = new Error(detail); err.status = resp.status; err.data = data; throw err;
+        }
         return data;
     }
 
@@ -46,6 +52,16 @@
         } catch (e) { setReconStatus('Could not reach the recon archive (' + e.message + ').'); }
     }
     populateReconYears();
+
+    // Shareable links: opening the page with ?mission=20241007N1 auto-loads that archive mission.
+    // Deferred to window 'load' so every script file has parsed before the load pipeline runs;
+    // a bad/unknown id just surfaces through loadReconMission's own error status.
+    (function autoLoadSharedMission() {
+        let shared = '';
+        try { shared = (new URLSearchParams(window.location.search).get('mission') || '').trim(); } catch (e) { return; }
+        if (!/^\d{8}[A-Z]+\d+$/i.test(shared)) return;
+        window.addEventListener('load', () => loadReconMission(shared.toUpperCase()));
+    })();
 
     reconYearSelect.addEventListener('change', async () => {
         resetReconSelect(reconStormSelect, 'Storm…');
@@ -80,7 +96,10 @@
             reconMissionsForStorm = (data && data.missions) || [];
             reconMissionsForStorm.forEach(m => {
                 const opt = document.createElement('option'); opt.value = m.mission_id;
-                opt.textContent = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
+                // Mission id leads (its first 8 digits are the date, so a separate date column
+                // would just repeat it in this narrow select).
+                opt.textContent = `${m.mission_id} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
+                opt.title = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
                 reconMissionSelect.appendChild(opt);
             });
             reconMissionSelect.disabled = false;
@@ -188,6 +207,10 @@
         parseEntireFile(tsv);   // hides loadingOverlay itself when done
 
         reconArchiveMeta = { missionId: mission.mission_id, stormName: mission.storm_name, stormId: mission.storm_id, aircraft: mission.aircraft, tailNum: mission.tail_num, sourceUrl: mission.source_url };
+        updateMissionHeader();   // re-run with reconArchiveMeta now set so the subline picks up the storm name
+        // Reflect the loaded mission in the URL so the address bar is a shareable link.
+        // (parseEntireFile just cleared any stale ?mission= - a manual upload leaves it cleared.)
+        try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); history.replaceState(null, '', u); } catch (e) {}
         if (mission.source_url) {
             reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden');
             reconSourceLink.title = 'Open the original full-resolution NetCDF from NOAA directly (same file this loaded automatically)';
@@ -239,15 +262,31 @@
         if (filteredData.length > 0) updateVisualComponents(currentIdx);
     });
 
-    // Color a best-track segment/point by intensity, roughly matching NHC's conventional track-map palette.
+    // Color a best-track segment/point by intensity. Monotonic cool-to-hot ramp (the standard
+    // Saffir-Simpson track-map palette) so a stronger category always reads as more severe -
+    // the old palette went red at cat 3 then magenta/purple, making 3 look worst and 4 vs 5
+    // nearly identical.
     function stormWindColor(windKt) {
-        if (windKt == null) return '#94a3b8';           // unknown intensity - neutral grey
-        if (windKt < 34) return '#5da5da';               // tropical depression
-        if (windKt < 64) return '#fbea59';                // tropical storm
-        if (windKt < 96) return '#f5a623';                // cat 1-2
-        if (windKt < 113) return '#f2453d';               // cat 3
-        if (windKt < 137) return '#e93cb5';               // cat 4
-        return '#7c2d92';                                 // cat 5
+        if (windKt == null) return '#94a3b8';            // unknown intensity - neutral grey
+        if (windKt < 34) return '#5ebaff';               // tropical depression
+        if (windKt < 64) return '#00faf4';               // tropical storm
+        if (windKt < 83) return '#ffffcc';               // cat 1
+        if (windKt < 96) return '#ffe775';               // cat 2
+        if (windKt < 113) return '#ffc140';              // cat 3
+        if (windKt < 137) return '#ff8f20';              // cat 4
+        return '#ff6060';                                // cat 5
+    }
+
+    // Short label drawn inside each best-track marker (matches the buckets above).
+    function stormCatLabel(windKt) {
+        if (windKt == null) return '';
+        if (windKt < 34) return 'TD';
+        if (windKt < 64) return 'TS';
+        if (windKt < 83) return '1';
+        if (windKt < 96) return '2';
+        if (windKt < 113) return '3';
+        if (windKt < 137) return '4';
+        return '5';
     }
 
     // Nearest best-track fix to the current playback time (points are chronological, ~6h apart).

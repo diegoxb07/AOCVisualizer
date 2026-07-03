@@ -36,6 +36,9 @@
         const requestCacheCancel = () => {
             batchCacheCancel = true;
             if (batchCacheAbortController) batchCacheAbortController.abort();
+            // Instant feedback - the loop needs a beat to unwind the in-flight tile.
+            const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Stopping…';
+            const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Stopping…';
         };
         const pillCancel = document.getElementById('satPrefetchCancel');
         if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) requestCacheCancel(); });
@@ -135,9 +138,14 @@
         return [minX, minY, maxX, maxY];
     }
 
+    // Local copies first (data/ ships with the app, so the basemap works offline);
+    // fall back to the original remote sources if the local fetch fails (e.g. file://).
+    const fetchGeo = (localPath, remoteUrl) =>
+        fetch(localPath).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .catch(() => fetch(remoteUrl).then(r => r.json()));
     Promise.all([
-        fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson').then(r => r.json()),
-        fetch('https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json').then(r => r.json())
+        fetchGeo('data/ne_50m_admin_0_countries.geojson', 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson'),
+        fetchGeo('data/us-states.json', 'https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json')
     ]).then(([world, us]) => {
         if (world && world.features) {
             world.features.forEach(f => {
@@ -564,3 +572,29 @@
 
     document.getElementById('recordStopBtn').addEventListener('click', finishRecording);
 
+
+    /* ---- Remembered display preferences ----
+       View settings only (no flight data) - restored on open, saved on every change.
+       Restoring dispatches 'change' so each control's normal handler runs; all of them
+       no-op safely when no flight is loaded yet. */
+    (function persistDisplayPrefs() {
+        const PREF_IDS = ['toggleImperial', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect'];
+        const KEY = 'aocVizPrefs';
+        try {
+            const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+            PREF_IDS.forEach(id => {
+                const el = document.getElementById(id); if (!el || !(id in saved)) return;
+                if (el.type === 'checkbox') {
+                    if (el.checked !== !!saved[id]) { el.checked = !!saved[id]; el.dispatchEvent(new Event('change')); }
+                } else if (el.value !== saved[id] && [...el.options].some(o => o.value === saved[id])) {
+                    el.value = saved[id]; el.dispatchEvent(new Event('change'));
+                }
+            });
+            const save = () => {
+                const out = {};
+                PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) out[id] = el.type === 'checkbox' ? el.checked : el.value; });
+                localStorage.setItem(KEY, JSON.stringify(out));
+            };
+            PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', save); });
+        } catch (e) { /* localStorage unavailable (private mode) - defaults stand */ }
+    })();

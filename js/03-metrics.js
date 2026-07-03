@@ -47,6 +47,7 @@
     let speeds = [1, 2, 4, 8, 16, 32, 64, 128]; 
     let currentSpeedIdx = 0;
     let plotMinLon, plotMaxLon, plotMinLat, plotMaxLat, deltaLon, deltaLat;
+    let lonDomainCenter = 0;   // 0 for normal flights; the flight's circular-mean lon for dateline crossers (see wrapLon)
 
     let isMeasuring = false, measureShape = 'polygon', measurePointsGeo = [], drawnShapes = [], liveMouseGeo = null;
     let baseHudHeight = 0;

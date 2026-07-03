@@ -8,7 +8,7 @@ module.exports = {
   // miss can never drop one from the compiled CSS.
   safelist: [
     'hidden', 'flex', 'block', 'grayscale', 'grayscale-0', 'saturate-0',
-    'opacity-50', 'opacity-60', 'opacity-70', 'pointer-events-none', 'cursor-not-allowed',
+    'opacity-40', 'opacity-50', 'opacity-60', 'opacity-70', 'pointer-events-none', 'cursor-not-allowed',
     'text-emerald-400', 'text-slate-500', 'text-slate-300', 'text-blue-100',
     'font-semibold', 'font-medium', 'border-2', 'border-blue-400', 'border-blue-500',
     'bg-slate-700', 'bg-slate-800', 'bg-blue-950/65', 'bg-blue-600', 'bg-blue-800',

@@ -12,8 +12,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written - regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260703d">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260703d">
+    <link rel="stylesheet" href="css/fonts.css?v=20260703l">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260703l">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -21,7 +21,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260703d">
+    <link rel="stylesheet" href="css/app.css?v=20260703l">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -31,7 +31,7 @@
     <p id="loadingOverlaySubtext" class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling variables...</p>
 </div>
 
-<button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-slate-800 text-slate-300 text-xs font-medium rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
+<button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded border border-blue-500 hover:bg-blue-500 transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
 
 <section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4" id="mainContainer">
     <header class="relative mb-4">
@@ -55,13 +55,13 @@
                     <div id="loadFlightDataGroup" class="relative flex items-center gap-2 mb-2 min-h-[28px]">
                         <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">
                             <span id="loadFlightDataLabel" class="text-emerald-400">Load Flight-Level Data</span>
-                            <span id="detectedRangeText" class="lowercase text-blue-400 font-bold ml-1 tracking-normal"></span>
                         </label>
                         <div id="dataDropZone" title="Manual upload (.txt or .nc)" class="relative flex items-center gap-1 shrink-0 bg-slate-800 border border-dashed border-slate-600 rounded px-2 py-1 hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
                             <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             <span class="text-[10px] text-slate-400 normal-case group-hover:text-blue-300 transition-colors whitespace-nowrap">or upload:</span>
                             <span id="dataDropLabel" class="text-[10px] text-slate-300 font-medium normal-case group-hover:text-blue-300 transition-colors truncate max-w-[70px]">Choose File</span>
                         </div>
+                        <button id="resetAppBtn" title="Clear the loaded flight, video, and overlays and start fresh" class="ml-auto shrink-0 px-2 py-1 bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white rounded text-[10px] font-semibold normal-case transition-colors whitespace-nowrap">↺ Reset</button>
                     </div>
 
                     <div id="archiveLoadBlock" class="relative">
@@ -78,7 +78,7 @@
                         </div>
                         <div class="relative flex items-center gap-2 mt-2">
                             <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-emerald-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-emerald-300">⤓ Load Flight + Storm Track</button>
-                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail - richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">⬇ .nc</a>
+                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail which is richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">⬇ .nc</a>
                         </div>
                         <span id="reconArchiveStatus" class="block text-[10px] text-slate-500 leading-tight mt-1"></span>
                         <!-- Covers the archive controls while the API is down. -->
@@ -135,10 +135,10 @@
                     </div>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
+                    <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
                     <div class="status-chip"><span class="chip-k">Flight ID</span><span class="chip-v" id="hdrFlightId">-</span></div>
                     <div class="status-chip"><span class="chip-k">Aircraft</span><span class="chip-v" id="hdrAircraft">-</span></div>
                     <div class="status-chip"><span class="chip-k">Flight Date</span><span class="chip-v" id="hdrDate">-</span></div>
-                    <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
                 </div>
             </div>
         </div>
@@ -235,7 +235,7 @@
                 </div>
 
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
-                    <div class="flex justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
+                    <div id="videoHeader" class="flex justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
                         <span class="pt-1">MMR Media Display</span>
                         <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
                     </div>
@@ -512,26 +512,26 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/01-state.js?v=20260703d"></script>
-    <script src="js/02-satellite.js?v=20260703d"></script>
-    <script src="js/03-metrics.js?v=20260703d"></script>
-    <script src="js/04-geo-measure.js?v=20260703d"></script>
-    <script src="js/05-interpolation.js?v=20260703d"></script>
-    <script src="js/06-ocr.js?v=20260703d"></script>
-    <script src="js/07-ui-controls.js?v=20260703d"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260703d"></script>
-    <script src="js/09-interaction.js?v=20260703d"></script>
-    <script src="js/10-point-analysis.js?v=20260703d"></script>
-    <script src="js/11-layout.js?v=20260703d"></script>
-    <script src="js/12-file-parsing.js?v=20260703d"></script>
-    <script src="js/12b-recon-archive.js?v=20260703d"></script>
-    <script src="js/13-charts-master.js?v=20260703d"></script>
-    <script src="js/14-filters-sync.js?v=20260703d"></script>
-    <script src="js/15-map-render.js?v=20260703d"></script>
-    <script src="js/16-pfd-hud.js?v=20260703d"></script>
-    <script src="js/17-charts.js?v=20260703d"></script>
-    <script src="js/18-engine.js?v=20260703d"></script>
-    <script src="js/19-bootstrap.js?v=20260703d"></script>
-    <script src="js/20-ui-polish.js?v=20260703d"></script>
+    <script src="js/01-state.js?v=20260703l"></script>
+    <script src="js/02-satellite.js?v=20260703l"></script>
+    <script src="js/03-metrics.js?v=20260703l"></script>
+    <script src="js/04-geo-measure.js?v=20260703l"></script>
+    <script src="js/05-interpolation.js?v=20260703l"></script>
+    <script src="js/06-ocr.js?v=20260703l"></script>
+    <script src="js/07-ui-controls.js?v=20260703l"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260703l"></script>
+    <script src="js/09-interaction.js?v=20260703l"></script>
+    <script src="js/10-point-analysis.js?v=20260703l"></script>
+    <script src="js/11-layout.js?v=20260703l"></script>
+    <script src="js/12-file-parsing.js?v=20260703l"></script>
+    <script src="js/12b-recon-archive.js?v=20260703l"></script>
+    <script src="js/13-charts-master.js?v=20260703l"></script>
+    <script src="js/14-filters-sync.js?v=20260703l"></script>
+    <script src="js/15-map-render.js?v=20260703l"></script>
+    <script src="js/16-pfd-hud.js?v=20260703l"></script>
+    <script src="js/17-charts.js?v=20260703l"></script>
+    <script src="js/18-engine.js?v=20260703l"></script>
+    <script src="js/19-bootstrap.js?v=20260703l"></script>
+    <script src="js/20-ui-polish.js?v=20260703l"></script>
 </body>
 </html>

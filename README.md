@@ -72,7 +72,7 @@ flowchart TD
 
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran.
+**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it.
 
 **Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) or a tab-separated AOC **`.txt`** log on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
 
@@ -97,6 +97,8 @@ All playback lives in the sticky bottom bar:
 | **Timeline slider** | Scrub anywhere; the UTC readout updates live. |
 | **8Hz Smoothing** (map header) | Catmull-Rom interpolation between the native 1-second samples for fluid motion instead of stepping. Recommended for training. |
 
+Keyboard: **Space** = play/pause, **← / →** = scrub (hold to accelerate), **Shift + ← / →** = jump 10 flight-minutes. Display preferences (units, tracker mode, track/barb colors, PFD, smoothing) are remembered between sessions.
+
 If an MMR video is loaded, the **video clock drives playback** and the telemetry follows it; otherwise the engine advances on its own clock.
 
 ---
@@ -109,6 +111,8 @@ Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header
 - **3D**: Three.js scene with terrain, a plane model, and the track drawn by altitude. Orbit/zoom with the mouse.
 
 Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
+
+> **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, stepping through the Saffir-Simpson categories from there. A fully black track just means the aircraft never sampled hurricane-force winds.
 
 **Measure & mark:** **📏 Measure** (map header) draws polygon/circle/rectangle for distance & area; **📌 Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to open **Point Data Analysis** and **📥 download** its full report.
 
@@ -130,6 +134,16 @@ Pick a layer from the **Sat:** dropdown in the map header (options auto-populate
 - **MODIS / VIIRS (polar, NASA GIBS)**: any date back to each mission's start. Keyed to a calendar day; a **day-stepper** moves between days and overpass times are looked up automatically.
 - **GOES-East / GOES-West (archive, needs API)**: rendered server-side from NOAA's S3 archive for the flight's **historical** date. Pick a **product** from the `Choose a product…` picker (spectral bands like Clean IR / Water Vapor, or composites like Sandwich / GeoColor). **Nothing fetches until you pick**, then the tool **pre-caches the whole flight** so scrubbing never waits (progress bar + Cancel). Imagery advances every **10 flight-minutes**; step it with **⏪ 10m / 10m ⏩**. A GOES option greys out when the flight is outside that satellite's view of Earth.
 - **⤓ Locally Cache Satellites** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
+
+Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):
+
+- **Band 3**: Veggie (Vegetation/NIR, 0.86 µm), daytime land and low-cloud contrast
+- **Band 5**: Near-IR (Snow/Ice, 1.6 µm), separates ice cloud from water cloud
+- **Band 7**: Shortwave IR ("Fire Temperature", 3.9 µm), low cloud and fog at night
+- **Band 9**: Mid-Level Water Vapor (6.9 µm), moisture, dry slots, shear
+- **Band 13**: Clean IR Window (10.3 µm), cloud-top temperature day or night; also offered as **IR Enhanced (ir4)** and **BD Curve (Dvorak)** variants
+- **Sandwich** (composite): Band 13 IR color over visible texture, best for daytime convection
+- **GeoColor** (composite): true color by day, IR by night
 
 ---
 
@@ -179,6 +193,6 @@ Filters (bottom bar): **Cockpit PFD** (attitude indicator overlay), **Imperial U
 
 ## Running & deploying
 
-- **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries load from CDNs (Tailwind, Chart.js, Three.js, netcdfjs, Tesseract.js).
+- **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries, fonts, and basemap data ship inside the repo, so the tool loads and replays manual uploads **with no internet at all** (only the archive/satellite APIs and the OCR engine's runtime download need a connection).
 - **Deployment:** GitHub Pages via [.github/workflows/static.yml](.github/workflows/static.yml)
 - **No test suite.** Verify changes by opening the page and exercising the upload → play flow.

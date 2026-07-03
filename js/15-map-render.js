@@ -80,8 +80,10 @@
     function getBarbColor(spd) { const [r, g, b] = getBarbColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
 
     function getBarbSpacingPx() {
+        // Screen-px gap between barbs along the track. The zoomed-out cap sets density at
+        // low zoom (was 30 - too sparse); zoomed in this converges to the same 8px floor.
         const zoom = Math.max(mapScale, 0.35);
-        return Math.min(30, Math.max(8, 30 / zoom));
+        return Math.min(16, Math.max(8, 30 / zoom));
     }
 
     function getBarbScale() {
@@ -101,11 +103,32 @@
             ctx.beginPath(); ctx.strokeStyle = stormWindColor(b.windKt); ctx.moveTo(getX(a.lon), getY(a.lat)); ctx.lineTo(getX(b.lon), getY(b.lat)); ctx.stroke();
         }
         ctx.setLineDash([]); ctx.globalAlpha = 1.0;
+        // Each fix is a small tropical-cyclone map symbol: category-colored disc with the
+        // category written inside (TD/TS/1-5), spiral arms from TS strength up, drawn
+        // slightly translucent so the basemap/satellite stays readable underneath.
         stormTrackPoints.forEach((p, i) => {
             const hovered = i === hoveredStormIdx;
+            const col = stormWindColor(p.windKt), lbl = stormCatLabel(p.windKt);
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            ctx.beginPath(); ctx.arc(0, 0, hovered ? 7 : 4.5, 0, 2 * Math.PI); ctx.fillStyle = stormWindColor(p.windKt); ctx.fill();
-            ctx.strokeStyle = hovered ? '#ffffff' : '#000000'; ctx.lineWidth = hovered ? 2 : 1; ctx.stroke(); ctx.restore();
+            ctx.globalAlpha = hovered ? 1.0 : 0.82;
+            if (!lbl) {   // unknown intensity: keep a plain small fix marker
+                ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
+                ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+                ctx.restore(); return;
+            }
+            const r = hovered ? 8 : 6;
+            if (p.windKt >= 34) {
+                ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
+            }
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
+            ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
+            ctx.fillStyle = '#111827';
+            ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(lbl, 0, 0.5);
+            ctx.restore();
         });
         ctx.restore();
     }
@@ -235,7 +258,7 @@
                 ctx.save(); ctx.rotate((t_track - 90) * Math.PI/180); 
                 ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25 * zoomFactor, 0); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2 * zoomFactor; ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(32 * zoomFactor, 0); ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); ctx.lineTo(24 * zoomFactor, 3 * zoomFactor); ctx.closePath(); ctx.fillStyle = '#38bdf8'; ctx.fill(); ctx.restore();
-                ctx.save(); ctx.rotate((t_th - 90) * Math.PI/180); ctx.scale(planeScale, planeScale); drawP3Orion(ctx); ctx.restore();
+                ctx.save(); ctx.rotate((t_th - 90) * Math.PI/180); ctx.scale(planeScale, planeScale); (isGulfstreamFlight() ? drawGulfstreamIV : drawP3Orion)(ctx); ctx.restore();
             }
             ctx.restore(); 
 

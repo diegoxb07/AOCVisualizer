@@ -2,8 +2,26 @@
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
+    // Shift a longitude into the flight-centered window [lonDomainCenter-180, lonDomainCenter+180)
+    // so a dateline-crossing flight (e.g. Hawaii -> Asia) projects continuously instead of
+    // snapping across the whole map. Identity (lonDomainCenter 0) for normal flights.
+    function wrapLon(lon) {
+        if (!lonDomainCenter) return lon;
+        return ((lon - lonDomainCenter) % 360 + 540) % 360 - 180 + lonDomainCenter;
+    }
+
     function calculateMapScales() {
-        const lons = filteredData.map(d => d.lon); const lats = filteredData.map(d => d.lat);
+        const rawLons = filteredData.map(d => d.lon); const lats = filteredData.map(d => d.lat);
+        // A dateline crosser reads as a ~360-degree raw span "the wrong way round". Re-center
+        // the longitude domain on the flight's circular-mean longitude so bounds, zoom, and
+        // every layer projected through getX stay continuous.
+        lonDomainCenter = 0;
+        if (rawLons.length && Math.max(...rawLons) - Math.min(...rawLons) > 180) {
+            let sx = 0, sy = 0;
+            rawLons.forEach(l => { const r = l * Math.PI / 180; sx += Math.cos(r); sy += Math.sin(r); });
+            lonDomainCenter = Math.atan2(sy, sx) * 180 / Math.PI;
+        }
+        const lons = rawLons.map(wrapLon);
         const minLon = Math.min(...lons), maxLon = Math.max(...lons), minLat = Math.min(...lats), maxLat = Math.max(...lats);
         const centerLon = (minLon + maxLon)/2; const centerLat = (minLat + maxLat)/2;
         deltaLon = (maxLon - minLon)*1.6 || 0.2; deltaLat = (maxLat - minLat)*1.6 || 0.2; 
@@ -13,7 +31,7 @@
     }
 
     // Projection works in LOGICAL css pixels; the renderers apply the DPR base transform.
-    function getX(lon) { return ((lon - plotMinLon) / deltaLon) * cssW; }
+    function getX(lon) { return ((wrapLon(lon) - plotMinLon) / deltaLon) * cssW; }
     function getY(lat) { return cssH - ((lat - plotMinLat) / deltaLat) * cssH; }
 
     // Geographic bounds currently visible (depends on pan/zoom). Used to draw the WHOLE world map
@@ -28,11 +46,11 @@
         return { minLon: lonAt(Math.min(x0, x1)), maxLon: lonAt(Math.max(x0, x1)),
                  minLat: latAt(Math.max(y0, y1)), maxLat: latAt(Math.min(y0, y1)) };
     }
-    function isBoxInView(bbox) {
+    function isBoxInView(bbox, lonShift = 0) {
         if (!bbox) return true;
         const v = getVisibleGeoBounds(); if (!v) return true;
         const m = 3;
-        return !(bbox[0] > v.maxLon + m || bbox[2] < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
+        return !(bbox[0] + lonShift > v.maxLon + m || bbox[2] + lonShift < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
     }
 
     function getHurricaneColorRGB(spd) {
@@ -175,19 +193,27 @@
             bgCtx.globalAlpha = 1.0;
         }
         if (mapFeatures.length > 0) {
-            bgCtx.fillStyle = isSatOn ? 'rgba(21,128,61,0.25)' : '#15803d'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale; 
-            mapFeatures.forEach(feature => {
-                if (!isBoxInView(feature.properties.bbox)) return;   // draw the whole world, cull only off-screen
-                const geom = feature.geometry; if (!geom) return;
-                const isState = feature.properties && feature.properties.isState === true;
-                if (geom.type === 'Polygon') {
-                    bgCtx.beginPath(); geom.coordinates.forEach(ring => { ring.forEach((coord, i) => { const x = getX(coord[0]); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); }); 
-                    if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke();
-                } else if (geom.type === 'MultiPolygon') {
-                    geom.coordinates.forEach(poly => { bgCtx.beginPath(); poly.forEach(ring => { ring.forEach((coord, i) => { const x = getX(coord[0]); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); }); 
-                    if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke(); });
-                }
-            });
+            bgCtx.fillStyle = isSatOn ? 'rgba(21,128,61,0.25)' : '#15803d'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale;
+            // Draw the whole world, cull only off-screen - and repeat it once shifted ±360 so a
+            // dateline-centered view (or panning past ±180 zoomed out) shows continuous land
+            // instead of an empty seam. One copy each way is plenty: even at min zoom the
+            // viewport can't span three worlds. The copies are placed explicitly, so this pass
+            // projects with the RAW (unwrapped) x - wrapping would cancel the shift.
+            const getXShift = (lon, shift) => (((lon + shift) - plotMinLon) / deltaLon) * cssW;
+            for (const shift of [0, -360, 360]) {
+                mapFeatures.forEach(feature => {
+                    if (!isBoxInView(feature.properties.bbox, shift)) return;
+                    const geom = feature.geometry; if (!geom) return;
+                    const isState = feature.properties && feature.properties.isState === true;
+                    if (geom.type === 'Polygon') {
+                        bgCtx.beginPath(); geom.coordinates.forEach(ring => { ring.forEach((coord, i) => { const x = getXShift(coord[0], shift); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); });
+                        if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke();
+                    } else if (geom.type === 'MultiPolygon') {
+                        geom.coordinates.forEach(poly => { bgCtx.beginPath(); poly.forEach(ring => { ring.forEach((coord, i) => { const x = getXShift(coord[0], shift); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); });
+                        if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke(); });
+                    }
+                });
+            }
         }
         bgCtx.restore(); bgNeedsUpdate = false;
     }

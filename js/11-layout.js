@@ -45,15 +45,26 @@
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');
         if (!handle || !bar) return;
         const MIN_H = 44, MAX_H = 900;  // stops at just enough height to keep the panel titles visible, not fully gone
+        // The hard ceiling: the panels must never grow under the sticky bottom bar, or the
+        // drag handle ends up unreachable and the layout is stuck big with no way to shrink.
+        // 60px ≈ media-bar padding + the handle itself + a small breathing gap above the bar.
+        const maxMediaH = () => {
+            const bb = document.getElementById('stickyBottomBar');
+            const bbH = bb ? bb.getBoundingClientRect().height : 90;
+            return Math.max(MIN_H, Math.min(MAX_H, window.innerHeight - bbH - 60));
+        };
         let dragging = false, startY = 0, startH = 0, rafPending = false;
         const pointerY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        const applyMediaH = (h) => {
+            document.documentElement.style.setProperty('--media-h', h + 'px');
+            document.documentElement.style.setProperty('--hud-scale', Math.max(0.55, Math.min(1, h / 480)).toFixed(3));
+        };
 
         function onDown(e) { dragging = true; isResizingMedia = true; startY = pointerY(e); startH = document.getElementById('mapPanel').getBoundingClientRect().height; bar.classList.add('resizing'); e.preventDefault(); }
         function onMove(e) {
             if (!dragging) return;
-            const h = Math.max(MIN_H, Math.min(MAX_H, startH + (pointerY(e) - startY)));
-            document.documentElement.style.setProperty('--media-h', h + 'px');
-            document.documentElement.style.setProperty('--hud-scale', Math.max(0.55, Math.min(1, h / 480)).toFixed(3));
+            const h = Math.max(MIN_H, Math.min(maxMediaH(), startH + (pointerY(e) - startY)));
+            applyMediaH(h);
             if (!rafPending) {
                 rafPending = true;
                 requestAnimationFrame(() => {
@@ -66,6 +77,22 @@
         function onUp() { if (!dragging) return; dragging = false; isResizingMedia = false; bar.classList.remove('resizing'); resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }
         handle.addEventListener('mousedown', onDown); handle.addEventListener('touchstart', onDown, { passive: false });
         window.addEventListener('mousemove', onMove); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('mouseup', onUp); window.addEventListener('touchend', onUp);
+
+        // Re-clamp if the window shrinks around an already-tall layout (and once at startup,
+        // for short screens where even the default height would bury the handle). Pinned
+        // (.fake-fs) panels are viewport-sized by design and skip this.
+        function clampMediaToViewport() {
+            const mapPanelEl = document.getElementById('mapPanel'), videoPanelEl = document.getElementById('videoPanel');
+            if (mapPanelEl.classList.contains('fake-fs') || (videoPanelEl && videoPanelEl.classList.contains('fake-fs'))) return;
+            const mx = maxMediaH();
+            if (mapPanelEl.getBoundingClientRect().height > mx + 1) {
+                applyMediaH(mx);
+                resizeCanvasLayout();
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+            }
+        }
+        window.addEventListener('resize', clampMediaToViewport);
+        clampMediaToViewport();
     })();
 
     function timeToSeconds(timeStr) {

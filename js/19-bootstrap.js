@@ -75,6 +75,14 @@
     document.getElementById('skipBack10Btn').addEventListener('click', () => skipFlightMinutes(-10));
     document.getElementById('skipFwd10Btn').addEventListener('click', () => skipFlightMinutes(10));
 
+    // Reset = a clean reload. Strip the shareable ?mission= param first; the reload-type
+    // guard in js/12b-recon-archive.js is the backstop that keeps a reload from re-loading
+    // the mission anyway. Display prefs (localStorage) persist by design.
+    document.getElementById('resetAppBtn').addEventListener('click', () => {
+        try { const u = new URL(window.location.href); u.searchParams.delete('mission'); history.replaceState(null, '', u); } catch (e) {}
+        location.reload();
+    });
+
     playPauseBtn.addEventListener('click', function() {
         if (filteredData.length === 0) return;
         if (isPlaying) { 

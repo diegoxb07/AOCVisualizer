@@ -167,7 +167,11 @@
             if (dt <= 0) continue;
             if (dt > 3600) { cleaned = []; current.computedVsi = 0; cleaned.push(current); continue; }
 
-            let latSpeed = Math.abs(current.lat - prev.lat) / dt; let lonSpeed = Math.abs(current.lon - prev.lon) / dt;
+            // Longitude delta the short way round: a dateline crossing (-179.99 -> +179.99)
+            // is a 0.02deg step, not a 360deg teleport - without this the glitch filter below
+            // silently drops the entire post-crossing half of a Pacific flight.
+            let dLonWrap = Math.abs(current.lon - prev.lon); if (dLonWrap > 180) dLonWrap = 360 - dLonWrap;
+            let latSpeed = Math.abs(current.lat - prev.lat) / dt; let lonSpeed = dLonWrap / dt;
             if (latSpeed < 0.00001 && lonSpeed < 0.00001 && current.gpsAlt !== null && current.gpsAlt < 500) continue;
             if (latSpeed > 0.02 || lonSpeed > 0.02) continue;
 
@@ -260,7 +264,11 @@
             if (dt <= 0) continue; 
             if (dt > 3600) { allParsedData = []; current.computedVsi = 0; allParsedData.push(current); continue; }
 
-            let latSpeed = Math.abs(current.lat - prev.lat) / dt; let lonSpeed = Math.abs(current.lon - prev.lon) / dt;
+            // Longitude delta the short way round: a dateline crossing (-179.99 -> +179.99)
+            // is a 0.02deg step, not a 360deg teleport - without this the glitch filter below
+            // silently drops the entire post-crossing half of a Pacific flight.
+            let dLonWrap = Math.abs(current.lon - prev.lon); if (dLonWrap > 180) dLonWrap = 360 - dLonWrap;
+            let latSpeed = Math.abs(current.lat - prev.lat) / dt; let lonSpeed = dLonWrap / dt;
             if (latSpeed < 0.00001 && lonSpeed < 0.00001 && current.gpsAlt !== null && current.gpsAlt < 500) continue;
             if (latSpeed > 0.02 || lonSpeed > 0.02) continue;
 
@@ -276,7 +284,8 @@
         availableMetrics.clear();
         allParsedData.forEach(row => { Object.keys(METRIC_DEFS).forEach(k => { if (row[k] !== null && row[k] !== undefined && !isNaN(row[k])) availableMetrics.add(k); }); });
 
-        document.getElementById('detectedRangeText').innerText = `[ Detected: ${allParsedData[0].time.slice(0,2)}:${allParsedData[0].time.slice(2,4)} UTC → ${allParsedData[allParsedData.length-1].time.slice(0,2)}:${allParsedData[allParsedData.length-1].time.slice(2,4)} UTC ]`;
+        // (The detected range shows only in the "Flight Data Detected" status chip - a
+        // "[ Detected: … ]" span next to the load label was removed as redundant.)
         updateMissionHeader();
         
         ['startTimeInput', 'endTimeInput', 'runBtn', 'exportKmlBtn', 'exportClipBtn'].forEach(id => document.getElementById(id).disabled = false);

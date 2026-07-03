@@ -167,8 +167,10 @@
 
     function get3DCoord(lon, lat, altMeters) {
         if (isNaN(lon) || isNaN(lat)) return new THREE.Vector3(0,0,0);
-        const centerLon = (plotMinLon + plotMaxLon) / 2 || 0, centerLat = (plotMinLat + plotMaxLat) / 2 || 0, scaleMult = 20; 
-        const x = (lon - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 250; return new THREE.Vector3(x, y, z);
+        const centerLon = (plotMinLon + plotMaxLon) / 2 || 0, centerLat = (plotMinLat + plotMaxLat) / 2 || 0, scaleMult = 20;
+        // wrapLon (js/15-map-render.js) keeps dateline-crossing flights continuous here too;
+        // safe because build3DScene only renders flight-adjacent features (never the far seam).
+        const x = (wrapLon(lon) - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 250; return new THREE.Vector3(x, y, z);
     }
 
     function sync3DMarkers() {
@@ -188,8 +190,10 @@
     function isBoxInFlightBounds(bbox) {
         if (!bbox) return true;
         const expandDeg = 15, viewMinLon = plotMinLon - expandDeg, viewMaxLon = plotMaxLon + expandDeg, viewMinLat = plotMinLat - expandDeg, viewMaxLat = plotMaxLat + expandDeg;
-        const fMinLon = bbox[0], fMinLat = bbox[1], fMaxLon = bbox[2], fMaxLat = bbox[3];
-        return !(fMinLon > viewMaxLon || fMaxLon < viewMinLon || fMinLat > viewMaxLat || fMaxLat < viewMinLat);
+        if (bbox[1] > viewMaxLat || bbox[3] < viewMinLat) return false;
+        // Also test the bbox shifted ±360: a dateline-centered flight's plot window sits outside
+        // [-180,180], where every raw feature bbox would otherwise miss it.
+        return [0, -360, 360].some(s => !(bbox[0] + s > viewMaxLon || bbox[2] + s < viewMinLon));
     }
 
     function build3DScene() {
@@ -253,20 +257,39 @@
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
     }
 
-    // Toggle off only when this exact element is already fullscreen; if a DIFFERENT element is
-    // fullscreen, requesting fullscreen on the new one switches directly (no exit-then-re-enter click).
-    const triggerFullscreen = (element) => { if (document.fullscreenElement === element) document.exitFullscreen(); else element.requestFullscreen().catch(err => { }); };
-    fullscreenBtn.addEventListener('click', () => triggerFullscreen(document.documentElement));
-    fullscreenMapBtn.addEventListener('click', () => triggerFullscreen(mapPanel));
-    fullscreenVideoBtn.addEventListener('click', () => triggerFullscreen(videoPanel));
+    // Real fullscreen is page-level ONLY. The panel ⛶ buttons "fake" fullscreen instead:
+    // pin the panel over the whole viewport (.fake-fs, styled by the same CSS as :fullscreen
+    // via :is()) and take the page fullscreen too if it isn't already. Switching panel <->
+    // page view is then a single click - nested element fullscreen forced an exit-then-
+    // re-enter (and needed the sticky bottom bar re-parented into the panel; the fixed
+    // z-2000 bar now just stays above the z-1500 fake panel).
+    const refreshAfterViewChange = () => setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
+    const setFakePanel = (panel) => {
+        mapPanel.classList.toggle('fake-fs', panel === mapPanel);
+        videoPanel.classList.toggle('fake-fs', panel === videoPanel);
+        // The main top-right button (z-9999, fixed) sits exactly on the pinned panel's own ⛶
+        // and would steal its clicks (real element-fullscreen used to hide it via the top
+        // layer) - hide it while a panel is pinned; Esc still exits real fullscreen.
+        fullscreenBtn.style.display = panel ? 'none' : '';
+        refreshAfterViewChange();
+    };
+    fullscreenBtn.addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(err => { });
+    });
+    const togglePanelFullscreen = (panel) => {
+        if (panel.classList.contains('fake-fs')) { setFakePanel(null); return; }
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => { });
+        setFakePanel(panel);
+    };
+    fullscreenMapBtn.addEventListener('click', () => togglePanelFullscreen(mapPanel));
+    fullscreenVideoBtn.addEventListener('click', () => togglePanelFullscreen(videoPanel));
 
     document.addEventListener('fullscreenchange', () => {
-        const text = !document.fullscreenElement ? "⛶ Fullscreen" : "⛶ Exit Fullscreen";
-        fullscreenBtn.innerText = text; fullscreenMapBtn.innerText = "⛶"; fullscreenVideoBtn.innerText = "⛶";
-        const recEl = document.getElementById('recordProgress');
-        if (document.fullscreenElement === mapPanel || document.fullscreenElement === videoPanel) { document.fullscreenElement.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'absolute'; if (recEl) document.fullscreenElement.appendChild(recEl); }
-        else { document.body.appendChild(stickyBottomBar); stickyBottomBar.style.position = 'fixed'; if (recEl) document.body.appendChild(recEl); }
-        setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
+        fullscreenBtn.innerText = !document.fullscreenElement ? "⛶ Fullscreen" : "⛶ Exit Fullscreen";
+        // Leaving real fullscreen (Esc or the main button) unpins any fake-fullscreened panel too.
+        if (!document.fullscreenElement) setFakePanel(null);
+        else refreshAfterViewChange();
     });
 
     trackerModeSelect.addEventListener('change', (e) => {

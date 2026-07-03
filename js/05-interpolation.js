@@ -51,7 +51,14 @@
 
         return {
             ...d1,
-            lat: cubic(d0.lat, d1.lat, d2.lat, d3.lat, t), lon: cubic(d0.lon, d1.lon, d2.lon, d3.lon, t),
+            lat: cubic(d0.lat, d1.lat, d2.lat, d3.lat, t),
+            // Longitude gets the same short-way unwrap as headings: a dateline crossing must
+            // interpolate -179.99 -> +179.99 as a 0.02deg step, not a sweep around the globe.
+            lon: (() => {
+                const l0 = unwrap(d0.lon, d1.lon), l2 = unwrap(d2.lon, d1.lon), l3 = unwrap(d3.lon, l2);
+                const res = cubic(l0, d1.lon, l2, l3, t);
+                return res === null ? null : ((res % 360) + 540) % 360 - 180;
+            })(),
             pitch: p_val !== null ? p_val + pitch_jitter : null, roll: r_val !== null ? r_val + roll_jitter : null,
             th: cubicAngle(d0.th, d1.th, d2.th, d3.th, t), gTrack: cubicAngle(d0.gTrack, d1.gTrack, d2.gTrack, d3.gTrack, t),
             pAlt: pa_val !== null ? pa_val + alt_jitter : null, gpsAlt: ga_val !== null ? ga_val + alt_jitter : null, radAlt: ra_val !== null ? ra_val + alt_jitter : null

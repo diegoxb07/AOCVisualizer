@@ -254,6 +254,16 @@
             sel.classList.toggle('saturate-0', apiDown);
             sel.classList.toggle('opacity-60', apiDown);
         });
+        // Grey out the ⬇ .nc source link with the rest of the archive block. The offline
+        // overlay covering the block is pointer-events-none, so without this the dimmed
+        // link would still take clicks through it.
+        const srcLink = document.getElementById('reconSourceLink');
+        if (srcLink) {
+            srcLink.classList.toggle('grayscale', apiDown);
+            srcLink.classList.toggle('saturate-0', apiDown);
+            srcLink.classList.toggle('opacity-40', apiDown);
+            srcLink.classList.toggle('pointer-events-none', apiDown);
+        }
         if (uploadZone) {
             uploadZone.classList.toggle('border-blue-400', apiDown);
             uploadZone.classList.toggle('border-2', apiDown);
@@ -529,6 +539,7 @@
                         const opt = document.createElement('option');
                         opt.value = b.id;
                         opt.textContent = b.name;
+                        opt.title = b.name;   // full name on hover - the closed select ellipsizes long ones (CSS max-width)
                         og.appendChild(opt);
                     });
                     bandSelect.appendChild(og);
@@ -540,6 +551,7 @@
                     const opt = document.createElement('option');
                     opt.value = b.id;
                     opt.textContent = b.name;
+                    opt.title = b.name;
                     bandSelect.appendChild(opt);
                 });
             }

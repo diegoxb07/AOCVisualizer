@@ -25,7 +25,7 @@ body {
 ::selection { background: rgba(56, 189, 248, 0.3); color: #fff; }
 :focus-visible { outline: 2px solid rgba(56, 189, 248, 0.55); outline-offset: 2px; }
 
-.font-mono, [class*="font-mono"], #timelineTimeDisplay, #detectedRangeText { font-family: 'Roboto Mono', ui-monospace, monospace !important; }
+.font-mono, [class*="font-mono"], #timelineTimeDisplay { font-family: 'Roboto Mono', ui-monospace, monospace !important; }
 .uppercase.tracking-wider { letter-spacing: 0.12em; }
 
 button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -45,24 +45,42 @@ select {
 select:not(:disabled):hover { border-color: #38516a; }
 select:not(:disabled):focus { border-color: rgba(56, 189, 248, 0.6); }
 
+/* Long product names ("Band 7 - Shortwave IR …") ellipsize while the picker is CLOSED so they
+   can't shove the fullscreen button and map controls off the header; the open dropdown list
+   still shows every option's full text (native select behavior), plus a hover tooltip. */
+#satBandSelect { max-width: 172px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
 /* Fullscreen behavior (functional - do not simplify) */
 :fullscreen { background-color: var(--ink); overflow-y: auto; padding: 24px; padding-bottom: 140px; }
-#mapPanel:fullscreen, #videoPanel:fullscreen { padding: 0; border: none; border-radius: 0; background-color: #10151d; display: flex; flex-direction: column; }
-#mapPanel:fullscreen { height: 100vh !important; }
-#mapPanel:fullscreen .panel-title, #videoPanel:fullscreen .panel-title { padding: 16px; background-color: rgba(16, 21, 29, 0.9); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid var(--line); }
-#mapPanel:fullscreen .media-container, #videoPanel:fullscreen .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
-#mapPanel:fullscreen .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
-#mapPanel:fullscreen #pfdOverlay { bottom: 170px; width: 250px; height: 250px; }
+#mapPanel:is(:fullscreen, .fake-fs), #videoPanel:is(:fullscreen, .fake-fs) { padding: 0; border: none; border-radius: 0; background-color: #10151d; display: flex; flex-direction: column; }
+#mapPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; }
+#mapPanel:is(:fullscreen, .fake-fs) .panel-title, #videoPanel:is(:fullscreen, .fake-fs) .panel-title { padding: 16px; background-color: rgba(16, 21, 29, 0.9); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid var(--line); }
+#mapPanel:is(:fullscreen, .fake-fs) .media-container, #videoPanel:is(:fullscreen, .fake-fs) .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
+#mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
+#mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: 170px; width: 250px; height: 250px; }
 /* In fullscreen the map is tall enough that the HUD (bottom-anchored, left) no longer collides
    with this stack, so put the storm card back on the left, under the satellite badge. */
-#mapPanel:fullscreen #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
+#mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
-#mapPanel:fullscreen #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its shadow gradient doesn't darken the buttons */
-#mapPanel:fullscreen #mapHeader { padding: 16px 16px 0 16px; }
-#mapPanel:fullscreen .map-controls { padding-right: 44px; }
-#mapPanel:fullscreen #fullscreenMapBtn { position: absolute; top: 14px; right: 16px; z-index: 200; }
-#videoPanel:fullscreen { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
+#mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its shadow gradient doesn't darken the buttons */
+#mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
+#mapPanel:is(:fullscreen, .fake-fs) .map-controls { padding-right: 50px; }
+#mapPanel:is(:fullscreen, .fake-fs) #fullscreenMapBtn { position: absolute; top: 16px; right: 22px; z-index: 200; }
+/* The MMR header is a plain flex row (no .panel-title class) - without this it sits flush
+   against the screen edge when the panel fills the screen, looking clipped. */
+#videoPanel:is(:fullscreen, .fake-fs) #videoHeader { padding: 14px 22px 0 22px; }
+#videoPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
+/* "Fake" panel fullscreen: the panel ⛶ buttons pin the panel over the viewport (page-level
+   fullscreen is the only real fullscreen), so panel <-> page switches never need an
+   exit-fullscreen step. z-index stays below the sticky bottom bar (2000) so the playback
+   controls remain usable on top. */
+#mapPanel.fake-fs, #videoPanel.fake-fs { position: fixed; inset: 0; width: 100vw; z-index: 1500; }
+/* Each panel is its own stacking context so one panel's overlays (#mapInfoStack z-2400, HUD,
+   PFD…) can't bleed over the OTHER panel while it's pinned at z-1500. The map panel sits higher
+   by default so its popups (measure group, day stepper) can still overflow onto the video panel. */
+#mapPanel { z-index: 1; }
+#videoPanel { z-index: 0; }
 
 /* Header */
 #mainContainer > header {
@@ -90,11 +108,15 @@ select:not(:disabled):focus { border-color: rgba(56, 189, 248, 0.6); }
 
 /* Mission status chips */
 .status-chip { display: flex; flex-direction: column; gap: 3px; background: #0d1219; border: 1px solid var(--line); border-left: 2px solid #2f3a47; border-radius: 6px; padding: 8px 12px; min-width: 0; transition: border-color 0.2s, background 0.2s; }
-.status-chip .chip-k { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #5d6773; }
-.status-chip .chip-v { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; color: #5d6773; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.status-chip .chip-k { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #94a3b8; }
+.status-chip .chip-v { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; color: #8b98a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .status-chip .chip-v.on { color: #e6edf3; }
 .status-chip.lit { border-left-color: var(--sig); background: #111a26; }
 .status-chip.lit .chip-v.on { color: var(--sig); }
+/* "Flight Data Detected" is the chip that matters most - give it its own (emerald) accent
+   so a loaded time range stands out from the cyan metadata chips. */
+.status-chip:has(#hdrRange).lit { border-left-color: #34d399; background: #0f2019; }
+.status-chip:has(#hdrRange) .chip-v.on { color: #34d399; }
 
 /* Hover feedback on the primary interactive zones */
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: rgba(56, 189, 248, 0.5); }
@@ -158,7 +180,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 #satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(11, 14, 19, 0.94); border: 1px solid rgba(56, 189, 248, 0.6); color: #bae6fd; padding: 7px 12px; border-radius: 10px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
 #satPrefetchBar.hidden { display: none; }
-#mapPanel:fullscreen #satPrefetchBar { z-index: 2002; }
+#mapPanel:is(:fullscreen, .fake-fs) #satPrefetchBar { z-index: 2002; }
 #satPrefetchLabel { white-space: nowrap; }
 #satPrefetchTrack { width: 180px; height: 8px; background: rgba(56, 189, 248, 0.15); border-radius: 999px; overflow: hidden; }
 #satPrefetchFill { width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #22d3ee); border-radius: 999px; transition: width 0.2s ease; }
@@ -218,7 +240,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 .cmd-group { display: flex; flex-direction: column; gap: 5px; }
 .cmd-group + .cmd-group { border-left: 1px solid #262e38; padding-left: 12px; }
-.cmd-group > .cmd-label { font-family: 'Roboto Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #5d6773; padding-left: 1px; }
+.cmd-group > .cmd-label { font-family: 'Roboto Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #94a3b8; padding-left: 1px; }
 .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
 #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }

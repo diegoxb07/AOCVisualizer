@@ -7,7 +7,15 @@
         if (ocrWorker) return;
         if (typeof Tesseract === 'undefined') { ocrAvailable = false; return; }
         try {
-            ocrWorker = await Tesseract.createWorker();
+            // Worker, wasm core, and eng language data are all vendored in lib/tesseract/ so
+            // Auto-Sync OCR works with no internet. Absolute URLs (resolved against the page)
+            // because the worker resolves relative corePath/langPath against ITS OWN location.
+            const base = new URL('lib/tesseract/', window.location.href).href;
+            ocrWorker = await Tesseract.createWorker({
+                workerPath: base + 'worker.min.js',
+                corePath: base.replace(/\/$/, ''),
+                langPath: base.replace(/\/$/, '')
+            });
             await ocrWorker.loadLanguage('eng'); await ocrWorker.initialize('eng');
             await ocrWorker.setParameters({ tessedit_char_whitelist: '0123456789:;.,|IloOZS ', tessjs_create_hocr: '0', tessjs_create_tsv: '0', tessjs_create_osd: '0' });
             ocrAvailable = true;

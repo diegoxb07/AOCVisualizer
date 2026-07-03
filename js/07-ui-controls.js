@@ -72,6 +72,26 @@
         let range = '';
         if (allParsedData && allParsedData.length) { const a = allParsedData[0].time, b = allParsedData[allParsedData.length-1].time; range = `${a.slice(0,2)}:${a.slice(2,4)} → ${b.slice(0,2)}:${b.slice(2,4)}Z`; }
         set('hdrRange', range);
+        const sub = document.getElementById('missionSubline');
+        if (sub) {
+            const rawId = (flightMetaData.id && flightMetaData.id !== 'Unknown') ? flightMetaData.id : '';
+            const idPart = rawId.replace(/\s*\([^)]*\)\s*$/, '');
+            // Storm name: archive metadata when available, else the "(NAME)" an archive
+            // load bakes into flightMetaData.id (reconArchiveMeta is set after parse).
+            let storm = (reconArchiveMeta && reconArchiveMeta.stormName) || (rawId.match(/\(([^)]+)\)/) || [])[1] || '';
+            if (/unknown|training/i.test(storm)) storm = '';
+            if (storm) storm = storm.charAt(0).toUpperCase() + storm.slice(1).toLowerCase();
+            // Aircraft designator from the tail number, NOAA name, or the mission-id letter (H/I/N).
+            const acId = ((flightMetaData.aircraft || '') + ' ' + rawId).toUpperCase();
+            let plane = '';
+            if (/N?42 ?RF|NOAA ?42|\d{8}H\d/.test(acId)) plane = 'NOAA42';
+            else if (/N?43 ?RF|NOAA ?43|\d{8}I\d/.test(acId)) plane = 'NOAA43';
+            else if (/N?49 ?RF|NOAA ?49|GULFSTREAM|\bG-?IV\b|\d{8}N\d/.test(acId)) plane = 'NOAA49';
+            const parts = [idPart, storm, plane].filter(Boolean);
+            sub.textContent = parts.join(' · ');
+            sub.classList.toggle('hidden', parts.length === 0);
+            document.title = (idPart ? idPart + ' · ' : '') + 'AOC Mission Visualizer';
+        }
     }
     
     function getConvertedVal(val, key, isImperial) {
@@ -96,6 +116,36 @@
         const drawProps = (cx, cy) => { c.beginPath(); c.ellipse(cx, cy, 0.5, 5, 0, 0, Math.PI * 2); c.fillStyle = 'rgba(200, 230, 255, 0.7)'; c.fill(); c.beginPath(); c.moveTo(cx, cy - 5); c.lineTo(cx, cy + 5); c.strokeStyle = '#aaaaaa'; c.lineWidth = 1; c.stroke(); };
         drawProps(11.5, -9); drawProps(9.5, -16); drawProps(11.5, 9); drawProps(9.5, 16);
         c.beginPath(); c.moveTo(17, -1.5); c.lineTo(19, -1); c.lineTo(19, 1); c.lineTo(17, 1.5); c.lineTo(16, 0); c.closePath(); c.fillStyle = '#222222'; c.fill();
+    }
+
+    // G-IV (NOAA49) glyph for the 2D tracker - same coordinate frame as drawP3Orion
+    // (nose at +X, drawn white with a dark outline). Swept wings, two aft-fuselage
+    // nacelles, T-tail; picked over the P-3 by isGulfstreamFlight().
+    function drawGulfstreamIV(c) {
+        c.fillStyle = '#ffffff'; c.strokeStyle = '#222222'; c.lineWidth = 2.5; c.beginPath();
+        c.moveTo(24, 0); c.quadraticCurveTo(23, -2.6, 17, -2.8); c.lineTo(5, -2.8);
+        c.lineTo(-11, -21); c.lineTo(-14, -21); c.lineTo(-9, -2.8);
+        c.lineTo(-21, -2.2); c.lineTo(-26.5, -9.5); c.lineTo(-28.5, -9.5); c.lineTo(-29.5, -1.2);
+        c.lineTo(-30.5, 0);
+        c.lineTo(-29.5, 1.2); c.lineTo(-28.5, 9.5); c.lineTo(-26.5, 9.5); c.lineTo(-21, 2.2);
+        c.lineTo(-9, 2.8); c.lineTo(-14, 21); c.lineTo(-11, 21);
+        c.lineTo(5, 2.8); c.lineTo(17, 2.8); c.quadraticCurveTo(23, 2.6, 24, 0);
+        c.closePath(); c.fill(); c.stroke();
+        const nacelle = (cy) => {
+            c.beginPath(); c.ellipse(-13.5, cy, 4.4, 1.8, 0, 0, Math.PI * 2); c.fillStyle = '#ffffff'; c.fill(); c.stroke();
+            c.beginPath(); c.moveTo(-9.4, cy - 1.2); c.lineTo(-8.2, cy); c.lineTo(-9.4, cy + 1.2); c.fillStyle = '#cccccc'; c.fill();
+        };
+        nacelle(-4.8); nacelle(4.8);
+        c.beginPath(); c.moveTo(-11, -21); c.lineTo(-9.8, -19.4); c.moveTo(-11, 21); c.lineTo(-9.8, 19.4); c.lineWidth = 1.5; c.stroke();  // winglets
+        c.beginPath(); c.moveTo(-21, 0); c.lineTo(-29.5, 0); c.strokeStyle = '#999999'; c.lineWidth = 1; c.stroke();  // fin seen from above
+        c.beginPath(); c.moveTo(19, -1.4); c.lineTo(21, -0.8); c.lineTo(21, 0.8); c.lineTo(19, 1.4); c.lineTo(18, 0); c.closePath(); c.fillStyle = '#222222'; c.fill();
+    }
+
+    // True when the loaded flight is the Gulfstream: aircraft letter N in the AOC
+    // mission id (e.g. 20240826N1), or an archive aircraft/tail string naming it.
+    function isGulfstreamFlight() {
+        const id = flightMetaData.id || '', ac = flightMetaData.aircraft || '';
+        return /\d{8}N\d/i.test(id) || /gulfstream|\bg-?iv\b|\bn49/i.test(ac + ' ' + id);
     }
 
     function init3D() {

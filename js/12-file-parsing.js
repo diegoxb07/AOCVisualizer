@@ -192,6 +192,8 @@
         // archive-loaded flight) - clear it here so a manual upload after an archive load doesn't keep
         // showing a stale storm's track, and so a fresh archive load starts from a clean slate too.
         stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;
+        // Same reasoning for the shareable ?mission= URL param - an archive load re-sets it after this returns.
+        try { const u = new URL(window.location.href); if (u.searchParams.has('mission')) { u.searchParams.delete('mission'); history.replaceState(null, '', u); } } catch (e) {}
         const stormToggleLabel = document.getElementById('stormTrackToggleLabel'); if (stormToggleLabel) stormToggleLabel.style.display = 'none';
         const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
 

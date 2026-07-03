@@ -160,8 +160,17 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isMeasuring) { stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return; }
         if (!filteredData || filteredData.length === 0) return; if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) return;
+        // Space = play/pause. Skipped when a button/select/checkbox has focus - space already
+        // activates those natively and hijacking it would double-fire (a focused range slider is
+        // fine though: space is a no-op there, and scrub-then-space is a common flow).
+        if (e.code === 'Space' && !/SELECT|BUTTON|TEXTAREA/.test(e.target.tagName)
+            && !(e.target.tagName === 'INPUT' && /checkbox|radio/.test(e.target.type))) {
+            e.preventDefault(); if (!playPauseBtn.disabled) playPauseBtn.click(); return;
+        }
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1; 
+            // Shift+arrow = jump 10 flight-minutes (same step as the satellite scan buttons).
+            if (e.shiftKey) { e.preventDefault(); skipFlightMinutes(e.key === 'ArrowRight' ? 10 : -10); return; }
+            e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1;
             let dir = e.key === 'ArrowRight' ? 1 : -1; let newIdx = currentIdx + (dir * arrowSkipSpeed); newIdx = Math.max(0, Math.min(filteredData.length - 1, newIdx)); 
             if (newIdx !== currentIdx) { currentIdx = newIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx); }
         }

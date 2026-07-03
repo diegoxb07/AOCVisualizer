@@ -286,11 +286,14 @@
     }
 
     function setReconApiHealth(healthy, reason) {
+        const transition = !reconApiHealthChecked || reconApiHealthOk !== !!healthy;
         reconApiHealthChecked = true;
         reconApiHealthOk = !!healthy;
         reconApiHealthReason = reason || '';
         updateReconApiUiState();
-        if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
+        // Rebuild the satellite dropdowns only when the health state actually flips -
+        // doing it on every 60s "still ok" poll wiped the picked product + loaded overlay.
+        if (transition && typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
     }
 
     function isReconApiAvailable() {
@@ -492,6 +495,7 @@
         const bandSelect = document.getElementById('satBandSelect');
         if (!satSelect || !bandSelect) return;
         _goesLabelMs = null;  // re-sync the GOES scan-time label after a layer/band change
+        const prevBand = bandSelect.value;   // restored below if the option still exists
 
         if (satSelect.value === 'none') {
             bandSelect.innerHTML = '';
@@ -540,6 +544,9 @@
                 });
             }
             bandSelect.style.display = '';
+            // A rebuild must not silently drop an active selection (the 60s product-list
+            // poll and flight reloads land here) - the placeholder is only for fresh picks.
+            if (prevBand && [...bandSelect.options].some(o => o.value === prevBand)) bandSelect.value = prevBand;
         }
     }
 
@@ -645,10 +652,14 @@
                     name: 'Band ' + b.band + ' - ' + b.name,
                     bboxSupported: b.bbox_supported !== false
                 }));
-            // The classic enhanced-IR curve was its own entry in the original list - keep it as a
-            // separate pick whenever the API says band 13 can render with the ir4 cmap.
-            const b13 = (data.bands || []).find(b => b.band === 13 && Array.isArray(b.cmaps) && b.cmaps.includes('ir4'));
-            if (b13) bandDefs.push({ id: 'band13_ir4', band: 13, cmap: 'ir4', name: 'Band 13 - IR Enhanced (ir4)', bboxSupported: b13.bbox_supported !== false });
+            // Extra band-13 enhancement variants, each its own entry when the API lists the cmap:
+            // ir4 = the classic enhanced-IR curve, bd = the Dvorak BD hurricane enhancement.
+            // Deliberately a short allowlist - the API also offers nrl/enhanced/grayscale on every
+            // IR band, and surfacing every cmap x band combination would triple the dropdown.
+            const b13 = (data.bands || []).find(b => b.band === 13 && Array.isArray(b.cmaps));
+            if (b13) [['ir4', 'IR Enhanced (ir4)'], ['bd', 'IR BD Curve (Dvorak)']].forEach(([cmap, label]) => {
+                if (b13.cmaps.includes(cmap)) bandDefs.push({ id: 'band13_' + cmap, band: 13, cmap: cmap, name: 'Band 13 - ' + label, bboxSupported: b13.bbox_supported !== false });
+            });
             const productDefs = (data.products || []).map(p => ({
                 id: p.product, product: p.product, name: p.name,
                 bboxSupported: p.bbox_supported === true,
@@ -662,13 +673,19 @@
                 const spacecraft = data.satellites && data.satellites[layerDef.satellite];
                 if (spacecraft && spacecraft.length && spacecraft[0].start) layerDef.minDate = spacecraft[0].start;
             });
-            setReconApiHealth(true, 'ok');
-            // A dropdown may already be open/populated from the hardcoded fallback - refresh it in place.
-            if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
+            const fp = JSON.stringify([allProducts, data.satellites]);
+            const changed = fp !== _lastProductsFingerprint;
+            _lastProductsFingerprint = fp;
+            setReconApiHealth(true, 'ok');   // rebuilds the dropdowns itself on a health transition
+            // Rebuilding resets the loaded overlay, so outside a transition only do it when
+            // the product list actually changed - NOT on every 60s poll (that used to wipe
+            // the user's product pick mid-caching).
+            if (changed && typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
         } catch (e) {
             setReconApiHealth(false, String(e));
         }
     }
+    let _lastProductsFingerprint = '';
     loadSatelliteProducts();
     setInterval(() => {
         if (document.visibilityState === 'visible') loadSatelliteProducts();
@@ -744,7 +761,12 @@
             // Checked both before AND after the sleep so a mid-batch Cancel is noticed within ~3s.
             for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
                 if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
-                await new Promise(r => setTimeout(r, 3000));
+                // Abort-aware sleep: a Cancel click resolves it immediately instead of
+                // waiting out the remainder of the 3s tick.
+                await new Promise(r => {
+                    const t = setTimeout(r, 3000);
+                    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true });
+                });
                 if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
                 data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`, { signal }).then(r => r.json());
             }
@@ -1172,8 +1194,15 @@
     // --- Background progress pill (2D map, top-center) ---------------------------------
     // Non-blocking indicator for the local satellite cache, so the user can close the modal and keep
     // working while it fills in the background. Driven by the batch cache via setBatchProgress().
-    function showSatPrefetchBar() { const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden'); }
-    function hideSatPrefetchBar() { const b = document.getElementById('satPrefetchBar'); if (b) b.classList.add('hidden'); }
+    function showSatPrefetchBar() {
+        const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden');
+        const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Preparing satellite cache…';
+        setPrefetchIndeterminate(true);   // bounce until the first tile actually lands
+    }
+    function hideSatPrefetchBar() {
+        const b = document.getElementById('satPrefetchBar'); if (b) b.classList.add('hidden');
+        setPrefetchIndeterminate(false);
+    }
 
     // --- Multi-flight batch cache ------------------------------------------------------
     // Pre-download archive-GOES imagery for MANY storms at once, WITHOUT loading each flight into the
@@ -1209,13 +1238,25 @@
         return { minLat, maxLat, minLon, maxLon };
     }
 
+    // Until the first tile lands there is no meaningful percentage (the first server-side
+    // render can take ~30s), so the fills bounce indeterminately - like the flight-data
+    // loading overlay - and switch to the real bar on the first setBatchProgress(done>0).
+    function setPrefetchIndeterminate(on) {
+        ['batchCacheFill', 'satPrefetchFill'].forEach(id => {
+            const el = document.getElementById(id); if (!el) return;
+            el.classList.toggle('indeterminate', on);
+            if (on) el.style.width = '';
+        });
+    }
+
     function setBatchProgress(done, total, note) {
         const pct = total ? Math.round((done / total) * 100) : 0;
+        if (done > 0) setPrefetchIndeterminate(false);
         // Modal progress (visible when the modal is open).
-        const fill = document.getElementById('batchCacheFill'); if (fill) fill.style.width = pct + '%';
+        const fill = document.getElementById('batchCacheFill'); if (fill && done > 0) fill.style.width = pct + '%';
         const lbl = document.getElementById('batchCacheStatus'); if (lbl && note) lbl.textContent = note;
         // Background pill (visible on the 2D map when the modal is closed).
-        const pf = document.getElementById('satPrefetchFill'); if (pf) pf.style.width = pct + '%';
+        const pf = document.getElementById('satPrefetchFill'); if (pf && done > 0) pf.style.width = pct + '%';
         const pl = document.getElementById('satPrefetchLabel'); if (pl && note) pl.textContent = note;
     }
 
@@ -1315,7 +1356,7 @@
             ? `Pre-cache stopped - ${fetched} tile(s) cached.`
             : `Pre-cache done - ${fetched} new tile(s) cached for smooth playback.`;
         setBatchProgress(done, total || 1, msg);
-        setTimeout(hideSatPrefetchBar, 2500);
+        setTimeout(hideSatPrefetchBar, cancelled ? 800 : 2500);
         showToast(msg, 6000);
         // Tiles are warm now: draw the current frame's imagery straight from cache.
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
@@ -1405,7 +1446,7 @@
             ? `Local cache stopped - ${fetched} tiles cached.`
             : `Local cache done - ${fetched} new tile(s) from ${files.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date)` : ''}.`;
         setBatchProgress(done, total || 1, msg);
-        setTimeout(hideSatPrefetchBar, 2500);   // leave the pill up briefly with the final count
+        setTimeout(hideSatPrefetchBar, cancelled ? 800 : 2500);   // leave the pill up briefly with the final count
         showToast(msg, 7000);
     }
 
@@ -1436,6 +1477,9 @@
         const startBtn = document.getElementById('batchCacheStartBtn');
         const satVal = (document.getElementById('batchSatSelect') || {}).value;
         const layerDef = GIBS_LAYERS.find(d => d.value === satVal);
+        // Capture existing ticks BEFORE clearing - rebuilds (health poll with the modal
+        // open) must not reset the user's selection.
+        const prevChecked = [...wrap.querySelectorAll('input[type="checkbox"]')].map(c => ({ id: c.value, on: c.checked }));
         wrap.innerHTML = '';
         if (layerDef && layerDef.isReconApi && !isReconApiAvailable()) {
             wrap.innerHTML = '<span class="text-red-300 font-semibold">API Offline - archive GOES caching unavailable</span>';
@@ -1450,7 +1494,9 @@
         bands.forEach((b, i) => {
             const lbl = document.createElement('label'); lbl.className = 'flex items-center gap-1 cursor-pointer';
             const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-sky-500 w-3.5 h-3.5';
-            cb.checked = bands.some(x => x.id === curBand) ? (b.id === curBand) : true;
+            const prev = prevChecked.find(p => p.id === b.id);
+            if (prev) cb.checked = prev.on;
+            else cb.checked = bands.some(x => x.id === curBand) ? (b.id === curBand) : true;
             lbl.appendChild(cb); lbl.appendChild(document.createTextNode(' ' + b.name));
             wrap.appendChild(lbl);
         });

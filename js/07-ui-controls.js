@@ -285,8 +285,10 @@
     fullscreenMapBtn.addEventListener('click', () => togglePanelFullscreen(mapPanel));
     fullscreenVideoBtn.addEventListener('click', () => togglePanelFullscreen(videoPanel));
 
+    const FULLSCREEN_ICON = '<svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>';
+    const EXIT_FULLSCREEN_ICON = '<svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
     document.addEventListener('fullscreenchange', () => {
-        fullscreenBtn.innerText = !document.fullscreenElement ? "⛶ Fullscreen" : "⛶ Exit Fullscreen";
+        fullscreenBtn.innerHTML = (!document.fullscreenElement ? FULLSCREEN_ICON + 'Fullscreen' : EXIT_FULLSCREEN_ICON + 'Exit Fullscreen');
         // Leaving real fullscreen (Esc or the main button) unpins any fake-fullscreened panel too.
         if (!document.fullscreenElement) setFakePanel(null);
         else refreshAfterViewChange();

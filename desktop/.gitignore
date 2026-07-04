@@ -1,0 +1,6 @@
+.devdata/
+build/
+dist/
+_pyinstaller_dist/
+__pycache__/
+*.pyc

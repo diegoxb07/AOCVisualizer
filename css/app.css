@@ -216,6 +216,20 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
     letter-spacing: 0.02em;
 }
 
+/* Local satellite-API health badge (desktop app only - hidden on the hosted website).
+   The .hidden override must win over .health-badge's own `display: flex` regardless of
+   stylesheet order - app.css loads after tailwind.css, so two same-specificity single-class
+   rules would otherwise let health-badge's `display:flex` beat Tailwind's `.hidden`. */
+.health-badge { display: flex; align-items: center; gap: 7px; background: #0d1219; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #94a3b8; white-space: nowrap; }
+.health-badge.hidden { display: none; }
+.health-badge .health-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: #64748b; }
+.health-badge[data-state="online"] { border-color: rgba(52, 211, 153, 0.4); color: #6ee7b7; }
+.health-badge[data-state="online"] .health-dot { background: #34d399; box-shadow: 0 0 6px rgba(52, 211, 153, 0.8); }
+.health-badge[data-state="offline"] { border-color: rgba(248, 113, 113, 0.45); color: #fca5a5; }
+.health-badge[data-state="offline"] .health-dot { background: #f87171; box-shadow: 0 0 6px rgba(248, 113, 113, 0.7); }
+.health-badge[data-state="checking"] .health-dot { background: #fbbf24; animation: healthPulse 1.2s ease-in-out infinite; }
+@keyframes healthPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
 /* Dropdown menus */
 .elevated-card { z-index: 100 !important; } /* elevation fix for chart dropdown menus */
 

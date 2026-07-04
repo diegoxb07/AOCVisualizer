@@ -26,7 +26,7 @@
         menu.innerHTML = ''; const isImp = document.getElementById('toggleImperial').checked;
         const activeKeys = masterChartInstance ? masterChartInstance.data.datasets.map(ds => ds.metricKey) : [];
 
-        const clearAllItem = document.createElement('div'); clearAllItem.className = 'dropdown-item'; clearAllItem.style.color = '#ef4444'; clearAllItem.style.fontWeight = 'bold'; clearAllItem.innerText = '✕ Clear All';
+        const clearAllItem = document.createElement('div'); clearAllItem.className = 'dropdown-item'; clearAllItem.style.color = '#ef4444'; clearAllItem.style.fontWeight = 'bold'; clearAllItem.innerHTML = '<span class="inline-flex items-center"><svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear All</span>';
         clearAllItem.onclick = (e) => { e.stopPropagation(); if (masterChartInstance) { masterChartInstance.data.datasets = []; masterChartInstance.update('none'); } updateMasterGraphVisibility(); buildMasterMenu(); };
         menu.appendChild(clearAllItem);
 

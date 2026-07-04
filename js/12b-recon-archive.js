@@ -3,8 +3,11 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order.
 
    Lets a flight be loaded straight from the archive (Year -> Storm -> Mission dropdowns) instead of
-   a manual file upload, and auto-loads the storm's whole-life best-track alongside it. Reuses
-   RECON_API_BASE from js/02-satellite.js (same API, already used there for archive GOES tiles). */
+   a manual file upload, and auto-loads the storm's whole-life best-track alongside it. Always uses
+   RECON_HOSTED_API_BASE (js/02-satellite.js) - archive/storm-track lookups are lightweight, unlike
+   satellite image rendering, so this deliberately keeps hitting the hosted API even in the desktop
+   app, regardless of the local satellite service's health (archiveApiHealthOk, also in
+   js/02-satellite.js, tracks the hosted API's own health independently). */
 
     const reconYearSelect = document.getElementById('reconYearSelect');
     const reconStormSelect = document.getElementById('reconStormSelect');
@@ -15,7 +18,7 @@
 
     function syncReconLoadButtonState() {
         if (!reconLoadBtn) return;
-        const apiDown = reconApiHealthChecked && !reconApiHealthOk;
+        const apiDown = archiveApiHealthChecked && !archiveApiHealthOk;
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
     }
 
@@ -39,7 +42,7 @@
     function setReconStatus(msg) { if (!suppressReconStatus && reconArchiveStatus) reconArchiveStatus.textContent = msg || ''; }
 
     async function reconApiJson(path) {
-        const resp = await fetch(RECON_API_BASE + path);
+        const resp = await fetch(RECON_HOSTED_API_BASE + path);
         const data = await resp.json().catch(() => null);
         if (!resp.ok) {
             // detail can be a string OR structured (FastAPI validation errors) - stringify the
@@ -262,7 +265,7 @@
         try {
             if (subtext) subtext.textContent = `Downloading full-resolution NetCDF for ${mission.mission_id}…`;
             const buf = await fetchArrayBufferWithProgress(
-                RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
+                RECON_HOSTED_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
                 (received, total) => {
                     const pct = Math.round(received / total * 100);
                     const mb = n => (n / 1048576).toFixed(1);

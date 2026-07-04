@@ -117,7 +117,7 @@
             const menu = document.getElementById(`menu-${id}`); if(!menu) return; menu.innerHTML = ''; const chart = customCharts[id]; if(!chart) return;
             const activeKeys = chart.data.datasets.map(ds => ds.metricKey);
             
-            const unselectAllItem = document.createElement('div'); unselectAllItem.className = 'dropdown-item'; unselectAllItem.style.color = '#ef4444'; unselectAllItem.style.fontWeight = 'bold'; unselectAllItem.innerText = '✕ Unselect All';
+            const unselectAllItem = document.createElement('div'); unselectAllItem.className = 'dropdown-item'; unselectAllItem.style.color = '#ef4444'; unselectAllItem.style.fontWeight = 'bold'; unselectAllItem.innerHTML = '<span class="inline-flex items-center"><svg class="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Unselect All</span>';
             unselectAllItem.onclick = (e) => { e.stopPropagation(); chart.data.datasets = []; chart.update('none'); buildDropdownMenus(); }; menu.appendChild(unselectAllItem);
             const breakHr = document.createElement('div'); breakHr.style.borderTop = '1px solid #20262f'; breakHr.style.margin = '4px 0'; menu.appendChild(breakHr);
             

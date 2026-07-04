@@ -99,7 +99,7 @@
 
         const closeThresh = satLoadedInfo.isModis ? 90 : 15;
         const within = absMin <= closeThresh;
-        badge.innerHTML = `🛰 ${satLoadedInfo.layerLabel}<br>`
+        badge.innerHTML = `<svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h.01M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 14 0M2 9.5a15 15 0 0 1 20 0"/></svg>${satLoadedInfo.layerLabel}<br>`
             + `Image: <b>${imgLabel}</b><br>`
             + (offStr ? `<span style="color:${within ? '#4ade80' : '#fbbf24'}">${offStr}</span>` : '');
         badge.classList.remove('hidden');
@@ -200,15 +200,22 @@
     // When set, the sat time-badge shows this note instead of imagery info (e.g. "out of view").
     let satUnavailableNote = null;
     let _goesLabelMs = null;  // last 10-min bucket reflected in the GOES dropdown label
-    let reconApiHealthChecked = false;
-    let reconApiHealthOk = true;
-    let reconApiHealthReason = '';
+    // Health of the LOCAL satellite-imagery service specifically (GOES tile rendering) - kept
+    // separate from archive/storm-track health (js/12b-recon-archive.js) because imagery
+    // rendering is compute-heavy and intentionally never falls back to the hosted API, while
+    // archive/storm lookups are lightweight and still go through the hosted API either way.
+    let satelliteApiHealthChecked = false;
+    let satelliteApiHealthOk = true;
+    let satelliteApiHealthReason = '';
 
-    function isReconApiDown() {
-        return reconApiHealthChecked ? !reconApiHealthOk : false;
+    function isSatelliteApiDown() {
+        return satelliteApiHealthChecked ? !satelliteApiHealthOk : false;
     }
 
-    function updateReconApiUiState() {
+    // Archive/storm-track UI (Year/Storm/Mission browser, manual-upload highlight) reacts to the
+    // HOSTED API's health (see js/12b-recon-archive.js's checkArchiveApiHealth) - it keeps using
+    // the hosted API regardless of whether the local satellite service is up.
+    function updateArchiveApiUiState() {
         const reconBtn = document.getElementById('reconLoadBtn');
         const reconMissionSelect = document.getElementById('reconMissionSelect');
         const reconStormSelect = document.getElementById('reconStormSelect');
@@ -218,7 +225,7 @@
         const uploadZone = document.getElementById('dataDropZone');
         const uploadLabel = document.getElementById('dataDropLabel');
         const uploadApiOfflineToastWrapper = document.getElementById('uploadApiOfflineToastWrapper');
-        const apiDown = isReconApiDown();
+        const apiDown = isArchiveApiDown();
 
         if (reconBtn) {
             if (!reconBtn.dataset.defaultTitle) reconBtn.dataset.defaultTitle = reconBtn.title;
@@ -285,6 +292,41 @@
         if (uploadApiOfflineToastWrapper) {
             uploadApiOfflineToastWrapper.classList.toggle('hidden', !apiDown);
         }
+    }
+
+    // --- Independent health check for the hosted archive/storm-track API -------------------
+    // Deliberately separate from the local satellite-imagery health below: storm tracks and the
+    // recon archive are lightweight and stay on the hosted API even when running the desktop app.
+    let archiveApiHealthChecked = false;
+    let archiveApiHealthOk = true;
+
+    function isArchiveApiDown() {
+        return archiveApiHealthChecked ? !archiveApiHealthOk : false;
+    }
+
+    function setArchiveApiHealth(healthy) {
+        archiveApiHealthChecked = true;
+        archiveApiHealthOk = !!healthy;
+        updateArchiveApiUiState();
+    }
+
+    async function checkArchiveApiHealth() {
+        try {
+            const res = await fetch(`${RECON_HOSTED_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setArchiveApiHealth(true);
+        } catch (e) {
+            setArchiveApiHealth(false);
+        }
+    }
+    // (started further down, once RECON_HOSTED_API_BASE is declared)
+
+    function setSatelliteApiHealth(healthy, reason) {
+        const transition = !satelliteApiHealthChecked || satelliteApiHealthOk !== !!healthy;
+        satelliteApiHealthChecked = true;
+        satelliteApiHealthOk = !!healthy;
+        satelliteApiHealthReason = reason || '';
+        updateLocalApiHealthBadge();
         // The batch modal, if already open, has its own satellite dropdown/band checks/Start button
         // that need the same API-down treatment - refresh them in place rather than waiting for the
         // user to close and reopen the modal.
@@ -293,21 +335,13 @@
             if (typeof populateBatchSatSelect === 'function') populateBatchSatSelect();
             if (typeof populateBatchBandChecks === 'function') populateBatchBandChecks();
         }
-    }
-
-    function setReconApiHealth(healthy, reason) {
-        const transition = !reconApiHealthChecked || reconApiHealthOk !== !!healthy;
-        reconApiHealthChecked = true;
-        reconApiHealthOk = !!healthy;
-        reconApiHealthReason = reason || '';
-        updateReconApiUiState();
         // Rebuild the satellite dropdowns only when the health state actually flips -
         // doing it on every 60s "still ok" poll wiped the picked product + loaded overlay.
         if (transition && typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
     }
 
-    function isReconApiAvailable() {
-        return !isReconApiDown();
+    function isSatelliteApiAvailable() {
+        return !isSatelliteApiDown();
     }
 
     // --- GOES Earth-disk coverage: a geostationary sat at `subLon` can only usefully see points
@@ -335,7 +369,7 @@
     // Label a GOES dropdown option: disable + "out of view" if the flight isn't in this sat's disk,
     // otherwise show the ~scan time for the current playback position (ticks as the clock advances).
     function setGoesOptionState(opt, layerDef) {
-        if (layerDef.isReconApi && !isReconApiAvailable()) {
+        if (layerDef.isReconApi && !isSatelliteApiAvailable()) {
             opt.disabled = true;
             opt.style.color = '#f87171';
             opt.style.fontWeight = '600';
@@ -480,7 +514,7 @@
         satSelect.value = stillOk ? prevVal : 'none';
         if (satSelect.value !== 'none') {
             const selectedLayer = GIBS_LAYERS.find(d => d.value === satSelect.value);
-            if (selectedLayer && selectedLayer.isReconApi && !isReconApiAvailable()) {
+            if (selectedLayer && selectedLayer.isReconApi && !isSatelliteApiAvailable()) {
                 satSelect.value = 'none';
             }
         }
@@ -516,7 +550,7 @@
         const layerDef = GIBS_LAYERS.find(d => d.value === satSelect.value);
         if (layerDef && layerDef.bands) {
             bandSelect.innerHTML = '';
-            if (layerDef.isReconApi && !isReconApiAvailable()) {
+            if (layerDef.isReconApi && !isSatelliteApiAvailable()) {
                 bandSelect.style.display = 'none';
                 return;
             }
@@ -638,10 +672,21 @@
         });
     }
 
-    // --- Archive GOES via the noaa-recon-api (https://joshmurdock.net/api): server-side renders of
-    // NOAA's S3 GOES NetCDF, so historical dates work (NASA GIBS only keeps ~90 days). The /tile
-    // request is an async job - it returns a key, then we poll /status until the PNG is ready.
-    const RECON_API_BASE = 'https://joshmurdock.net/api';
+    // --- Archive GOES via the noaa-recon-api: server-side renders of NOAA's S3 GOES NetCDF, so
+    // historical dates work (NASA GIBS only keeps ~90 days). The /tile request is an async job -
+    // it returns a key, then we poll /status until the PNG is ready.
+    //
+    // Rendering imagery is compute-heavy, so when running inside the desktop app (desktop/app.py
+    // injects window.__AOC_LOCAL_API__ before this script runs) it is served ONLY by the
+    // locally-run API - this never falls back to the hosted one. If the local service is down,
+    // satelliteApiHealthOk goes false and the existing GOES-disabling UI takes over
+    // (setSatelliteApiHealth); there's no automatic hand-off to the hosted server, since
+    // offloading that rendering load onto it is exactly what running locally is meant to avoid.
+    // The GitHub Pages deployment (no local API) still targets the hosted API directly, unchanged.
+    // Archive/storm-track lookups (js/12b-recon-archive.js) are lightweight and always use
+    // RECON_HOSTED_API_BASE regardless of the local satellite service's health.
+    const RECON_HOSTED_API_BASE = 'https://joshmurdock.net/api';
+    const RECON_SATELLITE_API_BASE = window.__AOC_LOCAL_API__ || RECON_HOSTED_API_BASE;
 
     // Discovery endpoint (GET /v1/satellite/products): every band/composite product the API can render,
     // plus each spacecraft's active date range - so this client doesn't have to hardcode that knowledge
@@ -650,7 +695,7 @@
     // their `minDate`. If the fetch fails, the hardcoded fallback just keeps working.
     async function loadSatelliteProducts() {
         try {
-            const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
+            const res = await fetch(`${RECON_SATELLITE_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             // Label every spectral band as "Band N - …" (the API's names alone don't carry the
@@ -688,13 +733,13 @@
             const fp = JSON.stringify([allProducts, data.satellites]);
             const changed = fp !== _lastProductsFingerprint;
             _lastProductsFingerprint = fp;
-            setReconApiHealth(true, 'ok');   // rebuilds the dropdowns itself on a health transition
+            setSatelliteApiHealth(true, 'ok');   // rebuilds the dropdowns itself on a health transition
             // Rebuilding resets the loaded overlay, so outside a transition only do it when
             // the product list actually changed - NOT on every 60s poll (that used to wipe
             // the user's product pick mid-caching).
             if (changed && typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
         } catch (e) {
-            setReconApiHealth(false, String(e));
+            setSatelliteApiHealth(false, String(e));
         }
     }
     let _lastProductsFingerprint = '';
@@ -702,6 +747,37 @@
     setInterval(() => {
         if (document.visibilityState === 'visible') loadSatelliteProducts();
     }, 60000);
+    // Archive/storm health is independent of the above - started here (rather than next to its
+    // definition) because it needs RECON_HOSTED_API_BASE, declared just above.
+    checkArchiveApiHealth();
+    setInterval(() => {
+        if (document.visibilityState === 'visible') checkArchiveApiHealth();
+    }, 60000);
+
+    // --- Local satellite-API health badge --------------------------------------------------
+    // Small, always-visible status pill (not the same as the per-layer "(API Offline)" dropdown
+    // labels above) so it's obvious at a glance whether the desktop app's local imagery service
+    // is up, without having to open the satellite picker. Only shown in the desktop app
+    // (window.__AOC_LOCAL_API__ set) - the hosted website has no "local service" to report on.
+    function updateLocalApiHealthBadge() {
+        const badge = document.getElementById('localApiHealthBadge');
+        if (!badge || !window.__AOC_LOCAL_API__) return;
+        badge.classList.remove('hidden');
+        const dot = badge.querySelector('.health-dot');
+        const label = badge.querySelector('.health-label');
+        if (!satelliteApiHealthChecked) {
+            badge.dataset.state = 'checking';
+            if (label) label.textContent = 'Local Imagery: Checking…';
+        } else if (satelliteApiHealthOk) {
+            badge.dataset.state = 'online';
+            if (label) label.textContent = 'Local Imagery: Online';
+        } else {
+            badge.dataset.state = 'offline';
+            if (label) label.textContent = 'Local Imagery: Offline';
+        }
+        if (dot) dot.title = satelliteApiHealthReason || '';
+    }
+    updateLocalApiHealthBadge();
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {
@@ -768,7 +844,7 @@
         const signal = (batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined;
         if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
         try {
-            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal }).then(r => r.json());
+            let data = await fetch(`${RECON_SATELLITE_API_BASE}/v1/satellite/tile?${params}`, { signal }).then(r => r.json());
             // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
             // Checked both before AND after the sleep so a mid-batch Cancel is noticed within ~3s.
             for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
@@ -780,13 +856,13 @@
                     if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true });
                 });
                 if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
-                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`, { signal }).then(r => r.json());
+                data = await fetch(`${RECON_SATELLITE_API_BASE}/v1/satellite/status/${data.key}`, { signal }).then(r => r.json());
             }
             if (!data || data.status !== 'ready') return { error: (data && (data.message || data.status)) || 'no response' };
             // bounds come back as [[lat_s, lon_w], [lat_n, lon_e]] → our {minLon,minLat,maxLon,maxLat}.
             const b = data.bounds;
             const box = { minLat: b[0][0], minLon: b[0][1], maxLat: b[1][0], maxLon: b[1][1] };
-            const c = await loadImageToCanvas(RECON_API_BASE + data.png_url);
+            const c = await loadImageToCanvas(RECON_SATELLITE_API_BASE + data.png_url);
             if (!c) return { error: 'image load failed' };
             // Reproject the Mercator PNG to equirectangular so it aligns with our lat-linear map.
             const eq = reprojectMercatorToEquirect(c, box);
@@ -876,7 +952,7 @@
         // user explicitly picks a product from the placeholder-first dropdown (updateBandOptions) - don't
         // fall back to a default product, or caching/fetching would start before they've actually chosen.
         if (layerDef.isReconApi) {
-            if (!isReconApiAvailable()) {
+            if (!isSatelliteApiAvailable()) {
                 satUnavailableNote = 'GOES archive API unavailable';
                 satImageLoaded = false; bgNeedsUpdate = true;
                 satLoadedInfo = null; updateSatTimeBadge();
@@ -1055,7 +1131,7 @@
         // Outside this satellite's Earth disk - bail with a clear note (the option is disabled too).
         if (!goesInCoverage(layerDef)) {
             satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true;
-            satUnavailableNote = `🛰 ${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
+            satUnavailableNote = `<svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h.01M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 14 0M2 9.5a15 15 0 0 1 20 0"/></svg>${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
             updateSatTimeBadge();
             if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             return;
@@ -1344,7 +1420,7 @@
         if (batchCaching) { showToast('A cache pass is already running.', 4000); return; }
         if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
         const layerDefForCheck = GIBS_LAYERS.find(d => d.value === layerValue);
-        if (layerDefForCheck && layerDefForCheck.isReconApi && !isReconApiAvailable()) {
+        if (layerDefForCheck && layerDefForCheck.isReconApi && !isSatelliteApiAvailable()) {
             showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
         }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
@@ -1415,7 +1491,7 @@
         if (!layerValue) { showToast('Pick a satellite to cache.', 5000); return; }
         if (!bandIds || !bandIds.length) { showToast('Pick at least one band to cache.', 5000); return; }
         const layerDefForCheck = GIBS_LAYERS.find(d => d.value === layerValue);
-        if (layerDefForCheck && layerDefForCheck.isReconApi && !isReconApiAvailable()) {
+        if (layerDefForCheck && layerDefForCheck.isReconApi && !isSatelliteApiAvailable()) {
             showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
         }
         batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
@@ -1473,7 +1549,7 @@
             // Archive-GOES options need the API to render any tile - gray them out (with an "API
             // Offline" label, same as the main satellite dropdown) rather than letting a batch pass
             // start against a satellite it can't actually fetch.
-            if (d.isReconApi && !isReconApiAvailable()) { o.disabled = true; o.textContent = `${d.baseLabel} (API Offline)`; }
+            if (d.isReconApi && !isSatelliteApiAvailable()) { o.disabled = true; o.textContent = `${d.baseLabel} (API Offline)`; }
             satSel.appendChild(o);
         });
         // Keep the current pick if valid and selectable, else mirror the map's selected layer, else first available.
@@ -1493,7 +1569,7 @@
         // open) must not reset the user's selection.
         const prevChecked = [...wrap.querySelectorAll('input[type="checkbox"]')].map(c => ({ id: c.value, on: c.checked }));
         wrap.innerHTML = '';
-        if (layerDef && layerDef.isReconApi && !isReconApiAvailable()) {
+        if (layerDef && layerDef.isReconApi && !isSatelliteApiAvailable()) {
             wrap.innerHTML = '<span class="text-red-300 font-semibold">API Offline - archive GOES caching unavailable</span>';
             if (startBtn) { startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
             return;

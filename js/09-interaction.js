@@ -54,17 +54,20 @@
         }
     }
 
+    const MEASURE_ICON = '<svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 7v3M10 7v5M14 7v3M18 7v5"/></svg>';
+    const STOP_MEASURE_ICON = '<svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>';
+
     function stopMeasuringState() {
         commitActivePolygon();  // keep a finished (3+ pt) polygon; discard an unfinished stub
         isMeasuring = false; liveMouseGeo = null; hoveredShapeIndex = -1; const btn = document.getElementById('measureBtn');
-        btn.innerText = '📏 Measure'; btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); updateMeasureUI();
+        btn.innerHTML = MEASURE_ICON + 'Measure'; btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); updateMeasureUI();
     }
 
     document.getElementById('measureBtn').addEventListener('click', () => {
         const wasMeasuring = isMeasuring;
         isMeasuring = !isMeasuring; const btn = document.getElementById('measureBtn');
-        if(isMeasuring) { btn.classList.remove('bg-blue-800', 'hover:bg-blue-700'); btn.classList.add('bg-blue-600', 'hover:bg-blue-500'); btn.innerText = '🛑 Stop Measuring'; } 
-        else { btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); btn.innerText = '📏 Measure'; }
+        if(isMeasuring) { btn.classList.remove('bg-blue-800', 'hover:bg-blue-700'); btn.classList.add('bg-blue-600', 'hover:bg-blue-500'); btn.innerHTML = STOP_MEASURE_ICON + 'Stop Measuring'; }
+        else { btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); btn.innerHTML = MEASURE_ICON + 'Measure'; }
         if (isMeasuring) { measurePointsGeo = []; }
         else { if (wasMeasuring) commitActivePolygon(); liveMouseGeo = null; }
         updateMeasureUI(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);

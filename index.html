@@ -12,8 +12,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written - regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260703l">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260703l">
+    <link rel="stylesheet" href="css/fonts.css?v=20260704a">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260704a">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -21,7 +21,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260703l">
+    <link rel="stylesheet" href="css/app.css?v=20260704a">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -31,7 +31,7 @@
     <p id="loadingOverlaySubtext" class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling variables...</p>
 </div>
 
-<button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded border border-blue-500 hover:bg-blue-500 transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
+<button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded border border-blue-500 hover:bg-blue-500 transition-colors shadow-lg z-[9999] flex items-center"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>Fullscreen</button>
 
 <section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4" id="mainContainer">
     <header class="relative mb-4">
@@ -42,7 +42,11 @@
                     <p id="brandSub">NOAA Aircraft Operations Center &middot; Science Branch</p>
                 </div>
             </div>
-            <div class="flex items-center gap-4 shrink-0">
+            <div class="flex items-center gap-3 shrink-0">
+                <div id="localApiHealthBadge" class="hidden health-badge" data-state="checking">
+                    <span class="health-dot" title=""></span>
+                    <span class="health-label">Local Imagery: Checking&hellip;</span>
+                </div>
                 <img src="assets/noaa-logo.svg" alt="NOAA Logo" class="h-9 object-contain">
             </div>
         </div>
@@ -61,7 +65,7 @@
                             <span class="text-[10px] text-slate-400 normal-case group-hover:text-blue-300 transition-colors whitespace-nowrap">or upload:</span>
                             <span id="dataDropLabel" class="text-[10px] text-slate-300 font-medium normal-case group-hover:text-blue-300 transition-colors truncate max-w-[70px]">Choose File</span>
                         </div>
-                        <button id="resetAppBtn" title="Clear the loaded flight, video, and overlays and start fresh" class="ml-auto shrink-0 px-2 py-1 bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white rounded text-[10px] font-semibold normal-case transition-colors whitespace-nowrap">↺ Reset</button>
+                        <button id="resetAppBtn" title="Clear the loaded flight, video, and overlays and start fresh" class="ml-auto shrink-0 px-2 py-1 bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white rounded text-[10px] font-semibold normal-case transition-colors whitespace-nowrap"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Reset</button>
                     </div>
 
                     <div id="archiveLoadBlock" class="relative">
@@ -77,14 +81,14 @@
                             </select>
                         </div>
                         <div class="relative flex items-center gap-2 mt-2">
-                            <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-emerald-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-emerald-300">⤓ Load Flight + Storm Track</button>
-                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail which is richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">⬇ .nc</a>
+                            <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-emerald-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800 disabled:hover:text-emerald-300"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Load Flight + Storm Track</button>
+                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail which is richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>.nc</a>
                         </div>
                         <span id="reconArchiveStatus" class="block text-[10px] text-slate-500 leading-tight mt-1"></span>
                         <!-- Covers the archive controls while the API is down. -->
                         <div id="uploadApiOfflineToastWrapper" class="hidden absolute inset-0 z-20 flex flex-row items-center justify-center gap-2 bg-slate-950/90 rounded pointer-events-none">
                             <span id="uploadApiOfflineToast" class="px-2.5 py-1 rounded-full border border-red-400/70 bg-red-950 text-[11px] font-semibold text-red-200 shadow-md whitespace-nowrap">API Offline</span>
-                            <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">↑ use manual upload instead</span>
+                            <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap flex items-center"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>use manual upload instead</span>
                         </div>
                     </div>
                 </div>
@@ -100,7 +104,7 @@
                     </div>
                 </div>
                 <div class="flex flex-col items-center justify-center gap-0.5 pt-2">
-                    <button id="batchCacheBtn" title="Pre-download satellite imagery to the local cache for one or more flights" class="w-full bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors">⤓ Locally Cache Satellites</button>
+                    <button id="batchCacheBtn" title="Pre-download satellite imagery to the local cache for one or more flights" class="w-full bg-slate-800 text-sky-300 border border-slate-700 hover:bg-sky-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Locally Cache Satellites</button>
                     <span class="text-[10px] text-slate-400 text-center leading-snug">can pre-load satellite images for multiple flights at a time! ^</span>
                 </div>
                 </div>
@@ -130,8 +134,8 @@
                         </div>
                     </div>
                     <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0 gap-2">
-                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded border border-purple-800 transition-colors shadow-sm whitespace-nowrap">🎥 Record Clip</button>
-                        <button id="exportKmlBtn" disabled class="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap">🌍 Export KML</button>
+                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded border border-purple-800 transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>Record Clip</button>
+                        <button id="exportKmlBtn" disabled class="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 4 6.1 4 9s-1.5 6.3-4 9c-2.5-2.7-4-6.1-4-9s1.5-6.3 4-9z"/></svg>Export KML</button>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
@@ -161,14 +165,14 @@
                                 <input type="checkbox" id="toggleStormTrack" checked class="accent-blue-400 w-3 h-3 mr-1"> Storm Track
                             </label>
                             <div id="measureCluster" class="relative flex items-center flex-none">
-                                <button id="measureBtn" class="px-2 py-1 bg-blue-800 hover:bg-blue-700 text-white text-[11px] rounded border border-blue-800 transition-colors shadow-sm whitespace-nowrap" title="Measure distance / area">📏 Measure</button>
+                                <button id="measureBtn" class="px-2 py-1 bg-blue-800 hover:bg-blue-700 text-white text-[11px] rounded border border-blue-800 transition-colors shadow-sm whitespace-nowrap" title="Measure distance / area"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="10" rx="1.5"/><path d="M6 7v3M10 7v5M14 7v3M18 7v5"/></svg>Measure</button>
                                 <div id="measureGroup" class="hidden absolute left-0 top-full mt-1 z-30 items-center gap-2 bg-slate-900/95 border border-slate-700 border-l-2 border-l-blue-500/60 rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
                                     <select id="measureShapeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-0.5 text-[11px] outline-none cursor-pointer">
                                         <option value="polygon">Polygon</option>
                                         <option value="circle">Circle</option>
                                         <option value="rectangle">Rectangle</option>
                                     </select>
-                                    <button id="clearMeasureBtn" class="hidden px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-[11px] rounded border border-red-900 transition-colors shadow-sm whitespace-nowrap">✕ Clear</button>
+                                    <button id="clearMeasureBtn" class="hidden px-2 py-1 bg-red-900 hover:bg-red-800 text-white text-[11px] rounded border border-red-900 transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
                                     <span id="measureHint" class="hidden text-[10px] text-slate-400 italic whitespace-nowrap"></span>
                                 </div>
                             </div>
@@ -176,7 +180,7 @@
                                 <option value="2d">2D Map Tracker</option>
                                 <option value="3d">3D WebGL Tracker</option>
                             </select>
-                            <button id="fullscreenMapBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm flex-none">⛶</button>
+                            <button id="fullscreenMapBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm flex-none flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
                             <div id="satControlGroup" class="relative flex gap-1 items-center flex-none">
                                 <select id="satelliteSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer" title="Satellite overlay (auto-populated by date/location after data loads)">
                                     <option value="none">Sat: Off</option>
@@ -193,8 +197,8 @@
                     </div>
                     <!-- Keep as a direct child of #mapPanel: #mapHeader's z-20 stacking context would trap it below the fullscreen bottom bar. -->
                     <div id="satStepCluster" style="display:none;" class="flex items-center gap-1 normal-case">
-                        <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">⏪ 10m</button>
-                        <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m ⏩</button>
+                        <button id="skipBack10Btn" disabled title="Jump back 10 minutes (steps the satellite scan back one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8 6zM21 18V6l-8 6z"/></svg>10m</button>
+                        <button id="skipFwd10Btn" disabled title="Jump forward 10 minutes (steps the satellite scan forward one frame)" class="px-2 py-1 bg-slate-800 text-slate-200 border border-slate-700 hover:bg-blue-700 hover:text-white font-bold rounded text-[11px] font-mono transition-colors whitespace-nowrap">10m<svg class="inline w-3.5 h-3.5 -mt-0.5 ml-1" viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8-6zM3 6v12l8-6z"/></svg></button>
                     </div>
                     <div class="media-container" id="mapContainer">
                         <div id="mapPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center px-6 pointer-events-none z-10">
@@ -215,7 +219,7 @@
                         <div id="mapInfoStack" class="absolute top-14 right-3 z-[2400] flex flex-col items-end gap-1.5 pointer-events-none text-right">
                             <div id="satTimeBadge" class="hidden bg-slate-950/85 border border-blue-500/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-200 leading-tight"></div>
                             <div id="stormStatusCard" class="hidden bg-slate-950/85 border border-blue-300/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-100 leading-tight">
-                                <div class="text-blue-300 font-bold mb-0.5">🌀 Last Storm Observation</div>
+                                <div class="text-blue-300 font-bold mb-0.5 flex items-center"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 3.8c4.4 0 7.6 2.6 8 6.4M12 20.2c-4.4 0-7.6-2.6-8-6.4"/></svg>Last Storm Observation</div>
                                 <div id="stormStatusBody"></div>
                             </div>
                         </div>
@@ -237,7 +241,7 @@
                 <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col" id="videoPanel">
                     <div id="videoHeader" class="flex justify-between items-start text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 z-20">
                         <span class="pt-1">MMR Media Display</span>
-                        <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm">⛶</button>
+                        <button id="fullscreenVideoBtn" class="px-2 py-1 bg-slate-800 text-slate-300 rounded border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors text-[11px] shadow-sm flex items-center justify-center"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
                     </div>
                     <div class="media-container relative h-full flex-grow">
                         <div id="videoPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6 pointer-events-none z-10">
@@ -264,56 +268,56 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-tempChart">
                 Temperature Profiles (°C)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tempChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tempChart')">＋</button><div id="menu-tempChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tempChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tempChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-tempChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="tempChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-navChart">
                 Navigation Angles (Deg)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('navChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-navChart')">＋</button><div id="menu-navChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('navChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-navChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-navChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="navChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-attChart">
                 Flow Angles (Deg)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('attChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-attChart')">＋</button><div id="menu-attChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('attChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-attChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-attChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="attChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-altChart">
                 Altitude Profile (m)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('altChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-altChart')">＋</button><div id="menu-altChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('altChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-altChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-altChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="altChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-tasChart">
                 Speed Profiles (kt)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tasChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tasChart')">＋</button><div id="menu-tasChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('tasChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-tasChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-tasChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="tasChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-vertWindChart">
                 Vertical Speeds & Accel
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('vertWindChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-vertWindChart')">＋</button><div id="menu-vertWindChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('vertWindChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-vertWindChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-vertWindChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="vertWindChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-sfcChart">
                 Pressure Profiles (mb)
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('sfcChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-sfcChart')">＋</button><div id="menu-sfcChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('sfcChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-sfcChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-sfcChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="sfcChart"></canvas></div>
         </div>
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm relative flex flex-col min-h-[240px]">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-thermoChart">
                 Thermodynamics & Moisture
-                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('thermoChart')" title="Reset zoom / scale">↺</button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-thermoChart')">＋</button><div id="menu-thermoChart" class="dropdown-menu"></div></div></div>
+                <div class="flex items-center gap-2"><button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('thermoChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button><div class="relative"><button class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-thermoChart')"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button><div id="menu-thermoChart" class="dropdown-menu"></div></div></div>
             </div>
             <div class="w-full flex-grow relative h-full"><canvas id="thermoChart"></canvas></div>
         </div>
@@ -323,9 +327,9 @@
         <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 z-20" id="title-masterChart">
             <span>Create Your Own Graph <span class="text-slate-500 font-normal normal-case">: You can use this to compare any variables you'd like!</span></span>
             <div class="flex items-center gap-2">
-                <button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('masterChart')" title="Reset zoom / scale">↺</button>
+                <button class="reset-scale-btn text-slate-400 text-base hover:text-sky-400 hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('masterChart')" title="Reset zoom / scale"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
                 <div class="relative">
-                    <button id="masterAddBtn" class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-masterChart')" title="Choose variables to plot">＋</button>
+                    <button id="masterAddBtn" class="text-sky-400 text-lg font-bold hover:text-white hover:scale-110 transition-all focus:outline-none" onclick="toggleMenu(event, 'menu-masterChart')" title="Choose variables to plot"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                     <div id="menu-masterChart" class="dropdown-menu"></div>
                 </div>
             </div>
@@ -333,7 +337,7 @@
 
         <button id="masterCreatePrompt" type="button" onclick="toggleMenu(event, 'menu-masterChart')"
             class="group w-full flex-grow min-h-[250px] flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-slate-700 hover:border-blue-500/70 hover:bg-slate-800/40 transition-colors cursor-pointer">
-            <span class="text-sky-400 text-6xl font-light leading-none group-hover:scale-110 transition-transform">＋</span>
+            <svg class="w-12 h-12 mx-auto text-sky-400 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span class="text-slate-200 text-base font-bold tracking-[0.25em] uppercase">Create Graph</span>
             <span class="text-slate-500 text-[11px] normal-case font-normal">Click to choose the variables you want to plot</span>
         </button>
@@ -352,26 +356,26 @@
             <button id="runBtn" disabled class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">Apply & Run</button>
             <button id="playPauseBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">▶ Play</button>
             <div class="flex items-center bg-slate-800 border border-slate-700 rounded-md overflow-hidden">
-                <button id="speedDownBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏪</button>
+                <button id="speedDownBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9 flex items-center justify-center"><svg class="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8 6zM21 18V6l-8 6z"/></svg></button>
                 <button id="speedDisplayBtn" class="px-2 py-2 bg-slate-800 text-slate-300 font-medium pointer-events-none h-9 w-[45px] text-center text-xs">1x</button>
-                <button id="speedUpBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9">⏩</button>
+                <button id="speedUpBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9 flex items-center justify-center"><svg class="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M13 6v12l8-6zM3 6v12l8-6z"/></svg></button>
             </div>
-            <button id="replayBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">↻ Reset</button>
+            <button id="replayBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Reset</button>
         </div>
     </div>
 
     <div class="cmd-group" id="cmdSyncGroup">
         <span class="cmd-label">Sync</span>
         <div class="cmd-row">
-            <button id="forceSyncBtn" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="Tip: Click a few times if sync fails. Hide other timestamps to avoid OCR errors.">🔄 Sync Now</button>
+            <button id="forceSyncBtn" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="Tip: Click a few times if sync fails. Hide other timestamps to avoid OCR errors."><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>Sync Now</button>
         </div>
     </div>
 
     <div class="cmd-group">
         <span class="cmd-label">Markers</span>
         <div class="cmd-row">
-            <button id="markBtn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">📌 Mark Point</button> 
-            <button id="clearMarksBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">❌ Clear</button>
+            <button id="markBtn" disabled class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.3"/></svg>Mark Point</button> 
+            <button id="clearMarksBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Clear</button>
         </div>
     </div>
 
@@ -420,17 +424,17 @@
 
 <div id="pointAnalysisModal" class="modal-overlay">
     <div class="modal-card">
-        <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('pointAnalysisModal').style.display='none'">✕</button>
+        <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('pointAnalysisModal').style.display='none'"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <h2 id="pointAnalysisTitle" class="text-white text-lg font-bold border-b border-slate-700 pb-2">Point Data Analysis</h2>
         <div id="pointAnalysisMeta" class="text-[11px] text-slate-400 mb-1"></div>
         <div id="pointAnalysisStats"></div>
-        <button onclick="downloadPointAnalysis()" class="self-start mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap">📥 Download Report (.txt)</button>
+        <button onclick="downloadPointAnalysis()" class="self-start mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Report (.txt)</button>
     </div>
 </div>
 
 <div id="batchCacheModal" class="modal-overlay">
     <div class="modal-card">
-        <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none">✕</button>
+        <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2">Cache Satellite Imagery Locally</h2>
         <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Pick a satellite and band(s), then select one or more flight files (.txt or .nc). Every tile those flights need is downloaded into the local cache. Cached imagery stays until you close the tab, so opening any of these flights later plays back with no fetching. (Flights outside the chosen satellite's view / before its data starts are skipped.)</p>
         <div class="mt-3 text-xs text-slate-300 font-semibold">Satellite:</div>
@@ -450,8 +454,8 @@
 
 <div id="clipRecordModal" class="modal-overlay">
     <div class="modal-card" style="max-width: 560px; max-height: 90vh; overflow-y: auto;">
-        <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('clipRecordModal').style.display='none'">✕</button>
-        <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2">🎥 Record Mission Clip</h2>
+        <button class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none" onclick="document.getElementById('clipRecordModal').style.display='none'"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2 flex items-center"><svg class="inline w-4 h-4 -mt-0.5 mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>Record Mission Clip</h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
             <div>
@@ -512,26 +516,26 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/01-state.js?v=20260703l"></script>
-    <script src="js/02-satellite.js?v=20260703l"></script>
-    <script src="js/03-metrics.js?v=20260703l"></script>
-    <script src="js/04-geo-measure.js?v=20260703l"></script>
-    <script src="js/05-interpolation.js?v=20260703l"></script>
-    <script src="js/06-ocr.js?v=20260703l"></script>
-    <script src="js/07-ui-controls.js?v=20260703l"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260703l"></script>
-    <script src="js/09-interaction.js?v=20260703l"></script>
-    <script src="js/10-point-analysis.js?v=20260703l"></script>
-    <script src="js/11-layout.js?v=20260703l"></script>
-    <script src="js/12-file-parsing.js?v=20260703l"></script>
-    <script src="js/12b-recon-archive.js?v=20260703l"></script>
-    <script src="js/13-charts-master.js?v=20260703l"></script>
-    <script src="js/14-filters-sync.js?v=20260703l"></script>
-    <script src="js/15-map-render.js?v=20260703l"></script>
-    <script src="js/16-pfd-hud.js?v=20260703l"></script>
-    <script src="js/17-charts.js?v=20260703l"></script>
-    <script src="js/18-engine.js?v=20260703l"></script>
-    <script src="js/19-bootstrap.js?v=20260703l"></script>
-    <script src="js/20-ui-polish.js?v=20260703l"></script>
+    <script src="js/01-state.js?v=20260704a"></script>
+    <script src="js/02-satellite.js?v=20260704a"></script>
+    <script src="js/03-metrics.js?v=20260704a"></script>
+    <script src="js/04-geo-measure.js?v=20260704a"></script>
+    <script src="js/05-interpolation.js?v=20260704a"></script>
+    <script src="js/06-ocr.js?v=20260704a"></script>
+    <script src="js/07-ui-controls.js?v=20260704a"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260704a"></script>
+    <script src="js/09-interaction.js?v=20260704a"></script>
+    <script src="js/10-point-analysis.js?v=20260704a"></script>
+    <script src="js/11-layout.js?v=20260704a"></script>
+    <script src="js/12-file-parsing.js?v=20260704a"></script>
+    <script src="js/12b-recon-archive.js?v=20260704a"></script>
+    <script src="js/13-charts-master.js?v=20260704a"></script>
+    <script src="js/14-filters-sync.js?v=20260704a"></script>
+    <script src="js/15-map-render.js?v=20260704a"></script>
+    <script src="js/16-pfd-hud.js?v=20260704a"></script>
+    <script src="js/17-charts.js?v=20260704a"></script>
+    <script src="js/18-engine.js?v=20260704a"></script>
+    <script src="js/19-bootstrap.js?v=20260704a"></script>
+    <script src="js/20-ui-polish.js?v=20260704a"></script>
 </body>
 </html>

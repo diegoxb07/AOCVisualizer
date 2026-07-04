@@ -308,7 +308,15 @@
             ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
             ctx.beginPath(); ctx.arc(sx, sy, r, 0, 2 * Math.PI); ctx.fillStyle = bg; ctx.fill();
             ctx.lineWidth = 1.5; ctx.strokeStyle = '#0b0e13'; ctx.stroke();
-            ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, sx, sy + 0.5);
+            if (label === '✓') {
+                // Vector checkmark - crisper across displays/scales than relying on the system
+                // font's rendering of the ✓ glyph at this small a size.
+                ctx.beginPath();
+                ctx.moveTo(sx - 4.5, sy + 0.5); ctx.lineTo(sx - 1.5, sy + 3.5); ctx.lineTo(sx + 5, sy - 4);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+            } else {
+                ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, sx, sy + 0.5);
+            }
             ctx.restore();
             measureButtons.push({ kind, shapeIndex, sx, sy, r: r + 4 });
         };

@@ -33,13 +33,31 @@
             }
         }
     }
-    window.addEventListener('resize', () => { 
-        if (filteredData.length > 0) { 
-            resizeCanvasLayout(); 
+    window.addEventListener('resize', () => {
+        if (filteredData.length > 0) {
+            resizeCanvasLayout();
             if(trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
             if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
-        } 
+        }
     });
+
+    // Fullscreen/fake-fs transitions resize the map's container on the browser's own timeline
+    // (varies by OS/animation, and doesn't always fire a `window` 'resize' event) - the
+    // fullscreenchange handler's fixed setTimeout (js/07-ui-controls.js) can fire before that
+    // layout has actually settled, leaving the canvas's backing store sized for the OLD box while
+    // its CSS size is already the new (much larger) one, which the browser then stretches to fit -
+    // the "map gets stretched in fullscreen" symptom. A ResizeObserver reacts to the container's
+    // TRUE rendered size whenever it actually changes, however many times, instead of guessing a
+    // delay - resizeCanvasLayout() is a no-op unless the backing store is actually out of date.
+    if (window.ResizeObserver) {
+        new ResizeObserver(() => {
+            resizeCanvasLayout();
+            if (filteredData.length > 0) {
+                if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+                if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
+            }
+        }).observe(canvas.parentElement);
+    }
 
     (function setupMediaResize() {
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');

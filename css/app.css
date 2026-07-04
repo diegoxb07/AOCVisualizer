@@ -172,6 +172,10 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(56, 189, 248, 0.55); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 170px; height: 170px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
+/* Crew ride cutaway - top-left of the 2D tracker, shown only when the toggle is on (JS). */
+#cabinOverlay { position: absolute; top: 48px; left: 16px; width: 200px; height: 150px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; overflow: hidden; pointer-events: none; z-index: 2450; }
+#cabinCanvas { width: 100%; height: 100%; display: block; }
+#mapPanel:is(:fullscreen, .fake-fs) #cabinOverlay { top: 96px; width: 260px; height: 195px; }
 
 /* Non-invasive satellite fetch status - a small pill, not a full-screen cover */
 #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(11, 14, 19, 0.9); border: 1px solid rgba(56, 189, 248, 0.6); color: #bae6fd; padding: 6px 12px; border-radius: 999px; font-family: 'Roboto Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
@@ -259,9 +263,20 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
    would also span the 4px vertical padding and protrude past the checkbox grid. */
 #cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 28px; padding: 4px 0 4px 12px; border-left: none !important; position: relative; }
 #cmdFiltersGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: #262e38; }
-#filtersGrid { display: grid !important; grid-template-columns: auto auto; gap: 6px 22px; align-items: center; }
-#filtersGrid label { font-size: 13px !important; gap: 6px !important; }
-#filtersGrid input[type="checkbox"] { width: 16px !important; height: 16px !important; }
+/* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
+   in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
+   reflowing the other filters. */
+#filtersGrid { display: flex !important; gap: 15px; align-items: flex-start; }
+.filter-col { display: flex; flex-direction: column; gap: 4px; }
+.filter-lbl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: #60a5fa; cursor: pointer; user-select: none; white-space: nowrap; }
+.filter-cb { accent-color: #3b82f6; width: 12px; height: 12px; cursor: pointer; flex-shrink: 0; }
+.filter-child { margin-left: 15px; position: relative; }
+.filter-child::before { content: ""; position: absolute; left: -10px; top: -8px; width: 7px; height: 15px; border-left: 1px solid #3f5871; border-bottom: 1px solid #3f5871; border-bottom-left-radius: 3px; }
+.filter-child.child-off, .filter-child.child-off::before { visibility: hidden; }   /* reserved space kept */
+.filter-note { margin-left: 17px; margin-top: -2px; font-size: 8.5px; font-weight: 600; font-style: italic; letter-spacing: 0.3px; color: #64748b; text-transform: uppercase; user-select: none; }
+/* In 3D fullscreen the info stack (satellite badge + storm card) sits top-left, where the
+   pitch/roll HUD used to overlap it - move the HUD to the top-right, clear of both. */
+#mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; }
 #cmdSyncGroup { display: none; }
 #cmdSyncGroup:has(#forceSyncBtn[style*="inline-block"]) { display: flex; }
 

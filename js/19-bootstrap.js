@@ -586,7 +586,9 @@
        Restoring dispatches 'change' so each control's normal handler runs; all of them
        no-op safely when no flight is loaded yet. */
     (function persistDisplayPrefs() {
-        const PREF_IDS = ['toggleImperial', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect'];
+        // NOTE: 'toggleCabin' (Crew Ride) is deliberately NOT persisted - it always starts OFF on
+        // load/refresh, so the checkbox can never come back checked-but-not-running after a reload.
+        const PREF_IDS = ['toggleImperial', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
         try {
             const saved = JSON.parse(localStorage.getItem(KEY) || '{}');

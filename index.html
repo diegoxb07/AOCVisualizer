@@ -12,8 +12,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written - regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260703l">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260703l">
+    <link rel="stylesheet" href="css/fonts.css?v=20260704a">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260704a">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -21,7 +21,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260703l">
+    <link rel="stylesheet" href="css/app.css?v=20260704a">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -230,6 +230,7 @@
                         <div id="pfdOverlay">
                             <canvas id="pfdCanvas"></canvas>
                         </div>
+                        <div id="cabinOverlay"><canvas id="cabinCanvas"></canvas></div>
                         <div id="stormTrackTooltip" class="hidden fixed z-[3000] bg-slate-950/95 border border-blue-300/60 rounded px-2.5 py-1.5 text-[10px] font-mono text-blue-100 leading-snug pointer-events-none"></div>
                     </div>
                 </div>
@@ -395,13 +396,31 @@
         </div>
     </div>
 
+    <div class="cmd-group">
+        <span class="cmd-label">3D Track Altitude</span>
+        <div class="cmd-row">
+            <select id="trackAltSelect" title="Which altitude the 3D map plots the track/plane at (independent of the PFD's Press&#8594;GPS filter)" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-md px-2 py-1.5 text-xs font-semibold outline-none cursor-pointer h-9 shadow-sm focus:border-blue-500 transition-colors">
+                <option value="gps">GPS Altitude</option>
+                <option value="press">Pressure Altitude</option>
+            </select>
+        </div>
+    </div>
+
     <div class="cmd-group" id="cmdFiltersGroup">
         <span class="cmd-label">Filters</span>
         <div class="cmd-row" id="filtersGrid">
-            <label class="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold cursor-pointer select-none whitespace-nowrap"><input type="checkbox" id="togglePfd" class="accent-blue-500 w-3.5 h-3.5 cursor-pointer" /> Cockpit PFD</label>
-            <label id="gpsAltContainer" class="hidden items-center gap-1.5 text-[11px] text-blue-400 font-bold cursor-pointer select-none whitespace-nowrap"><input type="checkbox" id="toggleGpsAlt" class="accent-blue-500 w-3.5 h-3.5 cursor-pointer" /> Press-&gt;GPS Alt</label>
-            <label class="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold cursor-pointer select-none whitespace-nowrap"><input type="checkbox" id="toggleImperial" class="accent-blue-500 w-3.5 h-3.5 cursor-pointer" /> Imperial Units</label>
-            <label class="flex items-center gap-1.5 text-[11px] text-blue-400 font-bold cursor-pointer select-none whitespace-nowrap"><input type="checkbox" id="simpleTrackerIcon" class="accent-blue-500 w-3.5 h-3.5 cursor-pointer" /> Simple Icon (2D)</label>
+            <div class="filter-col">
+                <label class="filter-lbl"><input type="checkbox" id="togglePfd" class="filter-cb" /> Cockpit PFD</label>
+                <label id="gpsAltContainer" class="filter-lbl filter-child child-off"><input type="checkbox" id="toggleGpsAlt" class="filter-cb" /> Press&#8594;GPS Alt</label>
+            </div>
+            <div class="filter-col">
+                <label class="filter-lbl"><input type="checkbox" id="toggleImperial" class="filter-cb" /> Imperial Units</label>
+                <label class="filter-lbl"><input type="checkbox" id="simpleTrackerIcon" class="filter-cb" /> Simple Icon (2D)</label>
+            </div>
+            <div class="filter-col">
+                <label title="Seated crew figures that sway and bounce with the flight's real accelerations and turbulence" class="filter-lbl"><input type="checkbox" id="toggleCabin" class="filter-cb" /> Crew Physics</label>
+                <span class="filter-note">experimental</span>
+            </div>
         </div>
     </div>
 
@@ -512,26 +531,28 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/01-state.js?v=20260703l"></script>
-    <script src="js/02-satellite.js?v=20260703l"></script>
-    <script src="js/03-metrics.js?v=20260703l"></script>
-    <script src="js/04-geo-measure.js?v=20260703l"></script>
-    <script src="js/05-interpolation.js?v=20260703l"></script>
-    <script src="js/06-ocr.js?v=20260703l"></script>
-    <script src="js/07-ui-controls.js?v=20260703l"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260703l"></script>
-    <script src="js/09-interaction.js?v=20260703l"></script>
-    <script src="js/10-point-analysis.js?v=20260703l"></script>
-    <script src="js/11-layout.js?v=20260703l"></script>
-    <script src="js/12-file-parsing.js?v=20260703l"></script>
-    <script src="js/12b-recon-archive.js?v=20260703l"></script>
-    <script src="js/13-charts-master.js?v=20260703l"></script>
-    <script src="js/14-filters-sync.js?v=20260703l"></script>
-    <script src="js/15-map-render.js?v=20260703l"></script>
-    <script src="js/16-pfd-hud.js?v=20260703l"></script>
-    <script src="js/17-charts.js?v=20260703l"></script>
-    <script src="js/18-engine.js?v=20260703l"></script>
-    <script src="js/19-bootstrap.js?v=20260703l"></script>
-    <script src="js/20-ui-polish.js?v=20260703l"></script>
+    <script src="js/00-var-catalog.js?v=20260704a"></script>
+    <script src="js/01-state.js?v=20260704a"></script>
+    <script src="js/02-satellite.js?v=20260704a"></script>
+    <script src="js/03-metrics.js?v=20260704a"></script>
+    <script src="js/04-geo-measure.js?v=20260704a"></script>
+    <script src="js/05-interpolation.js?v=20260704a"></script>
+    <script src="js/06-ocr.js?v=20260704a"></script>
+    <script src="js/07-ui-controls.js?v=20260704a"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260704a"></script>
+    <script src="js/09-interaction.js?v=20260704a"></script>
+    <script src="js/10-point-analysis.js?v=20260704a"></script>
+    <script src="js/11-layout.js?v=20260704a"></script>
+    <script src="js/12-file-parsing.js?v=20260704a"></script>
+    <script src="js/12b-recon-archive.js?v=20260704a"></script>
+    <script src="js/13-charts-master.js?v=20260704a"></script>
+    <script src="js/14-filters-sync.js?v=20260704a"></script>
+    <script src="js/15-map-render.js?v=20260704a"></script>
+    <script src="js/16-pfd-hud.js?v=20260704a"></script>
+    <script src="js/17-charts.js?v=20260704a"></script>
+    <script src="js/18-engine.js?v=20260704a"></script>
+    <script src="js/19-bootstrap.js?v=20260704a"></script>
+    <script src="js/20-ui-polish.js?v=20260704a"></script>
+    <script src="js/21-cabin.js?v=20260704a"></script>
 </body>
 </html>

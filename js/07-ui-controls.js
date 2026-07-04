@@ -161,8 +161,48 @@
         planeGroup3D.add(fuselage, wings, tail, vTail, nose); planeGroup3D.scale.set(0.15, 0.15, 0.15); scene3D.add(planeGroup3D);
         const arrowGroup = new THREE.Group(); const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8), new THREE.MeshBasicMaterial({color: 0x3da5ff})); shaft.rotation.x = Math.PI / 2; shaft.position.z = -1.8; const head = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 8), new THREE.MeshBasicMaterial({color: 0x3da5ff})); head.rotation.x = Math.PI / 2; head.position.z = -2.7; arrowGroup.add(shaft, head); arrowGroup.scale.set(0.7, 0.7, 0.7);
         trackArrow3D = arrowGroup; scene3D.add(trackArrow3D); scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
-        function animate3D() { requestAnimationFrame(animate3D); if (controls3D) controls3D.update(); renderer3D.render(scene3D, camera3D); }
+        buildWindStreaks3D();
+        function animate3D() { requestAnimationFrame(animate3D); if (controls3D) controls3D.update(); updateWindStreaks3D(); renderer3D.render(scene3D, camera3D); }
         animate3D(); threeDInitialized = true;
+    }
+
+    // Climb/descent indicator: a FEW small white streaks close to the plane that appear ONLY during
+    // a big ascent or descent (the aircraft's own vertical speed), streaming past the airframe like
+    // relative airflow. Nothing shows in level flight or gentle rates. Parented to the scene (stays
+    // world-vertical, does not bank); repositioned onto the plane each frame in update3DFrame.
+    let windStreaks3D = null, cur3DVertRate = 0, windStreakLastMs = 0;
+    function buildWindStreaks3D() {
+        if (windStreaks3D || !scene3D) return;
+        windStreaks3D = new THREE.Group();
+        for (let i = 0; i < 6; i++) {
+            const a = (Math.sin((i + 1) * 7.13) * 99991) % 1, b = (Math.sin((i + 1) * 3.71) * 77773) % 1;
+            const ang = a * Math.PI * 2, rad = 0.5 + Math.abs(b) * 0.5;   // tight ring hugging the plane
+            const seg = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.32, 0.025), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+            seg.userData = { x: Math.cos(ang) * rad, z: Math.sin(ang) * rad, phase: (a - 0.5) * 1.8 };
+            seg.position.set(seg.userData.x, seg.userData.phase, seg.userData.z);
+            windStreaks3D.add(seg);
+        }
+        windStreaks3D.visible = false; scene3D.add(windStreaks3D);
+    }
+    function updateWindStreaks3D() {
+        if (!windStreaks3D) return;
+        const now = performance.now(); let dt = (now - windStreakLastMs) / 1000; windStreakLastMs = now;
+        if (!(dt > 0) || dt > 0.1) dt = 1 / 60;
+        // Only during a BIG climb/descent: below ~4 m/s (~800 ft/min) nothing shows; fully lit by
+        // ~14 m/s (~2800 ft/min). |cur3DVertRate| is the aircraft's own vertical speed.
+        const ON = 4, FULL = 14, band = 1.0;
+        const intensity = Math.max(0, Math.min(1, (Math.abs(cur3DVertRate) - ON) / (FULL - ON)));
+        windStreaks3D.visible = intensity > 0.001;
+        if (!windStreaks3D.visible) return;
+        const speed = -Math.sign(cur3DVertRate) * (0.5 + intensity * 1.3);   // air streams DOWN past a climbing plane, UP past a descending one
+        windStreaks3D.children.forEach(seg => {
+            seg.userData.phase += speed * dt;
+            if (seg.userData.phase > band) seg.userData.phase -= 2 * band;
+            else if (seg.userData.phase < -band) seg.userData.phase += 2 * band;
+            seg.position.y = seg.userData.phase;
+            seg.scale.y = 0.5 + intensity * 1.2;
+            seg.material.opacity = 0.1 + intensity * 0.45;
+        });
     }
 
     function get3DCoord(lon, lat, altMeters) {
@@ -173,16 +213,26 @@
         const x = (wrapLon(lon) - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 250; return new THREE.Vector3(x, y, z);
     }
 
+    // Altitude source for the 3D map's vertical dimension (track, plane, markers). Its OWN control
+    // (#trackAltSelect, defaults to GPS) - independent of the PFD's Press->GPS filter (#toggleGpsAlt),
+    // which still only governs the PFD altitude tape / point analysis.
+    function track3DAltMeters(d) {
+        if (!d) return 0;
+        const sel = document.getElementById('trackAltSelect');
+        const useGps = !sel || sel.value !== 'press';   // default GPS
+        return useGps ? (d.gpsAlt != null ? d.gpsAlt : (d.pAlt != null ? d.pAlt : 0))
+                      : (d.pAlt != null ? d.pAlt : (d.gpsAlt != null ? d.gpsAlt : 0));
+    }
+
     function sync3DMarkers() {
         if (!threeDInitialized) return;
         while(threeMarkersGroup.children.length > 0) threeMarkersGroup.remove(threeMarkersGroup.children[0]);
-        const markerGeo = new THREE.SphereGeometry(0.08, 16, 16), useGps = document.getElementById('toggleGpsAlt').checked;
+        const markerGeo = new THREE.SphereGeometry(0.08, 16, 16);
         customMarkers.forEach(marker => {
             const d = filteredData[marker.idx];
             if(d) {
                 const markerMat = new THREE.MeshPhongMaterial({color: marker.color}); const mesh = new THREE.Mesh(markerGeo, markerMat);
-                const altM = useGps ? (d.gpsAlt !== null ? d.gpsAlt : (d.pAlt !== null ? d.pAlt : 0)) : (d.pAlt !== null ? d.pAlt : (d.gpsAlt !== null ? d.gpsAlt : 0));
-                mesh.position.copy(get3DCoord(d.lon, d.lat, altM)); mesh.userData = { dataPoint: d }; threeMarkersGroup.add(mesh);
+                mesh.position.copy(get3DCoord(d.lon, d.lat, track3DAltMeters(d))); mesh.userData = { dataPoint: d }; threeMarkersGroup.add(mesh);
             }
         });
     }
@@ -219,10 +269,9 @@
             if (geom.type === 'Polygon') processPolygon(geom.coordinates, isState); else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => processPolygon(poly, isState));
         });
         if(filteredData.length > 0) {
-            const useGps = document.getElementById('toggleGpsAlt').checked; const pathPts = []; const colors = [];
+            const pathPts = []; const colors = [];
             filteredData.forEach((d, idx) => {
-                const altM = useGps ? (d.gpsAlt !== null ? d.gpsAlt : (d.pAlt !== null ? d.pAlt : 0)) : (d.pAlt !== null ? d.pAlt : (d.gpsAlt !== null ? d.gpsAlt : 0));
-                pathPts.push(get3DCoord(d.lon, d.lat, altM)); const [r, g, b] = getPathColorRGB(d, idx); colors.push(r, g, b);
+                pathPts.push(get3DCoord(d.lon, d.lat, track3DAltMeters(d))); const [r, g, b] = getPathColorRGB(d, idx); colors.push(r, g, b);
             });
             const pathGeom = new THREE.BufferGeometry().setFromPoints(pathPts); pathGeom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             const trackMat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); const coloredTrack3D = new THREE.Line(pathGeom, trackMat); threeMapGroup.add(coloredTrack3D);
@@ -245,13 +294,22 @@
 
     function update3DFrame(idx, visualRow) {
         if (!threeDInitialized || !filteredData[idx]) return;
-        const d = visualRow || filteredData[idx], useGps = document.getElementById('toggleGpsAlt').checked;
-        const altM = useGps ? (d.gpsAlt !== null ? d.gpsAlt : (d.pAlt !== null ? d.pAlt : 0)) : (d.pAlt !== null ? d.pAlt : (d.gpsAlt !== null ? d.gpsAlt : 0));
-        const pos = get3DCoord(d.lon, d.lat, altM);
+        const d = visualRow || filteredData[idx];
+        const pos = get3DCoord(d.lon, d.lat, track3DAltMeters(d));
         planeGroup3D.position.copy(pos);
         let t_pitch = d.pitch ?? 0, t_th = d.th ?? 0, t_roll = d.roll ?? 0, t_track = d.gTrack ?? 0;
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
+        // aircraft vertical speed (m/s), central-difference over a few samples, for the climb/descent
+        // streaks (the plane's OWN motion, not turbulence). Same alt source as the 3D track.
+        let vr = 0;
+        const iA = Math.max(0, idx - 2), iB = Math.min(filteredData.length - 1, idx + 2);
+        if (iB > iA) {
+            const rA = filteredData[iA], rB = filteredData[iB], aA = track3DAltMeters(rA), aB = track3DAltMeters(rB), tdt = rB.absSeconds - rA.absSeconds;
+            if (tdt > 0) vr = (aB - aA) / tdt;
+        }
+        cur3DVertRate = vr;   // feed the climb/descent streaks (animated in animate3D)
+        if (windStreaks3D) windStreaks3D.position.copy(pos);
         camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
         controls3D.target.copy(pos); controls3D.update();
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
@@ -358,6 +416,7 @@
 
     document.getElementById('pathColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
     document.getElementById('barbColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
+    document.getElementById('trackAltSelect').addEventListener('change', () => { if (filteredData.length > 0 && threeDInitialized) { build3DScene(); updateVisualComponents(currentIdx); } });
     document.getElementById('toggle8Hz').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
 
     document.getElementById('markBtn').addEventListener('click', () => {
@@ -369,11 +428,13 @@
     document.getElementById('clearMarksBtn').addEventListener('click', () => { customMarkers = []; if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx); });
     document.getElementById('simpleTrackerIcon').addEventListener('change', () => { if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
 
-    document.getElementById('togglePfd').addEventListener('change', (e) => { 
+    document.getElementById('togglePfd').addEventListener('change', (e) => {
+        // Reveal the Press->GPS Alt sub-option in its reserved slot (elbow-connected under PFD),
+        // rather than inserting a cell that reflows the other filters.
         const gpsContainer = document.getElementById('gpsAltContainer');
-        if (e.target.checked) { gpsContainer.classList.remove('hidden'); gpsContainer.classList.add('flex'); } 
-        else { gpsContainer.classList.add('hidden'); gpsContainer.classList.remove('flex'); document.getElementById('toggleGpsAlt').checked = false; }
-        if (filteredData.length > 0) { const pfd = document.getElementById('pfdOverlay'); pfd.style.display = e.target.checked ? 'block' : 'none'; resizeCanvasLayout(); updateVisualComponents(currentIdx); } 
+        gpsContainer.classList.toggle('child-off', !e.target.checked);
+        if (!e.target.checked) document.getElementById('toggleGpsAlt').checked = false;
+        if (filteredData.length > 0) { const pfd = document.getElementById('pfdOverlay'); pfd.style.display = e.target.checked ? 'block' : 'none'; resizeCanvasLayout(); updateVisualComponents(currentIdx); }
     });
 
     document.getElementById('toggleImperial').addEventListener('change', () => { if (filteredData.length > 0) { buildChartLayout(); updateVisualComponents(currentIdx); } });

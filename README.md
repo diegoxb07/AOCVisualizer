@@ -108,9 +108,9 @@ If an MMR video is loaded, the **video clock drives playback** and the telemetry
 Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header.
 
 - **2D**: whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom, drag to pan; zoom out for synoptic context.
-- **3D**: Three.js scene with terrain, a plane model, and the track drawn by altitude. Orbit/zoom with the mouse.
+- **3D**: Three.js scene with terrain, a plane model, and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse.
 
-Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
+Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
 
 > **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, stepping through the Saffir-Simpson categories from there. A fully black track just means the aircraft never sampled hurricane-force winds.
 
@@ -157,7 +157,11 @@ Archive loads automatically draw the storm's **whole-life**, intensity-colored, 
 
 Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds/accel, pressure, thermodynamics) track the playback moment: **↺** resets zoom, **＋** adds/removes series, scroll/drag to zoom and pan. **Create Your Own Graph** (bottom) plots **any** variables the file contains against each other.
 
-Filters (bottom bar): **Cockpit PFD** (attitude indicator overlay), **Imperial Units**, and **Press→GPS Alt** (altitude source, when available). The HUD box on the map shows live telemetry text.
+Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a **slip/skid indicator**, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **Imperial Units**, and **Press→GPS Alt** (altitude source, when available). The HUD box on the map shows live telemetry text.
+
+**8 Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds is turbulence-aware, scaled to the recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air moves the airframe.
+
+**Crew Ride** (filters, *experimental*) is an optional novelty: seatbelted crew figures that lean with the flight's *real* lateral G and roll, **float** up against the belt in negative-G, **hunch** down in positive-G, and buzz along with the airframe in turbulence, so you can watch how rough a pass actually was. A rear-view cutaway shows on the 2D tracker; small figures ride inside the (translucent) plane in the 3D view. Always starts off (it is not remembered between sessions).
 
 ---
 
@@ -196,3 +200,15 @@ Filters (bottom bar): **Cockpit PFD** (attitude indicator overlay), **Imperial U
 - **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries, fonts, and basemap data ship inside the repo, so the tool loads and replays manual uploads **with no internet at all** (only the archive/satellite APIs and the OCR engine's runtime download need a connection).
 - **Deployment:** GitHub Pages via [.github/workflows/static.yml](.github/workflows/static.yml)
 - **No test suite.** Verify changes by opening the page and exercising the upload → play flow.
+
+---
+
+## Appendix: flight-level variables & sensors
+
+AOC flight-level files carry **hundreds** of columns, but this visualizer reads only the quality-controlled subset it needs to plot: position, GPS/pressure/radar altitude, D-value, pressures, temperature and dew point, true/indicated airspeed, wind speed/direction/vertical wind, drift, heading, ground track, pitch/roll, angle of attack and sideslip, vertical acceleration, mixing ratio, and equivalent potential temperature. Those are the fields shown in the charts, PFD, HUD, and "Create Your Own Graph."
+
+Most raw columns come in **redundant sensors** (`.1`, `.2`, `.3` …), and after each flight a quality-assurance pass picks the best one as the **reference** (the `ref` suffix, e.g. `THDGref`, `LATref`). This tool reads those references (falling back to sensor `.1`) because it works with already-QC'd data. Column suffixes: `.d` derived, `.c` corrected, `.N` sensor index, `ref` chosen reference; families include INE (inertial), GPS, air-data unit (ADDU), dropsonde (`DS_`), and the SFMR surface-wind radiometer.
+
+Everything is **metric by default**; the **Imperial Units** filter converts (m→ft, m/s→mph, °C→°F), while knots and nautical miles are never converted. A variable that isn't present in the uploaded file is greyed out.
+
+> The app also carries an internal dictionary of the full raw-variable set (`js/00-var-catalog.js`) that it does **not** yet use for playback. It's groundwork for a future **Quality-Check mode** that would list every variable in a file, overlay and cross-compare a measurement's redundant sensors, and flag data gaps, spikes, or sensor disagreement.

@@ -143,7 +143,7 @@
                         if (currentIdx === -1) currentIdx = 0;
                         updateVisualComponents(currentIdx);
                         if (wasPlaying) {
-                            isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; lastTickTime = performance.now();
+                            isPlaying = true; playPauseBtn.innerHTML = PAUSE_ICON + "Pause"; lastTickTime = performance.now();
                             if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
                             masterSyncEngineTick();
                         }

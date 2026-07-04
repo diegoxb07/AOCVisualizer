@@ -20,7 +20,10 @@ import api_process
 import provision
 import static_server
 import updater
-from config import API_REPO, FRONTEND_DIR, FRONTEND_REPO, ICON_PATH, IS_FROZEN, VENDOR_DIR
+from config import (
+    API_BRANCH, API_REPO, FRONTEND_BRANCH, FRONTEND_DIR, FRONTEND_REPO, ICON_PATH, IS_FROZEN,
+    VENDOR_DIR,
+)
 from state_store import load_state, update_state
 
 
@@ -63,25 +66,25 @@ def check_updates(splash: SplashWindow) -> None:
     if IS_FROZEN:
         splash.set_status("Checking for frontend updates...")
         try:
-            latest = updater.get_latest_sha(FRONTEND_REPO)
-            current = state.get("frontend_sha")
+            latest = updater.get_latest_sha(FRONTEND_REPO, branch=FRONTEND_BRANCH)
+            # Also re-check if the tracked branch itself changed since the last run (e.g. this
+            # build was just switched from main to app-dev) - the stale main-branch SHA in
+            # state.json would otherwise happen to differ from app-dev's HEAD anyway and still
+            # trigger a redownload, but tracking the branch explicitly makes that intentional
+            # rather than incidental.
+            current = state.get("frontend_sha") if state.get("frontend_branch") == FRONTEND_BRANCH else None
             if latest != current:
-                if confirm("Update available", "A newer version of the Mission Visualizer frontend is available. Update now?"):
+                if current is None or confirm("Update available", "A newer version of the Mission Visualizer frontend is available. Update now?"):
                     splash.set_status("Downloading frontend update...")
-                    updater.download_and_replace(FRONTEND_REPO, FRONTEND_DIR)
-                    update_state(frontend_sha=latest)
-                elif current is None:
-                    # First run declined the update: still need *something* on disk.
-                    splash.set_status("Downloading frontend...")
-                    updater.download_and_replace(FRONTEND_REPO, FRONTEND_DIR)
-                    update_state(frontend_sha=latest)
+                    updater.download_and_replace(FRONTEND_REPO, FRONTEND_DIR, branch=FRONTEND_BRANCH)
+                    update_state(frontend_sha=latest, frontend_branch=FRONTEND_BRANCH)
         except updater.UpdateCheckFailed:
             pass
 
     splash.set_status("Checking for API updates...")
     try:
-        latest_api = updater.get_latest_sha(API_REPO)
-        current_api = state.get("api_sha")
+        latest_api = updater.get_latest_sha(API_REPO, branch=API_BRANCH)
+        current_api = state.get("api_sha") if state.get("api_branch") == API_BRANCH else None
         need_download = not VENDOR_DIR.exists() or latest_api != current_api
         if need_download:
             do_it = current_api is None or confirm(
@@ -89,8 +92,8 @@ def check_updates(splash: SplashWindow) -> None:
             )
             if do_it:
                 splash.set_status("Downloading API update...")
-                updater.download_and_replace(API_REPO, VENDOR_DIR)
-                update_state(api_sha=latest_api)
+                updater.download_and_replace(API_REPO, VENDOR_DIR, branch=API_BRANCH)
+                update_state(api_sha=latest_api, api_branch=API_BRANCH)
     except updater.UpdateCheckFailed:
         pass
 

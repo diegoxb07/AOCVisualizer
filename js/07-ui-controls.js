@@ -2,6 +2,53 @@
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
+    // --- Theme toggle (Auto -> Dark -> Light -> Auto), persisted to localStorage ---
+    // "Auto" means no [data-theme] attribute at all - css/app.css's
+    // @media (prefers-color-scheme) block then decides. The early inline <script> in index.html's
+    // <head> applies a saved dark/light choice before first paint (no "auto" flash to prevent,
+    // since that's the CSS default); this block just handles the button + keeping them in sync.
+    (function initThemeToggle() {
+        const THEME_KEY = 'aocThemePreference';
+        const root = document.documentElement;
+        const btn = document.getElementById('themeToggleBtn');
+        if (!btn) return;
+        const iconDark = document.getElementById('themeToggleIconDark');
+        const iconLight = document.getElementById('themeToggleIconLight');
+        const iconAuto = document.getElementById('themeToggleIconAuto');
+        const label = document.getElementById('themeToggleLabel');
+        const MODES = ['auto', 'dark', 'light'];
+
+        function currentMode() {
+            const saved = root.getAttribute('data-theme');
+            return (saved === 'dark' || saved === 'light') ? saved : 'auto';
+        }
+
+        function applyMode(mode) {
+            if (mode === 'auto') root.removeAttribute('data-theme');
+            else root.setAttribute('data-theme', mode);
+            [iconDark, iconLight, iconAuto].forEach(el => el && el.classList.add('hidden'));
+            const icon = mode === 'dark' ? iconDark : mode === 'light' ? iconLight : iconAuto;
+            if (icon) icon.classList.remove('hidden');
+            if (label) label.textContent = mode === 'dark' ? 'Dark' : mode === 'light' ? 'Light' : 'Auto';
+        }
+
+        applyMode(currentMode());
+        btn.addEventListener('click', () => {
+            const next = MODES[(MODES.indexOf(currentMode()) + 1) % MODES.length];
+            applyMode(next);
+            try {
+                if (next === 'auto') localStorage.removeItem(THEME_KEY);
+                else localStorage.setItem(THEME_KEY, next);
+            } catch (e) { /* localStorage unavailable (private mode etc.) - toggle still works for this session */ }
+        });
+    })();
+
+    // Shared play/pause button icons - referenced from every file that flips playPauseBtn's
+    // state (11-layout, 12-file-parsing, 14-filters-sync, 18-engine, 19-bootstrap) instead of
+    // each duplicating its own icon+label HTML.
+    const PLAY_ICON = '<svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE_ICON = '<svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>';
+
     // --- Fullscreen-Friendly Drag & Drop Logic ---
     ['dataDropZone', 'videoDropZone'].forEach(zoneId => {
         const zone = document.getElementById(zoneId);

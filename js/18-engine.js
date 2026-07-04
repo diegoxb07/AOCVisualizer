@@ -21,7 +21,7 @@
         lastTickTime = now;
 
         if (videoLoaded) {
-            if (video.ended) { isPlaying = false; playPauseBtn.innerText = "▶ Play"; syncTelemetryToVideoClock(); return; }
+            if (video.ended) { isPlaying = false; playPauseBtn.innerHTML = PLAY_ICON + "Play"; syncTelemetryToVideoClock(); return; }
             
             const curSpeed = speeds[currentSpeedIdx];
             if (curSpeed <= 16) {
@@ -60,7 +60,7 @@
                     playbackAccumulator = 0;
                     updateVisualComponents(currentIdx); 
                     isPlaying = false; 
-                    playPauseBtn.innerText = "▶ Play"; 
+                    playPauseBtn.innerHTML = PLAY_ICON + "Play"; 
                     return; 
                 } 
                 

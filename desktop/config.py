@@ -14,6 +14,12 @@ from pathlib import Path
 FRONTEND_REPO = "diegoxb07/AOCVisualizer"
 API_REPO = "jjmurdock19/noaa-recon-api"
 
+# Branch the self-updater tracks for each repo - not necessarily "main". Currently pointed at the
+# in-development branch for the frontend while this desktop-app work is still being reviewed;
+# flip back to "main" once app-dev is merged, so office installs track the released code again.
+FRONTEND_BRANCH = "app-dev"
+API_BRANCH = "main"
+
 IS_FROZEN = bool(getattr(sys, "frozen", False))
 
 if IS_FROZEN:

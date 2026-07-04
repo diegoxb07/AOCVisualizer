@@ -2,9 +2,11 @@
 
 Both AOCVisualizer (the frontend) and noaa-recon-api (the API) are public repos, so this only
 ever needs unauthenticated GitHub REST calls - fine at "check once per launch" frequency
-(60 req/hr/IP limit). Updating means: compare the ``main`` branch's HEAD commit SHA to what we
-last installed, and if it differs, download ``.../archive/refs/heads/main.zip`` (no git required)
-and replace the target folder wholesale.
+(60 req/hr/IP limit). Updating means: compare a branch's HEAD commit SHA to what we last
+installed, and if it differs, download ``.../archive/refs/heads/{branch}.zip`` (no git required)
+and replace the target folder wholesale. The branch is configurable per-repo (see
+config.FRONTEND_BRANCH/API_BRANCH) rather than hardcoded to ``main``, so pointing the app at a
+feature branch under active development doesn't require code changes here.
 """
 import io
 import shutil
@@ -22,10 +24,10 @@ class UpdateCheckFailed(Exception):
     rather than blocking launch."""
 
 
-def get_latest_sha(repo: str, timeout: float = 5) -> str:
+def get_latest_sha(repo: str, branch: str = "main", timeout: float = 5) -> str:
     try:
         r = requests.get(
-            f"https://api.github.com/repos/{repo}/commits/main",
+            f"https://api.github.com/repos/{repo}/commits/{branch}",
             headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT},
             timeout=timeout,
         )
@@ -35,9 +37,9 @@ def get_latest_sha(repo: str, timeout: float = 5) -> str:
         raise UpdateCheckFailed(str(e)) from e
 
 
-def download_and_replace(repo: str, dest_dir: Path, timeout: float = 180, progress_cb=None) -> None:
-    """Downloads the repo's main-branch zip and replaces dest_dir's contents with it."""
-    url = f"https://github.com/{repo}/archive/refs/heads/main.zip"
+def download_and_replace(repo: str, dest_dir: Path, branch: str = "main", timeout: float = 180, progress_cb=None) -> None:
+    """Downloads the repo's branch zip and replaces dest_dir's contents with it."""
+    url = f"https://github.com/{repo}/archive/refs/heads/{branch}.zip"
     r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=timeout, stream=True)
     r.raise_for_status()
 

@@ -8,12 +8,24 @@
     <meta name="theme-color" content="#0b0e13">
     <link rel="icon" href="assets/noaa-logo.svg" type="image/svg+xml">
 
+    <!-- Applies any saved theme choice before first paint, so there's no flash of the wrong
+         theme while js/*.js (loaded at the end of body) parses. Not part of the numbered
+         js/*.js sequence - deliberately inline and this early, only reads localStorage. -->
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('aocThemePreference');
+                if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {}
+        })();
+    </script>
+
     <!-- Everything below is served from this repo - the app (incl. OCR, fonts, basemap) runs
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written - regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260704a">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260704a">
+    <link rel="stylesheet" href="css/fonts.css?v=20260704b">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260704b">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -21,7 +33,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260704a">
+    <link rel="stylesheet" href="css/app.css?v=20260704b">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -43,6 +55,12 @@
                 </div>
             </div>
             <div class="flex items-center gap-3 shrink-0">
+                <button id="themeToggleBtn" type="button" title="Toggle color theme" class="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-800 border border-slate-700 text-slate-300 hover:text-white rounded text-[11px] font-semibold transition-colors">
+                    <svg id="themeToggleIconDark" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+                    <svg id="themeToggleIconLight" class="hidden w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                    <svg id="themeToggleIconAuto" class="hidden w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                    <span id="themeToggleLabel">Dark</span>
+                </button>
                 <div id="localApiHealthBadge" class="hidden health-badge" data-state="checking">
                     <span class="health-dot" title=""></span>
                     <span class="health-label">Local Imagery: Checking&hellip;</span>
@@ -134,7 +152,7 @@
                         </div>
                     </div>
                     <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0 gap-2">
-                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold rounded border border-purple-800 transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>Record Clip</button>
+                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold rounded border border-slate-700 transition-colors whitespace-nowrap flex items-center justify-center"><span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 shrink-0"></span><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>Record Clip</button>
                         <button id="exportKmlBtn" disabled class="w-full px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded border border-emerald-800 transition-colors shadow-sm whitespace-nowrap"><svg class="inline w-3.5 h-3.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 4 6.1 4 9s-1.5 6.3-4 9c-2.5-2.7-4-6.1-4-9s1.5-6.3 4-9z"/></svg>Export KML</button>
                     </div>
                 </div>
@@ -188,9 +206,9 @@
                                 <select id="satBandSelect" style="display:none;" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer" title="Satellite Spectral Band">
                                 </select>
                                 <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-slate-900 border border-slate-700 border-l-2 border-l-blue-500 rounded px-1.5 py-1 shadow-lg">
-                                    <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">◀</button>
+                                    <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none flex items-center"><svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path d="M15 5v14L4 12z"/></svg></button>
                                     <span id="satDayLabel" class="text-[10px] font-mono text-blue-300 min-w-[78px] text-center leading-tight"></span>
-                                    <button id="satDayNext" title="Next day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none">▶</button>
+                                    <button id="satDayNext" title="Next day" class="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded border border-slate-700 text-[11px] leading-none flex items-center"><svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="currentColor"><path d="M9 5v14l11-7z"/></svg></button>
                                 </div>
                             </div>
                         </div>
@@ -354,7 +372,7 @@
         <span class="cmd-label">Playback</span>
         <div class="cmd-row">
             <button id="runBtn" disabled class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">Apply & Run</button>
-            <button id="playPauseBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9">▶ Play</button>
+            <button id="playPauseBtn" disabled class="px-4 py-2 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white font-bold rounded text-xs transition-colors whitespace-nowrap h-9 flex items-center justify-center"><svg class="inline w-3 h-3 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Play</button>
             <div class="flex items-center bg-slate-800 border border-slate-700 rounded-md overflow-hidden">
                 <button id="speedDownBtn" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors h-9 flex items-center justify-center"><svg class="w-4 h-4 mx-auto" viewBox="0 0 24 24" fill="currentColor"><path d="M11 18V6l-8 6zM21 18V6l-8 6z"/></svg></button>
                 <button id="speedDisplayBtn" class="px-2 py-2 bg-slate-800 text-slate-300 font-medium pointer-events-none h-9 w-[45px] text-center text-xs">1x</button>
@@ -499,7 +517,7 @@
             <p class="text-[13px] text-slate-300 mt-2">4 graphs max</p>
         </div>
 
-        <button id="startClipRecordBtn" class="mt-2 px-4 py-3 bg-purple-700 hover:bg-purple-600 text-white font-bold rounded text-sm transition-colors shadow-sm whitespace-nowrap w-full">⏺ Start Recording</button>
+        <button id="startClipRecordBtn" class="mt-2 px-4 py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded text-sm transition-colors whitespace-nowrap w-full flex items-center justify-center"><svg class="w-3.5 h-3.5 mr-2" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>Start Recording</button>
     </div>
 </div>
 
@@ -509,33 +527,33 @@
     <span class="rec-dot"></span>
     <span id="recordProgressLabel">Recording&hellip; 0%</span>
     <div class="rec-bar"><div id="recordProgressFill"></div></div>
-    <button id="recordStopBtn" title="Stop &amp; save the recording now">■ Stop</button>
+    <button id="recordStopBtn" title="Stop &amp; save the recording now"><svg class="inline w-2.5 h-2.5 -mt-0.5 mr-1" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg>Stop</button>
 </div>
 
 <!-- Application logic is split across js/*.js so one broken file cannot take down the
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/01-state.js?v=20260704a"></script>
-    <script src="js/02-satellite.js?v=20260704a"></script>
-    <script src="js/03-metrics.js?v=20260704a"></script>
-    <script src="js/04-geo-measure.js?v=20260704a"></script>
-    <script src="js/05-interpolation.js?v=20260704a"></script>
-    <script src="js/06-ocr.js?v=20260704a"></script>
-    <script src="js/07-ui-controls.js?v=20260704a"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260704a"></script>
-    <script src="js/09-interaction.js?v=20260704a"></script>
-    <script src="js/10-point-analysis.js?v=20260704a"></script>
-    <script src="js/11-layout.js?v=20260704a"></script>
-    <script src="js/12-file-parsing.js?v=20260704a"></script>
-    <script src="js/12b-recon-archive.js?v=20260704a"></script>
-    <script src="js/13-charts-master.js?v=20260704a"></script>
-    <script src="js/14-filters-sync.js?v=20260704a"></script>
-    <script src="js/15-map-render.js?v=20260704a"></script>
-    <script src="js/16-pfd-hud.js?v=20260704a"></script>
-    <script src="js/17-charts.js?v=20260704a"></script>
-    <script src="js/18-engine.js?v=20260704a"></script>
-    <script src="js/19-bootstrap.js?v=20260704a"></script>
-    <script src="js/20-ui-polish.js?v=20260704a"></script>
+    <script src="js/01-state.js?v=20260704b"></script>
+    <script src="js/02-satellite.js?v=20260704b"></script>
+    <script src="js/03-metrics.js?v=20260704b"></script>
+    <script src="js/04-geo-measure.js?v=20260704b"></script>
+    <script src="js/05-interpolation.js?v=20260704b"></script>
+    <script src="js/06-ocr.js?v=20260704b"></script>
+    <script src="js/07-ui-controls.js?v=20260704b"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260704b"></script>
+    <script src="js/09-interaction.js?v=20260704b"></script>
+    <script src="js/10-point-analysis.js?v=20260704b"></script>
+    <script src="js/11-layout.js?v=20260704b"></script>
+    <script src="js/12-file-parsing.js?v=20260704b"></script>
+    <script src="js/12b-recon-archive.js?v=20260704b"></script>
+    <script src="js/13-charts-master.js?v=20260704b"></script>
+    <script src="js/14-filters-sync.js?v=20260704b"></script>
+    <script src="js/15-map-render.js?v=20260704b"></script>
+    <script src="js/16-pfd-hud.js?v=20260704b"></script>
+    <script src="js/17-charts.js?v=20260704b"></script>
+    <script src="js/18-engine.js?v=20260704b"></script>
+    <script src="js/19-bootstrap.js?v=20260704b"></script>
+    <script src="js/20-ui-polish.js?v=20260704b"></script>
 </body>
 </html>

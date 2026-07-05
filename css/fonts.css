@@ -1,4 +1,17 @@
-/* Locally hosted Inter + Roboto Mono (latin subset), replacing the Google Fonts CDN. */
+/* Locally hosted fonts (latin), replacing the Google Fonts CDN so the app stays fully offline.
+   Manrope (UI) + IBM Plex Mono (telemetry/numbers) are the console-redesign faces; Inter + Roboto
+   Mono are kept below as fallbacks. */
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 400 800;   /* variable font: one file covers the whole weight range */
+  font-display: swap;
+  src: url(../fonts/Manrope-400.woff2) format('woff2');
+}
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url(../fonts/IBMPlexMono-400.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url(../fonts/IBMPlexMono-500.woff2) format('woff2'); }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url(../fonts/IBMPlexMono-600.woff2) format('woff2'); }
+
 @font-face {
   font-family: 'Inter';
   font-style: normal;

@@ -199,15 +199,33 @@
             const fig = new THREE.Group();
             const seat = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.32), shell); seat.position.y = -0.16;
             const hips = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.12, 10), body); hips.position.y = -0.06;
-            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.04, 0.24), beltMat); belt.position.y = -0.04;
+            // lap belt: a thin strap across the tops of the thighs (not a slab over the belly)
+            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.07), beltMat); belt.position.set(0, -0.075, -0.055);
             const torso = new THREE.Group();
             const tMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.095, 0.3, 10), body); tMesh.position.y = 0.15; torso.add(tMesh);
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 12), skin); head.position.y = 0.36; torso.add(head);
             const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.28, 8), body); armL.position.set(-0.1, 0.12, 0); torso.add(armL);
             const armR = armL.clone(); armR.position.x = 0.1; torso.add(armR);
             torso.position.y = 0.0; torso.userData.armL = armL; torso.userData.armR = armR;
-            fig.add(seat, hips, belt, torso);
-            fig.userData.torso = torso; fig.userData.baseY = -0.02;
+            // Legs stay PLANTED on the cabin floor: thigh rests on the seat top and runs forward toward
+            // the nose (-z); shin drops to the floor in front of the seat; the foot rests on the floor
+            // top. They are decoupled from the cushion bob (only the upper body springs), so the feet are
+            // never forced through the floor - no artificial clamp needed.
+            const legs = new THREE.Group();
+            [-0.055, 0.055].forEach(sx => {
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.042, 0.19, 8), body);
+                thigh.rotation.x = Math.PI * 0.46; thigh.position.set(sx, -0.10, -0.08);
+                const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.036, 0.1, 8), body);
+                shin.rotation.x = 0.14; shin.position.set(sx, -0.135, -0.185);
+                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.028, 0.11), skin);
+                foot.position.set(sx, -0.178, -0.205);   // foot bottom sits on the floor top (~-0.18 plane-local)
+                legs.add(thigh, shin, foot);
+            });
+            // upper body (hips + lap belt + torso) - the only part that springs on the cushion / rises
+            // against the belt; the seat and legs stay fixed to the figure.
+            const upper = new THREE.Group(); upper.add(hips, belt, torso);
+            fig.add(seat, legs, upper);
+            fig.userData.torso = torso; fig.userData.upper = upper; fig.userData.baseY = -0.02;
             fig.position.set(0, -0.02, zPos[i]); fig.scale.set(0.82, 0.82, 0.82);
             crewGroup3D.add(fig);
         }
@@ -221,10 +239,12 @@
         if (!crewGroup3D || !cabinSim) return;
         cabinSim.occ.forEach((o, i) => {
             const fig = crewGroup3D.children[i + 3]; if (!fig || !fig.userData.torso) return;   // +3: skip floor + 2 walls
-            const torso = fig.userData.torso;
+            const torso = fig.userData.torso, upper = fig.userData.upper;
             torso.rotation.z = o.torso;                          // lateral lean (plane local frame)
             torso.rotation.x = -o.torsoP - o.pelY * 0.25;        // hunch FORWARD (toward nose) under +G; slight float flex
-            fig.position.y = fig.userData.baseY + o.pelY;        // belt-capped vertical: float up (-G) / compress down (+G)
+            // Only the UPPER body springs (feet stay planted): rises against the belt in -G, presses a
+            // little into the cushion in +G. Realistic modest travel, so nothing clips the floor.
+            if (upper) upper.position.y = o.pelY > 0 ? o.pelY * 0.5 : o.pelY * 0.22;
             if (torso.userData.armL) { torso.userData.armL.rotation.z = o.arm * 0.8; torso.userData.armR.rotation.z = o.arm * 0.8; }
         });
     }

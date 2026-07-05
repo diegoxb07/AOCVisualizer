@@ -57,14 +57,14 @@
     function stopMeasuringState() {
         commitActivePolygon();  // keep a finished (3+ pt) polygon; discard an unfinished stub
         isMeasuring = false; liveMouseGeo = null; hoveredShapeIndex = -1; const btn = document.getElementById('measureBtn');
-        btn.innerText = '📏 Measure'; btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); updateMeasureUI();
+        btn.innerText = 'Measure'; btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); updateMeasureUI();
     }
 
     document.getElementById('measureBtn').addEventListener('click', () => {
         const wasMeasuring = isMeasuring;
         isMeasuring = !isMeasuring; const btn = document.getElementById('measureBtn');
-        if(isMeasuring) { btn.classList.remove('bg-blue-800', 'hover:bg-blue-700'); btn.classList.add('bg-blue-600', 'hover:bg-blue-500'); btn.innerText = '🛑 Stop Measuring'; } 
-        else { btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); btn.innerText = '📏 Measure'; }
+        if(isMeasuring) { btn.classList.remove('bg-blue-800', 'hover:bg-blue-700'); btn.classList.add('bg-blue-600', 'hover:bg-blue-500'); btn.innerText = 'Stop Measuring'; } 
+        else { btn.classList.remove('bg-blue-600', 'hover:bg-blue-500'); btn.classList.add('bg-blue-800', 'hover:bg-blue-700'); btn.innerText = 'Measure'; }
         if (isMeasuring) { measurePointsGeo = []; }
         else { if (wasMeasuring) commitActivePolygon(); liveMouseGeo = null; }
         updateMeasureUI(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);

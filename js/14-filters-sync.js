@@ -6,6 +6,9 @@
         isPlaying = false; playPauseBtn.innerText = "▶ Play"; if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
         const sLim = timeToSeconds(document.getElementById('startTimeInput').value); const eLim = timeToSeconds(document.getElementById('endTimeInput').value); videoStartSeconds = timeToSeconds(document.getElementById('videoStartInput').value);
+        // Remember the applied time window so the Play button (which folded in "Apply & Run") can tell
+        // whether the manual window was edited since and needs re-applying before playing.
+        window._appliedWindow = document.getElementById('startTimeInput').value + '|' + document.getElementById('endTimeInput').value + '|' + document.getElementById('videoStartInput').value;
         filteredData = allParsedData.filter(d => d.absSeconds >= sLim && (d.absSeconds <= eLim || eLim < sLim && d.absSeconds <= eLim + 86400));
         if (filteredData.length === 0) return;
 

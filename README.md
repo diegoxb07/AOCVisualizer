@@ -133,7 +133,7 @@ Pick a layer from the **Sat:** dropdown in the map header (options auto-populate
 
 - **MODIS / VIIRS (polar, NASA GIBS)**: any date back to each mission's start. Keyed to a calendar day; a **day-stepper** moves between days and overpass times are looked up automatically.
 - **GOES-East / GOES-West (archive, needs API)**: rendered server-side from NOAA's S3 archive for the flight's **historical** date. Pick a **product** from the `Choose a product…` picker (spectral bands like Clean IR / Water Vapor, or composites like Sandwich / GeoColor). **Nothing fetches until you pick**, then the tool **pre-caches the whole flight** so scrubbing never waits (progress bar + Cancel). Imagery advances every **10 flight-minutes**; step it with **⏪ 10m / 10m ⏩**. A GOES option greys out when the flight is outside that satellite's view of Earth.
-- **⤓ Locally Cache Satellites** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
+- **⤓ Pre-Cache Satellite Imagery** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
 
 Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):
 
@@ -182,7 +182,7 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 | Auto-Sync lands on the wrong time | Click **🔄 Sync Now** again on a clear frame, hide other on-screen timestamps, or switch to **Manual**. |
 | Charts/map not updating after a window change | Click **`Apply & Run`**. |
 | Nothing plays | Load a file, then **`Apply & Run`**, then **`▶ Play`**. |
-| Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Locally Cache Satellites**. |
+| Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
 
 ---
 

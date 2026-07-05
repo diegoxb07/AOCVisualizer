@@ -36,12 +36,10 @@
     };
 
     // Compact rows: [base, description, unit, category, usedKey]
-    //   unit      = the metric/native unit this family is BELIEVED to carry (deduced unless confirmed)
-    //   category  = coarse grouping for the QC tool's variable browser
-    //   usedKey   = METRIC_DEFS key the visualizer already derives from this family, or '' if unused
-    // A family collapses all its sensor indices (TTM covers TTM.1/.3/.4, DS_Ta covers DS_Ta.1-.8):
-    // for a "cross-compare the sensors of one measurement" QC view, the family IS the comparison unit
-    // and the indices are the sensors to overlay.
+    //   unit     = the metric/native unit this family carries (deduced unless confirmed)
+    //   category = coarse grouping for the QC tool's variable browser
+    //   usedKey  = METRIC_DEFS key derived from this family, or '' if unused
+    // A family collapses all its sensor indices (TTM covers TTM.1/.3/.4) into one comparison unit.
     const RAW_VAR_ROWS = [
         // --- time ---
         ['Time', 'Seconds since file start / time base', 's', 'time', ''],

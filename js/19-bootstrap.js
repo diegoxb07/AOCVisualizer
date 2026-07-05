@@ -279,7 +279,7 @@
         }
         list.innerHTML = clipGraphEntries.map((id, i) =>
             `<label class="flex items-center gap-2 text-xs text-slate-300 py-1 cursor-pointer">` +
-            `<input type="checkbox" class="clip-graph-chk accent-purple-500 w-3.5 h-3.5" value="${id}" ${i < 4 ? 'checked' : ''}> ${clipGraphName(id)}</label>`
+            `<input type="checkbox" class="clip-graph-chk accent-slate-400 w-3.5 h-3.5" value="${id}" ${i < 4 ? 'checked' : ''}> ${clipGraphName(id)}</label>`
         ).join('');
     }
 
@@ -386,7 +386,7 @@
         const yCss = v => ca.bottom - (ca.bottom - ca.top) * (v - sc.min) / (sc.max - sc.min);
         const leftX = dx + ca.left * kx, rightX = dx + ca.right * kx;
         [1 / 3, 2 / 3].forEach(f => { const v = stats.mn + (stats.mx - stats.mn) * f; drawValTag(rctx, rightX, leftX, dy + yCss(v) * ky, top, bot, clipFmtVal(v), 'rgba(190,198,206,0.9)', 'rgba(255,255,255,0.10)', false); });
-        drawValTag(rctx, rightX, leftX, dy + yCss(stats.mx) * ky, top, bot, 'max ' + clipFmtVal(stats.mx), '#34d399', 'rgba(52,211,153,0.4)', true);
+        drawValTag(rctx, rightX, leftX, dy + yCss(stats.mx) * ky, top, bot, 'max ' + clipFmtVal(stats.mx), '#38bdf8', 'rgba(56,189,248,0.4)', true);
         drawValTag(rctx, rightX, leftX, dy + yCss(stats.mn) * ky, top, bot, 'min ' + clipFmtVal(stats.mn), '#f87171', 'rgba(248,113,113,0.4)', true);
     }
 

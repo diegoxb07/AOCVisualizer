@@ -125,7 +125,7 @@
             let startSpd = Math.floor((spd - (cy / spdPxPerKt)) / 10) * 10; let endSpd = Math.ceil((spd + (cy / spdPxPerKt)) / 10) * 10;
             for (let s = startSpd; s <= endSpd; s += 10) { if (s < 0) continue; let y = cy - (s - spd) * spdPxPerKt; ctx.beginPath(); ctx.moveTo(leftW - 8, y); ctx.lineTo(leftW, y); ctx.stroke(); if (s % 20 === 0) ctx.fillText(s, leftW - 10, y); }
         }
-        ctx.fillStyle = '#2dd4bf'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(iasVal !== null ? 'IAS' : 'TAS', leftW / 2, 4); ctx.restore();
+        ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(iasVal !== null ? 'IAS' : 'TAS', leftW / 2, 4); ctx.restore();
         
         ctx.fillStyle = '#000'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fillRect(4, cy - bugH/2, leftW - 4, bugH); ctx.strokeRect(4, cy - bugH/2, leftW - 4, bugH); ctx.fillStyle = spd !== null ? '#fff' : '#888'; ctx.textAlign = 'center'; ctx.font = 'bold ' + fSizeLg + 'px monospace'; ctx.fillText(spd !== null ? spd.toFixed(0) : '---', leftW / 2 + 2, cy + 1);
 
@@ -136,7 +136,7 @@
             let startAlt = Math.floor((alt - (cy / altPxPerUnit)) / altStep) * altStep; let endAlt = Math.ceil((alt + (cy / altPxPerUnit)) / altStep) * altStep;
             for (let a = startAlt; a <= endAlt; a += altStep) { let y = cy - (a - alt) * altPxPerUnit; ctx.beginPath(); ctx.moveTo(rightX, y); ctx.lineTo(rightX + 8, y); ctx.stroke(); if (a % altMajorStep === 0) ctx.fillText(a, rightX + 12, y); }
         }
-        ctx.fillStyle = '#2dd4bf'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(altUnit, rightX + rightW / 2, 4); ctx.restore();
+        ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(altUnit, rightX + rightW / 2, 4); ctx.restore();
         
         ctx.fillStyle = '#000'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fillRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.strokeRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.fillStyle = alt !== null ? '#fff' : '#888'; ctx.textAlign = 'center'; ctx.font = 'bold ' + fSizeLg + 'px monospace'; ctx.fillText(alt !== null ? alt.toFixed(0) : '---', rightX + rightW / 2 - 2, cy + 1);
 
@@ -144,17 +144,17 @@
         if (availableMetrics.has('radAlt') && d.radAlt !== null && d.radAlt * 3.28084 < 2500) {
             const raVal = isImperial ? d.radAlt * 3.28084 : d.radAlt;
             ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(rightX, cy + bugH / 2 + 3, rightW - 4, 14 * k);
-            ctx.fillStyle = '#4ade80'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold ' + Math.max(8, fSize - 2) + 'px monospace';
+            ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold ' + Math.max(8, fSize - 2) + 'px monospace';
             ctx.fillText('RA ' + raVal.toFixed(0), rightX + (rightW - 4) / 2, cy + bugH / 2 + 3 + 7 * k);
         }
 
         ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(vsiX, 0, vsiW, botY); ctx.beginPath(); ctx.moveTo(vsiX, cy); ctx.lineTo(w, cy); ctx.strokeStyle = '#888'; ctx.stroke();
-        ctx.fillStyle = '#2dd4bf'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; let vsiFontSize = Math.max(8, fSize - 3); ctx.font = 'bold ' + vsiFontSize + 'px sans-serif';
+        ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; let vsiFontSize = Math.max(8, fSize - 3); ctx.font = 'bold ' + vsiFontSize + 'px sans-serif';
         vsiUnitChars.forEach((char, i) => { ctx.fillText(char, vsiX + vsiW/2, 2 + vsiFontSize * i); });
 
         if (alt !== null && vsi !== 0) {
             let maxDeflectionPx = (botY - 20) / 2; let vsiHeight = Math.max(-maxDeflectionPx, Math.min(maxDeflectionPx, (vsi / vsiMax) * maxDeflectionPx));
-            ctx.fillStyle = vsi > 0 ? '#34e3a2' : '#ef4444';
+            ctx.fillStyle = vsi > 0 ? '#7dd3fc' : '#ef4444';
             ctx.beginPath(); ctx.moveTo(vsiX + vsiW/2, cy); ctx.lineTo(vsiX + vsiW/2, cy - vsiHeight); ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = Math.max(2, vsiW * 0.25); ctx.stroke();
             ctx.beginPath(); let arrowOffset = vsi > 0 ? 5 : -5; ctx.moveTo(vsiX + 2, cy - vsiHeight + arrowOffset); ctx.lineTo(vsiX + vsiW - 2, cy - vsiHeight + arrowOffset); ctx.lineTo(vsiX + vsiW/2, cy - vsiHeight); ctx.fill();
         }
@@ -172,11 +172,11 @@
                     if (isMajor) { let text = displayHdg.toString(); if (displayHdg === 0) text = 'N'; else if (displayHdg === 90) text = 'E'; else if (displayHdg === 180) text = 'S'; else if (displayHdg === 270) text = 'W'; else text = (displayHdg / 10).toString(); ctx.fillText(text, x, botY + 10); }
                 }
             }
-            // Magenta ground-track diamond on the tape (the HSI's track indicator)
+            // Ground-track diamond on the tape (the HSI's track indicator)
             if (d.gTrack !== null && d.th !== null) {
                 let dTrk = d.gTrack - hdg; while (dTrk > 180) dTrk -= 360; while (dTrk < -180) dTrk += 360;
                 const tx = centerHdgX + dTrk * hdgPxPerDeg;
-                ctx.fillStyle = '#d946ef';
+                ctx.fillStyle = '#9aa1ad';
                 ctx.beginPath(); ctx.moveTo(tx, botY + 1); ctx.lineTo(tx + 4, botY + 7); ctx.lineTo(tx, botY + 13); ctx.lineTo(tx - 4, botY + 7); ctx.closePath(); ctx.fill();
                 ctx.fillStyle = '#fff';
             }
@@ -191,15 +191,15 @@
         ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, botY, leftW, h - botY); ctx.fillRect(rightX, botY, rightW + vsiW, h - botY);
         ctx.font = 'bold ' + cornerF + 'px monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
         const oat = d.tempr !== null ? (isImperial ? d.tempr * 9 / 5 + 32 : d.tempr).toFixed(0) + '°' : '---';
-        ctx.fillStyle = '#2dd4bf'; ctx.fillText('OAT', pad, botY + half * 0.7);
+        ctx.fillStyle = '#38bdf8'; ctx.fillText('OAT', pad, botY + half * 0.7);
         ctx.fillStyle = '#fff'; ctx.fillText(oat, pad + cornerF * 2.6, botY + half * 0.7);
         const gs = pfdGroundSpeedKt();
-        ctx.fillStyle = '#2dd4bf'; ctx.fillText('GS', pad, botY + half * 1.6);
-        ctx.fillStyle = '#d946ef'; ctx.fillText(gs !== null ? gs.toFixed(0) + 'KT' : '---', pad + cornerF * 2.6, botY + half * 1.6);
-        ctx.fillStyle = '#2dd4bf'; ctx.fillText('TAS', rightX + pad, botY + half * 0.7);
+        ctx.fillStyle = '#38bdf8'; ctx.fillText('GS', pad, botY + half * 1.6);
+        ctx.fillStyle = '#9aa1ad'; ctx.fillText(gs !== null ? gs.toFixed(0) + 'KT' : '---', pad + cornerF * 2.6, botY + half * 1.6);
+        ctx.fillStyle = '#38bdf8'; ctx.fillText('TAS', rightX + pad, botY + half * 0.7);
         ctx.fillStyle = '#fff'; ctx.fillText(d.tas !== null ? d.tas.toFixed(0) + 'KT' : '---', rightX + pad + cornerF * 2.6, botY + half * 0.7);
         if (iasVal !== null) {
-            ctx.fillStyle = '#2dd4bf'; ctx.fillText('IAS', rightX + pad, botY + half * 1.6);
+            ctx.fillStyle = '#38bdf8'; ctx.fillText('IAS', rightX + pad, botY + half * 1.6);
             ctx.fillStyle = '#fff'; ctx.fillText(iasVal.toFixed(0) + 'KT', rightX + pad + cornerF * 2.6, botY + half * 1.6);
         }
     }
@@ -235,7 +235,7 @@
         // Core metrics end here. Extra metrics are ALWAYS shown now (no toggle); they live below the
         // fold and scroll into view, so the HUD stays pinned to its core size and never covers content above.
         let coreHtml = h;
-        let extraHtml = `<div style="border-top:1px solid #2dd4bf; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
+        let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
 
         // GPS altitude always lives in the extra metrics (skipped only if it was the core fallback above).

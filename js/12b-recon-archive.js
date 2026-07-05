@@ -10,6 +10,18 @@
     const reconStormSelect = document.getElementById('reconStormSelect');
     const reconMissionSelect = document.getElementById('reconMissionSelect');
     const reconLoadBtn = document.getElementById('reconLoadBtn');
+
+    // <option> text can't hold HTML markup, so this swaps A-Z/a-z/0-9 for Unicode "Mathematical
+    // Sans-Serif Bold" lookalikes to make the storm name / mission id read bold in the dropdown.
+    const BOLD_UP = 0x1D5D4 - 65, BOLD_LOW = 0x1D5EE - 97, BOLD_DIGIT = 0x1D7EC - 48;
+    function boldUnicode(str) {
+        return String(str).replace(/[A-Za-z0-9]/g, ch => {
+            const c = ch.charCodeAt(0);
+            if (c >= 65 && c <= 90) return String.fromCodePoint(c + BOLD_UP);
+            if (c >= 97 && c <= 122) return String.fromCodePoint(c + BOLD_LOW);
+            return String.fromCodePoint(c + BOLD_DIGIT);
+        });
+    }
     const reconSourceLink = document.getElementById('reconSourceLink');
     const reconArchiveStatus = document.getElementById('reconArchiveStatus');
 
@@ -129,11 +141,9 @@
             const data = await reconApiJson('/v1/recon/' + year);
             if (req !== stormListReqId) return;
             reconStormsForYear = (data && data.storms) || [];
-            // The storms payload carries no dates, so prefetch every storm's mission list in
-            // parallel: it dates each storm in the dropdown (find a mission id without opening
-            // every storm), sorts storms chronologically, and makes the storm pick instant
-            // later (no second fetch). A failed list (e.g. the API 404s on "Unknown / Training",
-            // whose slash breaks its routing) just gets no date and sorts to the end.
+            // The storms payload carries no dates, so prefetch every storm's mission list in parallel
+            // to date and sort the dropdown chronologically and make the storm pick instant. A failed
+            // list (e.g. "Unknown / Training", whose slash breaks its routing) sorts to the end.
             const lists = await Promise.all(reconStormsForYear.map(s =>
                 reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
             if (req !== stormListReqId) return;
@@ -149,7 +159,7 @@
             reconStormsForYear.sort((a, b) => a._firstUnix - b._firstUnix || a.storm_name.localeCompare(b.storm_name));
             reconStormsForYear.forEach(s => {
                 const opt = document.createElement('option'); opt.value = s.storm_name;
-                opt.textContent = `${s.storm_name} (${s.mission_count} flight${s.mission_count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
+                opt.textContent = `${boldUnicode(s.storm_name)} (${s.mission_count} flight${s.mission_count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
                 reconStormSelect.appendChild(opt);
             });
             reconStormSelect.disabled = false;
@@ -177,7 +187,7 @@
                 const opt = document.createElement('option'); opt.value = m.mission_id;
                 // Mission id leads (its first 8 digits are the date, so a separate date column
                 // would just repeat it in this narrow select).
-                opt.textContent = `${m.mission_id} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
+                opt.textContent = `${boldUnicode(m.mission_id)} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
                 opt.title = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
                 reconMissionSelect.appendChild(opt);
             });
@@ -252,12 +262,11 @@
 
         flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
 
-        // Primary path: stream the mission's ORIGINAL full-resolution NetCDF straight through the API
-        // (GET .../download - now a direct CORS-open stream, not a redirect to NOAA's non-CORS archive)
-        // and run it through the same ncArrayBufferToTsv() + parseEntireFile() pipeline a manual .nc
-        // upload uses, so every recorded variable (attitude, radar, etc.) is available - not just the
-        // ~7-field decimated preview /v1/recon/mission/{id} returns. Falls back to that decimated JSON
-        // (reconObsToTsv) if the download or parse fails for any reason (slow link, malformed file, ...).
+        // Primary path: stream the mission's original full-resolution NetCDF through the API's
+        // CORS-open download endpoint, then run it through the same ncArrayBufferToTsv() +
+        // parseEntireFile() pipeline a manual .nc upload uses, so every recorded variable is available
+        // - not just the ~7-field decimated preview. Falls back to that decimated JSON if the
+        // download/parse fails.
         let tsv, usedFullRes = false;
         try {
             if (subtext) subtext.textContent = `Downloading full-resolution NetCDF for ${mission.mission_id}…`;
@@ -269,6 +278,10 @@
                     const msg = `Downloading full-resolution NetCDF… ${pct}% (${mb(received)} / ${mb(total)} MB)`;
                     if (subtext) subtext.textContent = msg;
                     setReconStatus(msg);
+                    // Backgrounded tabs stop repainting, so this text can look frozen while the download
+                    // keeps progressing underneath. The document title still updates while hidden, so
+                    // mirror the percent there; updateMissionHeader() overwrites it once loading finishes.
+                    document.title = `${pct}% ↓ ${mission.mission_id} - AOC Mission Visualizer`;
                 }
             );
             if (subtext) subtext.textContent = 'Parsing NetCDF variables…';
@@ -342,10 +355,8 @@
         if (filteredData.length > 0) updateVisualComponents(currentIdx);
     });
 
-    // Color a best-track segment/point by intensity. Monotonic cool-to-hot ramp (the standard
-    // Saffir-Simpson track-map palette) so a stronger category always reads as more severe -
-    // the old palette went red at cat 3 then magenta/purple, making 3 look worst and 4 vs 5
-    // nearly identical.
+    // Color a best-track segment/point by intensity: monotonic cool-to-hot ramp (the standard
+    // Saffir-Simpson track-map palette) so a stronger category always reads as more severe.
     function stormWindColor(windKt) {
         if (windKt == null) return '#94a3b8';            // unknown intensity - neutral grey
         if (windKt < 34) return '#5ebaff';               // tropical depression
@@ -403,9 +414,9 @@
         const mm = String(totalMin % 60).padStart(2, '0');
         const dirTxt = rawDiffMs >= 0 ? 'ago' : 'from now';
         const hrsOff = near.diffMs / 3600000;
-        body.innerHTML = `${stormTrackMeta.name} - <b>${p.category || p.status || ''}</b><br>`
-            + `${windTxt} / ${presTxt}<br>`
-            + `<span style="color:${hrsOff <= 3 ? '#4ade80' : '#fbbf24'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
+        body.innerHTML = `${escapeHtml(stormTrackMeta.name)} - <b>${escapeHtml(p.category || p.status || '')}</b><br>`
+            + `${escapeHtml(windTxt)} / ${escapeHtml(presTxt)}<br>`
+            + `<span style="color:${hrsOff <= 3 ? '#38bdf8' : '#fbbf24'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
         card.classList.remove('hidden');
     }
 
@@ -432,7 +443,7 @@
         const timeStr = isFinite(p.ms) ? new Date(p.ms).toISOString().slice(0, 16).replace('T', ' ') + 'Z' : '-';
         const windTxt = p.windKt != null ? `${p.windKt} kt` : '-';
         const presTxt = p.pressureMb != null ? `${p.pressureMb} mb` : '-';
-        const catTxt = p.category || p.status || '-';
+        const catTxt = escapeHtml(p.category || p.status || '-');
         return `<div class="font-bold" style="color:${stormWindColor(p.windKt)}">${catTxt}</div>`
             + `<div>Time: ${timeStr}</div>`
             + `<div>Wind: ${windTxt}</div>`

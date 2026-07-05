@@ -23,7 +23,7 @@
     function getBaseChartOptions(titleText, config = {}) {
         const enforceIntegers = config.enforceIntegers || false; const minRange = config.minRange || 0;
         const limitCallback = (scale) => { if (minRange > 0) { const range = scale.max - scale.min; if (range < minRange) { const mid = (scale.max + scale.min) / 2; scale.max = mid + (minRange / 2); scale.min = mid - (minRange / 2); } } };
-        const tickConfig = { color: '#9184a8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#ff7ad9', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
+        const tickConfig = { color: '#9184a8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
             onHover: (e, elements, chart) => {

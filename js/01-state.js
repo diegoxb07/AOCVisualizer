@@ -15,11 +15,9 @@
     let satLoadedInfo = null;
     let satImageBox = null;
     let satDebounceTimer = null;
-    // Two-tier satellite tile cache, both keyed by the exact fetchId (layer||band||time||box).
-    // HOT = decoded drawables (canvas/ImageBitmap) for instant display; small, holds the playback
-    // neighborhood. COLD = compressed PNG blobs (lossless, ~50-100x lighter); big, survives across
-    // flights so many storms can stay cached until the tab closes. A COLD hit is decoded into HOT on
-    // demand (~ms) and the preloader pre-decodes upcoming buckets so playback sees no delay.
+    // Two-tier satellite tile cache, both keyed by fetchId (layer||band||time||box). HOT = decoded
+    // drawables for instant display. COLD = compressed PNG blobs, surviving across flights until the
+    // tab closes. A COLD hit decodes into HOT on demand; the preloader pre-decodes upcoming buckets.
     const satTileCache = new Map();          // HOT: fetchId -> { canvas, box, scanStartMs }
     const SAT_CACHE_MAX = 24;                // just the playback neighborhood (decoded = RAM-heavy)
     const satBlobStore = new Map();          // COLD: fetchId -> { blob, box, scanStartMs }

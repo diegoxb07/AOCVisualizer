@@ -159,53 +159,23 @@
         planeGroup3D = new THREE.Group(); const matWhite = new THREE.MeshPhongMaterial({color: 0xffffff}), matBlue = new THREE.MeshPhongMaterial({color: 0x3da5ff});
         const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 16), matWhite); fuselage.rotation.x = Math.PI / 2; const wings = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.1, 0.8), matBlue); const tail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.5), matBlue); tail.position.set(0, 0, 1.8); const vTail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1, 0.6), matBlue); vTail.position.set(0, 0.5, 1.8); const noseMat = new THREE.MeshPhongMaterial({ color: 0xffffff }); const nose = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 16), noseMat); nose.rotation.x = -Math.PI / 2; nose.position.set(0, 0, -2.4);
         planeGroup3D.add(fuselage, wings, tail, vTail, nose); planeGroup3D.scale.set(0.15, 0.15, 0.15); scene3D.add(planeGroup3D);
-        const arrowGroup = new THREE.Group(); const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8), new THREE.MeshBasicMaterial({color: 0x3da5ff})); shaft.rotation.x = Math.PI / 2; shaft.position.z = -1.8; const head = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 8), new THREE.MeshBasicMaterial({color: 0x3da5ff})); head.rotation.x = Math.PI / 2; head.position.z = -2.7; arrowGroup.add(shaft, head); arrowGroup.scale.set(0.7, 0.7, 0.7);
-        trackArrow3D = arrowGroup; scene3D.add(trackArrow3D); scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
-        buildWindStreaks3D();
-        function animate3D() { requestAnimationFrame(animate3D); if (controls3D) controls3D.update(); updateWindStreaks3D(); renderer3D.render(scene3D, camera3D); }
+        // Direction arrow: shaft + a cone HEAD whose apex points forward (-Z, this model's nose
+        // direction). The cone's local apex is at +Y, so it needs a NEGATIVE X rotation to face -Z.
+        const buildDirectionArrow = (color, scale) => {
+            const mat = new THREE.MeshBasicMaterial({ color });
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.2, 8), mat); shaft.rotation.x = Math.PI / 2; shaft.position.z = -1.65;
+            const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 8), mat); head.rotation.x = -Math.PI / 2; head.position.z = -2.45;
+            const group = new THREE.Group(); group.add(shaft, head); group.scale.set(scale, scale, scale);
+            return group;
+        };
+        // Ground track: blue, parented to the scene.
+        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.42); scene3D.add(trackArrow3D);
+        // True heading: yellow, also scene-level (not planeGroup3D) so it is never swept up by the
+        // crew-ride fuselage dim/transparency pass. Same vertical level as the ground-track arrow.
+        headingArrow3D = buildDirectionArrow(0xffd400, 0.36); scene3D.add(headingArrow3D);
+        scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
+        function animate3D() { requestAnimationFrame(animate3D); if (controls3D) controls3D.update(); renderer3D.render(scene3D, camera3D); }
         animate3D(); threeDInitialized = true;
-    }
-
-    // Climb/descent indicator: a few TINY white streaks hugging the wing/tail EDGES that appear ONLY
-    // during a big ascent or descent (the aircraft's own vertical speed), streaming past like relative
-    // airflow. Nothing shows in level flight. Parented to `planeGroup3D` (plane-local coords), so the
-    // sprites sit on the wingtips/tail and bank with the airframe.
-    let windStreaks3D = null, cur3DVertRate = 0, windStreakLastMs = 0;
-    function buildWindStreaks3D() {
-        if (windStreaks3D || typeof planeGroup3D === 'undefined' || !planeGroup3D) return;
-        windStreaks3D = new THREE.Group();
-        // anchors in plane-local units (wings span x=±2.25 at z=0; tailplane at z=1.8, x=±0.9)
-        const anchors = [ {x:-2.05,z:0.0}, {x:2.05,z:0.0}, {x:-1.95,z:0.18}, {x:1.95,z:0.18}, {x:-0.78,z:1.8}, {x:0.78,z:1.8} ];
-        anchors.forEach((a, i) => {
-            const seg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.05), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
-            seg.userData = { x: a.x, z: a.z, phase: ((Math.sin((i + 1) * 7.13) * 99991) % 1) * 0.85 };
-            seg.position.set(a.x, seg.userData.phase, a.z);
-            windStreaks3D.add(seg);
-        });
-        windStreaks3D.visible = false; planeGroup3D.add(windStreaks3D);   // inherits plane bank/pitch/scale
-    }
-    function updateWindStreaks3D() {
-        if (!windStreaks3D) return;
-        const now = performance.now(); let dt = (now - windStreakLastMs) / 1000; windStreakLastMs = now;
-        if (!(dt > 0) || dt > 0.1) dt = 1 / 60;
-        // Only during a BIG climb/descent: below ~4 m/s (~800 ft/min) nothing shows; fully lit by
-        // ~14 m/s (~2800 ft/min). |cur3DVertRate| is the aircraft's own vertical speed.
-        const ON = 4, FULL = 14, band = 0.9;
-        const intensity = Math.max(0, Math.min(1, (Math.abs(cur3DVertRate) - ON) / (FULL - ON)));
-        windStreaks3D.visible = intensity > 0.001;
-        if (!windStreaks3D.visible) return;
-        // Freeze the airflow when playback is paused - otherwise the streaks keep scrolling off the last
-        // climb rate forever, looking like constant downward motion with nothing actually happening.
-        const moving = (typeof isPlaying === 'undefined') || isPlaying;
-        const speed = moving ? -Math.sign(cur3DVertRate) * (1.0 + intensity * 2.0) : 0;   // plane-local units/s; air streams DOWN past a climbing plane
-        windStreaks3D.children.forEach(seg => {
-            seg.userData.phase += speed * dt;
-            if (seg.userData.phase > band) seg.userData.phase -= 2 * band;
-            else if (seg.userData.phase < -band) seg.userData.phase += 2 * band;
-            seg.position.y = seg.userData.phase;
-            seg.scale.y = 0.5 + intensity * 1.0;
-            seg.material.opacity = 0.15 + intensity * 0.5;
-        });
     }
 
     function get3DCoord(lon, lat, altMeters) {
@@ -303,33 +273,24 @@
         let t_pitch = d.pitch ?? 0, t_th = d.th ?? 0, t_roll = d.roll ?? 0, t_track = d.gTrack ?? 0;
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
-        // aircraft vertical speed (m/s), central-difference over a few samples, for the climb/descent
-        // streaks (the plane's OWN motion, not turbulence). Same alt source as the 3D track.
-        let vr = 0;
-        const iA = Math.max(0, idx - 2), iB = Math.min(filteredData.length - 1, idx + 2);
-        if (iB > iA) {
-            const rA = filteredData[iA], rB = filteredData[iB], aA = track3DAltMeters(rA), aB = track3DAltMeters(rB), tdt = rB.absSeconds - rA.absSeconds;
-            if (tdt > 0) vr = (aB - aA) / tdt;
-        }
-        cur3DVertRate = vr;   // feed the climb/descent streaks (animated in animate3D; parented to planeGroup3D)
+        // True-heading arrow: same scene-level convention as the ground-track arrow (world position,
+        // Y-only rotation - not banked/pitched with the airframe), so it always reads as a clean compass
+        // pointer at the same vertical level as the ground-track arrow.
+        if (headingArrow3D) { headingArrow3D.position.copy(pos); headingArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_th), 0); }
         camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
         controls3D.target.copy(pos); controls3D.update();
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
     }
 
-    // Real fullscreen is page-level ONLY. The panel ⛶ buttons "fake" fullscreen instead:
-    // pin the panel over the whole viewport (.fake-fs, styled by the same CSS as :fullscreen
-    // via :is()) and take the page fullscreen too if it isn't already. Switching panel <->
-    // page view is then a single click - nested element fullscreen forced an exit-then-
-    // re-enter (and needed the sticky bottom bar re-parented into the panel; the fixed
-    // z-2000 bar now just stays above the z-1500 fake panel).
+    // Real fullscreen is page-level ONLY. The panel ⛶ buttons "fake" fullscreen instead: pin the
+    // panel over the whole viewport (.fake-fs, styled like :fullscreen via :is()) and take the page
+    // fullscreen too if it isn't already, so panel/page switches are a single click.
     const refreshAfterViewChange = () => setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
     const setFakePanel = (panel) => {
         mapPanel.classList.toggle('fake-fs', panel === mapPanel);
         videoPanel.classList.toggle('fake-fs', panel === videoPanel);
-        // The main top-right button (z-9999, fixed) sits exactly on the pinned panel's own ⛶
-        // and would steal its clicks (real element-fullscreen used to hide it via the top
-        // layer) - hide it while a panel is pinned; Esc still exits real fullscreen.
+        // The main top-right button sits exactly on the pinned panel's own ⛶ and would steal its
+        // clicks, so hide it while a panel is pinned; Esc still exits real fullscreen.
         fullscreenBtn.style.display = panel ? 'none' : '';
         refreshAfterViewChange();
     };
@@ -392,11 +353,9 @@
         buildSatDayStepper();
         updateSatTimeBadge();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
-            // For archive-GOES layers, updateBandOptions() just reset satBandSelect to its blank
-            // "Choose a product…" placeholder - fetchSatelliteImage/maybeAutoPrecacheSatellite both
-            // no-op on an empty product, so nothing fetches or builds until the satBandSelect handler
-            // below fires with an actual pick. Polar (MODIS/VIIRS) layers have no placeholder and fetch
-            // their single daily image immediately, same as always.
+            // Archive-GOES layers reset satBandSelect to a blank placeholder, so fetchSatelliteImage/
+            // maybeAutoPrecacheSatellite no-op until a product is picked. Polar (MODIS/VIIRS) layers
+            // have no placeholder and fetch their daily image immediately.
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
             maybeAutoPrecacheSatellite();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
@@ -423,7 +382,7 @@
 
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
-            const palette = ['#fbbf24', '#ef4444', '#2dd4bf', '#34e3a2', '#a78bfa', '#f472b6', '#22d0ee']; const assignedColor = palette[customMarkers.length % palette.length];
+            const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#7dd3fc', '#9aa1ad', '#7ad9ff', '#22d0ee']; const assignedColor = palette[customMarkers.length % palette.length];
             customMarkers.push({ idx: currentIdx, color: assignedColor }); if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx);
         }
     });

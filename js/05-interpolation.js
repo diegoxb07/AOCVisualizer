@@ -37,13 +37,9 @@
         };
 
         // --- Micro-motion between the 1 Hz keyframes ---
-        // The log is ground truth AT each sample; whatever we add in between is invented, so it
-        // is only honest if it reflects how bumpy the air actually was there. Amplitude scales
-        // with a MEASURED turbulence proxy (vertical wind - the direct gust signal), and the
-        // shape is smooth band-limited noise (a few sub-2 Hz sinusoids in continuous time) so it
-        // reads as an airframe responding to gusts, not TV static. In calm air (vtWnd ~ 0) the
-        // plane sits still; the old model added the same per-frame white-noise twitch regardless
-        // of conditions, which looked like vibration on a heavy aircraft in smooth air.
+        // Amplitude scales with vertical wind (the measured turbulence proxy); shape is smooth
+        // band-limited noise (a few sub-2 Hz sinusoids) so it reads as gust response, not static.
+        // In calm air (vtWnd ~ 0) the plane sits still.
         let turb = 0.10;   // faint baseline only for files with NO vertical-wind channel (never frozen-dead)
         if (d1.vtWnd !== null && d2.vtWnd !== null) turb = Math.min(1, Math.abs(d1.vtWnd + (d2.vtWnd - d1.vtWnd) * t) / 3.0);
         const bandNoise = (ph) => 0.6 * Math.sin(exactSec * 2.3 + ph) + 0.3 * Math.sin(exactSec * 5.9 + ph * 2.1) + 0.1 * Math.sin(exactSec * 11.7 + ph * 3.7);

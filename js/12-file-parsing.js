@@ -191,10 +191,8 @@
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.
         if (typeof resetSatPreload === 'function') resetSatPreload();
-        // New flight: any storm best-track / archive-mission metadata belonged to the PREVIOUS flight
-        // (set after this function returns, by js/12b-recon-archive.js's loadReconMission for an
-        // archive-loaded flight) - clear it here so a manual upload after an archive load doesn't keep
-        // showing a stale storm's track, and so a fresh archive load starts from a clean slate too.
+        // Clear any storm best-track / archive-mission metadata from the previous flight - it's
+        // re-set after this returns by loadReconMission for an archive load.
         stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;
         // Same reasoning for the shareable ?mission= URL param - an archive load re-sets it after this returns.
         try { const u = new URL(window.location.href); if (u.searchParams.has('mission')) { u.searchParams.delete('mission'); history.replaceState(null, '', u); } } catch (e) {}

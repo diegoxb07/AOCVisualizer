@@ -188,8 +188,8 @@
         crewGroup3D = new THREE.Group();
         const shell = new THREE.MeshPhongMaterial({ color: 0x141c26, side: THREE.DoubleSide });
         const body = new THREE.MeshPhongMaterial({ color: 0x5eb0ef }), skin = new THREE.MeshPhongMaterial({ color: 0xe6f2ff }), beltMat = new THREE.MeshPhongMaterial({ color: 0xe8b854 });
-        // hollow opaque cabin trough (floor + a LOW lip, open top) so the crew sit INSIDE it but
-        // their lower halves stay visible (the walls used to rise past the hips and hide them)
+        // hollow opaque cabin trough (floor + a LOW lip, open top) so the crew sit INSIDE it with
+        // their lower halves still visible
         const floor = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 2.7), shell); floor.position.set(0, -0.2, -0.05);
         const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.13, 2.7), shell); wallL.position.set(-0.23, -0.15, -0.05);
         const wallR = wallL.clone(); wallR.position.x = 0.23;
@@ -207,10 +207,8 @@
             const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.28, 8), body); armL.position.set(-0.1, 0.12, 0); torso.add(armL);
             const armR = armL.clone(); armR.position.x = 0.1; torso.add(armR);
             torso.position.y = 0.0; torso.userData.armL = armL; torso.userData.armR = armR;
-            // Legs stay PLANTED on the cabin floor: thigh rests on the seat top and runs forward toward
-            // the nose (-z); shin drops to the floor in front of the seat; the foot rests on the floor
-            // top. They are decoupled from the cushion bob (only the upper body springs), so the feet are
-            // never forced through the floor - no artificial clamp needed.
+            // Legs stay planted on the cabin floor: thigh on the seat top running forward, shin to the
+            // floor, foot flat. Decoupled from the cushion bob (only the upper body springs).
             const legs = new THREE.Group();
             [-0.055, 0.055].forEach(sx => {
                 const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.042, 0.19, 8), body);
@@ -256,8 +254,7 @@
         if (overlay) overlay.style.display = (on && !in3D) ? 'block' : 'none';
         const show3D = !!(on && in3D);
         if (crewGroup3D) crewGroup3D.visible = show3D;
-        // hollow out the WHOLE plane (dim every body mesh to a translucent shell) so the crew read as
-        // being inside, not behind it - the wings used to stay opaque and the crew clipped into them
+        // dim every body mesh (not just the fuselage) to a translucent shell so the crew read as inside it
         (_planeBodyMeshes || []).forEach(m => {
             m.material.transparent = show3D;
             m.material.opacity = show3D ? 0.2 : 1;

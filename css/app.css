@@ -8,7 +8,8 @@
     --ink: #1f182a;                       /* page background (deep plum console shell) */
     --panel: #29213a;                     /* card surface */
     --line: rgba(255,255,255,0.07);       /* hairline borders */
-    --sig: #2dd4bf;                       /* accent teal */
+    --sig: #38bdf8;                       /* accent sky blue */
+    --sig-rgb: 56, 189, 248;              /* same color, as an r,g,b triplet for rgba(var(--sig-rgb), a) */
     --media-h: clamp(480px, 56vh, 620px); /* JS-resizable via the media drag handle */
 }
 
@@ -22,8 +23,8 @@ body {
 }
 ::backdrop { background-color: var(--ink); }
 ::-webkit-backdrop { background-color: var(--ink); }
-::selection { background: rgba(45, 212, 191, 0.3); color: #fff; }
-:focus-visible { outline: 2px solid rgba(45, 212, 191, 0.55); outline-offset: 2px; }
+::selection { background: rgba(var(--sig-rgb), 0.3); color: #fff; }
+:focus-visible { outline: 2px solid rgba(var(--sig-rgb), 0.55); outline-offset: 2px; }
 
 .font-mono, [class*="font-mono"], #timelineTimeDisplay { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
 .uppercase.tracking-wider { letter-spacing: 0.12em; }
@@ -43,7 +44,7 @@ select {
     transition: border-color 0.15s;
 }
 select:not(:disabled):hover { border-color: #564a6d; }
-select:not(:disabled):focus { border-color: rgba(45, 212, 191, 0.6); }
+select:not(:disabled):focus { border-color: rgba(var(--sig-rgb), 0.6); }
 
 /* Console redesign: pill-shaped controls everywhere (buttons, selects, text inputs, dropzones,
    status chips). Checkboxes/range/file inputs and the collapse lip keep their own shapes. */
@@ -72,10 +73,12 @@ select { padding-left: 14px !important; }
 #mapPanel:is(:fullscreen, .fake-fs) .media-container, #videoPanel:is(:fullscreen, .fake-fs) .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
 #mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
 #mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: 170px; width: 250px; height: 250px; }
-/* In fullscreen the map is tall enough that the HUD (bottom-anchored, left) no longer collides
-   with this stack, so put the storm card back on the left, under the satellite badge. */
+/* In fullscreen, put the storm card on the left under the satellite badge. */
 #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
+/* Pre-hide the 2D-only controls on a 3D-preference refresh (class set by the inline head script
+   in index.html) so they don't flash before persistDisplayPrefs restores the 3D tracker mode. */
+html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { display: none; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
 #mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its shadow gradient doesn't darken the buttons */
 #mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
@@ -123,15 +126,14 @@ select { padding-left: 14px !important; }
 .status-chip .chip-v.on { color: #e6edf3; }
 .status-chip.lit { border-left-color: var(--sig); background: #231b34; }
 .status-chip.lit .chip-v.on { color: var(--sig); }
-/* "Flight Data Detected" is the chip that matters most - give it its own (emerald) accent
-   so a loaded time range stands out from the cyan metadata chips. */
-.status-chip:has(#hdrRange).lit { border-left-color: #34d399; background: #0b1810; }
-.status-chip:has(#hdrRange) .chip-v.on { color: #34d399; }
+/* "Flight Data Detected" gets its own teal accent so it stands out from the sky-blue metadata chips. */
+.status-chip:has(#hdrRange).lit { border-left-color: #2dd4bf; background: #0b1a18; }
+.status-chip:has(#hdrRange) .chip-v.on { color: #2dd4bf; }
 
 /* Hover feedback on the primary interactive zones */
-#playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: rgba(45, 212, 191, 0.5); }
-#dataDropZone:hover, #videoDropZone:hover { box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.3), 0 0 18px -6px rgba(45, 212, 191, 0.35); }
-#masterCreatePrompt:hover { box-shadow: inset 0 0 60px rgba(45, 212, 191, 0.05), 0 0 26px -12px rgba(45, 212, 191, 0.45); }
+#playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: rgba(var(--sig-rgb), 0.5); }
+#dataDropZone:hover, #videoDropZone:hover { box-shadow: 0 0 0 1px rgba(var(--sig-rgb), 0.3), 0 0 18px -6px rgba(var(--sig-rgb), 0.35); }
+#masterCreatePrompt:hover { box-shadow: inset 0 0 60px rgba(var(--sig-rgb), 0.05), 0 0 26px -12px rgba(var(--sig-rgb), 0.45); }
 
 /* Sticky media bar + resize handle (functional) */
 .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--ink); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--line); box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.8); }
@@ -159,10 +161,10 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: #171122; cursor: grab; z-index: 2; }
 
 /* Idle placeholders (hidden wholesale once data loads, via style.display on the placeholder div) */
-.radar-idle { position: relative; width: 130px; height: 130px; border-radius: 50%; border: 1px solid rgba(45, 212, 191, 0.28); background: radial-gradient(circle, rgba(45, 212, 191, 0.07), rgba(45, 212, 191, 0.02) 55%, transparent 72%); }
-.radar-idle::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 20px, rgba(45, 212, 191, 0.14) 20px 21px); }
-.radar-idle::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(45, 212, 191, 0.16), rgba(45, 212, 191, 0.16)) 50% 0 / 1px 100%, linear-gradient(rgba(45, 212, 191, 0.16), rgba(45, 212, 191, 0.16)) 0 50% / 100% 1px; background-repeat: no-repeat; }
-.radar-sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(45, 212, 191, 0.5), rgba(45, 212, 191, 0.08) 70deg, transparent 110deg); animation: radarSweep 3.4s linear infinite; opacity: 0.6; }
+.radar-idle { position: relative; width: 130px; height: 130px; border-radius: 50%; border: 1px solid rgba(var(--sig-rgb), 0.28); background: radial-gradient(circle, rgba(var(--sig-rgb), 0.07), rgba(var(--sig-rgb), 0.02) 55%, transparent 72%); }
+.radar-idle::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 20px, rgba(var(--sig-rgb), 0.14) 20px 21px); }
+.radar-idle::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(var(--sig-rgb), 0.16), rgba(var(--sig-rgb), 0.16)) 50% 0 / 1px 100%, linear-gradient(rgba(var(--sig-rgb), 0.16), rgba(var(--sig-rgb), 0.16)) 0 50% / 100% 1px; background-repeat: no-repeat; }
+.radar-sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, rgba(var(--sig-rgb), 0.5), rgba(var(--sig-rgb), 0.08) 70deg, transparent 110deg); animation: radarSweep 3.4s linear infinite; opacity: 0.6; }
 @keyframes radarSweep { to { transform: rotate(360deg); } }
 .radar-blip { position: absolute; top: 34%; left: 62%; width: 5px; height: 5px; border-radius: 50%; background: #22d3ee; animation: blipPulse 3.4s ease-out infinite; }
 @keyframes blipPulse { 0%, 12% { opacity: 1; } 60%, 100% { opacity: 0.12; } }
@@ -171,19 +173,19 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* In-map overlays: HUD, PFD, pills, badges */
 .overlays-wrapper { position: absolute; top: 44px; bottom: 30px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
-#hudOverlay { background-color: rgba(33, 26, 45, 0.92); border: 1px solid rgba(45, 212, 191, 0.55); border-radius: 8px; padding: 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
+#hudOverlay { background-color: rgba(33, 26, 45, 0.92); border: 1px solid rgba(var(--sig-rgb), 0.55); border-radius: 8px; padding: 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; line-height: 1.4; color: #ffffff; display: none; min-width: 240px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
 #hudOverlay::-webkit-scrollbar { width: 6px; }
 #hudOverlay::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
-#hudOverlay::-webkit-scrollbar-thumb { background: #2dd4bf; border-radius: 3px; }
-#hudOverlay::-webkit-scrollbar-thumb:hover { background: #14b8a6; }
+#hudOverlay::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 3px; }
+#hudOverlay::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
 #hudOverlay d { display: block; white-space: pre; }
-#hudOverlay span { color: #5eead4; font-weight: bold; float: right; margin-left: 12px; }
+#hudOverlay span { color: #7dd3fc; font-weight: bold; float: right; margin-left: 12px; }
 #hudOverlay span.temp-val { color: #ff9933; }
 
-#pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(45, 212, 191, 0.55); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 170px; height: 170px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; }
+#pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.55); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 170px; height: 170px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; transform: scale(var(--hud-scale, 1)); transform-origin: bottom right; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
 /* Crew ride cutaway - top-left of the 2D tracker, shown only when the toggle is on (JS). */
-#cabinOverlay { position: absolute; top: 34px; left: 16px; width: 200px; height: 150px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(45, 212, 191, 0.45); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; overflow: hidden; pointer-events: none; z-index: 2450; }
+#cabinOverlay { position: absolute; top: 34px; left: 16px; width: 200px; height: 150px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.45); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; overflow: hidden; pointer-events: none; z-index: 2450; }
 #cabinCanvas { width: 100%; height: 100%; display: block; }
 /* In fullscreen the info stack (sat badge + storm card) sits top-LEFT, so move the crew overlay to
    the top-RIGHT to clear it. Safe: the crew overlay is 2D-only and #attitudeHud (also top-right in
@@ -191,16 +193,16 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #mapPanel:is(:fullscreen, .fake-fs) #cabinOverlay { top: 96px; left: auto; right: 16px; width: 260px; height: 195px; }
 
 /* Non-invasive satellite fetch status - a small pill, not a full-screen cover */
-#satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(31, 24, 42, 0.9); border: 1px solid rgba(45, 212, 191, 0.6); color: #99f6e4; padding: 6px 12px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
+#satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(31, 24, 42, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.6); color: #bae6fd; padding: 6px 12px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
 #satLoadingOverlay.show { display: flex; }
-#satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid #2dd4bf; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
+#satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 
-#satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(31, 24, 42, 0.94); border: 1px solid rgba(45, 212, 191, 0.6); color: #99f6e4; padding: 7px 12px; border-radius: 10px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
+#satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: rgba(31, 24, 42, 0.94); border: 1px solid rgba(var(--sig-rgb), 0.6); color: #bae6fd; padding: 7px 12px; border-radius: 10px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
 #satPrefetchBar.hidden { display: none; }
 #mapPanel:is(:fullscreen, .fake-fs) #satPrefetchBar { z-index: 2002; }
 #satPrefetchLabel { white-space: nowrap; }
-#satPrefetchTrack { width: 180px; height: 8px; background: rgba(45, 212, 191, 0.15); border-radius: 999px; overflow: hidden; }
-#satPrefetchFill { width: 0%; height: 100%; background: linear-gradient(90deg, #2dd4bf, #22d3ee); border-radius: 999px; transition: width 0.2s ease; }
+#satPrefetchTrack { width: 180px; height: 8px; background: rgba(var(--sig-rgb), 0.15); border-radius: 999px; overflow: hidden; }
+#satPrefetchFill { width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #22d3ee); border-radius: 999px; transition: width 0.2s ease; }
 /* Indeterminate phase (before the first tile lands): bounce a fixed-width fill back and
    forth; js/02-satellite.js swaps this for the real width once progress is measurable. */
 #satPrefetchFill.indeterminate, #batchCacheFill.indeterminate { width: 38% !important; animation: prefetchBounce 1.1s ease-in-out infinite alternate; transition: none; }
@@ -217,14 +219,14 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 @media (max-width: 900px) { #syncingIndicator .sync-sub { display: none; } }
 
 /* Recording progress pill - Stop stays clickable while recording */
-#recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: rgba(31, 24, 42, 0.95); border: 1px solid rgba(168, 85, 247, 0.7); color: #e9d5ff; padding: 8px 14px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+#recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: rgba(31, 24, 42, 0.95); border: 1px solid rgba(154, 161, 173, 0.6); color: #e5e7eb; padding: 8px 14px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #recordProgress.show { display: flex; }
 #recordProgress .rec-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.9); animation: recPulse 1s ease-in-out infinite; }
 @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 #recordProgress .rec-bar { width: 160px; height: 7px; background: #231b34; border-radius: 4px; overflow: hidden; }
-#recordProgress #recordProgressFill { width: 0%; height: 100%; background: linear-gradient(90deg, #a855f7, #2dd4bf); transition: width 0.15s linear; }
-#recordProgress #recordStopBtn { background: #7e22ce; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
-#recordProgress #recordStopBtn:hover { background: #9333ea; }
+#recordProgress #recordProgressFill { width: 0%; height: 100%; background: linear-gradient(90deg, #9aa1ad, #38bdf8); transition: width 0.15s linear; }
+#recordProgress #recordStopBtn { background: #475569; color: #fff; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+#recordProgress #recordStopBtn:hover { background: #64748b; }
 
 /* HUD + sat badges read in Inter with tabular digits for cleaner numbers */
 #hudOverlay, #satTimeBadge, #satDayLabel {
@@ -241,7 +243,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 @keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } }
 .dropdown-item { font-size: 13px; color: #b3a7c6; padding: 8px 12px; cursor: pointer; border-radius: 4px; text-transform: none; font-weight: 500; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; transition: background-color 0.1s, color 0.1s; }
 .dropdown-item:hover { background-color: #3f3354; color: #fff; }
-.dropdown-item.active { background-color: rgba(45, 212, 191, 0.13); color: #2dd4bf; font-weight: 700; }
+.dropdown-item.active { background-color: rgba(var(--sig-rgb), 0.13); color: #38bdf8; font-weight: 700; }
 .dropdown-item.active::after { content: '✓'; font-size: 12px; }
 
 /* Modals / toast */
@@ -249,7 +251,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .modal-card { background-color: #322847; border: 1px solid var(--line); border-radius: 12px; padding: 24px; max-width: 650px; width: 100%; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8); position: relative; display: flex; flex-direction: column; gap: 16px; animation: modalIn 0.2s ease; }
 @keyframes modalIn { from { opacity: 0; transform: translateY(10px); } }
 
-.toast-notification { position: fixed; top: 20px; right: 20px; background-color: rgba(41, 33, 59, 0.96); border: 1px solid var(--line); border-left: 4px solid #2dd4bf; color: #fff; padding: 16px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
+.toast-notification { position: fixed; top: 20px; right: 20px; background-color: rgba(41, 33, 59, 0.96); border: 1px solid var(--line); border-left: 4px solid #38bdf8; color: #fff; padding: 16px 20px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
 .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
 /* Bottom command bar */
@@ -280,19 +282,23 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
    in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
    reflowing the other filters. */
-#filtersGrid { display: flex !important; gap: 11px; align-items: flex-start; }
+#filtersGrid { display: flex !important; gap: 20px !important; align-items: flex-start; }
 .filter-col { display: flex; flex-direction: column; gap: 4px; }
-.filter-lbl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: #5eead4; cursor: pointer; user-select: none; white-space: nowrap; }
-.filter-cb { accent-color: #2dd4bf; width: 12px; height: 12px; cursor: pointer; flex-shrink: 0; }
+.filter-lbl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: #7dd3fc; cursor: pointer; user-select: none; white-space: nowrap; }
+.filter-cb { accent-color: #38bdf8; width: 12px; height: 12px; cursor: pointer; flex-shrink: 0; }
 .filter-child { margin-left: 18px; position: relative; }
 /* Elbow connector: descends from just below the Cockpit PFD checkbox and turns right into the child
    checkbox. Starts below the parent row (top negative but small) so it never overlaps the PFD filter. */
 .filter-child::before { content: ""; position: absolute; left: -12px; top: -3px; width: 11px; height: 10px; border-left: 1px solid #4d4360; border-bottom: 1px solid #4d4360; border-bottom-left-radius: 3px; pointer-events: none; }
 .filter-child.child-off { visibility: hidden; }   /* reserved space kept when the PFD sub-option is off */
 .filter-note { margin-left: 17px; margin-top: -2px; font-size: 8.5px; font-weight: 600; font-style: italic; letter-spacing: 0.3px; color: #6f6288; text-transform: uppercase; user-select: none; }
-/* In 3D fullscreen the info stack (satellite badge + storm card) sits top-left, where the
-   pitch/roll HUD used to overlap it - move the HUD to the top-right, clear of both. */
-#mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; }
+/* Pitch/roll HUD and the info stack scale with --hud-scale (set by the media resize handle in
+   js/11-layout.js), staying in step with the metric HUD/PFD. Each scales from its anchored corner. */
+#attitudeHud { transform: scale(var(--hud-scale, 1)); transform-origin: top left; }
+#mapInfoStack { transform: scale(var(--hud-scale, 1)); transform-origin: top right; }
+/* In 3D fullscreen the pitch/roll HUD moves to the top-right and the info stack to the top-left. */
+#mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; transform-origin: top right; }
+#mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { transform-origin: top left; }
 /* Hide the pitch/roll box until it actually has telemetry - otherwise it's an odd empty bordered
    square floating in the 3D view before a flight is loaded. */
 #attitudeHud:empty { display: none !important; }
@@ -301,11 +307,11 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* Range inputs */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; background: #231b34; height: 8px; border-radius: 4px; outline: none; border: 1px solid #443a58; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #2dd4bf; cursor: pointer; transition: 0.2s; border: 2px solid #171122; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; transition: 0.2s; border: 2px solid #171122; }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
-input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #2dd4bf; cursor: pointer; border: 2px solid #171122; }
+input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #171122; }
 /* Elapsed-portion fill - --fill is painted by js/20-ui-polish.js */
-#timelineSlider { background: linear-gradient(90deg, #14b8a6 0%, #22d3ee var(--fill, 0%), #231b34 var(--fill, 0%)); }
+#timelineSlider { background: linear-gradient(90deg, #0ea5e9 0%, #22d3ee var(--fill, 0%), #231b34 var(--fill, 0%)); }
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
@@ -317,16 +323,17 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 *::-webkit-scrollbar-thumb { background: #443a58; border-radius: 6px; border: 2px solid #171122; }
 *::-webkit-scrollbar-thumb:hover { background: #564a6d; }
 
-/* Primary Play button: bigger, green "go" control that folds in the old Apply & Run. The selector
-   matches the compact bottom-bar sizing rule's specificity and is placed later, so it wins. */
+/* Primary Play button: bigger, sky-blue "go" control that folds in the old Apply & Run - matches the
+   app's one signature accent (--sig) instead of a second, competing blue. The selector matches the
+   compact bottom-bar sizing rule's specificity and is placed later, so it wins. */
 .sticky-bottom-bar .cmd-group button#playPauseBtn {
     height: 34px !important;
     font-size: 13px !important;
     padding-left: 1.35rem !important;
     padding-right: 1.35rem !important;
-    background: #10b981 !important;
-    color: #04231a !important;
+    background: #0ea5e9 !important;
+    color: #082f49 !important;
     border: none !important;
-    box-shadow: 0 6px 18px -6px rgba(16,185,129,0.55) !important;
+    box-shadow: 0 6px 18px -6px rgba(14,165,233,0.55) !important;
 }
-.sticky-bottom-bar .cmd-group button#playPauseBtn:hover { background: #34d399 !important; }
+.sticky-bottom-bar .cmd-group button#playPauseBtn:hover { background: #38bdf8 !important; }

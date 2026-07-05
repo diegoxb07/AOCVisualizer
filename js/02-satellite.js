@@ -2,6 +2,14 @@
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
+    // Escapes a string for safe interpolation into an innerHTML template that also carries real
+    // markup (<br>/<b>/<span>) - for the handful of badges below that mix that markup with text
+    // sourced from the noaa-recon-api (band/storm names), so an unexpected API response can't inject
+    // elements into the page. Reused by js/12b-recon-archive.js (loads after this file).
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    }
+
     function showSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.add('show'); }
     function hideSatLoader() { const ov=document.getElementById('satLoadingOverlay'); if(ov) ov.classList.remove('show'); }
 
@@ -99,9 +107,9 @@
 
         const closeThresh = satLoadedInfo.isModis ? 90 : 15;
         const within = absMin <= closeThresh;
-        badge.innerHTML = `🛰 ${satLoadedInfo.layerLabel}<br>`
+        badge.innerHTML = `🛰 ${escapeHtml(satLoadedInfo.layerLabel)}<br>`
             + `Image: <b>${imgLabel}</b><br>`
-            + (offStr ? `<span style="color:${within ? '#4ade80' : '#fbbf24'}">${offStr}</span>` : '');
+            + (offStr ? `<span style="color:${within ? '#38bdf8' : '#fbbf24'}">${offStr}</span>` : '');
         badge.classList.remove('hidden');
     }
 
@@ -140,17 +148,14 @@
               {id:'Brightness_Temp_Band31_Night', name:'Infrared (Band 31, Night)'}
           ]
         },
-        // GOES geostationary imagery - ARCHIVE, via the noaa-recon-api (https://joshmurdock.net/api).
-        // Listed LAST. Unlike NASA GIBS (which only keeps a rolling ~90 days), this server renders
-        // GOES ABI tiles from NOAA's S3 archive for ANY historical date - the right source for recon
-        // playback. `isReconApi:true` routes it through fetchReconApiSat; each "band" carries the API's
-        // `band`+`cmap` (or `product` for a composite). It rides the generic GOES machinery: a 10-min
-        // `cadenceMin` bucket tied to the playback clock, and `subLon` for the Earth-disk coverage test
-        // (which greys the layer out when the flight sits outside that satellite's disk). The API
-        // auto-resolves the actual spacecraft from the date (East: GOES-16/19; West: GOES-17/18), so we
-        // just pass `satellite`. The `bands` list below is a fallback shown until loadSatelliteProducts()
-        // (below) replaces it with the live list from GET /v1/satellite/products - don't hardcode new
-        // bands/products here going forward, that discovery endpoint is the source of truth now.
+        // GOES geostationary imagery - ARCHIVE, via the noaa-recon-api. Renders GOES ABI tiles from
+        // NOAA's S3 archive for any historical date. `isReconApi:true` routes it through
+        // fetchReconApiSat; each "band" carries `band`+`cmap` (or `product` for a composite).
+        // `cadenceMin` buckets fetches to the playback clock; `subLon` drives the Earth-disk coverage
+        // test that greys the layer out when the flight is outside that satellite's disk. The API
+        // auto-resolves the spacecraft from the date, so only `satellite` needs to be passed. The
+        // `bands` list is a fallback until loadSatelliteProducts() replaces it with the live list from
+        // GET /v1/satellite/products - don't hardcode new bands/products here, use that endpoint.
         { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
           bands: [
@@ -233,7 +238,7 @@
             loadFlightDataGroup.classList.toggle('opacity-70', apiDown);
         }
         if (loadFlightDataLabel) {
-            loadFlightDataLabel.classList.toggle('text-emerald-400', !apiDown);
+            loadFlightDataLabel.classList.toggle('text-blue-400', !apiDown);
             loadFlightDataLabel.classList.toggle('text-slate-500', apiDown);
         }
         [reconYearSelect, reconStormSelect, reconMissionSelect].forEach(sel => {
@@ -358,12 +363,10 @@
     }
 
     function computeSatFetchBox(extent) {
-        // Fetch a region sized to the flight (its extent + a margin) rather than a whole-hemisphere
-        // composite. Clamped so it's never tiny (keeps synoptic context) nor huge (one fast image):
-        // ~18°×14° min, ~44°×30° max. Smaller area + the lower pixel cap below = faster GIBS loads.
-        // DETERMINISTIC: based on the whole cleaned flight extent (not canvas/zoom/time-filter), so a
-        // batch-cached polar tile has the SAME box (= same fetchId) the live path will request. Pass an
-        // explicit extent for batch caching (which never loads the flight); live calls it with no args.
+        // Region sized to the flight extent + margin (clamped ~18x14 to ~44x30 degrees) instead of a
+        // whole-hemisphere composite. Deterministic from the cleaned flight extent (not canvas/zoom/
+        // time-filter) so batch caching and live playback compute the same fetchId. Batch caching
+        // passes an explicit extent since it never loads the flight; live calls pass none.
         const ex = extent || flightLatLonExtent();
         if (!ex) return null;
         const cLon = (ex.minLon + ex.maxLon) / 2, cLat = (ex.minLat + ex.maxLat) / 2;
@@ -643,20 +646,16 @@
     // request is an async job - it returns a key, then we poll /status until the PNG is ready.
     const RECON_API_BASE = 'https://joshmurdock.net/api';
 
-    // Discovery endpoint (GET /v1/satellite/products): every band/composite product the API can render,
-    // plus each spacecraft's active date range - so this client doesn't have to hardcode that knowledge
-    // and picks up new products (e.g. new bands, new composites) without a code change. Fetched once at
-    // startup; replaces the two archive-GOES layers' `bands` fallback in GIBS_LAYERS above and refines
-    // their `minDate`. If the fetch fails, the hardcoded fallback just keeps working.
+    // Discovery endpoint: every band/composite the API can render, plus each spacecraft's active date
+    // range. Fetched once at startup; replaces the archive-GOES `bands` fallback in GIBS_LAYERS and
+    // refines `minDate`. Falls back to the hardcoded list if the fetch fails.
     async function loadSatelliteProducts() {
         try {
             const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            // Label every spectral band as "Band N - …" (the API's names alone don't carry the
-            // band number) and keep them sorted by band, one entry per band - matching how the
-            // original hardcoded list read. Composites are tagged so the dropdown can group them
-            // separately instead of mixing multi-band blends in with the single-band products.
+            // Label each spectral band "Band N - …" and sort by band number; composites are tagged
+            // so the dropdown can group them separately from single-band products.
             const bandDefs = (data.bands || [])
                 .slice().sort((a, b) => a.band - b.band)
                 .map(b => ({
@@ -664,10 +663,9 @@
                     name: 'Band ' + b.band + ' - ' + b.name,
                     bboxSupported: b.bbox_supported !== false
                 }));
-            // Extra band-13 enhancement variants, each its own entry when the API lists the cmap:
-            // ir4 = the classic enhanced-IR curve, bd = the Dvorak BD hurricane enhancement.
-            // Deliberately a short allowlist - the API also offers nrl/enhanced/grayscale on every
-            // IR band, and surfacing every cmap x band combination would triple the dropdown.
+            // Band-13 enhancement variants (ir4 = enhanced-IR curve, bd = Dvorak BD curve), added only
+            // when the API lists the cmap. Short allowlist on purpose - every cmap x band combination
+            // would triple the dropdown.
             const b13 = (data.bands || []).find(b => b.band === 13 && Array.isArray(b.cmaps));
             if (b13) [['ir4', 'IR Enhanced (ir4)'], ['bd', 'IR BD Curve (Dvorak)']].forEach(([cmap, label]) => {
                 if (b13.cmaps.includes(cmap)) bandDefs.push({ id: 'band13_' + cmap, band: 13, cmap: cmap, name: 'Band 13 - ' + label, bboxSupported: b13.bbox_supported !== false });
@@ -689,9 +687,9 @@
             const changed = fp !== _lastProductsFingerprint;
             _lastProductsFingerprint = fp;
             setReconApiHealth(true, 'ok');   // rebuilds the dropdowns itself on a health transition
-            // Rebuilding resets the loaded overlay, so outside a transition only do it when
-            // the product list actually changed - NOT on every 60s poll (that used to wipe
-            // the user's product pick mid-caching).
+            // Rebuilding resets the loaded overlay, so outside a transition only do it when the
+            // product list actually changed - not on every 60s poll, which would wipe the user's
+            // product pick mid-caching.
             if (changed && typeof updateSatelliteOptions === 'function') updateSatelliteOptions();
         } catch (e) {
             setReconApiHealth(false, String(e));
@@ -719,11 +717,9 @@
         });
     }
 
-    // The recon-api returns PNGs in Web Mercator (EPSG:3857) - rows spaced linearly in Mercator Y,
-    // NOT in latitude. Our 2D map is equirectangular (getY is linear in lat), so drawing the tile as-is
-    // mispositions it vertically (worse toward the edges / higher latitudes). Reproject Mercator→equirect
-    // ONCE here so it flows correctly through the renderer/cache. Longitude is linear in both projections,
-    // so only the rows (Y) need resampling; columns (X) are copied straight across.
+    // recon-api tiles are Web Mercator (rows linear in Mercator Y); our 2D map is equirectangular
+    // (getY linear in lat). Reproject once here so rows aren't vertically misplaced. Longitude is
+    // linear in both, so only rows (Y) need resampling - columns (X) copy straight across.
     function reprojectMercatorToEquirect(src, box) {
         const W = src.width, H = src.height;
         if (!W || !H) return src;
@@ -1025,11 +1021,8 @@
         return { minLat, maxLat, minLon, maxLon };
     }
 
-    // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
-    // DETERMINISTIC: derived from the flight extent (optionally passed in for batch pre-cache) and
-    // snapped to a coarse grid (center 0.5°, dims 500 km) so the live path, the preloader, the
-    // "Cache flight" pass, and multi-flight batch caching all build the SAME fetchId - and so it
-    // never changes with canvas size / zoom (which used to cause needless refetches).
+    // Square bbox (km) centered on the flight extent + margin, snapped to a coarse grid (center 0.5°,
+    // dims 500 km) so live playback, preloading, and batch caching all build the same fetchId.
     function computeReconTileGeom(extent) {
         const ex = extent || flightLatLonExtent();
         if (!ex) return { centerStr: '0.000,0.000', dimsKm: 800 };
@@ -1217,12 +1210,9 @@
     }
 
     // --- Multi-flight batch cache ------------------------------------------------------
-    // Pre-download archive-GOES imagery for MANY storms at once, WITHOUT loading each flight into the
-    // app. Each selected flight file is parsed (same pipeline as playback), its extent/date/time give
-    // the same deterministic tile IDs playback will request, GOES-East/West is auto-picked per storm,
-    // and every 10-min tile for the chosen bands is pulled into the shared cold blob store. Everything
-    // accumulates there until the tab closes, so later opening any of those storms plays from cache.
-    // (batchCaching / batchCacheCancel state live in 01-state.js.)
+    // Pre-downloads archive-GOES imagery for many storms without loading each flight into the app.
+    // Each file is parsed (same pipeline as playback) to get the same deterministic tile IDs, then
+    // every 10-min tile for the chosen bands is pulled into the shared blob store.
 
     // Read one flight file to cleaned rows + its date (date comes from the filename, like the loader).
     function readFlightFileForBatch(file) {
@@ -1335,11 +1325,9 @@
         if (bandSelect) bandSelect.disabled = locked;
     }
 
-    // Pre-cache the CURRENTLY loaded flight's tiles for a satellite/bands using the in-memory parsed
-    // rows (no file re-read). It builds the SAME deterministic tile list the live playback path will
-    // request, so once this finishes playback hits the cache and never pauses on the API mid-flight.
-    // Triggered automatically by maybeAutoPrecacheSatellite() below (also reachable from the manual
-    // multi-flight "Locally Cache Satellites" modal via batchCacheFlights).
+    // Pre-caches the currently loaded flight's tiles for a satellite/bands, building the same
+    // deterministic tile list live playback will request, so playback never pauses on the API.
+    // Triggered by maybeAutoPrecacheSatellite() or the "Pre-Cache Satellite Imagery" modal.
     async function precacheCurrentFlight(layerValue, bandIds) {
         if (batchCaching) { showToast('A cache pass is already running.', 4000); return; }
         if (!allParsedData || !allParsedData.length) { showToast('Load a flight first.', 4000); return; }
@@ -1374,17 +1362,11 @@
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
     }
 
-    // Auto-trigger the full-timeframe pre-cache (no confirm() prompt) whenever an archive-GOES layer
-    // is active - so imagery is fully ready BEFORE playback needs it instead of trickling in one scan
-    // at a time as the playhead crosses each bucket. Called after a flight (re)loads
-    // (updateSatelliteOptions) and whenever the satellite/band pick changes.
-    //
-    // RECHECKS THE ACTUAL COLD CACHE every call, not a one-shot session flag: if every tile this
-    // flight/layer/band needs is already in satBlobStore (e.g. this exact mission was already fully
-    // built earlier this session, or a previous pass finished), there is nothing to do - stay
-    // completely silent, no toast, no progress pill, no network requests. A CANCELLED or partial pass
-    // is therefore retried automatically the next time this fires, since "missing" is recomputed fresh
-    // rather than remembered.
+    // Auto-triggers the full-timeframe pre-cache whenever an archive-GOES layer is active, so imagery
+    // is ready before playback needs it. Called after a flight (re)loads and on satellite/band change.
+    // Rechecks the actual cold cache every call (not a session flag): if every tile is already in
+    // satBlobStore, stays silent with no network requests; a cancelled/partial pass is retried
+    // automatically next time since "missing" is recomputed fresh, not remembered.
     function maybeAutoPrecacheSatellite() {
         const satSelect = document.getElementById('satelliteSelect');
         const bandSelect = document.getElementById('satBandSelect');
@@ -1505,7 +1487,7 @@
         const curBand = (document.getElementById('satBandSelect') || {}).value;
         bands.forEach((b, i) => {
             const lbl = document.createElement('label'); lbl.className = 'flex items-center gap-1 cursor-pointer';
-            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-sky-500 w-3.5 h-3.5';
+            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-blue-500 w-3.5 h-3.5';
             const prev = prevChecked.find(p => p.id === b.id);
             if (prev) cb.checked = prev.on;
             else cb.checked = bands.some(x => x.id === curBand) ? (b.id === curBand) : true;

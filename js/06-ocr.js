@@ -36,15 +36,15 @@
         el.classList.toggle('show', !!hunting);
     }
 
-    // --- Mark a drop zone as "file loaded": turn it purple + show the filename small ---
+    // --- Mark a drop zone as "file loaded": turn it gray + show the filename small ---
     function markDropZoneLoaded(zoneId, labelId, filename) {
         const zone = document.getElementById(zoneId);
         const label = document.getElementById(labelId);
         if (!zone || !label) return;
         zone.classList.remove('bg-slate-800', 'border-slate-600', 'border-dashed', 'hover:border-blue-500', 'hover:bg-slate-700');
-        zone.classList.add('bg-purple-950/40', 'border-purple-800', 'border-solid', 'hover:border-purple-600', 'hover:bg-purple-950/60');
+        zone.classList.add('bg-slate-950/40', 'border-slate-600', 'border-solid', 'hover:border-slate-500', 'hover:bg-slate-950/60');
         label.classList.remove('text-slate-300', 'group-hover:text-blue-300');
-        label.classList.add('text-purple-300', 'group-hover:text-purple-200');
+        label.classList.add('text-slate-200', 'group-hover:text-slate-100');
         label.textContent = filename;
         label.title = filename;
     }

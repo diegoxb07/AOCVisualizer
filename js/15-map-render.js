@@ -180,7 +180,7 @@
     
     function renderBackground() {
         if (!bgCanvas.width || !bgCanvas.height) return; 
-        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#171122'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#0b1220'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
@@ -235,7 +235,7 @@
             lastX = curX; lastY = curY;
         }
         
-        ctx.beginPath(); ctx.strokeStyle = '#9184a8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
+        ctx.beginPath(); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
         lastX = getX(filteredData[idx].lon); lastY = getY(filteredData[idx].lat); ctx.moveTo(lastX, lastY);
         for (let i = idx + 1; i < filteredData.length; i++) { 
             let curX = getX(filteredData[i].lon), curY = getY(filteredData[i].lat);

@@ -274,9 +274,17 @@
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
         // True-heading arrow: same scene-level convention as the ground-track arrow (world position,
-        // Y-only rotation - not banked/pitched with the airframe), so it always reads as a clean compass
-        // pointer at the same vertical level as the ground-track arrow.
-        if (headingArrow3D) { headingArrow3D.position.copy(pos); headingArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_th), 0); }
+        // Y-only rotation - not banked/pitched with the airframe), so it reads as a clean compass pointer.
+        // It fades in only as heading diverges from ground track (hidden below 3 deg of drift, full by 8)
+        // so a no-drift leg shows a single arrow instead of two overlapping, z-fighting ones.
+        if (headingArrow3D) {
+            headingArrow3D.position.copy(pos); headingArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_th), 0);
+            const drift = Math.abs(((t_track - t_th + 540) % 360) - 180);
+            const op = Math.max(0, Math.min(1, (drift - 3) / 5));
+            headingArrow3D.visible = op > 0.02;
+            const hmat = headingArrow3D.children[0].material;
+            hmat.transparent = true; hmat.opacity = op;
+        }
         camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
         controls3D.target.copy(pos); controls3D.update();
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;

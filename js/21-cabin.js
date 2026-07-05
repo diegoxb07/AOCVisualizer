@@ -154,8 +154,14 @@
         const c = document.getElementById('cabinCanvas'); if (!c || !c.getContext) return;
         const host = c.parentElement; const rect = host.getBoundingClientRect();
         if (rect.width < 4 || rect.height < 4) return;
-        if (c.width !== Math.round(rect.width) || c.height !== Math.round(rect.height)) { c.width = Math.round(rect.width); c.height = Math.round(rect.height); }
-        const ctx = c.getContext('2d'); const w = c.width, h = c.height; const cx = w / 2, cy = h * 0.52;
+        // Size the backing store to the rendered size (rect already includes the --hud-scale transform)
+        // times devicePixelRatio, then draw in CSS pixels, so the crew view stays sharp on HiDPI.
+        const DPR = window.devicePixelRatio || 1;
+        const w = Math.round(rect.width), h = Math.round(rect.height);
+        const bw = Math.round(w * DPR), bh = Math.round(h * DPR);
+        if (c.width !== bw || c.height !== bh) { c.width = bw; c.height = bh; }
+        const ctx = c.getContext('2d'); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+        const cx = w / 2, cy = h * 0.52;
         const s = Math.max(0.7, Math.min(1.4, w / 200));
         ctx.clearRect(0, 0, w, h);
         if (!cabinSim || !cabinSim.valid) {

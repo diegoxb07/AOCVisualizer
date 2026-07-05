@@ -334,7 +334,7 @@
     function drawTrackerInto(rctx, x, y, w, h) {
         const is3D = trackerModeSelect.value === '3d';
         const src = is3D ? (typeof renderer3D !== 'undefined' && renderer3D ? renderer3D.domElement : null) : canvas;
-        rctx.fillStyle = '#171122';
+        rctx.fillStyle = '#0b1220';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (src && src.width && src.height) drawImageContain(rctx, src, x, y, w, h);

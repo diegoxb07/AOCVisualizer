@@ -22,7 +22,7 @@ module.exports = {
       // accent (tier-for-tier same lightness progression as Tailwind's own default 'sky' scale), so
       // every existing text-slate-*/bg-blue-*/border-slate-* class rethemes with no per-element churn.
       colors: {
-        slate: {50:'#f4f1f8',100:'#e9e3f1',200:'#d6cde4',300:'#b3a7c6',400:'#9184a8',500:'#6f6288',600:'#4d4360',700:'#383049',800:'#342a46',900:'#29213a',950:'#161120'},
+        slate: {50:'#f8fafc',100:'#f1f5f9',200:'#e2e8f0',300:'#cbd5e1',400:'#94a3b8',500:'#64748b',600:'#475569',700:'#334155',800:'#1e293b',900:'#0f172a',950:'#020617'},
         blue:  {100:'#e0f2fe',200:'#bae6fd',300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e',950:'#082f49'}
       },
       fontFamily: {

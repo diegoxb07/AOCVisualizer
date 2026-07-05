@@ -15,7 +15,7 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://gibs.earthdata.nasa.gov https://joshmurdock.net; font-src 'self' data:; connect-src 'self' https://joshmurdock.net https://cmr.earthdata.nasa.gov https://raw.githubusercontent.com; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
     <title>AOC Mission Visualizer</title>
     <meta name="description" content="NOAA AOC hurricane-hunter mission playback: flight-level data, synced MMR video, satellite overlay, and charts.">
-    <meta name="theme-color" content="#251d33">
+    <meta name="theme-color" content="#0f172a">
     <link rel="icon" href="assets/noaa-logo.svg" type="image/svg+xml">
 
     <!-- Stamp the saved tracker mode onto <html> before the body paints, so the 2D-only map
@@ -33,8 +33,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written - regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260706e">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260706e">
+    <link rel="stylesheet" href="css/fonts.css?v=20260706j">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260706j">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -42,7 +42,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260706e">
+    <link rel="stylesheet" href="css/app.css?v=20260706j">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -548,28 +548,28 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260706e"></script>
-    <script src="js/01-state.js?v=20260706e"></script>
-    <script src="js/02-satellite.js?v=20260706e"></script>
-    <script src="js/03-metrics.js?v=20260706e"></script>
-    <script src="js/04-geo-measure.js?v=20260706e"></script>
-    <script src="js/05-interpolation.js?v=20260706e"></script>
-    <script src="js/06-ocr.js?v=20260706e"></script>
-    <script src="js/07-ui-controls.js?v=20260706e"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260706e"></script>
-    <script src="js/09-interaction.js?v=20260706e"></script>
-    <script src="js/10-point-analysis.js?v=20260706e"></script>
-    <script src="js/11-layout.js?v=20260706e"></script>
-    <script src="js/12-file-parsing.js?v=20260706e"></script>
-    <script src="js/12b-recon-archive.js?v=20260706e"></script>
-    <script src="js/13-charts-master.js?v=20260706e"></script>
-    <script src="js/14-filters-sync.js?v=20260706e"></script>
-    <script src="js/15-map-render.js?v=20260706e"></script>
-    <script src="js/16-pfd-hud.js?v=20260706e"></script>
-    <script src="js/17-charts.js?v=20260706e"></script>
-    <script src="js/18-engine.js?v=20260706e"></script>
-    <script src="js/19-bootstrap.js?v=20260706e"></script>
-    <script src="js/20-ui-polish.js?v=20260706e"></script>
-    <script src="js/21-cabin.js?v=20260706e"></script>
+    <script src="js/00-var-catalog.js?v=20260706j"></script>
+    <script src="js/01-state.js?v=20260706j"></script>
+    <script src="js/02-satellite.js?v=20260706j"></script>
+    <script src="js/03-metrics.js?v=20260706j"></script>
+    <script src="js/04-geo-measure.js?v=20260706j"></script>
+    <script src="js/05-interpolation.js?v=20260706j"></script>
+    <script src="js/06-ocr.js?v=20260706j"></script>
+    <script src="js/07-ui-controls.js?v=20260706j"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260706j"></script>
+    <script src="js/09-interaction.js?v=20260706j"></script>
+    <script src="js/10-point-analysis.js?v=20260706j"></script>
+    <script src="js/11-layout.js?v=20260706j"></script>
+    <script src="js/12-file-parsing.js?v=20260706j"></script>
+    <script src="js/12b-recon-archive.js?v=20260706j"></script>
+    <script src="js/13-charts-master.js?v=20260706j"></script>
+    <script src="js/14-filters-sync.js?v=20260706j"></script>
+    <script src="js/15-map-render.js?v=20260706j"></script>
+    <script src="js/16-pfd-hud.js?v=20260706j"></script>
+    <script src="js/17-charts.js?v=20260706j"></script>
+    <script src="js/18-engine.js?v=20260706j"></script>
+    <script src="js/19-bootstrap.js?v=20260706j"></script>
+    <script src="js/20-ui-polish.js?v=20260706j"></script>
+    <script src="js/21-cabin.js?v=20260706j"></script>
 </body>
 </html>

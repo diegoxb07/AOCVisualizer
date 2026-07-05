@@ -23,7 +23,7 @@
     function getBaseChartOptions(titleText, config = {}) {
         const enforceIntegers = config.enforceIntegers || false; const minRange = config.minRange || 0;
         const limitCallback = (scale) => { if (minRange > 0) { const range = scale.max - scale.min; if (range < minRange) { const mid = (scale.max + scale.min) / 2; scale.max = mid + (minRange / 2); scale.min = mid - (minRange / 2); } } };
-        const tickConfig = { color: '#9184a8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
+        const tickConfig = { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
             onHover: (e, elements, chart) => {
@@ -34,8 +34,8 @@
                 if (Math.abs(xPixel - playheadPx) < 15) chart.canvas.style.cursor = 'ew-resize';
                 else chart.canvas.style.cursor = 'crosshair';
             },
-            scales: { x: { grid: { color: 'rgba(214,205,228,0.05)' }, ticks: { color: '#9184a8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(214,205,228,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#9184a8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
-            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#d6cde4', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 14, usePointStyle: true, pointStyle: 'line' }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
+            scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
+            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 14, usePointStyle: true, pointStyle: 'line' }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
         };
     }
 

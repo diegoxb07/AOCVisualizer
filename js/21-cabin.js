@@ -166,7 +166,7 @@
         ctx.clearRect(0, 0, w, h);
         if (!cabinSim || !cabinSim.valid) {
             ctx.fillStyle = 'rgba(150,165,180,0.6)'; ctx.font = (11 * s) + 'px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText('Crew ride — load a flight', cx, cy); return;
+            ctx.fillText('Crew ride: load a flight', cx, cy); return;
         }
         // world-level horizon behind the cabin (stays level while the cabin banks -> shows the bank)
         ctx.save(); ctx.strokeStyle = 'rgba(90,130,170,0.35)'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);

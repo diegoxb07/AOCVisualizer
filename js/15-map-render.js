@@ -180,7 +180,7 @@
     
     function renderBackground() {
         if (!bgCanvas.width || !bgCanvas.height) return; 
-        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#161b22'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#171122'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
@@ -193,7 +193,7 @@
             bgCtx.globalAlpha = 1.0;
         }
         if (mapFeatures.length > 0) {
-            bgCtx.fillStyle = isSatOn ? 'rgba(21,128,61,0.25)' : '#15803d'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale;
+            bgCtx.fillStyle = isSatOn ? 'rgba(37,107,80,0.3)' : '#256b50'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale;
             // Draw the whole world, cull only off-screen - and repeat it once shifted ±360 so a
             // dateline-centered view (or panning past ±180 zoomed out) shows continuous land
             // instead of an empty seam. One copy each way is plenty: even at min zoom the
@@ -237,7 +237,7 @@
             lastX = curX; lastY = curY;
         }
         
-        ctx.beginPath(); ctx.strokeStyle = '#aaaaaa'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
+        ctx.beginPath(); ctx.strokeStyle = '#9184a8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
         lastX = getX(filteredData[idx].lon); lastY = getY(filteredData[idx].lat); ctx.moveTo(lastX, lastY);
         for (let i = idx + 1; i < filteredData.length; i++) { 
             let curX = getX(filteredData[i].lon), curY = getY(filteredData[i].lat);
@@ -278,12 +278,12 @@
             const d = dPlane; ctx.save(); ctx.translate(getX(d.lon), getY(d.lat)); ctx.scale(1/mapScale, 1/mapScale); 
             const zoomFactor = Math.max(1, Math.pow(mapScale, 0.6));
             if (document.getElementById('simpleTrackerIcon').checked) {
-                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#ef4444'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
+                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#f0369e'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
                 const planeScale = 0.22 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
                 ctx.save(); ctx.rotate((t_track - 90) * Math.PI/180); 
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25 * zoomFactor, 0); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2 * zoomFactor; ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(32 * zoomFactor, 0); ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); ctx.lineTo(24 * zoomFactor, 3 * zoomFactor); ctx.closePath(); ctx.fillStyle = '#38bdf8'; ctx.fill(); ctx.restore();
+                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25 * zoomFactor, 0); ctx.strokeStyle = '#2dd4bf'; ctx.lineWidth = 2 * zoomFactor; ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(32 * zoomFactor, 0); ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); ctx.lineTo(24 * zoomFactor, 3 * zoomFactor); ctx.closePath(); ctx.fillStyle = '#2dd4bf'; ctx.fill(); ctx.restore();
                 ctx.save(); ctx.rotate((t_th - 90) * Math.PI/180); ctx.scale(planeScale, planeScale); (isGulfstreamFlight() ? drawGulfstreamIV : drawP3Orion)(ctx); ctx.restore();
             }
             ctx.restore(); 
@@ -333,7 +333,7 @@
 
         const drawShapeGeometry = (type, pts, isActiveShape, shapeIndex, isHovered) => {
             if (pts.length === 0) return;
-            const stroke = isHovered ? '#7dd3fc' : '#38bdf8';
+            const stroke = isHovered ? '#7dd3fc' : '#2dd4bf';
             const fill = isHovered ? 'rgba(56, 189, 248, 0.38)' : 'rgba(56, 189, 248, 0.25)';
             // Measurement/preview line widths (original sizes - the DPR transform, not a fatter line, is what keeps them crisp).
             ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = (type === 'polygon' ? 5 : 3) / mapScale;
@@ -372,7 +372,7 @@
                     let maxDiam = 0; const tempPts = [...pts, liveMouseGeo];
                     for (let i = 0; i < tempPts.length; i++) { for (let j = i + 1; j < tempPts.length; j++) { const d = getDistanceNM(tempPts[i].lat, tempPts[i].lon, tempPts[j].lat, tempPts[j].lon); if (d > maxDiam) maxDiam = d; } }
                     const liveX = (getX(liveMouseGeo.lon) * mapScale) + mapOffsetX + 130; const liveY = (getY(liveMouseGeo.lat) * mapScale) + mapOffsetY;
-                    statBox(liveX, liveY - 45, [{t:`Seg: ${liveSegDist.toFixed(1)} NM`,c:'#38bdf8'},{t:`Tot: ${totalDist.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
+                    statBox(liveX, liveY - 45, [{t:`Seg: ${liveSegDist.toFixed(1)} NM`,c:'#2dd4bf'},{t:`Tot: ${totalDist.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
                 } else if (!isMeasuring && isHovered && pts.length >= 3) {
                     let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180; let maxDiam = 0;
                     pts.forEach((p, i) => {
@@ -381,11 +381,11 @@
                     });
                     const widthNM = getDistanceNM(minLat, minLon, minLat, maxLon); const heightNM = getDistanceNM(minLat, minLon, maxLat, minLon);
                     const bb = shapeScreenBBox(type, pts);
-                    statBox(bb.minX, bb.minY - 4, [{t:'Bounds:',c:'#38bdf8'},{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
+                    statBox(bb.minX, bb.minY - 4, [{t:'Bounds:',c:'#2dd4bf'},{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#fff'},{t:`Diam: ${maxDiam.toFixed(1)} NM`,c:'#facc15'}]);
                 } else if (!isMeasuring && isHovered && pts.length === 2) {
                     const lenNM = getDistanceNM(pts[0].lat, pts[0].lon, pts[1].lat, pts[1].lon);
                     const mid = toScreenPt((pts[0].lon + pts[1].lon) / 2, (pts[0].lat + pts[1].lat) / 2);
-                    statBox(mid.x, mid.y - 4, [{t:'Length:',c:'#38bdf8'},{t:`${lenNM.toFixed(1)} NM`,c:'#fff'}]);
+                    statBox(mid.x, mid.y - 4, [{t:'Length:',c:'#2dd4bf'},{t:`${lenNM.toFixed(1)} NM`,c:'#fff'}]);
                 }
             } else if (type === 'circle') {
                 const centerGeo = pts[0]; const edgeGeo = pts.length === 2 ? pts[1] : (liveMouseGeo || centerGeo);
@@ -398,7 +398,7 @@
                     if ((isActiveShape && isMeasuring) || (!isMeasuring && isHovered)) {
                         const anchor = (isActiveShape && isMeasuring) ? toScreenPt(edgeGeo.lon, edgeGeo.lat) : shapeScreenBBox(type, pts);
                         const ax = (isActiveShape && isMeasuring) ? anchor.x + 130 : anchor.minX; const ay = (isActiveShape && isMeasuring) ? anchor.y : anchor.minY - 4;
-                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`Radius: ${rNM.toFixed(1)} NM`,c:'#38bdf8'},{t:`Area: ${(Math.PI * rNM * rNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${(rNM * 2).toFixed(1)} NM`,c:'#facc15'}]);
+                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`Radius: ${rNM.toFixed(1)} NM`,c:'#2dd4bf'},{t:`Area: ${(Math.PI * rNM * rNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${(rNM * 2).toFixed(1)} NM`,c:'#facc15'}]);
                     }
                 }
             } else if (type === 'rectangle') {
@@ -410,7 +410,7 @@
                         const diamNM = getDistanceNM(p1.lat, p1.lon, p2.lat, p2.lon);
                         const anchor = (isActiveShape && isMeasuring) ? toScreenPt(p2.lon, p2.lat) : shapeScreenBBox(type, pts);
                         const ax = (isActiveShape && isMeasuring) ? anchor.x + 130 : anchor.minX; const ay = (isActiveShape && isMeasuring) ? anchor.y : anchor.minY - 4;
-                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#38bdf8'},{t:`Area: ${(widthNM * heightNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${diamNM.toFixed(1)} NM`,c:'#facc15'}]);
+                        statBox(ax, ay - (isActiveShape ? 50 : 0), [{t:`${widthNM.toFixed(1)} x ${heightNM.toFixed(1)} NM`,c:'#2dd4bf'},{t:`Area: ${(widthNM * heightNM).toFixed(1)} NM²`,c:'#fff'},{t:`Diam: ${diamNM.toFixed(1)} NM`,c:'#facc15'}]);
                     }
                 }
             }

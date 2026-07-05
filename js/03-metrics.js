@@ -8,29 +8,30 @@
     let threeMarkersGroup = new THREE.Group();
     let threeDInitialized = false;
 
+    // Console redesign: neon data palette (equal-weight lines, no gradient fills).
     const METRIC_DEFS = {
-        'pAlt': { label: 'Press Altitude (m)', color: '#d946ef', yAxisID: 'y' },
-        'gpsAlt': { label: 'GPS Altitude (m)', color: '#a855f7', yAxisID: 'y' },
-        'radAlt': { label: 'Radar Altitude (m)', color: '#14b8a6', yAxisID: 'y' },
-        'dValue': { label: 'D-Value (m)', color: '#8b5cf6', yAxisID: 'y' },
-        'sfcPr': { label: 'Surface Press (mb)', color: '#38bdf8', yAxisID: 'y' },
-        'tempr': { label: 'Ambient Temp (°C)', color: '#ff5555', yAxisID: 'y1' },
-        'dewpt': { label: 'Dew Point (°C)', color: '#ffaa00', yAxisID: 'y1' },
-        'tas': { label: 'TAS (kt)', color: '#f59e0b', yAxisID: 'y1' },
+        'pAlt': { label: 'Press Altitude (m)', color: '#e879f9', yAxisID: 'y' },
+        'gpsAlt': { label: 'GPS Altitude (m)', color: '#a78bfa', yAxisID: 'y' },
+        'radAlt': { label: 'Radar Altitude (m)', color: '#2dd4bf', yAxisID: 'y' },
+        'dValue': { label: 'D-Value (m)', color: '#7c93ff', yAxisID: 'y' },
+        'sfcPr': { label: 'Surface Press (mb)', color: '#4cc3ff', yAxisID: 'y' },
+        'tempr': { label: 'Ambient Temp (°C)', color: '#ff5c5c', yAxisID: 'y1' },
+        'dewpt': { label: 'Dew Point (°C)', color: '#ff9e42', yAxisID: 'y1' },
+        'tas': { label: 'TAS (kt)', color: '#fbbf24', yAxisID: 'y1' },
         'ias': { label: 'IAS (kt)', color: '#a3e635', yAxisID: 'y1' },
-        'windSpd': { label: 'Wind Speed (kt)', color: '#f43f5e', yAxisID: 'y1' },
-        'driftAngle': { label: 'Drift Angle (Deg)', color: '#ec4899', yAxisID: 'y1' },
-        'th': { label: 'True Heading (Deg)', color: '#3b82f6', yAxisID: 'y1' },
-        'gTrack': { label: 'Ground Track (Deg)', color: '#38bdf8', yAxisID: 'y1' },
-        'pitch': { label: 'Pitch (°)', color: '#ef4444', yAxisID: 'y1' },
-        'roll': { label: 'Roll (°)', color: '#3b82f6', yAxisID: 'y1' },
-        'alpha': { label: 'Alpha (AOA °)', color: '#10b981', yAxisID: 'y1' },
-        'beta': { label: 'Beta (Slip °)', color: '#ec4899', yAxisID: 'y1' },
-        'vtWnd': { label: 'Vert Wind (m/s)', color: '#ff1744', yAxisID: 'y1' },
-        'accZ': { label: 'Vertical Accel (m/s²)', color: '#f43f5e', yAxisID: 'y1' },
-        'mixRate': { label: 'Mixing Ratio (g/kg)', color: '#fbbf24', yAxisID: 'y1' },
+        'windSpd': { label: 'Wind Speed (kt)', color: '#f0369e', yAxisID: 'y1' },
+        'driftAngle': { label: 'Drift Angle (Deg)', color: '#ff7ad9', yAxisID: 'y1' },
+        'th': { label: 'True Heading (Deg)', color: '#6ea8ff', yAxisID: 'y1' },
+        'gTrack': { label: 'Ground Track (Deg)', color: '#22d0ee', yAxisID: 'y1' },
+        'pitch': { label: 'Pitch (°)', color: '#ff5c5c', yAxisID: 'y1' },
+        'roll': { label: 'Roll (°)', color: '#4cc3ff', yAxisID: 'y1' },
+        'alpha': { label: 'Alpha (AOA °)', color: '#34e3a2', yAxisID: 'y1' },
+        'beta': { label: 'Beta (Slip °)', color: '#ff7ad9', yAxisID: 'y1' },
+        'vtWnd': { label: 'Vert Wind (m/s)', color: '#ff3d71', yAxisID: 'y1' },
+        'accZ': { label: 'Vertical Accel (m/s²)', color: '#fb7185', yAxisID: 'y1' },
+        'mixRate': { label: 'Mixing Ratio (g/kg)', color: '#ffd84d', yAxisID: 'y1' },
         'thetaE': { label: 'Theta E (K)', color: '#c084fc', yAxisID: 'y1' },
-        'pressure': { label: 'Static Press (mb)', color: '#00ffcc', yAxisID: 'y' }
+        'pressure': { label: 'Static Press (mb)', color: '#5eead4', yAxisID: 'y' }
     };
 
     let customCharts = {}; 

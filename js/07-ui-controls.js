@@ -151,7 +151,7 @@
     function init3D() {
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
-        scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x0f172a);
+        scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
         camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000); camera3D.position.set(0, 10, 20);
         renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
@@ -166,23 +166,23 @@
         animate3D(); threeDInitialized = true;
     }
 
-    // Climb/descent indicator: a FEW small white streaks close to the plane that appear ONLY during
-    // a big ascent or descent (the aircraft's own vertical speed), streaming past the airframe like
-    // relative airflow. Nothing shows in level flight or gentle rates. Parented to the scene (stays
-    // world-vertical, does not bank); repositioned onto the plane each frame in update3DFrame.
+    // Climb/descent indicator: a few TINY white streaks hugging the wing/tail EDGES that appear ONLY
+    // during a big ascent or descent (the aircraft's own vertical speed), streaming past like relative
+    // airflow. Nothing shows in level flight. Parented to `planeGroup3D` (plane-local coords), so the
+    // sprites sit on the wingtips/tail and bank with the airframe.
     let windStreaks3D = null, cur3DVertRate = 0, windStreakLastMs = 0;
     function buildWindStreaks3D() {
-        if (windStreaks3D || !scene3D) return;
+        if (windStreaks3D || typeof planeGroup3D === 'undefined' || !planeGroup3D) return;
         windStreaks3D = new THREE.Group();
-        for (let i = 0; i < 6; i++) {
-            const a = (Math.sin((i + 1) * 7.13) * 99991) % 1, b = (Math.sin((i + 1) * 3.71) * 77773) % 1;
-            const ang = a * Math.PI * 2, rad = 0.5 + Math.abs(b) * 0.5;   // tight ring hugging the plane
-            const seg = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.32, 0.025), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
-            seg.userData = { x: Math.cos(ang) * rad, z: Math.sin(ang) * rad, phase: (a - 0.5) * 1.8 };
-            seg.position.set(seg.userData.x, seg.userData.phase, seg.userData.z);
+        // anchors in plane-local units (wings span x=±2.25 at z=0; tailplane at z=1.8, x=±0.9)
+        const anchors = [ {x:-2.05,z:0.0}, {x:2.05,z:0.0}, {x:-1.95,z:0.18}, {x:1.95,z:0.18}, {x:-0.78,z:1.8}, {x:0.78,z:1.8} ];
+        anchors.forEach((a, i) => {
+            const seg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.5, 0.05), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+            seg.userData = { x: a.x, z: a.z, phase: ((Math.sin((i + 1) * 7.13) * 99991) % 1) * 0.85 };
+            seg.position.set(a.x, seg.userData.phase, a.z);
             windStreaks3D.add(seg);
-        }
-        windStreaks3D.visible = false; scene3D.add(windStreaks3D);
+        });
+        windStreaks3D.visible = false; planeGroup3D.add(windStreaks3D);   // inherits plane bank/pitch/scale
     }
     function updateWindStreaks3D() {
         if (!windStreaks3D) return;
@@ -190,18 +190,21 @@
         if (!(dt > 0) || dt > 0.1) dt = 1 / 60;
         // Only during a BIG climb/descent: below ~4 m/s (~800 ft/min) nothing shows; fully lit by
         // ~14 m/s (~2800 ft/min). |cur3DVertRate| is the aircraft's own vertical speed.
-        const ON = 4, FULL = 14, band = 1.0;
+        const ON = 4, FULL = 14, band = 0.9;
         const intensity = Math.max(0, Math.min(1, (Math.abs(cur3DVertRate) - ON) / (FULL - ON)));
         windStreaks3D.visible = intensity > 0.001;
         if (!windStreaks3D.visible) return;
-        const speed = -Math.sign(cur3DVertRate) * (0.5 + intensity * 1.3);   // air streams DOWN past a climbing plane, UP past a descending one
+        // Freeze the airflow when playback is paused - otherwise the streaks keep scrolling off the last
+        // climb rate forever, looking like constant downward motion with nothing actually happening.
+        const moving = (typeof isPlaying === 'undefined') || isPlaying;
+        const speed = moving ? -Math.sign(cur3DVertRate) * (1.0 + intensity * 2.0) : 0;   // plane-local units/s; air streams DOWN past a climbing plane
         windStreaks3D.children.forEach(seg => {
             seg.userData.phase += speed * dt;
             if (seg.userData.phase > band) seg.userData.phase -= 2 * band;
             else if (seg.userData.phase < -band) seg.userData.phase += 2 * band;
             seg.position.y = seg.userData.phase;
-            seg.scale.y = 0.5 + intensity * 1.2;
-            seg.material.opacity = 0.1 + intensity * 0.45;
+            seg.scale.y = 0.5 + intensity * 1.0;
+            seg.material.opacity = 0.15 + intensity * 0.5;
         });
     }
 
@@ -308,8 +311,7 @@
             const rA = filteredData[iA], rB = filteredData[iB], aA = track3DAltMeters(rA), aB = track3DAltMeters(rB), tdt = rB.absSeconds - rA.absSeconds;
             if (tdt > 0) vr = (aB - aA) / tdt;
         }
-        cur3DVertRate = vr;   // feed the climb/descent streaks (animated in animate3D)
-        if (windStreaks3D) windStreaks3D.position.copy(pos);
+        cur3DVertRate = vr;   // feed the climb/descent streaks (animated in animate3D; parented to planeGroup3D)
         camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
         controls3D.target.copy(pos); controls3D.update();
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
@@ -421,7 +423,7 @@
 
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
-            const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#10b981', '#a855f7', '#f472b6', '#0ea5e9']; const assignedColor = palette[customMarkers.length % palette.length];
+            const palette = ['#fbbf24', '#ef4444', '#2dd4bf', '#34e3a2', '#a78bfa', '#f472b6', '#22d0ee']; const assignedColor = palette[customMarkers.length % palette.length];
             customMarkers.push({ idx: currentIdx, color: assignedColor }); if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx);
         }
     });

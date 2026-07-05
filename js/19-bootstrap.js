@@ -12,7 +12,7 @@
         el.addEventListener('keyup', (e) => { if (e.key === 'Enter') el.blur(); });
     });
     
-    document.getElementById('runBtn').addEventListener('click', function() { applyFiltersAndInit(true); });
+    // The old "Apply & Run" button is gone - the Play button folds it in (see the play handler below).
 
     // Batch satellite cache modal (works across many storms without loading each flight into the app).
     (function wireBatchCache() {
@@ -84,8 +84,14 @@
     });
 
     playPauseBtn.addEventListener('click', function() {
+        // Fold the old "Apply & Run" into Play: when starting playback in manual mode, if the start/end
+        // time window was edited since it was last applied, apply it (from the window start) then play.
+        if (!isPlaying && allParsedData.length && videoSyncMode.value !== 'auto') {
+            const win = document.getElementById('startTimeInput').value + '|' + document.getElementById('endTimeInput').value + '|' + document.getElementById('videoStartInput').value;
+            if (win !== window._appliedWindow) { applyFiltersAndInit(true); return; }
+        }
         if (filteredData.length === 0) return;
-        if (isPlaying) { 
+        if (isPlaying) {
             isPlaying = false; playPauseBtn.innerText = "▶ Play"; 
             if (videoLoaded) video.pause(); 
             if (animationFrameId) cancelAnimationFrame(animationFrameId); 
@@ -328,7 +334,7 @@
     function drawTrackerInto(rctx, x, y, w, h) {
         const is3D = trackerModeSelect.value === '3d';
         const src = is3D ? (typeof renderer3D !== 'undefined' && renderer3D ? renderer3D.domElement : null) : canvas;
-        rctx.fillStyle = '#161b22';
+        rctx.fillStyle = '#171122';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (src && src.width && src.height) drawImageContain(rctx, src, x, y, w, h);

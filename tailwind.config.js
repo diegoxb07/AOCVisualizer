@@ -18,13 +18,16 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // Console redesign: 'slate' remapped to a deep-plum shell, 'blue' remapped to a teal accent,
+      // so every existing text-slate-*/bg-blue-*/border-slate-* class rethemes with no per-element churn.
       colors: {
-        slate: {50:'#eef1f4',100:'#dce1e7',200:'#c8d0d8',300:'#aab4be',400:'#7c8794',500:'#5d6773',600:'#454e58',700:'#343c46',800:'#20262f',900:'#161b22',950:'#0b0e13'},
-        blue:  {300:'#7dd3fc',400:'#38bdf8',500:'#0ea5e9',600:'#0284c7',700:'#0369a1',800:'#075985',900:'#0c4a6e'}
+        slate: {50:'#f4f1f8',100:'#e9e3f1',200:'#d6cde4',300:'#b3a7c6',400:'#9184a8',500:'#6f6288',600:'#4d4360',700:'#383049',800:'#342a46',900:'#29213a',950:'#161120'},
+        blue:  {100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e',800:'#115e59',900:'#134e4a',950:'#042f2e'}
       },
       fontFamily: {
-        sans: ['Inter','ui-sans-serif','system-ui','sans-serif'],
-        mono: ['Roboto Mono','ui-monospace','SFMono-Regular','monospace']
+        sans: ['Manrope','ui-sans-serif','system-ui','sans-serif'],
+        mono: ['IBM Plex Mono','ui-monospace','SFMono-Regular','monospace'],
+        serif: ['Manrope','sans-serif']
       }
     }
   }

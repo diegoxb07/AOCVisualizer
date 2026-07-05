@@ -22,7 +22,7 @@ flowchart TD
     LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
-    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br>(<b>🔄 Sync Now</b> forces a lock, or use Manual)"]
+    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>🔄 Sync Now</b> forces a lock, or use Manual"]
     MMR -- "No" --> WINDOW{"Replay only part<br>of the flight?"}
     WINDOW -- "Yes" --> TRIM["Set <b>Start / End</b> times (HHMMSS)<br>then click <b>Apply & Run</b>"]
     WINDOW -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}

@@ -150,7 +150,7 @@
         applySyncModeLock();
 
         if (filteredData.length > 0 && !isPlaying) {
-            isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; playbackAccumulator = 0; lastTickTime = performance.now();
+            isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now();
             if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
             masterSyncEngineTick();
         }

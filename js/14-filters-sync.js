@@ -3,7 +3,7 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     function applyFiltersAndInit(shouldPlay = false) {
-        isPlaying = false; playPauseBtn.innerText = "▶ Play"; if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        isPlaying = false; playPauseBtn.innerText = "Play"; if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
         const sLim = timeToSeconds(document.getElementById('startTimeInput').value); const eLim = timeToSeconds(document.getElementById('endTimeInput').value); videoStartSeconds = timeToSeconds(document.getElementById('videoStartInput').value);
         // Remember the applied time window so the Play button (which folded in "Apply & Run") can tell
@@ -31,7 +31,7 @@
         else updateVisualComponents(currentIdx);
 
         if (shouldPlay === true) {
-            isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); 
+            isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); 
             if (videoSyncMode.value === 'auto' && !hasInitialSyncOccurred) { setTimeout(() => { forceOcrSyncNextTick = true; hasInitialSyncOccurred = true; }, 2000); }
             if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{}); 
             masterSyncEngineTick();

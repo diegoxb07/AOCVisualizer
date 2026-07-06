@@ -270,9 +270,21 @@
                 ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#e2e4e8'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
                 const planeScale = 0.22 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
-                ctx.save(); ctx.rotate((t_track - 90) * Math.PI/180); 
-                ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25 * zoomFactor, 0); ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2 * zoomFactor; ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(32 * zoomFactor, 0); ctx.lineTo(24 * zoomFactor, -3 * zoomFactor); ctx.lineTo(24 * zoomFactor, 3 * zoomFactor); ctx.closePath(); ctx.fillStyle = '#38bdf8'; ctx.fill(); ctx.restore();
+                // ground-track (blue) and true-heading (yellow) arrows ahead of the plane, the
+                // same pair the 3D tracker flies: translucent so the dynamic wind barb stays
+                // readable through them, the heading arrow nesting inside the track arrow
+                // whenever the two agree
+                const arrow2D = (deg, color, s1, lw) => {
+                    ctx.save(); ctx.rotate((deg - 90) * Math.PI / 180); ctx.globalAlpha = 0.55;
+                    ctx.beginPath(); ctx.moveTo(14 * zoomFactor, 0); ctx.lineTo(s1 * zoomFactor, 0);
+                    ctx.strokeStyle = color; ctx.lineWidth = lw * zoomFactor; ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo((s1 + 8) * zoomFactor, 0);
+                    ctx.lineTo(s1 * zoomFactor, -3.2 * zoomFactor); ctx.lineTo(s1 * zoomFactor, 3.2 * zoomFactor);
+                    ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+                    ctx.restore();
+                };
+                arrow2D(t_track, '#3da5ff', 30, 2.6);
+                arrow2D(t_th, '#ffd400', 26, 2);
                 ctx.save(); ctx.rotate((t_th - 90) * Math.PI/180); ctx.scale(planeScale, planeScale); (isGulfstreamFlight() ? drawGulfstreamIV : drawP3Orion)(ctx); ctx.restore();
             }
             ctx.restore(); 

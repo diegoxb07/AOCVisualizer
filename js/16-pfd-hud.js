@@ -34,7 +34,11 @@
 
     function renderPFD(d) {
         const c = document.getElementById('pfdCanvas'); if (!c || !c.getContext) return; const ctx = c.getContext('2d');
-        const w = c.width; const h = c.height; const cx = w / 2; const cy = h / 2;
+        // The backing store is devicePixelRatio-scaled (sized in resizeCanvasLayout); all layout
+        // below works in logical CSS pixels through this base transform, keeping text crisp on HiDPI.
+        const dpr = window.devicePixelRatio || 1;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const w = c.width / dpr; const h = c.height / dpr; const cx = w / 2; const cy = h / 2;
         ctx.clearRect(0, 0, w, h);
         const isImperial = document.getElementById('toggleImperial').checked, useGps = document.getElementById('toggleGpsAlt').checked;
         // The tape prefers IAS like a real G1000 (TAS gets its own data strip below); falls back to TAS.

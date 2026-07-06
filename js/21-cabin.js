@@ -32,11 +32,12 @@
             const j = Math.sin((i + 1) * 12.9898) * 43758.5453; const r = j - Math.floor(j);  // deterministic per-seat variation
             occ.push({
                 // articulated-body joint angles (rad, 0 = upright rel. to the seat) + velocities
-                torso: 0, torsoV: 0, head: 0, headV: 0, arm: 0, armV: 0, torsoP: 0, torsoPV: 0, pelY: 0, pelVy: 0,
+                torso: 0, torsoV: 0, head: 0, headV: 0, arm: 0, armV: 0, fore: 0, foreV: 0, torsoP: 0, torsoPV: 0, pelY: 0, pelVy: 0,
                 // natural frequencies: wG = gravity-torque coupling, wP = muscle/posture stiffness
                 wG: 2 * Math.PI * (0.82 + 0.18 * r), wP: 2 * Math.PI * (0.70 + 0.15 * r), zT: 0.30,     // torso lateral
                 wGH: 2 * Math.PI * (1.25 + 0.3 * r), wPH: 2 * Math.PI * (1.5 + 0.3 * r), zH: 0.33,      // head/neck
-                wGA: 2 * Math.PI * (0.95 + 0.25 * r), wPA: 2 * Math.PI * (0.45 + 0.1 * r), zA: 0.20,    // arms (floppier)
+                wGA: 2 * Math.PI * (0.95 + 0.25 * r), wPA: 2 * Math.PI * (0.45 + 0.1 * r), zA: 0.20,    // upper arms (floppier)
+                wGF: 2 * Math.PI * (1.15 + 0.3 * r), wPF: 2 * Math.PI * (0.85 + 0.2 * r), zF: 0.24,     // forearms (follow the arm with lag)
                 wPfa: 2 * Math.PI * (0.85 + 0.2 * r), zPfa: 0.62,                                       // torso fore-aft (hunch, well-damped)
                 wV: 2 * Math.PI * (2.8 + 0.5 * r), zV: 0.26,                                            // seat cushion (vertical)
                 jphase: r * Math.PI * 2,                                                                // per-seat phase for the shared airframe jitter
@@ -95,9 +96,13 @@
                 // head: pendulum in apparent gravity, held toward the torso line by the neck
                 o.headV += (-o.wGH * o.wGH * gApp * Math.sin(o.head - alpha) - o.wPH * o.wPH * (o.head - o.torso) - 2 * o.zH * o.wGH * o.headV) * h;
                 o.head  += o.headV * h;
-                // arms: floppier pendulum toward apparent gravity, weak return to hanging (0)
+                // upper arms: floppier pendulum toward apparent gravity, weak return to hanging (0)
                 o.armV += (-o.wGA * o.wGA * gApp * Math.sin(o.arm - alpha) - o.wPA * o.wPA * o.arm - 2 * o.zA * o.wGA * o.armV) * h;
                 o.arm  += o.armV * h;
+                // forearms: a second pendulum hinged at the elbow, pulled toward apparent gravity and
+                // sprung toward the upper-arm line, so the arm articulates instead of swinging rigid
+                o.foreV += (-o.wGF * o.wGF * gApp * Math.sin(o.fore - alpha) - o.wPF * o.wPF * (o.fore - o.arm) - 2 * o.zF * o.wGF * o.foreV) * h;
+                o.fore  += o.foreV * h;
                 // torso fore-aft: hunch FORWARD under sustained +G (pushed down), extend slightly under -G (kept gentle)
                 const pTarget = gzEff > 0 ? Math.min(0.42, gzEff * 0.8 * o.gain) : Math.max(-0.13, gzEff * 0.28 * o.gain);
                 o.torsoPV += (-o.wPfa * o.wPfa * (o.torsoP - pTarget) - 2 * o.zPfa * o.wPfa * o.torsoPV) * h;
@@ -115,39 +120,53 @@
         cabinSim.valid = f.valid;
     }
 
-    // --- 2D rear-view cutaway: slim seated human with arms, planted on a belted seat ---
+    // --- 2D rear-view cutaway: jointed crash-test dummy, belted to the seat ---
     function drawSeated2D(ctx, x, seatY, s, torsoLen, o) {
         const beltLift = o.pelY * 55 * s;                         // + = float against the belt (-G),, = compress into seat (+G)
         const hunch = Math.max(0, o.torsoP);                      // fore-aft forward hunch (+G); in rear view it foreshortens + drops the torso
         const hipY = seatY - s * 3 - beltLift;
         const L = torsoLen * (1 - 0.16 * hunch);                  // hunch foreshortens the torso
         const shX = x + Math.sin(o.torso) * L, shY = hipY - Math.cos(o.torso) * L + hunch * s * 2.0;   // shoulders drop when hunched
-        const hl = L * 0.4;
-        const headX = shX + Math.sin(o.head) * hl, headY = shY - Math.cos(o.head) * hl;
+        const nl = L * 0.4;
+        const headX = shX + Math.sin(o.head) * nl, headY = shY - Math.cos(o.head) * nl;
+        const jointDot = (jx, jy) => { ctx.fillStyle = '#23262b'; ctx.beginPath(); ctx.arc(jx, jy, s * 1.3, 0, Math.PI * 2); ctx.fill(); };
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         // seat: cushion + short back (fixed, grounding the figure)
         ctx.fillStyle = 'rgba(66,88,112,0.55)';
         ctx.fillRect(x - L * 0.4, seatY, L * 0.8, s * 4);
         ctx.fillRect(x - L * 0.42, seatY - L * 0.5, s * 2.3, L * 0.5);
-        // thigh resting on the cushion (fixed), reads as seated
-        ctx.strokeStyle = '#4a90d9'; ctx.lineWidth = s * 3.0;
-        ctx.beginPath(); ctx.moveTo(x, hipY); ctx.lineTo(x + L * 0.34, seatY - s * 0.5); ctx.stroke();
-        // arms hanging from the shoulders, swinging with the apparent gravity (drawn behind the torso)
-        const armAng = o.torso + o.arm, al = L * 0.85;
-        const handX = shX + Math.sin(armAng) * al * 0.5, handY = shY + Math.cos(armAng) * al;
-        ctx.strokeStyle = '#5aa8e6'; ctx.lineWidth = s * 2.1;
-        ctx.beginPath(); ctx.moveTo(shX, shY + s * 0.5); ctx.lineTo(handX, handY); ctx.stroke();
-        // torso (slim)
-        ctx.strokeStyle = '#5eb0ef'; ctx.lineWidth = s * 3.4;
+        // legs: knee and foot rise off the floor when negative G floats the body against the belt
+        const lift = Math.max(0, o.pelY / o.beltCap);
+        const floorY = seatY + s * 4;
+        const kneeX = x + L * 0.34, kneeY = hipY + s * 1.4 - lift * L * 0.30;
+        const footY = floorY - lift * (floorY - kneeY) * 0.85;
+        ctx.strokeStyle = '#c9761f'; ctx.lineWidth = s * 2.6;
+        ctx.beginPath(); ctx.moveTo(x, hipY); ctx.lineTo(kneeX, kneeY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(kneeX, kneeY); ctx.lineTo(kneeX + s * 0.6, footY); ctx.stroke();
+        jointDot(kneeX, kneeY);
+        // arm: upper arm from the shoulder, forearm hinged at the elbow with its own swing
+        const armAng = o.torso + o.arm, foreAng = o.torso + o.fore, al = L * 0.5;
+        const elbX = shX + Math.sin(armAng) * al * 0.55, elbY = shY + s * 0.5 + Math.cos(armAng) * al;
+        const handX = elbX + Math.sin(foreAng) * al * 0.5, handY = elbY + Math.cos(foreAng) * al * 0.95;
+        ctx.strokeStyle = '#d07f28'; ctx.lineWidth = s * 2.1;
+        ctx.beginPath(); ctx.moveTo(shX, shY + s * 0.5); ctx.lineTo(elbX, elbY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(elbX, elbY); ctx.lineTo(handX, handY); ctx.stroke();
+        jointDot(elbX, elbY);
+        // torso segment
+        ctx.strokeStyle = '#df8a30'; ctx.lineWidth = s * 3.4;
         ctx.beginPath(); ctx.moveTo(x, hipY); ctx.lineTo(shX, shY); ctx.stroke();
+        jointDot(x, hipY); jointDot(shX, shY + s * 0.3);
         // lap belt across the hips
         ctx.strokeStyle = 'rgba(232,184,84,0.95)'; ctx.lineWidth = s * 1.6;
         ctx.beginPath(); ctx.moveTo(x - L * 0.26, hipY + s * 0.5); ctx.lineTo(x + L * 0.26, hipY + s * 0.5); ctx.stroke();
-        // neck + head
-        ctx.strokeStyle = '#8bd0ff'; ctx.lineWidth = s * 2.1;
+        // neck + dummy head with its side calibration target
+        ctx.strokeStyle = '#df8a30'; ctx.lineWidth = s * 2.1;
         ctx.beginPath(); ctx.moveTo(shX, shY); ctx.lineTo(headX, headY); ctx.stroke();
-        ctx.fillStyle = '#e8f4ff';
+        jointDot(shX, shY - s * 1.1);
+        ctx.fillStyle = '#e29a3f';
         ctx.beginPath(); ctx.arc(headX, headY, s * 3.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#23262b';
+        ctx.beginPath(); ctx.arc(headX + s * 1.4, headY - s * 0.4, s * 1.0, 0, Math.PI * 2); ctx.fill();
     }
 
     function renderCabin2D() {
@@ -188,68 +207,112 @@
         ctx.fillText('CREW RIDE (rear view)', 7, 6);
     }
 
-    // --- 3D crew: slim figures with arms, seated inside a hollowed, opaque cabin trough ---
+    // --- 3D crew: jointed crash-test dummies belted into a hollow cabin trough. Figure layout is
+    // sized per airframe from activeCabinSpec() (js/07b-plane-models.js). Fig-local units put the
+    // cabin floor at y=0; spec.figScale fits the dummies inside the active fuselage. ---
     function build3DCrew() {
         if (crewGroup3D || typeof planeGroup3D === 'undefined' || !planeGroup3D || typeof THREE === 'undefined') return;
+        const spec = (typeof activeCabinSpec === 'function') ? activeCabinSpec()
+            : { floorY: -0.10, halfW: 0.20, figScale: 0.62, seatsZ: [-1.15, -0.42, 0.32, 1.02] };
         crewGroup3D = new THREE.Group();
         const shell = new THREE.MeshPhongMaterial({ color: 0x141c26, side: THREE.DoubleSide });
-        const body = new THREE.MeshPhongMaterial({ color: 0x5eb0ef }), skin = new THREE.MeshPhongMaterial({ color: 0xe6f2ff }), beltMat = new THREE.MeshPhongMaterial({ color: 0xe8b854 });
-        // hollow opaque cabin trough (floor + a LOW lip, open top) so the crew sit INSIDE it with
+        const seg = new THREE.MeshPhongMaterial({ color: 0xdf8a30 });     // dummy rubber skin
+        const joint = new THREE.MeshPhongMaterial({ color: 0x23262b });   // joint hardware + head targets
+        const beltMat = new THREE.MeshPhongMaterial({ color: 0xe8b854 });
+        const zs = spec.seatsZ, zc = (zs[0] + zs[zs.length - 1]) / 2, troughLen = zs[zs.length - 1] - zs[0] + 0.55;
+        // hollow cabin trough (floor + low side lips, open top) so the crew sit inside it with
         // their lower halves still visible
-        const floor = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 2.7), shell); floor.position.set(0, -0.2, -0.05);
-        const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.13, 2.7), shell); wallL.position.set(-0.23, -0.15, -0.05);
-        const wallR = wallL.clone(); wallR.position.x = 0.23;
+        const floor = new THREE.Mesh(new THREE.BoxGeometry(spec.halfW * 2 + 0.06, 0.03, troughLen), shell);
+        floor.position.set(0, spec.floorY - 0.015, zc);
+        const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.10, troughLen), shell);
+        wallL.position.set(-(spec.halfW + 0.015), spec.floorY + 0.035, zc);
+        const wallR = wallL.clone(); wallR.position.x = spec.halfW + 0.015;
         crewGroup3D.add(floor, wallL, wallR);
-        const zPos = [-1.15, -0.42, 0.32, 1.02];   // all within the cabin; clear of nose (-2.4) and tail (1.8)
+        const figs = [];
         for (let i = 0; i < CABIN_CREW; i++) {
             const fig = new THREE.Group();
-            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.32), shell); seat.position.y = -0.16;
-            const hips = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.1, 0.12, 10), body); hips.position.y = -0.06;
-            // lap belt: a thin strap across the tops of the thighs (not a slab over the belly)
-            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.07), beltMat); belt.position.set(0, -0.075, -0.055);
-            const torso = new THREE.Group();
-            const tMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.095, 0.3, 10), body); tMesh.position.y = 0.15; torso.add(tMesh);
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.085, 12, 12), skin); head.position.y = 0.36; torso.add(head);
-            const armL = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.28, 8), body); armL.position.set(-0.1, 0.12, 0); torso.add(armL);
-            const armR = armL.clone(); armR.position.x = 0.1; torso.add(armR);
-            torso.position.y = 0.0; torso.userData.armL = armL; torso.userData.armR = armR;
-            // Legs stay planted on the cabin floor: thigh on the seat top running forward, shin to the
-            // floor, foot flat. Decoupled from the cushion bob (only the upper body springs).
-            const legs = new THREE.Group();
-            [-0.055, 0.055].forEach(sx => {
-                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.042, 0.19, 8), body);
-                thigh.rotation.x = Math.PI * 0.46; thigh.position.set(sx, -0.10, -0.08);
-                const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.036, 0.1, 8), body);
-                shin.rotation.x = 0.14; shin.position.set(sx, -0.135, -0.185);
-                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.028, 0.11), skin);
-                foot.position.set(sx, -0.178, -0.205);   // foot bottom sits on the floor top (~-0.18 plane-local)
-                legs.add(thigh, shin, foot);
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.04, 0.30), shell); seat.position.set(0, 0.085, 0.05);
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.34, 0.05), shell); back.position.set(0, 0.27, 0.17);
+            const upper = new THREE.Group();
+            const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.10, 0.16), seg); pelvis.position.set(0, 0.135, 0.02);
+            const belt = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.026, 0.07), beltMat); belt.position.set(0, 0.16, -0.055);
+            upper.add(pelvis, belt);
+            // legs hang from hip joints; hip/knee groups articulate so feet can leave the floor
+            const mkLeg = (sx) => {
+                const hip = new THREE.Group(); hip.position.set(sx, 0.14, 0);
+                const hipBall = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 8), joint); hip.add(hipBall);
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.030, 0.17, 8), seg);
+                thigh.rotation.x = Math.PI / 2; thigh.position.set(0, 0, -0.085); hip.add(thigh);
+                const knee = new THREE.Group(); knee.position.set(0, 0, -0.17); hip.add(knee);
+                const kneeBall = new THREE.Mesh(new THREE.SphereGeometry(0.030, 10, 8), joint); knee.add(kneeBall);
+                const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.024, 0.115, 8), seg);
+                shin.position.set(0, -0.062, -0.008); shin.rotation.x = 0.10; knee.add(shin);
+                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.022, 0.10), joint);
+                foot.position.set(0, -0.128, -0.035); knee.add(foot);
+                return { hip, knee };
+            };
+            const legL = mkLeg(-0.06), legR = mkLeg(0.06);
+            upper.add(legL.hip, legR.hip);
+            // torso chain: lumbar + chest segments, ball joints at shoulders and neck
+            const torso = new THREE.Group(); torso.position.set(0, 0.15, 0);
+            const lumbar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.062, 0.11, 10), seg); lumbar.position.y = 0.055; torso.add(lumbar);
+            const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.075, 0.15, 10), seg); chest.position.y = 0.185; torso.add(chest);
+            const mkArm = (sx) => {
+                const shoulderBall = new THREE.Mesh(new THREE.SphereGeometry(0.034, 10, 8), joint); shoulderBall.position.set(sx, 0.245, 0); torso.add(shoulderBall);
+                const arm = new THREE.Group(); arm.position.set(sx, 0.245, 0);
+                const upperArm = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.024, 0.15, 8), seg); upperArm.position.y = -0.075; arm.add(upperArm);
+                const elbow = new THREE.Group(); elbow.position.y = -0.15; arm.add(elbow);
+                const elbowBall = new THREE.Mesh(new THREE.SphereGeometry(0.028, 10, 8), joint); elbow.add(elbowBall);
+                const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.14, 8), seg); forearm.position.y = -0.07; elbow.add(forearm);
+                const hand = new THREE.Mesh(new THREE.SphereGeometry(0.028, 8, 8), seg); hand.position.y = -0.145; elbow.add(hand);
+                torso.add(arm);
+                return { arm, elbow };
+            };
+            const armL = mkArm(-0.105), armR = mkArm(0.105);
+            const neckBall = new THREE.Mesh(new THREE.SphereGeometry(0.030, 10, 8), joint); neckBall.position.set(0, 0.275, 0); torso.add(neckBall);
+            const neck = new THREE.Group(); neck.position.set(0, 0.275, 0);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 12), seg); head.position.y = 0.085; neck.add(head);
+            [-0.075, 0.075].forEach(hx => {   // the dummy head's side calibration targets
+                const target = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.004, 12), joint);
+                target.rotation.z = Math.PI / 2; target.position.set(hx, 0.085, 0); neck.add(target);
             });
-            // upper body (hips + lap belt + torso), the only part that springs on the cushion / rises
-            // against the belt; the seat and legs stay fixed to the figure.
-            const upper = new THREE.Group(); upper.add(hips, belt, torso);
-            fig.add(seat, legs, upper);
-            fig.userData.torso = torso; fig.userData.upper = upper; fig.userData.baseY = -0.02;
-            fig.position.set(0, -0.02, zPos[i]); fig.scale.set(0.82, 0.82, 0.82);
-            crewGroup3D.add(fig);
+            torso.add(neck);
+            upper.add(torso);
+            fig.add(seat, back, upper);
+            fig.userData = { upper, torso, neck, armL: armL.arm, armR: armR.arm, elbowL: armL.elbow, elbowR: armR.elbow, hipL: legL.hip, hipR: legR.hip, kneeL: legL.knee, kneeR: legR.knee };
+            fig.position.set(0, spec.floorY, zs[i]);
+            fig.scale.set(spec.figScale, spec.figScale, spec.figScale);
+            crewGroup3D.add(fig); figs.push(fig);
         }
+        crewGroup3D.userData.figs = figs;
         planeGroup3D.add(crewGroup3D);   // inherits the plane's position + bank + pitch
-        // every body mesh (fuselage, wings, tail, vTail, nose), dimmed to a translucent shell while
-        // crew are shown so they read as INSIDE the plane (crewGroup3D is a Group, so it's excluded)
-        _planeBodyMeshes = planeGroup3D.children.filter(ch => ch.isMesh && ch.material);
+        // every airframe mesh dims to a translucent shell while crew are shown so they read as
+        // INSIDE the plane; meshes flagged noDim (prop discs) keep their own transparency
+        _planeBodyMeshes = [];
+        if (typeof planeModelGroup3D !== 'undefined' && planeModelGroup3D) {
+            planeModelGroup3D.traverse(o => { if (o.isMesh && !o.userData.noDim) _planeBodyMeshes.push(o); });
+        } else {
+            _planeBodyMeshes = planeGroup3D.children.filter(ch => ch.isMesh && ch.material);
+        }
     }
 
     function updateCabin3D() {
-        if (!crewGroup3D || !cabinSim) return;
+        if (!crewGroup3D || !cabinSim || !crewGroup3D.userData.figs) return;
         cabinSim.occ.forEach((o, i) => {
-            const fig = crewGroup3D.children[i + 3]; if (!fig || !fig.userData.torso) return;   // +3: skip floor + 2 walls
-            const torso = fig.userData.torso, upper = fig.userData.upper;
-            torso.rotation.z = o.torso;                          // lateral lean (plane local frame)
-            torso.rotation.x = -o.torsoP - o.pelY * 0.25;        // hunch FORWARD (toward nose) under +G; slight float flex
-            // Only the UPPER body springs (feet stay planted): rises against the belt in -G, presses a
-            // little into the cushion in +G. Realistic modest travel, so nothing clips the floor.
-            if (upper) upper.position.y = o.pelY > 0 ? o.pelY * 0.5 : o.pelY * 0.22;
-            if (torso.userData.armL) { torso.userData.armL.rotation.z = o.arm * 0.8; torso.userData.armR.rotation.z = o.arm * 0.8; }
+            const fig = crewGroup3D.userData.figs[i]; if (!fig) return;
+            const u = fig.userData;
+            u.torso.rotation.z = o.torso;                        // lateral lean (plane local frame)
+            u.torso.rotation.x = -o.torsoP - o.pelY * 0.25;      // hunch FORWARD (toward nose) under +G; slight float flex
+            u.neck.rotation.z = o.head - o.torso;                // head lags/leads the torso on its own hinge
+            u.armL.rotation.z = o.arm; u.armR.rotation.z = o.arm;
+            const bend = o.fore - o.arm;                         // forearm swings about the elbow relative to the upper arm
+            u.elbowL.rotation.z = bend; u.elbowR.rotation.z = bend;
+            u.upper.position.y = o.pelY > 0 ? o.pelY * 0.5 : o.pelY * 0.22;
+            // negative G floats the body against the belt AND lifts the legs: knees rise about the
+            // hips, shins dangle, and the feet leave the floor
+            const lift = Math.max(0, o.pelY / o.beltCap);
+            u.hipL.rotation.x = lift * 0.6; u.hipR.rotation.x = lift * 0.6;
+            u.kneeL.rotation.x = -lift * 0.35; u.kneeR.rotation.x = -lift * 0.35;
         });
     }
 

@@ -29,6 +29,8 @@
         if (!reconLoadBtn) return;
         const apiDown = reconApiHealthChecked && !reconApiHealthOk;
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
+        const preBtn = document.getElementById('reconPreloadBtn');
+        if (preBtn) preBtn.disabled = reconLoadBtn.disabled;
     }
 
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
@@ -68,6 +70,8 @@
         sel.disabled = true;
     }
 
+    // The select starts disabled with a "Loading…" placeholder in the markup, so a refresh never
+    // offers a clickable empty list; it opens up only once the year list has actually arrived.
     async function populateReconYears() {
         try {
             const data = await reconApiJson('/v1/recon/years');
@@ -76,6 +80,10 @@
                 const opt = document.createElement('option'); opt.value = y; opt.textContent = y; reconYearSelect.appendChild(opt);
             });
         } catch (e) { setReconStatus('Could not reach the recon archive (' + e.message + ').'); }
+        reconYearSelect.options[0].textContent = 'Year…';
+        reconYearSelect.disabled = false;
+        reconYearSelect.style.cursor = '';
+        const spin = document.getElementById('archiveLoadingSpin'); if (spin) spin.remove();
     }
     const reconYearsReady = populateReconYears();
 
@@ -143,13 +151,15 @@
                 u.searchParams.set('t', row.time);
                 u.searchParams.set('view', trackerModeSelect.value);
                 url = u.toString();
-                history.replaceState(null, '', u);
             } catch (e) { return; }
             const hhmmss = row.time.slice(0,2) + ':' + row.time.slice(2,4) + ':' + row.time.slice(4);
+            // The address bar stays as it is, so a refresh still resets cleanly; only the
+            // clipboard-unavailable fallback writes the link into the URL as a last resort.
             try {
                 await navigator.clipboard.writeText(url);
                 showToast('Share link copied. It opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
             } catch (e) {
+                try { history.replaceState(null, '', url); } catch (e2) {}
                 showToast('Could not access the clipboard, but the address bar now holds the share link.', 6000);
             }
         });
@@ -188,6 +198,8 @@
         const year = reconYearSelect.value;
         if (!year) return;
         const req = ++stormListReqId;
+        reconStormSelect.options[0].textContent = 'Loading…';   // stays disabled until the list lands
+        reconStormSelect.style.cursor = 'progress';
         setReconStatus('Loading storms for ' + year + '…');
         try {
             const data = await reconApiJson('/v1/recon/' + year);
@@ -214,9 +226,17 @@
                 opt.textContent = `${boldUnicode(s.storm_name)} (${s.mission_count} flight${s.mission_count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
                 reconStormSelect.appendChild(opt);
             });
+            reconStormSelect.options[0].textContent = 'Storm…';
             reconStormSelect.disabled = false;
+            reconStormSelect.style.cursor = '';
             setReconStatus(reconStormsForYear.length ? '' : 'No archived recon flights found for ' + year + '.');
-        } catch (e) { if (req === stormListReqId) setReconStatus('Could not load storms for ' + year + ' (' + e.message + ').'); }
+        } catch (e) {
+            if (req === stormListReqId) {
+                reconStormSelect.options[0].textContent = 'Storm…';
+                reconStormSelect.style.cursor = '';
+                setReconStatus('Could not load storms for ' + year + ' (' + e.message + ').');
+            }
+        }
     };
     reconYearSelect.addEventListener('change', onReconYearChange);
 
@@ -226,6 +246,8 @@
         reconMissionsForStorm = [];
         const year = reconYearSelect.value, stormName = reconStormSelect.value;
         if (!year || !stormName) return;
+        reconMissionSelect.options[0].textContent = 'Loading…';   // invisible on the (usual) prefetched path, no await before the restore
+        reconMissionSelect.style.cursor = 'progress';
         setReconStatus('Loading flights for ' + stormName + '…');
         try {
             // Usually already prefetched (and sorted) by the year handler above.
@@ -243,10 +265,16 @@
                 opt.title = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
                 reconMissionSelect.appendChild(opt);
             });
+            reconMissionSelect.options[0].textContent = 'Flight…';
             reconMissionSelect.disabled = false;
+            reconMissionSelect.style.cursor = '';
             reconLoadBtn.disabled = reconMissionsForStorm.length === 0;
             setReconStatus(reconMissionsForStorm.length ? '' : 'No archived flights found for ' + stormName + '.');
-        } catch (e) { setReconStatus('Could not load flights for ' + stormName + ' (' + e.message + ').'); }
+        } catch (e) {
+            reconMissionSelect.options[0].textContent = 'Flight…';
+            reconMissionSelect.style.cursor = '';
+            setReconStatus('Could not load flights for ' + stormName + ' (' + e.message + ').');
+        }
     };
     reconStormSelect.addEventListener('change', onReconStormChange);
 
@@ -368,7 +396,17 @@
 
         if (usedFullRes) setReconStatus(`Loaded full-resolution ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track…`);
         else setReconStatus(`Loaded ${mission.obs_count} decimated obs for ${mission.mission_id}. Fetching storm track…`);
-        stormTrackFetchPromise = loadStormTrackForMission(mission);   // fire-and-forget; awaited only by autoLoadSharedMission
+        // Every archive mission loaded this session joins the preloaded list too, so it can be
+        // reopened instantly without an explicit preload. Rows are captured by reference now
+        // (another load may replace allParsedData before the storm fetch settles).
+        const parsedRef = { rows: allParsedData, stats: lastParseStats };
+        stormTrackFetchPromise = loadStormTrackForMission(mission).then(() => {   // fire-and-forget; awaited only by autoLoadSharedMission
+            preloadedMissions.set(mission.mission_id, {
+                mission, parsed: parsedRef, isNc: usedFullRes,
+                storm: stormTrackPoints.length ? { points: stormTrackPoints, meta: stormTrackMeta } : null
+            });
+            updatePreloadedSelect(mission.mission_id);
+        });
 
         syncReconLoadButtonState();
     }
@@ -376,23 +414,33 @@
     // Best-track (every ~6-hourly fix) for the WHOLE storm life, not just the flight's window, so the
     // map shows where the storm came from and where it went. storm_id is an ATCF id like "AL142024":
     // first 2 chars are the basin NHC's /v1/storms endpoints want to disambiguate reused names.
-    async function loadStormTrackForMission(mission) {
-        stormTrackPoints = []; stormTrackMeta = null;
+    // Pure fetch (no globals): shared by the live loader and the mission preloader.
+    async function fetchStormTrackData(mission) {
         const stormName = mission.storm_name;
-        if (!stormName || /unknown|training/i.test(stormName)) { setReconStatus(`Loaded ${mission.mission_id}. No named storm to fetch a best-track for.`); refreshStormTrackDisplay(); return; }
+        if (!stormName || /unknown|training/i.test(stormName)) return null;
         const basin = mission.storm_id ? mission.storm_id.slice(0, 2) : undefined;
-        try {
-            const params = new URLSearchParams({}); if (basin) params.set('basin', basin);
-            const qs = params.toString();
-            const track = await reconApiJson(`/v1/storms/${mission.year}/${encodeURIComponent(stormName)}${qs ? '?' + qs : ''}`);
-            stormTrackPoints = (track.points || []).map(p => ({
+        const params = new URLSearchParams({}); if (basin) params.set('basin', basin);
+        const qs = params.toString();
+        const track = await reconApiJson(`/v1/storms/${mission.year}/${encodeURIComponent(stormName)}${qs ? '?' + qs : ''}`);
+        return {
+            points: (track.points || []).map(p => ({
                 ms: Date.parse(p.datetime_utc), lat: p.lat, lon: p.lon,
                 windKt: p.wind_kt, pressureMb: p.pressure_mb, category: p.category, status: p.status
-            })).filter(p => isFinite(p.ms));
-            stormTrackMeta = { year: track.year, name: track.name, basin: track.basin, atcfId: track.atcf_id };
-            setReconStatus(`Loaded ${mission.mission_id} + ${stormTrackPoints.length} obs best-track for ${track.name}.`);
+            })).filter(p => isFinite(p.ms)),
+            meta: { year: track.year, name: track.name, basin: track.basin, atcfId: track.atcf_id }
+        };
+    }
+
+    async function loadStormTrackForMission(mission) {
+        stormTrackPoints = []; stormTrackMeta = null;
+        if (!mission.storm_name || /unknown|training/i.test(mission.storm_name)) { setReconStatus(`Loaded ${mission.mission_id}. No named storm to fetch a best-track for.`); refreshStormTrackDisplay(); return; }
+        try {
+            const track = await fetchStormTrackData(mission);
+            stormTrackPoints = track.points; stormTrackMeta = track.meta;
+            setReconStatus(`Loaded ${mission.mission_id} + ${stormTrackPoints.length} obs best-track for ${track.meta.name}.`);
+            if (typeof showToast === 'function') showToast(`${track.meta.name}'s whole-life best track is on the map: the dashed line with cyclone symbols, labeled at its first fix.`, 7000);
         } catch (e) {
-            setReconStatus(`Loaded ${mission.mission_id}. No best-track found for ${stormName} (${e.message}).`);
+            setReconStatus(`Loaded ${mission.mission_id}. No best-track found for ${mission.storm_name} (${e.message}).`);
         }
         refreshStormTrackDisplay();
     }
@@ -545,4 +593,79 @@
                 if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             }
         });
+    })();
+
+    // --- Mission preloader: download + parse flights in the background (like the satellite tile
+    // pre-cache, but for flight data), held in a session-lifetime cache so switching between
+    // missions is instant. The preloaded list is its own dropdown, no digging through the archive
+    // selectors to remember what was fetched. ---
+    const preloadedMissions = new Map();   // missionId -> { mission, parsed { rows, stats }, isNc, storm }
+
+    function updatePreloadedSelect(selectedId) {
+        const sel = document.getElementById('preloadedSelect'); if (!sel) return;
+        sel.innerHTML = '<option value="">Preloaded missions…</option>';
+        preloadedMissions.forEach((rec, id) => {
+            const opt = document.createElement('option'); opt.value = id;
+            opt.textContent = `${boldUnicode(id)} · ${rec.mission.storm_name || ''}${rec.isNc ? '' : ' (preview)'}`;
+            sel.appendChild(opt);
+        });
+        sel.disabled = preloadedMissions.size === 0;
+        sel.value = selectedId || '';
+    }
+
+    async function preloadReconMission(missionId) {
+        if (preloadedMissions.has(missionId)) { setReconStatus(missionId + ' is already preloaded.'); return; }
+        setReconStatus('Preloading ' + missionId + ' in the background…');
+        try {
+            const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
+            if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
+            let parsed, isNc = false;
+            try {
+                const buf = await fetchArrayBufferWithProgress(
+                    RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
+                    (r, t) => setReconStatus('Preloading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
+                parsed = await parseFlightSource(buf);
+                if (!parsed.rows.length) throw new Error('no usable rows');
+                isNc = true;
+            } catch (e) {
+                parsed = await parseFlightSource(reconObsToTsv(mission));   // decimated preview fallback
+            }
+            if (!parsed.rows.length) throw new Error('no usable rows');
+            let storm = null;
+            try { storm = await fetchStormTrackData(mission); } catch (e) { }
+            preloadedMissions.set(missionId, { mission, parsed, isNc, storm });
+            updatePreloadedSelect();
+            setReconStatus('Preloaded ' + missionId + '. Pick it from the preloaded list to open it instantly.');
+        } catch (e) {
+            setReconStatus('Could not preload ' + missionId + ' (' + e.message + ').');
+        }
+    }
+
+    // Open a preloaded mission: no download, no parse, the held rows apply immediately.
+    function openPreloadedMission(missionId) {
+        const rec = preloadedMissions.get(missionId); if (!rec) return;
+        const mission = rec.mission;
+        flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
+        try {
+            applyParsedFlight(rec.parsed);
+        } catch (e) {
+            setReconStatus('Could not open ' + missionId + ' (' + e.message + ').');
+            return;
+        }
+        isNcFile = rec.isNc;
+        reconArchiveMeta = { missionId: mission.mission_id, stormName: mission.storm_name, stormId: mission.storm_id, aircraft: mission.aircraft, tailNum: mission.tail_num, sourceUrl: mission.source_url };
+        updateMissionHeader();
+        try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
+        if (mission.source_url) { reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden'); }
+        stormTrackPoints = rec.storm ? rec.storm.points : [];
+        stormTrackMeta = rec.storm ? rec.storm.meta : null;
+        refreshStormTrackDisplay();
+        setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples' + (rec.storm ? ', best-track included' : '') + ').');
+    }
+
+    (function wirePreload() {
+        const btn = document.getElementById('reconPreloadBtn');
+        if (btn) btn.addEventListener('click', () => { if (reconMissionSelect.value) preloadReconMission(reconMissionSelect.value); });
+        const sel = document.getElementById('preloadedSelect');
+        if (sel) sel.addEventListener('change', () => { if (sel.value) openPreloadedMission(sel.value); });
     })();

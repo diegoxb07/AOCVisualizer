@@ -26,6 +26,9 @@
         const tickConfig = { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
+            // tooltips trigger for the nearest sample at the cursor's x, so hovering anywhere
+            // near the plot reads values without having to land exactly on the thin line
+            interaction: { mode: 'nearest', axis: 'x', intersect: false },
             onHover: (e, elements, chart) => {
                 if (filteredData.length === 0) return;
                 const xAxis = chart.scales.x;
@@ -35,7 +38,18 @@
                 else chart.canvas.style.cursor = 'crosshair';
             },
             scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
-            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 14, usePointStyle: true, pointStyle: 'line' }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
+            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 14, usePointStyle: true, pointStyle: 'line',
+                // deselected datasets read as a calm dimmed slate instead of struck-through text,
+                // so every available variable stays legible whether it is plotted or not
+                generateLabels: (chart) => {
+                    const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                    items.forEach(it => {
+                        const off = it.hidden;
+                        it.hidden = false;
+                        if (off) { it.fontColor = '#526075'; it.strokeStyle = '#3d4a5c'; it.fillStyle = '#3d4a5c'; }
+                    });
+                    return items;
+                } }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
         };
     }
 

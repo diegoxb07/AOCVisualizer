@@ -82,31 +82,33 @@
                 w.terminate();
                 try { resolve(onMainThread()); } catch (err) { reject(err); }
             };
+            // Clone rather than transfer the buffer: a transfer detaches it here, and the
+            // main-thread fallback in onerror still needs a readable copy.
             if (typeof source === 'string') w.postMessage({ tsv: source });
-            else w.postMessage({ nc: source }, [source]);
+            else w.postMessage({ nc: source });
         });
     }
 
-    // Fill #dataReportLine with the parser's honesty ledger (rows filtered, values derived) and
-    // warn loudly when a large share of the file was dropped, so a wrong-format file can never
-    // quietly present itself as a clean flight.
+    // Fill #dataReportLine with the parser's honesty ledger (rows filtered, values derived),
+    // so what was done to the data is always disclosed under the mission header.
     function updateDataReport(stats) {
         const line = document.getElementById('dataReportLine');
         if (line) {
             line.textContent = 'Data report: ' + summarizeParseStats(stats);
             line.classList.remove('hidden');
         }
-        const d = stats.dropped;
-        const totalDropped = d.shortLine + d.noTime + d.badPosition + d.error + d.taxi + d.ground + d.dupTime + d.glitch + d.gapReset;
-        if (stats.dataLines > 0 && totalDropped > 0.2 * stats.dataLines && stats.rows > 0) {
-            showToast('Heads up: ' + totalDropped.toLocaleString('en-US') + ' of ' + stats.dataLines.toLocaleString('en-US')
-                + ' lines were filtered out. See the data report under the mission header for the breakdown.', 9000);
-        }
     }
 
     // Load a flight from a TSV string or an .nc ArrayBuffer. Throws (after cleaning up its own
     // state) when the file yields nothing usable; callers decide how to surface that.
     async function parseEntireFile(source) {
+        applyParsedFlight(await parseFlightSource(source));
+    }
+
+    // Take an already-parsed { rows, stats } (fresh from the worker, or held by the mission
+    // preloader) and make it the loaded flight: resets, globals, and the post-parse UI setup.
+    // Throws when the rows are empty.
+    function applyParsedFlight(parsed) {
         // New flight: KEEP the satellite tile cache (it accumulates across storms until the tab closes;
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.
@@ -119,7 +121,6 @@
         const stormToggleLabel = document.getElementById('stormTrackToggleLabel'); if (stormToggleLabel) stormToggleLabel.style.display = 'none';
         const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
 
-        const parsed = await parseFlightSource(source);
         allParsedData = parsed.rows; lastParseStats = parsed.stats;
         updateDataReport(parsed.stats);
         if (allParsedData.length === 0) {

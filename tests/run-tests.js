@@ -61,19 +61,23 @@ section('Units and physics (expected values computed independently)');
     check('derived pressure altitude is disclosed in stats', r.stats.derived.pAltFromPressure, 2);
 }
 {
-    // Mixing ratio unit guess: kg/kg values scale to g/kg; already-g/kg values pass through.
+    // Mixing ratio by column definition: MR.d is already g/kg; MRkg.d is kg/kg and converts by
+    // the x1000 unit identity. MR.d wins when both columns are present.
     const kg = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'MRkg.d', 'WD.d', 'X8', 'TA.d'], [
         ['10', '0', '0', '20.0', '-60.0', '200', '0.012', '90', '', '20'],
         ['10', '0', '1', '20.001', '-60.001', '200', '0.012', '90', '', '20'],
     ]));
-    check('0.012 kg/kg scales to 12 g/kg', kg.rows[0].mixRate, 12, 1e-9);
-    check('mixing-ratio scaling is disclosed in stats', kg.stats.derived.mixRateScaled, 2);
+    check('MRkg.d 0.012 kg/kg converts to 12 g/kg', kg.rows[0].mixRate, 12, 1e-9);
     const g = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'MR.d', 'WD.d', 'X8', 'TA.d'], [
         ['10', '0', '0', '20.0', '-60.0', '200', '12', '90', '', '20'],
         ['10', '0', '1', '20.001', '-60.001', '200', '12', '90', '', '20'],
     ]));
-    check('12 g/kg passes through unscaled', g.rows[0].mixRate, 12, 1e-9);
-    check('no scaling disclosed when input is already g/kg', g.stats.derived.mixRateScaled, 0);
+    check('MR.d 12 g/kg passes through unscaled', g.rows[0].mixRate, 12, 1e-9);
+    const both = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'MR.d', 'MRkg.d', 'X8', 'TA.d'], [
+        ['10', '0', '0', '20.0', '-60.0', '200', '14', '0.014', '', '20'],
+        ['10', '0', '1', '20.001', '-60.001', '200', '14', '0.014', '', '20'],
+    ]));
+    check('MR.d preferred over MRkg.d when both present', both.rows[0].mixRate, 14, 1e-9);
 }
 {
     // Radar altitude carried only in feet converts with the exact international foot.
@@ -127,14 +131,20 @@ section('Time handling');
 // ---------------------------------------------------------------------------------------------
 section('Row filters count what they drop');
 {
-    // Taxi filter: TAS below 60 kt.
+    // Rows below 20 kt airspeed (ramp idle) are filtered and counted; 20 kt and above is kept,
+    // as are rows with no airspeed at all.
     const r = parseFlightTextToRows(tsv(H, [
+        ['9', '59', '58', '20.000', '-60.000', '5', '50', '90', '10', '20'],
+        ['9', '59', '59', '20.000', '-60.000', '12', '50', '90', '10', '20'],
         ['10', '0', '0', '20.000', '-60.000', '30', '50', '90', '3000', '20'],
-        ['10', '0', '1', '20.001', '-60.001', '200', '50', '90', '3000', '20'],
+        ['10', '0', '1', '20.000', '-60.000', '0', '50', '90', '30', '20'],
         ['10', '0', '2', '20.002', '-60.002', '200', '50', '90', '3000', '20'],
+        ['10', '0', '3', '20.003', '-60.003', '', '50', '90', '3000', '20'],
     ]));
-    check('sub-60kt row dropped', r.rows.length, 2);
-    check('taxi drop counted', r.stats.dropped.taxi, 1);
+    check('sub-20kt rows filtered, faster rows kept', r.rows.length, 3);
+    check('sub-20kt filtering counted for the data report', r.stats.dropped.preTakeoff, 3);
+    check('playback starts at the first moving sample', r.rows[0].tas, 30);
+    check('rows with no airspeed are kept', r.rows[2].tas, null);
 }
 {
     // Dateline crossing survives (a realistic 1 Hz step), a genuine teleport is dropped and counted.
@@ -203,6 +213,8 @@ if (!globalThis.netcdfjs) {
             { nm: 'PS.c', atts: [{ nm: 'scale_factor', type: 6, buf: f64(0.1) }, { nm: 'add_offset', type: 6, buf: f64(0) }], data: [7000, 7000, 7000, 7000, 7000] },
             // Fill-valued variable: index 1 carries the sentinel and must come out null.
             { nm: 'TA.d', atts: [{ nm: '_FillValue', type: 5, buf: f32(-32768) }], data: [20, -32768, 21, 22, 23] },
+            // Padding variables so the TSV clears the parser's 10-column row minimum.
+            ...['X1', 'X2', 'X3', 'X4', 'X5'].map(nm => ({ nm, atts: [], data: [0, 0, 0, 0, 0] })),
         ];
 
         head.push(Buffer.from('CDF\x01', 'latin1'));

@@ -602,7 +602,7 @@
                 const el = document.getElementById(id); if (!el || !(id in saved)) return;
                 if (el.type === 'checkbox') {
                     if (el.checked !== !!saved[id]) { el.checked = !!saved[id]; el.dispatchEvent(new Event('change')); }
-                } else if (el.value !== saved[id] && [...el.options].some(o => o.value === saved[id])) {
+                } else if (el.value !== saved[id] && (!el.options || [...el.options].some(o => o.value === saved[id]))) {
                     el.value = saved[id]; el.dispatchEvent(new Event('change'));
                 }
             });

@@ -24,11 +24,14 @@
             }
         }
 
+        // PFD backing store is DPR-scaled too (CSS keeps the display size at 100%); renderPFD
+        // draws in logical CSS pixels through a setTransform(dpr) base, so its text stays crisp.
         const pfdC = document.getElementById('pfdCanvas');
         if (pfdC && pfdC.parentElement && pfdC.parentElement.style.display !== 'none') {
             const pRect = pfdC.parentElement.getBoundingClientRect();
-            if (pRect.width > 0 && pRect.height > 0 && (pfdC.width !== pRect.width || pfdC.height !== pRect.height)) {
-                pfdC.width = pRect.width; pfdC.height = pRect.height;
+            const pbw = Math.round(pRect.width * dpr), pbh = Math.round(pRect.height * dpr);
+            if (pRect.width > 0 && pRect.height > 0 && (pfdC.width !== pbw || pfdC.height !== pbh)) {
+                pfdC.width = pbw; pfdC.height = pbh;
                 if(filteredData.length > 0) renderPFD(filteredData[currentIdx]);
             }
         }

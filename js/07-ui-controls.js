@@ -151,33 +151,55 @@
         return /\d{8}N\d/i.test(id) || /gulfstream|\bg-?iv\b|\bn49/i.test(ac + ' ' + id);
     }
 
+    let storm3DIcons = [];      // cyclone sprite materials on the 3D best-track, spun by the render loop
+    let _cycloneTex3D = null;
+    // Shared white tropical-cyclone symbol (disc + two spiral arms); sprites tint it per intensity.
+    function cycloneTex3D() {
+        if (_cycloneTex3D) return _cycloneTex3D;
+        const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+        const c = cv.getContext('2d');
+        c.strokeStyle = '#ffffff'; c.fillStyle = '#ffffff'; c.lineCap = 'round';
+        c.beginPath(); c.arc(32, 32, 9, 0, Math.PI * 2); c.fill();
+        c.lineWidth = 7;
+        c.beginPath(); c.arc(32, 32, 18, -0.3, 1.6); c.stroke();
+        c.beginPath(); c.arc(32, 32, 18, Math.PI - 0.3, Math.PI + 1.6); c.stroke();
+        _cycloneTex3D = new THREE.CanvasTexture(cv);
+        return _cycloneTex3D;
+    }
+
     function init3D() {
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
-        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000); camera3D.position.set(0, 10, 20);
+        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000); camera3D.position.set(0, 1.2, 2.4);   // starts close to the aircraft, no scroll-in needed
         renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
-        planeGroup3D = new THREE.Group(); const matWhite = new THREE.MeshPhongMaterial({color: 0xffffff}), matBlue = new THREE.MeshPhongMaterial({color: 0x3da5ff});
-        const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 4, 16), matWhite); fuselage.rotation.x = Math.PI / 2; const wings = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.1, 0.8), matBlue); const tail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 0.5), matBlue); tail.position.set(0, 0, 1.8); const vTail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1, 0.6), matBlue); vTail.position.set(0, 0.5, 1.8); const noseMat = new THREE.MeshPhongMaterial({ color: 0xffffff }); const nose = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 16), noseMat); nose.rotation.x = -Math.PI / 2; nose.position.set(0, 0, -2.4);
-        planeGroup3D.add(fuselage, wings, tail, vTail, nose); planeGroup3D.scale.set(0.15, 0.15, 0.15); scene3D.add(planeGroup3D);
+        planeGroup3D = new THREE.Group(); planeGroup3D.scale.set(0.06, 0.06, 0.06); scene3D.add(planeGroup3D);
+        // the airframe itself (WP-3D or G-IV per the loaded flight) is built by js/07b-plane-models.js
+        if (typeof setPlaneModel3D === 'function') setPlaneModel3D();
         // Direction arrow: shaft + a cone HEAD whose apex points forward (-Z, this model's nose
         // direction). The cone's local apex is at +Y, so it needs a NEGATIVE X rotation to face -Z.
-        const buildDirectionArrow = (color, scale) => {
+        const buildDirectionArrow = (color, scale, standoff) => {
             const mat = new THREE.MeshBasicMaterial({ color });
-            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.2, 8), mat); shaft.rotation.x = Math.PI / 2; shaft.position.z = -1.65;
-            const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 8), mat); head.rotation.x = -Math.PI / 2; head.position.z = -2.45;
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.2, 8), mat); shaft.rotation.x = Math.PI / 2; shaft.position.z = -standoff - 0.6;
+            const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 8), mat); head.rotation.x = -Math.PI / 2; head.position.z = -standoff - 1.4;
             const group = new THREE.Group(); group.add(shaft, head); group.scale.set(scale, scale, scale);
             return group;
         };
-        // Ground track: blue, parented to the scene.
-        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.42); scene3D.add(trackArrow3D);
+        // Ground track: blue, standing well out ahead of the airframe so it never overlaps it.
+        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.17, 3.2); scene3D.add(trackArrow3D);
         // True heading: yellow, also scene-level (not planeGroup3D) so it is never swept up by the
-        // crew-ride fuselage dim/transparency pass. Same vertical level as the ground-track arrow.
-        headingArrow3D = buildDirectionArrow(0xffd400, 0.36); scene3D.add(headingArrow3D);
+        // crew-ride fuselage dim/transparency pass. Sits nearer the plane than the track arrow.
+        headingArrow3D = buildDirectionArrow(0xffd400, 0.145, 1.05); scene3D.add(headingArrow3D);
         scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
-        function animate3D() { requestAnimationFrame(animate3D); if (controls3D) controls3D.update(); renderer3D.render(scene3D, camera3D); }
+        function animate3D() {
+            requestAnimationFrame(animate3D); if (controls3D) controls3D.update();
+            // props spin only while playback runs; pausing freezes them with everything else
+            if (typeof planeSpinners3D !== 'undefined' && isPlaying) for (let i = 0; i < planeSpinners3D.length; i++) planeSpinners3D[i].rotation.z += 0.3;
+            for (let i = 0; i < storm3DIcons.length; i++) storm3DIcons[i].rotation -= 0.02;   // cyclone icons turn slowly
+            renderer3D.render(scene3D, camera3D);
+        }
         animate3D(); threeDInitialized = true;
     }
 
@@ -200,16 +222,33 @@
                       : (d.pAlt != null ? d.pAlt : (d.gpsAlt != null ? d.gpsAlt : 0));
     }
 
+    // 3D waypoints: each point-analysis marker gets a dotted plumb line from the sea surface up to
+    // the flagged sample, a ground ring anchoring it, and a glowing beacon at altitude, so a mark
+    // reads as a surveyed position in space rather than a floating dot.
     function sync3DMarkers() {
         if (!threeDInitialized) return;
-        while(threeMarkersGroup.children.length > 0) threeMarkersGroup.remove(threeMarkersGroup.children[0]);
-        const markerGeo = new THREE.SphereGeometry(0.08, 16, 16);
+        while (threeMarkersGroup.children.length > 0) {
+            const c = threeMarkersGroup.children[0]; threeMarkersGroup.remove(c);
+            if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose();
+        }
         customMarkers.forEach(marker => {
             const d = filteredData[marker.idx];
-            if(d) {
-                const markerMat = new THREE.MeshPhongMaterial({color: marker.color}); const mesh = new THREE.Mesh(markerGeo, markerMat);
-                mesh.position.copy(get3DCoord(d.lon, d.lat, track3DAltMeters(d))); mesh.userData = { dataPoint: d }; threeMarkersGroup.add(mesh);
-            }
+            if (!d) return;
+            const top = get3DCoord(d.lon, d.lat, track3DAltMeters(d));
+            const col = new THREE.Color(marker.color);
+            const line = new THREE.Line(
+                new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(top.x, 0, top.z), top]),
+                new THREE.LineDashedMaterial({ color: col, dashSize: 0.06, gapSize: 0.045, transparent: true, opacity: 0.9 }));
+            line.computeLineDistances();
+            threeMarkersGroup.add(line);
+            const ring = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.075, 24),
+                new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.75 }));
+            ring.rotation.x = -Math.PI / 2; ring.position.set(top.x, 0.012, top.z);
+            threeMarkersGroup.add(ring);
+            const bead = new THREE.Mesh(new THREE.OctahedronGeometry(0.055),
+                new THREE.MeshPhongMaterial({ color: col, emissive: col, emissiveIntensity: 0.35 }));
+            bead.position.copy(top); bead.userData = { dataPoint: d };
+            threeMarkersGroup.add(bead);
         });
     }
 
@@ -224,6 +263,8 @@
 
     function build3DScene() {
         if (!threeDInitialized) init3D();
+        // a newly loaded flight may be the other airframe; no-ops when the right model is up
+        if (typeof setPlaneModel3D === 'function') setPlaneModel3D();
         while(threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]); 
         const landMat = new THREE.MeshBasicMaterial({ color: 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }); const borderMat = new THREE.LineBasicMaterial({ color: 0x000000 });
         const processPolygon = (poly, isState) => {
@@ -255,6 +296,7 @@
         // Storm best-track overlay (js/12b-recon-archive.js), same points as the 2D layer, flattened to
         // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
         // flight's altitude profile.
+        storm3DIcons = [];
         if (showStormTrack && stormTrackPoints.length > 1) {
             const stormPts = [], stormColors = [];
             stormTrackPoints.forEach(p => {
@@ -264,6 +306,28 @@
             const stormGeom = new THREE.BufferGeometry().setFromPoints(stormPts); stormGeom.setAttribute('color', new THREE.Float32BufferAttribute(stormColors, 3));
             const stormMat = new THREE.LineDashedMaterial({ vertexColors: true, linewidth: 2, dashSize: 0.3, gapSize: 0.2 });
             const stormTrack3D = new THREE.Line(stormGeom, stormMat); stormTrack3D.computeLineDistances(); threeMapGroup.add(stormTrack3D);
+            // spinning cyclone icon at every best-track fix, tinted by the same intensity ramp as
+            // the 2D symbols, so the dashed line is unmistakably the storm
+            stormTrackPoints.forEach((p, i) => {
+                const mat = new THREE.SpriteMaterial({ map: cycloneTex3D(), color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, opacity: 0.9, depthWrite: false });
+                const spr = new THREE.Sprite(mat);
+                spr.scale.set(0.14, 0.14, 1);
+                spr.position.copy(stormPts[i]); spr.position.y = 0.03;
+                threeMapGroup.add(spr); storm3DIcons.push(mat);
+            });
+            // name tag floating over the first fix
+            if (stormTrackMeta && stormTrackMeta.name) {
+                const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
+                const c2 = cv.getContext('2d');
+                c2.font = '700 40px Inter, ui-sans-serif, sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle';
+                c2.lineWidth = 8; c2.strokeStyle = 'rgba(0,0,0,0.85)';
+                const tag = stormTrackMeta.name.toUpperCase() + ' BEST TRACK';
+                c2.strokeText(tag, 256, 32); c2.fillStyle = '#e2e8f0'; c2.fillText(tag, 256, 32);
+                const lblSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
+                lblSpr.scale.set(1.6, 0.2, 1);
+                lblSpr.position.copy(stormPts[0]); lblSpr.position.y = 0.22;
+                threeMapGroup.add(lblSpr);
+            }
         }
         sync3DMarkers();
     }
@@ -329,6 +393,10 @@
         const clearMeasureBtn = document.getElementById('clearMeasureBtn');
         const satSelect = document.getElementById('satelliteSelect');
         const satBandSelect = document.getElementById('satBandSelect');
+
+        // Keep the early-boot FOUC guard (index.html <head>) in sync with the live mode: its CSS
+        // rule hides the 2D-only controls, and clearing an inline display cannot override it.
+        document.documentElement.classList.toggle('pref-tracker-3d', e.target.value === '3d');
 
         if (e.target.value === '3d') {
             canvas.style.display = 'none'; threeDContainer.style.display = 'block';

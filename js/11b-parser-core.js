@@ -81,8 +81,8 @@
     function parseFlightTextToRows(rawText) {
         const stats = {
             dataLines: 0, parsed: 0, rows: 0, timeSource: null,
-            dropped: { shortLine: 0, noTime: 0, badPosition: 0, error: 0, taxi: 0, ground: 0, dupTime: 0, glitch: 0, gapReset: 0 },
-            derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0, mixRateScaled: 0 }
+            dropped: { shortLine: 0, noTime: 0, badPosition: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0 },
+            derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0 }
         };
         const lines = rawText.split('\n');
         if (lines.length < 2) return { rows: [], stats };
@@ -130,9 +130,10 @@
                 if (tasKt === null && rawTas !== null) { tasKt = rawTas * 1.94384; stats.derived.tasFromMs++; }
                 let iasKt = getVal(parts, 'IASkt.d') ?? getVal(parts, 'CasADDUkt.1');
                 if (iasKt === null && getVal(parts, 'IAS.d') !== null) { iasKt = getVal(parts, 'IAS.d') * 1.94384; stats.derived.iasFromMs++; }
-                let rawMixRate = getVal(parts, 'MRkg.d') ?? getVal(parts, 'MR.d') ?? null;
-                let finalMixRate = rawMixRate;
-                if (rawMixRate !== null && rawMixRate < 0.5) { finalMixRate = rawMixRate * 1000; stats.derived.mixRateScaled++; }
+                // Mixing ratio: MR.d is already g/kg; MRkg.d is kg/kg by definition, so the x1000 is
+                // a unit identity, not a derivation, and is not counted in the ledger.
+                let finalMixRate = getVal(parts, 'MR.d');
+                if (finalMixRate === null) { const mrKgKg = getVal(parts, 'MRkg.d'); if (mrKgKg !== null) finalMixRate = mrKgKg * 1000; }
                 let radAlt = getVal(parts, 'AltRa.1');
                 if (radAlt === null && getVal(parts, 'AltRaft.1') !== null) { radAlt = getVal(parts, 'AltRaft.1') * 0.3048; stats.derived.radAltFromFeet++; }
 
@@ -153,9 +154,13 @@
         if (tempParsedData.length === 0) return { rows: [], stats };
         tempParsedData.sort((a,b) => a.absSeconds - b.absSeconds);
         let cleaned = [];
+        // Cleanup drops rows below 20 kt airspeed (ramp idle, normally unused, and it slows playback)
+        // and erroneous rows (duplicate timestamps, GPS teleports, hour-plus gaps); everything else,
+        // including slow taxi above 20 kt, is part of the record. Rows with no airspeed are kept.
         for (let i = 0; i < tempParsedData.length; i++) {
             let current = tempParsedData[i];
-            if (current.tas !== null && current.tas < 60) { stats.dropped.taxi++; continue; }
+            const spd = current.tas !== null ? current.tas : current.ias;
+            if (spd !== null && spd < 20) { stats.dropped.preTakeoff++; continue; }
             if (cleaned.length === 0) { current.computedVsi = 0; cleaned.push(current); continue; }
             let prev = cleaned[cleaned.length - 1]; let dt = current.absSeconds - prev.absSeconds;
             if (dt <= 0) { stats.dropped.dupTime++; continue; }
@@ -166,7 +171,6 @@
             // silently drops the entire post-crossing half of a Pacific flight.
             let dLonWrap = Math.abs(current.lon - prev.lon); if (dLonWrap > 180) dLonWrap = 360 - dLonWrap;
             let latSpeed = Math.abs(current.lat - prev.lat) / dt; let lonSpeed = dLonWrap / dt;
-            if (latSpeed < 0.00001 && lonSpeed < 0.00001 && current.gpsAlt !== null && current.gpsAlt < 500) { stats.dropped.ground++; continue; }
             if (latSpeed > 0.02 || lonSpeed > 0.02) { stats.dropped.glitch++; continue; }
 
             if (current.pAlt !== null && prev.pAlt !== null) current.computedVsi = ((current.pAlt - prev.pAlt) / dt);
@@ -185,8 +189,7 @@
         const fmt = n => n.toLocaleString('en-US');
         const d = stats.dropped, out = [fmt(stats.rows) + ' samples'];
         const drops = [];
-        if (d.taxi) drops.push(fmt(d.taxi) + ' below 60 kt (taxi/slow)');
-        if (d.ground) drops.push(fmt(d.ground) + ' stationary on ground');
+        if (d.preTakeoff) drops.push(fmt(d.preTakeoff) + ' below 20 kt airspeed');
         if (d.glitch) drops.push(fmt(d.glitch) + ' GPS position glitches');
         if (d.dupTime) drops.push(fmt(d.dupTime) + ' duplicate timestamps');
         if (d.gapReset) drops.push(fmt(d.gapReset) + ' before a data gap over 1 hr');
@@ -201,7 +204,6 @@
         if (v.tasFromMs) der.push('TAS converted from m/s');
         if (v.iasFromMs) der.push('IAS converted from m/s');
         if (v.radAltFromFeet) der.push('radar altitude converted from feet');
-        if (v.mixRateScaled) der.push('mixing ratio scaled from kg/kg to g/kg');
         if (stats.timeSource && stats.timeSource !== 'HH/MM/SS columns') der.push('time read as ' + stats.timeSource);
         if (der.length) out.push('derived: ' + der.join('; '));
         return out.join(' · ');

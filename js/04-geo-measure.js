@@ -1,4 +1,4 @@
-/* Mission Visualizer - geo math + measurement hit-testing
+/* Mission Visualizer, geo math + measurement hit-testing
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -79,33 +79,4 @@
         const lon = plotMinLon + (baseCanvasX / cssW) * deltaLon;
         const lat = plotMinLat - ((baseCanvasY - cssH) / cssH) * deltaLat;
         return { lat, lon };
-    }
-    
-    function isPointInShape(geoPt) {
-        const checkPts = (type, pts) => {
-            if (pts.length === 0) return false;
-            if (type === 'circle' && pts.length === 2) {
-                const rNM = getDistanceNM(pts[0].lat, pts[0].lon, pts[1].lat, pts[1].lon);
-                const distNM = getDistanceNM(pts[0].lat, pts[0].lon, geoPt.lat, geoPt.lon);
-                return distNM <= rNM;
-            } else if (type === 'rectangle' && pts.length === 2) {
-                const minLat = Math.min(pts[0].lat, pts[1].lat), maxLat = Math.max(pts[0].lat, pts[1].lat);
-                const minLon = Math.min(pts[0].lon, pts[1].lon), maxLon = Math.max(pts[0].lon, pts[1].lon);
-                return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
-            } else if (type === 'polygon' && pts.length >= 3 && !isMeasuring) {
-                let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-                pts.forEach(p => {
-                    if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
-                    if (p.lon < minLon) minLon = p.lon; if (p.lon > maxLon) maxLon = p.lon;
-                });
-                return geoPt.lat >= minLat && geoPt.lat <= maxLat && geoPt.lon >= minLon && geoPt.lon <= maxLon;
-            }
-            return false;
-        };
-
-        if (checkPts(measureShape, measurePointsGeo)) return true;
-        for (let shape of drawnShapes) {
-            if (checkPts(shape.type, shape.points)) return true;
-        }
-        return false;
     }

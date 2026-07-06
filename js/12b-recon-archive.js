@@ -1,4 +1,4 @@
-/* Mission Visualizer - NOAA Recon Archive browser (noaa-recon-api: https://joshmurdock.net/api)
+/* Mission Visualizer, NOAA Recon Archive browser (noaa-recon-api: https://joshmurdock.net/api)
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order.
 
@@ -37,13 +37,13 @@
     let stormListReqId = 0;           // guards against an older year's slower fetch overwriting a newer one
 
     const RECON_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    // "Aug 12-16" / "Sep 24 - Oct 9" span of a storm's (sorted) missions, from flight_date YYYY-MM-DD.
+    // "Aug 12-16" / "Sep 24, Oct 9" span of a storm's (sorted) missions, from flight_date YYYY-MM-DD.
     function reconDateSpan(missions) {
         const fmt = d => { const p = d.split('-'); return RECON_MONTHS[+p[1] - 1] + ' ' + (+p[2]); };
         const a = missions[0].flight_date, b = missions[missions.length - 1].flight_date;
         if (!a || !b) return '';
         if (a === b) return fmt(a);
-        return a.slice(0, 7) === b.slice(0, 7) ? fmt(a) + '-' + (+b.split('-')[2]) : fmt(a) + ' - ' + fmt(b);
+        return a.slice(0, 7) === b.slice(0, 7) ? fmt(a) + ' to ' + (+b.split('-')[2]) : fmt(a) + ' to ' + fmt(b);
     }
 
     let suppressReconStatus = false;   // true while reflectLoadedMissionInSelectors() drives the dropdowns
@@ -54,7 +54,7 @@
         const resp = await fetch(RECON_API_BASE + path);
         const data = await resp.json().catch(() => null);
         if (!resp.ok) {
-            // detail can be a string OR structured (FastAPI validation errors) - stringify the
+            // detail can be a string OR structured (FastAPI validation errors), stringify the
             // latter so status messages never read "[object Object]".
             let detail = (data && data.detail) || resp.statusText;
             if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
@@ -72,38 +72,90 @@
         try {
             const data = await reconApiJson('/v1/recon/years');
             const years = (data && data.years) || [];
-            years.slice().reverse().forEach(y => {   // newest first - most-requested storms are recent
+            years.slice().reverse().forEach(y => {   // newest first, most-requested storms are recent
                 const opt = document.createElement('option'); opt.value = y; opt.textContent = y; reconYearSelect.appendChild(opt);
             });
         } catch (e) { setReconStatus('Could not reach the recon archive (' + e.message + ').'); }
     }
     const reconYearsReady = populateReconYears();
 
-    // Shareable links: opening the page with ?mission=20241007N1 auto-loads that archive mission.
-    // Deferred to window 'load' so every script file has parsed before the load pipeline runs;
-    // a bad/unknown id just surfaces through loadReconMission's own error status.
+    // Shareable links: opening the page with ?mission=20241007N1 auto-loads that archive mission;
+    // optional t=HHMMSS seeks the playhead there and view=2d|3d picks the tracker (both written by
+    // the Share button). Deferred to window 'load' so every script file has parsed before the load
+    // pipeline runs; a bad/unknown id just surfaces through loadReconMission's own error status.
     (function autoLoadSharedMission() {
-        let shared = '';
-        try { shared = (new URLSearchParams(window.location.search).get('mission') || '').trim(); } catch (e) { return; }
+        let shared = '', sharedT = '', sharedView = '';
+        try {
+            const params = new URLSearchParams(window.location.search);
+            shared = (params.get('mission') || '').trim();
+            sharedT = (params.get('t') || '').trim();
+            sharedView = (params.get('view') || '').trim();
+        } catch (e) { return; }
         if (!/^\d{8}[A-Z]+\d+$/i.test(shared)) return;
-        // Refresh-as-reset: the param exists for SHARING (fresh navigations). On a reload,
-        // strip it and start clean instead of re-loading the mission, so F5 resets the app.
+        // Refresh-as-reset: the params exist for SHARING (fresh navigations). On a reload,
+        // strip them and start clean instead of re-loading the mission, so F5 resets the app.
         const nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
         if (nav && nav.type === 'reload') {
-            try { const u = new URL(window.location.href); u.searchParams.delete('mission'); history.replaceState(null, '', u); } catch (e) {}
+            try { const u = new URL(window.location.href); ['mission', 't', 'view'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u); } catch (e) {}
             return;
         }
         window.addEventListener('load', async () => {
             await loadReconMission(shared.toUpperCase());
             // Let the storm-track fetch land its final status message BEFORE the selector
-            // reflection suppresses status writes - otherwise "Loaded … + N obs best-track"
+            // reflection suppresses status writes, otherwise "Loaded … + N obs best-track"
             // arrives mid-reflection and gets swallowed.
             try { await stormTrackFetchPromise; } catch (e) { }
             reflectLoadedMissionInSelectors();
+            applySharedPlaybackParams(sharedT, sharedView);
         });
     })();
 
-    // Drive the Year/Storm/Flight selectors to match an auto-loaded shared mission - without
+    // Apply a share link's t/view once its mission has loaded: switch the tracker first, then seek
+    // the playhead to the first sample at/after the shared clock time.
+    function applySharedPlaybackParams(t, view) {
+        if ((view === '2d' || view === '3d') && trackerModeSelect.value !== view) {
+            trackerModeSelect.value = view;
+            trackerModeSelect.dispatchEvent(new Event('change'));
+        }
+        if (!/^\d{6}$/.test(t) || !filteredData.length) return;
+        let sec = timeToSeconds(t);
+        if (sec < filteredData[0].absSeconds) sec += 86400;   // shared moment past midnight relative to takeoff
+        let idx = filteredData.findIndex(d => d.absSeconds >= sec);
+        if (idx === -1) idx = filteredData.length - 1;
+        currentIdx = idx;
+        timelineSlider.value = idx;
+        updateVisualComponents(currentIdx);
+    }
+
+    // Share button: copies a link that reopens this mission at the current playback moment in the
+    // current tracker view. Enabled by updateMissionHeader() only while an archive mission is loaded
+    // (a manually uploaded file has no mission id to share).
+    (function wireShareLink() {
+        const btn = document.getElementById('shareLinkBtn');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            if (!reconArchiveMeta || !filteredData.length) return;
+            const row = filteredData[currentIdx] || filteredData[0];
+            let url = '';
+            try {
+                const u = new URL(window.location.href);
+                u.searchParams.set('mission', reconArchiveMeta.missionId);
+                u.searchParams.set('t', row.time);
+                u.searchParams.set('view', trackerModeSelect.value);
+                url = u.toString();
+                history.replaceState(null, '', u);
+            } catch (e) { return; }
+            const hhmmss = row.time.slice(0,2) + ':' + row.time.slice(2,4) + ':' + row.time.slice(4);
+            try {
+                await navigator.clipboard.writeText(url);
+                showToast('Share link copied. It opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
+            } catch (e) {
+                showToast('Could not access the clipboard, but the address bar now holds the share link.', 6000);
+            }
+        });
+    })();
+
+    // Drive the Year/Storm/Flight selectors to match an auto-loaded shared mission, without
     // this a ?mission= load leaves them on their placeholders and the load card looks empty.
     // Cosmetic only: failures are swallowed and the loaded flight is unaffected.
     async function reflectLoadedMissionInSelectors() {
@@ -207,7 +259,7 @@
 
     // Convert one mission's decimated obs ([unix_time, lat, lon, wind_kt, wind_dir, sfmr_kt, alt_m])
     // into the same tab-separated format parseEntireFile() already consumes for uploaded .txt/.nc
-    // files - reuses ALL of the existing parse/clean/interpolate pipeline instead of duplicating it.
+    // files, reuses ALL of the existing parse/clean/interpolate pipeline instead of duplicating it.
     // parseEntireFile requires >=10 tab fields per row (an upload-format guard), so two unused
     // trailing columns pad every row out to that minimum.
     function reconObsToTsv(mission) {
@@ -263,11 +315,11 @@
         flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
 
         // Primary path: stream the mission's original full-resolution NetCDF through the API's
-        // CORS-open download endpoint, then run it through the same ncArrayBufferToTsv() +
-        // parseEntireFile() pipeline a manual .nc upload uses, so every recorded variable is available
-        // - not just the ~7-field decimated preview. Falls back to that decimated JSON if the
-        // download/parse fails.
-        let tsv, usedFullRes = false;
+        // CORS-open download endpoint into the same parseEntireFile() pipeline a manual .nc upload
+        // uses (parse worker + parser core), so every recorded variable is available, not just the
+        // ~7-field decimated preview. Falls back to that decimated JSON if the download or parse
+        // fails or yields no usable rows.
+        let usedFullRes = false;
         try {
             if (subtext) subtext.textContent = `Downloading full-resolution NetCDF for ${mission.mission_id}…`;
             const buf = await fetchArrayBufferWithProgress(
@@ -281,29 +333,34 @@
                     // Backgrounded tabs stop repainting, so this text can look frozen while the download
                     // keeps progressing underneath. The document title still updates while hidden, so
                     // mirror the percent there; updateMissionHeader() overwrites it once loading finishes.
-                    document.title = `${pct}% ↓ ${mission.mission_id} - AOC Mission Visualizer`;
+                    document.title = `${pct}% ↓ ${mission.mission_id} · AOC Mission Visualizer`;
                 }
             );
             if (subtext) subtext.textContent = 'Parsing NetCDF variables…';
-            tsv = ncArrayBufferToTsv(buf);
+            await parseEntireFile(buf);
             usedFullRes = true;
         } catch (e) {
-            tsv = reconObsToTsv(mission);
-            setReconStatus(`Full-res download failed (${e.message}) - loaded the quick decimated preview instead.`);
+            setReconStatus(`Full-res load failed (${e.message}), loading the decimated preview…`);
+            try {
+                await parseEntireFile(reconObsToTsv(mission));
+            } catch (e2) {
+                setReconStatus(`Could not load mission ${missionId} (${e2.message}).`);
+                hideLoadingOverlay();
+                syncReconLoadButtonState();
+                return;
+            }
         }
         if (subtext) subtext.textContent = 'Pulling variables...';   // restore the default for the next (manual-upload) use of this overlay
 
         isNcFile = usedFullRes;
         // parseEntireFile() resets reconArchiveMeta/the source link at its top (so a manual upload
-        // afterwards doesn't inherit stale archive state) - so this metadata must be set AFTER it
+        // afterwards doesn't inherit stale archive state), so this metadata must be set AFTER it
         // returns, not before, or its own reset would immediately wipe what we just set.
-        parseEntireFile(tsv);   // hides loadingOverlay itself when done
-
         reconArchiveMeta = { missionId: mission.mission_id, stormName: mission.storm_name, stormId: mission.storm_id, aircraft: mission.aircraft, tailNum: mission.tail_num, sourceUrl: mission.source_url };
         updateMissionHeader();   // re-run with reconArchiveMeta now set so the subline picks up the storm name
-        // Reflect the loaded mission in the URL so the address bar is a shareable link.
-        // (parseEntireFile just cleared any stale ?mission= - a manual upload leaves it cleared.)
-        try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); history.replaceState(null, '', u); } catch (e) {}
+        // Reflect the loaded mission in the URL so the address bar is a shareable link. Only the
+        // Share button writes t/view, so a fresh load clears any stale pair.
+        try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
         if (mission.source_url) {
             reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden');
             reconSourceLink.title = 'Open the original full-resolution NetCDF from NOAA directly (same file this loaded automatically)';
@@ -316,7 +373,7 @@
         syncReconLoadButtonState();
     }
 
-    // Best-track (every ~6-hourly fix) for the WHOLE storm life - not just the flight's window - so the
+    // Best-track (every ~6-hourly fix) for the WHOLE storm life, not just the flight's window, so the
     // map shows where the storm came from and where it went. storm_id is an ATCF id like "AL142024":
     // first 2 chars are the basin NHC's /v1/storms endpoints want to disambiguate reused names.
     async function loadStormTrackForMission(mission) {
@@ -358,7 +415,7 @@
     // Color a best-track segment/point by intensity: monotonic cool-to-hot ramp (the standard
     // Saffir-Simpson track-map palette) so a stronger category always reads as more severe.
     function stormWindColor(windKt) {
-        if (windKt == null) return '#94a3b8';            // unknown intensity - neutral grey
+        if (windKt == null) return '#94a3b8';            // unknown intensity, neutral grey
         if (windKt < 34) return '#5ebaff';               // tropical depression
         if (windKt < 64) return '#00faf4';               // tropical storm
         if (windKt < 83) return '#ffffcc';               // cat 1
@@ -391,7 +448,7 @@
         return { point: best, diffMs: bestDiff };
     }
 
-    // Per-frame storm status card (left side, next to the archive controls - not an on-map overlay),
+    // Per-frame storm status card (left side, next to the archive controls, not an on-map overlay),
     // refreshed from updateVisualComponents() alongside the sat time badge.
     function updateStormTrackBadge() {
         const card = document.getElementById('stormStatusCard');
@@ -414,14 +471,14 @@
         const mm = String(totalMin % 60).padStart(2, '0');
         const dirTxt = rawDiffMs >= 0 ? 'ago' : 'from now';
         const hrsOff = near.diffMs / 3600000;
-        body.innerHTML = `${escapeHtml(stormTrackMeta.name)} - <b>${escapeHtml(p.category || p.status || '')}</b><br>`
+        body.innerHTML = `${escapeHtml(stormTrackMeta.name)} · <b>${escapeHtml(p.category || p.status || '')}</b><br>`
             + `${escapeHtml(windTxt)} / ${escapeHtml(presTxt)}<br>`
             + `<span style="color:${hrsOff <= 3 ? '#38bdf8' : '#fbbf24'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
         card.classList.remove('hidden');
     }
 
     // Hover tooltip for individual best-track points on the 2D map. Uses ONLY the storm-track fix's
-    // own fields (category/status, wind, pressure, observation time) - never anything flight-level.
+    // own fields (category/status, wind, pressure, observation time), never anything flight-level.
     // Hit-tested in SCREEN space (constant pixel radius) so the target size doesn't shrink when zoomed out.
     function stormPointIndexAt(mx, my) {
         if (!showStormTrack || stormTrackPoints.length === 0 || trackerModeSelect.value !== '2d') return -1;

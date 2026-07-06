@@ -1,4 +1,4 @@
-/* Mission Visualizer - Chart.js layout + per-frame fan-out
+/* Mission Visualizer, Chart.js layout + per-frame fan-out
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -150,18 +150,24 @@
         chart.update('none'); buildDropdownMenus(); 
     }
 
+    let _lastStaticIdx = -1;   // last idx the HUD/badges/charts were rendered for
     function updateVisualComponents(idx, skipCharts = false) {
         const currentRow = filteredData[idx]; if (!currentRow) return;
-        
+
         let visualRow = currentRow;
         if (document.getElementById('toggle8Hz') && document.getElementById('toggle8Hz').checked) {
             const tempRow = getInterpolatedRow();
             if (tempRow) visualRow = tempRow;
         }
 
+        // The HUD, storm badge, and chart playheads depend only on idx, so the 8Hz sub-sample
+        // ticks (skipCharts=true, same idx) skip rebuilding them; any idx change or full update
+        // (unit toggle, marker add, scrub) still redraws everything.
+        const skipStatic = skipCharts && idx === _lastStaticIdx;
+
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(idx, visualRow); else update3DFrame(idx, visualRow);
-        renderHUD(currentRow);
-        
+        if (!skipStatic) renderHUD(currentRow);
+
         if (document.getElementById('togglePfd').checked) renderPFD(visualRow);
         if (!isScrubbing) timelineSlider.value = idx; 
 
@@ -183,10 +189,12 @@
             const b = document.getElementById('satTimeBadge');
             if (b) b.classList.add('hidden');
         }
+        if (skipStatic) return;
         updateStormTrackBadge();
 
         if (masterChartInstance) masterChartInstance.draw();
         Object.values(customCharts).forEach(c => {
             if(c) c.draw();
         });
+        _lastStaticIdx = idx;
     }

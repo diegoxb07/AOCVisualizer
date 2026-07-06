@@ -1,11 +1,11 @@
-/* Mission Visualizer - PFD attitude indicator + HUD text
+/* Mission Visualizer, PFD attitude indicator + HUD text
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     // Slip/skid ball deflection in [-1, 1] (full scale = the G1000 trapezoid's travel), or null.
     // Prefers the gust probe's measured sideslip angle (beta); without it, estimates lateral
     // balance from the coordinated-turn relation g*tan(roll) = V*(heading rate) using the
-    // neighboring 1Hz samples - a skidding turn deflects the ball to the outside, a slipping
+    // neighboring 1Hz samples, a skidding turn deflects the ball to the outside, a slipping
     // one to the low side, exactly like the real instrument.
     function pfdSlipDeflection(d) {
         if (availableMetrics.has('beta') && d.beta !== null && d.beta !== undefined) return Math.max(-1, Math.min(1, d.beta / 6));
@@ -22,7 +22,7 @@
         return Math.max(-1, Math.min(1, latG / 0.15));
     }
 
-    // Ground speed (kt) from the neighboring position samples - the log has no GS channel.
+    // Ground speed (kt) from the neighboring position samples, the log has no GS channel.
     function pfdGroundSpeedKt() {
         if (!filteredData.length || filteredData.length < 3) return null;
         const i = Math.max(1, Math.min(currentIdx, filteredData.length - 2));

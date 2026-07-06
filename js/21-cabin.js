@@ -1,20 +1,20 @@
-/* Mission Visualizer - Cabin crew ride physics (2D cutaway + 3D figures)
+/* Mission Visualizer, Cabin crew ride physics (2D cutaway + 3D figures)
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order.
 
-   Opt-in "Crew Ride" view. Each seated, belted occupant is simulated as an ARTICULATED BODY -
+   Opt-in "Crew Ride" view. Each seated, belted occupant is simulated as an ARTICULATED BODY,
    a small pendulum chain (torso hinged at the belted pelvis, head hinged on the torso, arms
    hinged at the shoulders) responding to the cabin's apparent-gravity field. That field is the
    real physics: in the seat frame the body feels gravity plus the negative of the cabin's own
    acceleration. Its LATERAL component (the skid/slip imbalance the PFD ball shows) tilts the
    apparent-gravity vector so each limb swings toward it, and its VERTICAL component (the load
-   factor - >1 g in an updraft/pull-up, <1 g in a downdraft) scales how heavy every limb feels.
-   The response is G-relative: only vertical G past a deadband produces a visible posture change -
+   factor, >1 g in an updraft/pull-up, <1 g in a downdraft) scales how heavy every limb feels.
+   The response is G-relative: only vertical G past a deadband produces a visible posture change,
    the pelvis floats up against the seatbelt in sustained negative-G and the torso hunches forward
    (pushed down into the seat) in sustained positive-G; small bumps do nothing. Forward dynamics is
    integrated with substepped semi-implicit Euler off the real flight accelerations, always read
    from the smoothly interpolated row (independent of the 8 Hz toggle) so the ride is fluid, not a
-   1 Hz step that makes the crew teleport. Calm air keeps them still; rough air tosses them -
+   1 Hz step that makes the crew teleport. Calm air keeps them still; rough air tosses them,
    communicating ride quality, not random flail. One sim feeds a 2D rear-view cutaway (2D tracker)
    and slim figures inside a hollowed plane (the whole airframe dims to a translucent shell) in the
    3D scene. Off by default; nothing runs unless the toggle is on. */
@@ -24,7 +24,7 @@
     let cabinRaf = null;
     let cabinLastMs = 0;
     let crewGroup3D = null;
-    let _planeBodyMeshes = [];   // the 3D plane's body meshes - all dimmed to a shell while crew are shown
+    let _planeBodyMeshes = [];   // the 3D plane's body meshes, all dimmed to a shell while crew are shown
 
     function initCabinSim() {
         const occ = [];
@@ -58,10 +58,10 @@
         const ball = (typeof pfdSlipDeflection === 'function') ? pfdSlipDeflection(d) : null;
         if (ball !== null) lat = ball * 0.15;   // PFD ball is latG / 0.15g -> back to g
         // Vertical load-factor deviation (g): updraft -> heavier (+G, pressed down), downdraft ->
-        // lighter (-G, float). Derived from the measured vertical wind - the actual felt vertical G.
+        // lighter (-G, float). Derived from the measured vertical wind, the actual felt vertical G.
         let gz = 0;
         if (d.vtWnd != null) gz = Math.max(-0.85, Math.min(1.2, d.vtWnd * 0.09));
-        // Turbulence intensity (0..1) - the SAME |vtWnd|/3 proxy the airframe's 8Hz micro-motion uses,
+        // Turbulence intensity (0..1), the SAME |vtWnd|/3 proxy the airframe's 8Hz micro-motion uses,
         // so the crew buzz/jitter in step with the plane, not just the slow hunch/float postural modes.
         let turb = (d.vtWnd != null) ? Math.min(1, Math.abs(d.vtWnd) / 3.0) : 0;
         return { lat, gz, turb, roll: rollRad, valid: true };
@@ -117,7 +117,7 @@
 
     // --- 2D rear-view cutaway: slim seated human with arms, planted on a belted seat ---
     function drawSeated2D(ctx, x, seatY, s, torsoLen, o) {
-        const beltLift = o.pelY * 55 * s;                         // + = float against the belt (-G), - = compress into seat (+G)
+        const beltLift = o.pelY * 55 * s;                         // + = float against the belt (-G),, = compress into seat (+G)
         const hunch = Math.max(0, o.torsoP);                      // fore-aft forward hunch (+G); in rear view it foreshortens + drops the torso
         const hipY = seatY - s * 3 - beltLift;
         const L = torsoLen * (1 - 0.16 * hunch);                  // hunch foreshortens the torso
@@ -129,7 +129,7 @@
         ctx.fillStyle = 'rgba(66,88,112,0.55)';
         ctx.fillRect(x - L * 0.4, seatY, L * 0.8, s * 4);
         ctx.fillRect(x - L * 0.42, seatY - L * 0.5, s * 2.3, L * 0.5);
-        // thigh resting on the cushion (fixed) - reads as seated
+        // thigh resting on the cushion (fixed), reads as seated
         ctx.strokeStyle = '#4a90d9'; ctx.lineWidth = s * 3.0;
         ctx.beginPath(); ctx.moveTo(x, hipY); ctx.lineTo(x + L * 0.34, seatY - s * 0.5); ctx.stroke();
         // arms hanging from the shoulders, swinging with the apparent gravity (drawn behind the torso)
@@ -225,7 +225,7 @@
                 foot.position.set(sx, -0.178, -0.205);   // foot bottom sits on the floor top (~-0.18 plane-local)
                 legs.add(thigh, shin, foot);
             });
-            // upper body (hips + lap belt + torso) - the only part that springs on the cushion / rises
+            // upper body (hips + lap belt + torso), the only part that springs on the cushion / rises
             // against the belt; the seat and legs stay fixed to the figure.
             const upper = new THREE.Group(); upper.add(hips, belt, torso);
             fig.add(seat, legs, upper);
@@ -234,7 +234,7 @@
             crewGroup3D.add(fig);
         }
         planeGroup3D.add(crewGroup3D);   // inherits the plane's position + bank + pitch
-        // every body mesh (fuselage, wings, tail, vTail, nose) - dimmed to a translucent shell while
+        // every body mesh (fuselage, wings, tail, vTail, nose), dimmed to a translucent shell while
         // crew are shown so they read as INSIDE the plane (crewGroup3D is a Group, so it's excluded)
         _planeBodyMeshes = planeGroup3D.children.filter(ch => ch.isMesh && ch.material);
     }

@@ -1,4 +1,4 @@
-/* Mission Visualizer - 8Hz Catmull-Rom interpolation
+/* Mission Visualizer, 8Hz Catmull-Rom interpolation
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -65,7 +65,7 @@
             pitch: p_val !== null ? p_val + pitch_jitter : null, roll: r_val !== null ? r_val + roll_jitter : null,
             th: cubicAngle(d0.th, d1.th, d2.th, d3.th, t), gTrack: cubicAngle(d0.gTrack, d1.gTrack, d2.gTrack, d3.gTrack, t),
             pAlt: pa_val !== null ? pa_val + alt_jitter : null, gpsAlt: ga_val !== null ? ga_val + alt_jitter : null, radAlt: ra_val !== null ? ra_val + alt_jitter : null,
-            // Linear (not cubic - avoids inventing phantom gust overshoot) so the vertical-wind forcing
+            // Linear (not cubic, avoids inventing phantom gust overshoot) so the vertical-wind forcing
             // that drives the Crew Ride's float/hunch is continuous, not a 1 Hz step.
             vtWnd: lerp(d1.vtWnd, d2.vtWnd, t)
         };

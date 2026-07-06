@@ -1,11 +1,11 @@
-/* Mission Visualizer - Raw flight-level variable catalog (INERT background data)
+/* Mission Visualizer, Raw flight-level variable catalog (INERT background data)
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded FIRST as a classic (non-module) script; shares the one global scope like every other part.
 
    WHAT THIS IS
    A dictionary of the raw AOC flight-level variables that actually appear in the tab-separated
    .txt / NetCDF logs (P-3 as of 2026-07-04; the G-IV is similar but has more faulty sensors, and
-   future aircraft will differ). It is NOT wired into playback - the visualizer still reads only the
+   future aircraft will differ). It is NOT wired into playback, the visualizer still reads only the
    handful of QC'd fields the parser pulls (js/12-file-parsing.js) into METRIC_DEFS. This catalog
    exists so the app has an internal model of everything that IS in a flight, and as scaffolding for
    a future Quality-Check (QC) mode that would: list every variable present, cross-compare the
@@ -17,7 +17,7 @@
    here is a LOGICAL DEDUCTION from the naming + physics and is flagged unitConf:'assumed' until it
    is checked against real sample values. Some names in the source notes also disagree with the true
    column names (naming inconsistencies are expected); this catalog follows the ACTUAL column names.
-   Variables come and go year to year - nothing here is guaranteed to be present in any given file. */
+   Variables come and go year to year, nothing here is guaranteed to be present in any given file. */
 
     // Sensor / suffix naming conventions used throughout the raw columns.
     const RAW_VAR_CONVENTIONS = {
@@ -25,13 +25,13 @@
         '.c': 'corrected value',
         '.<N>': 'redundant sensor index: .1 .2 .3 ... each N is a separate physical sensor of the same quantity',
         'ref': 'the sensor chosen post-flight to best represent that quantity (the quality-assured reference)',
-        'I': 'INE - Inertial Navigation Equipment derived (e.g. PitchI, RollI, GsXI)',
+        'I': 'INE: Inertial Navigation Equipment derived (e.g. PitchI, RollI, GsXI)',
         'I-GPS': 'blended INE + GPS solution',
         'GPS': 'GPS receiver channel',
         'ADDU': 'Air Data Distribution Unit (air-data computer feed: TasADDU, AltPaADDU, ...)',
         'AAD': 'Air-data / AoA sensor housekeeping (checksums, QC volts, status bits)',
         'DS_': 'dropsonde channel (indices .1-.8 = successive drops in the record)',
-        'Sfmr / ASfmr': 'Stepped-Frequency Microwave Radiometer - surface wind speed & rain rate',
+        'Sfmr / ASfmr': 'Stepped-Frequency Microwave Radiometer: surface wind speed & rain rate',
         'kt / ft suffix': 'an explicit-unit variant of a metric base (e.g. TASkt.d = TAS in knots, ALTPAft.d = pressure alt in feet)'
     };
 

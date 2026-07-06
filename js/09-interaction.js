@@ -1,4 +1,4 @@
-/* Mission Visualizer - menus, measure, scrub, keyboard, canvas input
+/* Mission Visualizer, menus, measure, scrub, keyboard, canvas input
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -72,7 +72,7 @@
 
     document.getElementById('clearMeasureBtn').addEventListener('click', () => { 
         measurePointsGeo = []; drawnShapes = []; 
-        isHoveringShape = false; isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1; measureButtons = [];
+        isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1; measureButtons = [];
         updateMeasureUI(); 
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); 
     });
@@ -160,7 +160,7 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isMeasuring) { stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return; }
         if (!filteredData || filteredData.length === 0) return; if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) return;
-        // Space = play/pause. Skipped when a button/select/checkbox has focus - space already
+        // Space = play/pause. Skipped when a button/select/checkbox has focus, space already
         // activates those natively and hijacking it would double-fire (a focused range slider is
         // fine though: space is a no-op there, and scrub-then-space is a common flow).
         if (e.code === 'Space' && !/SELECT|BUTTON|TEXTAREA/.test(e.target.tagName)
@@ -219,20 +219,22 @@
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;
         const geo = screenToGeo(e.clientX, e.clientY);
 
+        // Shapes, hover states, and the rubber-band line draw on the FOREGROUND canvas, so these
+        // repaints reuse the cached background (no bgNeedsUpdate); only pan/zoom invalidate it.
         if (!isMeasuring) {
             if (isDraggingShape && draggingShapeIndex >= 0) {
                 const dLat = geo.lat - lastDragGeo.lat; const dLon = geo.lon - lastDragGeo.lon;
                 const shp = drawnShapes[draggingShapeIndex];
                 if (shp) shp.points = shp.points.map(p => ({lat: p.lat + dLat, lon: p.lon + dLon}));
-                lastDragGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
+                lastDragGeo = geo; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
             } else if (drawnShapes.length > 0 && !isDraggingMap) {
                 const overBtn = measureButtonAt(mx, my);
                 const hit = overBtn ? -1 : shapeIndexAtGeo(geo);
                 canvas.style.cursor = overBtn ? 'pointer' : (hit >= 0 ? 'move' : 'grab');
-                if (hit !== hoveredShapeIndex) { hoveredShapeIndex = hit; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+                if (hit !== hoveredShapeIndex) { hoveredShapeIndex = hit; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
             }
         }
-        if (isMeasuring && (measurePointsGeo.length > 0 || drawnShapes.length > 0)) { liveMouseGeo = geo; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+        if (isMeasuring && (measurePointsGeo.length > 0 || drawnShapes.length > 0)) { liveMouseGeo = geo; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
         if (isDraggingMap) { mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } 
     });
     

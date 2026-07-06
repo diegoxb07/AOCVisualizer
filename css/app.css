@@ -1,6 +1,6 @@
 /* Mission Visualizer stylesheet.
    Functional rules (fullscreen behavior, media-bar sizing, overlay pills, classes
-   toggled from js/*.js) live alongside the visual styling - check for JS references
+   toggled from js/*.js) live alongside the visual styling, check for JS references
    before renaming or removing a selector. */
 
 /* Tokens */
@@ -60,12 +60,12 @@ select { padding-left: 14px !important; }
    slightly larger + brighter. text-transform/letter-spacing override the parent's uppercase styling. */
 .panel-subhead { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: #e2e8f0; }
 
-/* Long product names ("Band 7 - Shortwave IR …") ellipsize while the picker is CLOSED so they
+/* Long product names ("Band 7, Shortwave IR …") ellipsize while the picker is CLOSED so they
    can't shove the fullscreen button and map controls off the header; the open dropdown list
    still shows every option's full text (native select behavior), plus a hover tooltip. */
 #satBandSelect { max-width: 172px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-/* Fullscreen behavior (functional - do not simplify) */
+/* Fullscreen behavior (functional, do not simplify) */
 :fullscreen { background-color: var(--ink); overflow-y: auto; padding: 24px; padding-bottom: 140px; }
 #mapPanel:is(:fullscreen, .fake-fs), #videoPanel:is(:fullscreen, .fake-fs) { padding: 0; border: none; border-radius: 0; background-color: #0b1220; display: flex; flex-direction: column; }
 #mapPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; }
@@ -84,7 +84,7 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { di
 #mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
 #mapPanel:is(:fullscreen, .fake-fs) .map-controls { padding-right: 50px; }
 #mapPanel:is(:fullscreen, .fake-fs) #fullscreenMapBtn { position: absolute; top: 16px; right: 22px; z-index: 200; }
-/* The MMR header is a plain flex row (no .panel-title class) - without this it sits flush
+/* The MMR header is a plain flex row (no .panel-title class), without this it sits flush
    against the screen edge when the panel fills the screen, looking clipped. */
 #videoPanel:is(:fullscreen, .fake-fs) #videoHeader { padding: 14px 22px 0 22px; }
 #videoPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
@@ -99,7 +99,7 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { di
 #mapPanel { z-index: 1; }
 #videoPanel { z-index: 0; }
 
-/* Header - flat brand bar (NOAA logo + divider + title), console redesign */
+/* Header, flat brand bar (NOAA logo + divider + title), console redesign */
 #mainContainer > header {
     padding: 2px 2px 10px;
     position: relative;
@@ -184,7 +184,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.55); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 140px; height: 140px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; transform: scale(var(--hud-scale, 1)); transform-origin: bottom right; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
-/* Crew ride cutaway - top-left of the 2D tracker, shown only when the toggle is on (JS). */
+/* Crew ride cutaway, top-left of the 2D tracker, shown only when the toggle is on (JS). */
 #cabinOverlay { position: absolute; top: 22px; left: 16px; width: 160px; height: 120px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.45); border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; overflow: hidden; pointer-events: none; z-index: 2450; transform: scale(var(--hud-scale, 1)); transform-origin: top left; }
 #cabinCanvas { width: 100%; height: 100%; display: block; }
 /* In fullscreen the info stack (sat badge + storm card) sits top-LEFT, so move the crew overlay to
@@ -192,7 +192,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
    fullscreen) is 3D-only, so the two never show at the same time. */
 #mapPanel:is(:fullscreen, .fake-fs) #cabinOverlay { top: 96px; left: auto; right: 16px; width: 210px; height: 158px; }
 
-/* Non-invasive satellite fetch status - a small pill, not a full-screen cover */
+/* Non-invasive satellite fetch status, a small pill, not a full-screen cover */
 #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(var(--sig-rgb), 0.6); color: #bae6fd; padding: 6px 12px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
 #satLoadingOverlay.show { display: flex; }
 #satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
@@ -210,7 +210,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satPrefetchCancel { flex: none; cursor: pointer; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.6); color: #fca5a5; border-radius: 6px; padding: 3px 8px; font: inherit; }
 #satPrefetchCancel:hover { background: rgba(239, 68, 68, 0.3); color: #fff; }
 
-/* Auto-Sync indicator - anchored in the MMR video panel, non-blocking */
+/* Auto-Sync indicator, anchored in the MMR video panel, non-blocking */
 #syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(251, 191, 36, 0.75); color: #fcd34d; padding: 6px 12px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
 #syncingIndicator.show { opacity: 1; transform: translateY(0); }
 #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid #fbbf24; border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
@@ -218,7 +218,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 @keyframes syncSpin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) { #syncingIndicator .sync-sub { display: none; } }
 
-/* Recording progress pill - Stop stays clickable while recording */
+/* Recording progress pill, Stop stays clickable while recording */
 #recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(154, 161, 173, 0.6); color: #e5e7eb; padding: 8px 14px; border-radius: 999px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #recordProgress.show { display: flex; }
 #recordProgress .rec-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.9); animation: recPulse 1s ease-in-out infinite; }
@@ -275,7 +275,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) .cmd-row { gap: 5px; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { max-width: 150px; text-overflow: ellipsis; }
 /* Filters live on the far right of the top row (order:1), packed 2x2 so the bar height is unchanged.
-   Separator drawn as a pseudo-element spanning only the content box - the inherited border-left
+   Separator drawn as a pseudo-element spanning only the content box, the inherited border-left
    would also span the 4px vertical padding and protrude past the checkbox grid. */
 #cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 8px; padding: 4px 0 4px 10px; border-left: none !important; position: relative; }
 #cmdFiltersGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: #334155; }
@@ -301,7 +301,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* In 3D fullscreen the pitch/roll HUD moves to the top-right and the info stack to the top-left. */
 #mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; transform-origin: top right; }
 #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { transform-origin: top left; }
-/* Hide the pitch/roll box until it actually has telemetry - otherwise it's an odd empty bordered
+/* Hide the pitch/roll box until it actually has telemetry, otherwise it's an odd empty bordered
    square floating in the 3D view before a flight is loaded. */
 #attitudeHud:empty { display: none !important; }
 #cmdSyncGroup { display: none; }
@@ -312,7 +312,7 @@ input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; b
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; transition: 0.2s; border: 2px solid #0b1220; }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid #0b1220; }
-/* Elapsed-portion fill - --fill is painted by js/20-ui-polish.js */
+/* Elapsed-portion fill, --fill is painted by js/20-ui-polish.js */
 #timelineSlider { background: linear-gradient(90deg, #0ea5e9 0%, #22d3ee var(--fill, 0%), #1e293b var(--fill, 0%)); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -325,7 +325,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 *::-webkit-scrollbar-thumb { background: #334155; border-radius: 6px; border: 2px solid #0b1220; }
 *::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-/* Primary Play button: bigger, sky-blue "go" control that folds in the old Apply & Run - matches the
+/* Primary Play button: bigger, sky-blue "go" control that folds in the old Apply & Run, matches the
    app's one signature accent (--sig) instead of a second, competing blue. The selector matches the
    compact bottom-bar sizing rule's specificity and is placed later, so it wins. */
 .sticky-bottom-bar .cmd-group button#playPauseBtn {

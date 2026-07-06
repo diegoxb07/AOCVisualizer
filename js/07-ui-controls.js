@@ -1,4 +1,4 @@
-/* Mission Visualizer - DOM refs, sync-mode, 3D scene, control wiring
+/* Mission Visualizer, DOM refs, sync-mode, 3D scene, control wiring
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -29,7 +29,7 @@
         });
     });
 
-    const canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d'), video = document.getElementById('radarVideo'), hud = document.getElementById('hudOverlay'), mapPlaceholder = document.getElementById('mapPlaceholder'), playPauseBtn = document.getElementById('playPauseBtn'), timelineSlider = document.getElementById('timelineSlider'), timelineTimeDisplay = document.getElementById('timelineTimeDisplay'), speedDownBtn = document.getElementById('speedDownBtn'), speedDisplayBtn = document.getElementById('speedDisplayBtn'), speedUpBtn = document.getElementById('speedUpBtn'), replayBtn = document.getElementById('replayBtn'), videoSyncMode = document.getElementById('videoSyncMode'), ocrIndicator = document.getElementById('ocrIndicator'), fullscreenBtn = document.getElementById('fullscreenBtn'), fullscreenMapBtn = document.getElementById('fullscreenMapBtn'), fullscreenVideoBtn = document.getElementById('fullscreenVideoBtn'), mapPanel = document.getElementById('mapPanel'), videoPanel = document.getElementById('videoPanel'), trackerModeSelect = document.getElementById('trackerModeSelect'), threeDContainer = document.getElementById('threeDContainer'), attitudeHud = document.getElementById('attitudeHud'), stickyBottomBar = document.getElementById('stickyBottomBar');
+    const canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d'), video = document.getElementById('radarVideo'), hud = document.getElementById('hudOverlay'), mapPlaceholder = document.getElementById('mapPlaceholder'), playPauseBtn = document.getElementById('playPauseBtn'), timelineSlider = document.getElementById('timelineSlider'), timelineTimeDisplay = document.getElementById('timelineTimeDisplay'), speedDownBtn = document.getElementById('speedDownBtn'), speedDisplayBtn = document.getElementById('speedDisplayBtn'), speedUpBtn = document.getElementById('speedUpBtn'), replayBtn = document.getElementById('replayBtn'), videoSyncMode = document.getElementById('videoSyncMode'), ocrIndicator = document.getElementById('ocrIndicator'), fullscreenBtn = document.getElementById('fullscreenBtn'), fullscreenMapBtn = document.getElementById('fullscreenMapBtn'), fullscreenVideoBtn = document.getElementById('fullscreenVideoBtn'), mapPanel = document.getElementById('mapPanel'), videoPanel = document.getElementById('videoPanel'), trackerModeSelect = document.getElementById('trackerModeSelect'), threeDContainer = document.getElementById('threeDContainer'), attitudeHud = document.getElementById('attitudeHud'), stickyBottomBar = document.getElementById('stickyBottomBar'), pathColorSelect = document.getElementById('pathColorSelect'), barbColorSelect = document.getElementById('barbColorSelect');
 
     function applySyncModeLock() {
         // On Auto-Sync the timeline window is driven by the video clock, so the user must NOT type start/end times.
@@ -92,6 +92,9 @@
             sub.classList.toggle('hidden', parts.length === 0);
             document.title = (idPart ? idPart + ' · ' : '') + 'AOC Mission Visualizer';
         }
+        // Share links need an archive mission id; a manually uploaded file has none.
+        const shareBtn = document.getElementById('shareLinkBtn');
+        if (shareBtn) shareBtn.disabled = !reconArchiveMeta;
     }
     
     function getConvertedVal(val, key, isImperial) {
@@ -118,7 +121,7 @@
         c.beginPath(); c.moveTo(17, -1.5); c.lineTo(19, -1); c.lineTo(19, 1); c.lineTo(17, 1.5); c.lineTo(16, 0); c.closePath(); c.fillStyle = '#222222'; c.fill();
     }
 
-    // G-IV (NOAA49) glyph for the 2D tracker - same coordinate frame as drawP3Orion
+    // G-IV (NOAA49) glyph for the 2D tracker, same coordinate frame as drawP3Orion
     // (nose at +X, drawn white with a dark outline). Swept wings, two aft-fuselage
     // nacelles, T-tail; picked over the P-3 by isGulfstreamFlight().
     function drawGulfstreamIV(c) {
@@ -187,7 +190,7 @@
     }
 
     // Altitude source for the 3D map's vertical dimension (track, plane, markers). Its OWN control
-    // (#trackAltSelect, defaults to GPS) - independent of the PFD's Press->GPS filter (#toggleGpsAlt),
+    // (#trackAltSelect, defaults to GPS), independent of the PFD's Press->GPS filter (#toggleGpsAlt),
     // which still only governs the PFD altitude tape / point analysis.
     function track3DAltMeters(d) {
         if (!d) return 0;
@@ -249,7 +252,7 @@
             const pathGeom = new THREE.BufferGeometry().setFromPoints(pathPts); pathGeom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             const trackMat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); const coloredTrack3D = new THREE.Line(pathGeom, trackMat); threeMapGroup.add(coloredTrack3D);
         }
-        // Storm best-track overlay (js/12b-recon-archive.js) - same points as the 2D layer, flattened to
+        // Storm best-track overlay (js/12b-recon-archive.js), same points as the 2D layer, flattened to
         // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
         // flight's altitude profile.
         if (showStormTrack && stormTrackPoints.length > 1) {
@@ -274,7 +277,7 @@
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
         // True-heading arrow: same scene-level convention as the ground-track arrow (world position,
-        // Y-only rotation - not banked/pitched with the airframe), so it reads as a clean compass pointer.
+        // Y-only rotation, not banked/pitched with the airframe), so it reads as a clean compass pointer.
         // It fades in only as heading diverges from ground track (hidden below 3 deg of drift, full by 8)
         // so a no-drift leg shows a single arrow instead of two overlapping, z-fighting ones.
         if (headingArrow3D) {
@@ -374,7 +377,7 @@
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             // Archived (recon-api) satellites stream a tile per 10-min scan from the API, which can
-            // pause playback - so picking a bbox-capable product auto-builds its whole timeframe up
+            // pause playback, so picking a bbox-capable product auto-builds its whole timeframe up
             // front (maybeAutoPrecacheSatellite) instead of trickling in during playback. A full-disk-
             // only composite (sandwich/geocolor) skips that and just streams per-frame like a polar layer.
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
@@ -383,8 +386,8 @@
         }
     });
 
-    document.getElementById('pathColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
-    document.getElementById('barbColorSelect').addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
+    pathColorSelect.addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
+    barbColorSelect.addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
     document.getElementById('trackAltSelect').addEventListener('change', () => { if (filteredData.length > 0 && threeDInitialized) { build3DScene(); updateVisualComponents(currentIdx); } });
     document.getElementById('toggle8Hz').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
 

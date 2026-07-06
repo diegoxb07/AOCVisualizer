@@ -4,7 +4,7 @@
  *  Theme matches the old cdn.tailwindcss.com inline config exactly. */
 module.exports = {
   content: ['./index.html', './js/*.js'],
-  // Classes toggled from JS (classList.add/toggle) - listed explicitly so a scanner
+  // Classes toggled from JS (classList.add/toggle), listed explicitly so a scanner
   // miss can never drop one from the compiled CSS.
   safelist: [
     'hidden', 'flex', 'block', 'grayscale', 'grayscale-0', 'saturate-0',

@@ -1,6 +1,6 @@
-/* Mission Visualizer - cosmetic UI polish (timeline glow fill)
+/* Mission Visualizer, cosmetic UI polish (timeline glow fill)
    Part of index.html, split into modules so a failure in one file does not break the others.
-   Loaded as a classic (non-module) script; carries NO app state - everything here is
+   Loaded as a classic (non-module) script; carries NO app state, everything here is
    presentation-only and the app functions identically if this file fails to load. */
 
     (function () {

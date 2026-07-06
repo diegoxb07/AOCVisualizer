@@ -1,4 +1,4 @@
-/* Mission Visualizer - 2D map projection + render engine
+/* Mission Visualizer, 2D map projection + render engine
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -35,7 +35,7 @@
     function getY(lat) { return cssH - ((lat - plotMinLat) / deltaLat) * cssH; }
 
     // Geographic bounds currently visible (depends on pan/zoom). Used to draw the WHOLE world map
-    // but only the parts on screen - so Africa etc. appear when you zoom out, with no perf hit when
+    // but only the parts on screen, so Africa etc. appear when you zoom out, with no perf hit when
     // zoomed into the flight.
     function getVisibleGeoBounds() {
         if (!cssW || !cssH || !deltaLon) return null;
@@ -64,12 +64,11 @@
     }
 
     function getBarbColorMode() {
-        const el = document.getElementById('barbColorSelect');
-        return el && el.value === 'hurricane' ? 'hurricane' : 'wind';
+        return barbColorSelect.value === 'hurricane' ? 'hurricane' : 'wind';
     }
 
     function getPathColorRGB(d, idx) {
-        const mode = document.getElementById('pathColorSelect').value;
+        const mode = pathColorSelect.value;
         if (mode === 'temp') {
             let t = d.tempr; if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
             let delta = t - tempBaseline[idx]; let f = Math.min(Math.abs(delta) / 3.0, 1);
@@ -89,8 +88,6 @@
         return [r/255, g/255, b/255];
     }
     
-    function getSpdColor(spd) { const [r, g, b] = getSpdColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
-
     function getBarbColorRGB(spd) {
         return getBarbColorMode() === 'hurricane' ? getHurricaneColorRGB(spd) : getSpdColorRGB(spd);
     }
@@ -99,17 +96,13 @@
 
     function getBarbSpacingPx() {
         // Screen-px gap between barbs along the track. The zoomed-out cap sets density at
-        // low zoom (was 30 - too sparse); zoomed in this converges to the same 8px floor.
+        // low zoom (was 30, too sparse); zoomed in this converges to the same 8px floor.
         const zoom = Math.max(mapScale, 0.35);
         return Math.min(16, Math.max(8, 30 / zoom));
     }
 
-    function getBarbScale() {
-        return 1;
-    }
-
     // Best-track overlay for the storm the loaded mission belongs to (js/12b-recon-archive.js), spanning
-    // its whole life - not just the flight's window. Drawn UNDER the flight track/plane so the flight
+    // its whole life, not just the flight's window. Drawn UNDER the flight track/plane so the flight
     // stays the visually dominant element; getX/getY project it exactly like everything else on this
     // map (they're linear in lon/lat, not tied to the flight's own bounds).
     function drawStormTrack2D() {
@@ -152,17 +145,15 @@
     }
 
     function getPathColorHex(d, idx) {
-        const mode = document.getElementById('pathColorSelect').value;
-        if (mode === 'temp') { const [r,g,b] = getPathColorRGB(d, idx); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
-        const [r,g,b] = getPathColorRGB(d, idx);
+        const [r, g, b] = getPathColorRGB(d, idx);
         return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
     }
 
     function drawWindBarbFrame(x, y, dir, spd, scale, isDynamic = false) {
-        const strokeColor = getBarbColor(spd); const barbScale = getBarbScale();
-        ctx.save(); ctx.translate(x, y); let mult = isDynamic ? 1.4 : 1; ctx.scale((mult * barbScale) / scale, (mult * barbScale) / scale); ctx.rotate((dir - 90) * Math.PI/180);
+        const strokeColor = getBarbColor(spd);
+        ctx.save(); ctx.translate(x, y); let mult = isDynamic ? 1.4 : 1; ctx.scale(mult / scale, mult / scale); ctx.rotate((dir - 90) * Math.PI/180);
         const drawShapes = () => {
-            const shaftLength = 18 * barbScale; const featherBase = 6 * barbScale; const featherSpread = 0.85 * barbScale;
+            const shaftLength = 18; const featherBase = 6; const featherSpread = 0.85;
             ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(shaftLength, 0); ctx.stroke();
             let k = Math.round(spd/5)*5; let hx = shaftLength; const xa = Math.cos(60*Math.PI/180)*featherBase; const ya = Math.sin(60*Math.PI/180)*featherBase;
             while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-(3 * featherSpread),0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4 * featherSpread; k-=50; }
@@ -171,10 +162,10 @@
         };
         const isBlackBarb = strokeColor === 'rgb(0, 0, 0)';
         if (isBlackBarb) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.6 * barbScale; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes();
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes();
         }
-        if (isDynamic) { ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 2.0 * barbScale; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes(); }
-        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.0 * barbScale; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; drawShapes();
+        if (isDynamic) { ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 2.0; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes(); }
+        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.0; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; drawShapes();
         ctx.restore();
     }
     
@@ -196,7 +187,7 @@
             bgCtx.fillStyle = isSatOn ? 'rgba(37,107,80,0.3)' : '#256b50'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale;
             // Draw the whole world, cull off-screen, and repeat it shifted ±360 so a dateline-centered
             // or zoomed-out view shows continuous land instead of an empty seam. Projects with the
-            // raw (unwrapped) x - wrapping would cancel the shift.
+            // raw (unwrapped) x, wrapping would cancel the shift.
             const getXShift = (lon, shift) => (((lon + shift) - plotMinLon) / deltaLon) * cssW;
             for (const shift of [0, -360, 360]) {
                 mapFeatures.forEach(feature => {
@@ -333,7 +324,7 @@
             if (pts.length === 0) return;
             const stroke = isHovered ? '#7dd3fc' : '#38bdf8';
             const fill = isHovered ? 'rgba(56, 189, 248, 0.38)' : 'rgba(56, 189, 248, 0.25)';
-            // Measurement/preview line widths (original sizes - the DPR transform, not a fatter line, is what keeps them crisp).
+            // Measurement/preview line widths (original sizes, the DPR transform, not a fatter line, is what keeps them crisp).
             ctx.save(); ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = (type === 'polygon' ? 5 : 3) / mapScale;
             if (type === 'polygon') {
                 const P = pts.map(p => ({ x: getX(p.lon), y: getY(p.lat) }));
@@ -343,7 +334,7 @@
                     P.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
                     ctx.closePath(); ctx.fill();
                 }
-                // Build the WHOLE connecting-line path, then stroke once - drawing the vertex dots in
+                // Build the WHOLE connecting-line path, then stroke once, drawing the vertex dots in
                 // between would call ctx.beginPath() and wipe the line.
                 let totalDist = 0, liveSegDist = 0;
                 ctx.setLineDash([9 / mapScale, 5 / mapScale]); ctx.beginPath();

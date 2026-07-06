@@ -1,4 +1,4 @@
-/* Mission Visualizer - canvas/layout resize + time helpers
+/* Mission Visualizer, canvas/layout resize + time helpers
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -95,20 +95,8 @@
         clampMediaToViewport();
     })();
 
-    function timeToSeconds(timeStr) {
-        if (!timeStr) return 0; 
-        let cleanStr = String(timeStr).replace(/[^0-9]/g, ''); 
-        if (cleanStr.length === 4) cleanStr = cleanStr + "00";
-        if (cleanStr.length < 6) cleanStr = cleanStr.padStart(6, '0');
-        return parseInt(cleanStr.slice(0,2))*3600 + parseInt(cleanStr.slice(2,4))*60 + parseInt(cleanStr.slice(4,6));
-    }
-    
-    function toHHMMSS(secs) {
-        let secNum = parseInt(secs, 10);
-        let h = Math.floor(secNum / 3600), m = Math.floor((secNum % 3600) / 60), s = secNum % 60;
-        return String(h).padStart(2,'0') + String(m).padStart(2,'0') + String(s).padStart(2,'0');
-    }
-    
+    // timeToSeconds/toHHMMSS live in js/11b-parser-core.js (shared with the parse worker and tests).
+
     function updateEndWindowFromVideo(preservePlayback = false) {
         if (videoLoaded && video.duration && !isNaN(video.duration)) {
             let startSecs = timeToSeconds(document.getElementById('videoStartInput').value);

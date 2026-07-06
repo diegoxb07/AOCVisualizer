@@ -1,4 +1,4 @@
-/* Mission Visualizer - metric definitions + map/measure state
+/* Mission Visualizer, metric definitions + map/measure state
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -51,11 +51,10 @@
     let lonDomainCenter = 0;   // 0 for normal flights; the flight's circular-mean lon for dateline crossers (see wrapLon)
 
     let isMeasuring = false, measureShape = 'polygon', measurePointsGeo = [], drawnShapes = [], liveMouseGeo = null;
-    let baseHudHeight = 0;
     const EARTH_RADIUS_NM = 3440.065;
 
     let isScrubbing = false, activeScrubChart = null, wasPlayingBeforeScrub = false;
     let hasInitialSyncOccurred = false, scrubSyncTimeout = null, forceOcrSyncNextTick = false;
     let isManualSyncRequest = false, scrubDebounceTimer = null;
-    let isHoveringShape = false, isDraggingShape = false, lastDragGeo = null;
+    let isDraggingShape = false, lastDragGeo = null;
     let draggingShapeIndex = -1, hoveredShapeIndex = -1, measureButtons = [], measureClickHandled = false;

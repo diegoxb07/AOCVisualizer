@@ -1,4 +1,4 @@
-/* Mission Visualizer - "Create Your Own Graph" + temp baseline
+/* Mission Visualizer, "Create Your Own Graph" + temp baseline
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -48,11 +48,18 @@
         else { wrapper.classList.remove('block'); wrapper.classList.add('hidden'); if (prompt) prompt.classList.remove('hidden'); }
     }
 
+    // Rolling ±300-sample mean of ambient temp, kept as a sliding-window sum so a long flight
+    // doesn't recompute 600 samples per row on every filter change.
     function computeTempBaseline() {
-        tempBaseline = new Array(filteredData.length).fill(null);
-        for(let i=0; i<filteredData.length; i++) {
-            let sum=0, count=0;
-            for(let j=Math.max(0, i-300); j<Math.min(filteredData.length, i+300); j++) { if(filteredData[j].tempr !== null) { sum+=filteredData[j].tempr; count++; } }
-            tempBaseline[i] = count > 0 ? sum/count : filteredData[i].tempr;
+        const n = filteredData.length;
+        tempBaseline = new Array(n).fill(null);
+        let sum = 0, count = 0;
+        const add = i => { const t = filteredData[i].tempr; if (t !== null) { sum += t; count++; } };
+        const drop = i => { const t = filteredData[i].tempr; if (t !== null) { sum -= t; count--; } };
+        for (let j = 0; j < Math.min(n, 300); j++) add(j);
+        for (let i = 0; i < n; i++) {
+            tempBaseline[i] = count > 0 ? sum / count : filteredData[i].tempr;
+            if (i - 300 >= 0) drop(i - 300);
+            if (i + 300 < n) add(i + 300);
         }
     }

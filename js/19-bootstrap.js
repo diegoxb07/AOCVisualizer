@@ -1,4 +1,4 @@
-/* Mission Visualizer - remaining wiring, map geojson fetch, clip recorder
+/* Mission Visualizer, remaining wiring, map geojson fetch, clip recorder
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -12,7 +12,7 @@
         el.addEventListener('keyup', (e) => { if (e.key === 'Enter') el.blur(); });
     });
     
-    // The old "Apply & Run" button is gone - the Play button folds it in (see the play handler below).
+    // The old "Apply & Run" button is gone, the Play button folds it in (see the play handler below).
 
     // Batch satellite cache modal (works across many storms without loading each flight into the app).
     (function wireBatchCache() {
@@ -22,7 +22,7 @@
         const startBtn = document.getElementById('batchCacheStartBtn');
         if (!btn || !modal || !fileInput || !startBtn) return;
         let picked = [];
-        // Closing the modal only HIDES it - caching keeps running in the background (progress shows on
+        // Closing the modal only HIDES it, caching keeps running in the background (progress shows on
         // the on-map pill), so the user can close it and keep working. Stopping is explicit (Stop button
         // or the pill's Cancel).
         const closeModal = () => { modal.style.display = 'none'; };
@@ -36,7 +36,7 @@
         const requestCacheCancel = () => {
             batchCacheCancel = true;
             if (batchCacheAbortController) batchCacheAbortController.abort();
-            // Instant feedback - the loop needs a beat to unwind the in-flight tile.
+            // Instant feedback, the loop needs a beat to unwind the in-flight tile.
             const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Stopping…';
             const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Stopping…';
         };
@@ -75,11 +75,11 @@
     document.getElementById('skipBack10Btn').addEventListener('click', () => skipFlightMinutes(-10));
     document.getElementById('skipFwd10Btn').addEventListener('click', () => skipFlightMinutes(10));
 
-    // Reset = a clean reload. Strip the shareable ?mission= param first; the reload-type
+    // Reset = a clean reload. Strip the shareable ?mission=/t=/view= params first; the reload-type
     // guard in js/12b-recon-archive.js is the backstop that keeps a reload from re-loading
     // the mission anyway. Display prefs (localStorage) persist by design.
     document.getElementById('resetAppBtn').addEventListener('click', () => {
-        try { const u = new URL(window.location.href); u.searchParams.delete('mission'); history.replaceState(null, '', u); } catch (e) {}
+        try { const u = new URL(window.location.href); ['mission', 't', 'view'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u); } catch (e) {}
         location.reload();
     });
 
@@ -246,7 +246,7 @@
 
     // --- Composite Clip Recorder ---------------------------------------------------------------
     // Records a single 1080p WebM by compositing the live tracker (2D/3D + satellite) on the left and
-    // the user-selected graphs stacked down the right onto an offscreen canvas - no screen sharing.
+    // the user-selected graphs stacked down the right onto an offscreen canvas, no screen sharing.
     // The recorder drives playback through the chosen segment; the user can keep adjusting the view.
     const recordCanvas = document.getElementById('recordCanvas');
     let clipGraphEntries = [];   // graphs offered in the modal this open
@@ -274,7 +274,7 @@
         });
         if (masterChartInstance && masterChartInstance.data.datasets.length > 0) clipGraphEntries.push('parameterChart');
         if (clipGraphEntries.length === 0) {
-            list.innerHTML = '<div class="text-[11px] text-slate-500 italic col-span-2 py-1">No graphs with data yet - the clip will record just the tracker.</div>';
+            list.innerHTML = '<div class="text-[11px] text-slate-500 italic col-span-2 py-1">No graphs with data yet, the clip will record just the tracker.</div>';
             return;
         }
         list.innerHTML = clipGraphEntries.map((id, i) =>
@@ -348,7 +348,7 @@
         rctx.restore();
     }
 
-    // Static per-graph stats (min/max of the first visible series over the clip range) - computed once at capture start.
+    // Static per-graph stats (min/max of the first visible series over the clip range), computed once at capture start.
     function computeGraphStats(ch, startIdx, endIdx) {
         if (!ch || !ch.data || !ch.data.datasets.length) return null;
         let dsIdx = -1;
@@ -588,11 +588,11 @@
 
 
     /* ---- Remembered display preferences ----
-       View settings only (no flight data) - restored on open, saved on every change.
+       View settings only (no flight data), restored on open, saved on every change.
        Restoring dispatches 'change' so each control's normal handler runs; all of them
        no-op safely when no flight is loaded yet. */
     (function persistDisplayPrefs() {
-        // NOTE: 'toggleCabin' (Crew Ride) is deliberately NOT persisted - it always starts OFF on
+        // NOTE: 'toggleCabin' (Crew Ride) is deliberately NOT persisted, it always starts OFF on
         // load/refresh, so the checkbox can never come back checked-but-not-running after a reload.
         const PREF_IDS = ['toggleImperial', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
@@ -612,5 +612,5 @@
                 localStorage.setItem(KEY, JSON.stringify(out));
             };
             PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', save); });
-        } catch (e) { /* localStorage unavailable (private mode) - defaults stand */ }
+        } catch (e) { /* localStorage unavailable (private mode), defaults stand */ }
     })();

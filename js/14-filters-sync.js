@@ -1,4 +1,4 @@
-/* Mission Visualizer - filter window init + video-clock sync
+/* Mission Visualizer, filter window init + video-clock sync
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -17,7 +17,7 @@
         ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn'].forEach(id => document.getElementById(id).disabled = false);
         
         timelineSlider.min = 0; timelineSlider.max = filteredData.length - 1; timelineSlider.value = 0;
-        resizeCanvasLayout(); calculateMapScales(); resetMapView(); lastRenderedIdx = -1; buildChartLayout();
+        resizeCanvasLayout(); calculateMapScales(); resetMapView(); buildChartLayout();
         
         masterChartInstance.data.datasets = []; buildMasterMenu(); updateMasterGraphVisibility();
         if (trackerModeSelect.value === '3d') build3DScene();
@@ -54,7 +54,6 @@
                 window.ocrCanvas.width = scanW; window.ocrCanvas.height = scanH;
                 window.ocrCtx.fillStyle = "black"; window.ocrCtx.fillRect(0, 0, scanW, scanH);
                 
-                const sliceH = scanH * 0.20;
                 window.ocrCtx.drawImage(video, 0, 0, vw, vh * 0.15, 0, 0, scanW, vh * 0.15);
                 window.ocrCtx.drawImage(video, 0, vh * 0.75, vw, vh * 0.25, 0, vh * 0.15, scanW, vh * 0.25);
                 
@@ -107,7 +106,13 @@
         refreshSyncingIndicator();
 
         const targetSec = videoStartSeconds + video.currentTime;
-        let newIdx = filteredData.findIndex(d => d.absSeconds >= targetSec);
+        // First row at/after the video clock. Binary search (filteredData is time-sorted), this
+        // runs every animation frame during video playback so a full-array scan is too slow.
+        let lo = 0, hi = filteredData.length - 1, newIdx = -1;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (filteredData[mid].absSeconds >= targetSec) { newIdx = mid; hi = mid - 1; } else lo = mid + 1;
+        }
         if (newIdx === -1) newIdx = targetSec < filteredData[0].absSeconds ? 0 : filteredData.length - 1;
         
         let force8HzUpdate = document.getElementById('toggle8Hz') && document.getElementById('toggle8Hz').checked;

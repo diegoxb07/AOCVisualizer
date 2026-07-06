@@ -22,7 +22,7 @@ flowchart TD
     LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
-    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>🔄 Sync Now</b> forces a lock, or use Manual"]
+    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
     MMR -- "No" --> WINDOW{"Replay only part<br>of the flight?"}
     WINDOW -- "Switch to Manual Mode, then set Start/End Times, and click Play." --> TRIM["Set <b>Start / End</b> times (HHMMSS)<br>then click <b>Apply & Run</b>"]
     WINDOW -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
@@ -31,12 +31,12 @@ flowchart TD
     SAT -- "Yes" --> FROMARC{"Was the flight loaded from<br>the archive in step 1?"}
     FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive)<br>pick a product to pre-cache the flight"]
     FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
-    SAT -- "No" --> PLAY["<b>▶ Play</b>, scroll through timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
+    SAT -- "No" --> PLAY["<b>Play</b>, scroll through timeline, change speed,<br>toggle 8Hz Smoothing / PFD / Imperial"]
     SATGOES --> PLAY
     SATPOLAR --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
-    EXPORT -- "Google Earth" --> KML["🌍 Export KML"]
-    EXPORT -- "Briefing video" --> CLIP["🎥 Record Clip (.webm)"]
+    EXPORT -- "Google Earth" --> KML["Export KML"]
+    EXPORT -- "Briefing video" --> CLIP["Record Clip (.webm)"]
     EXPORT -- "No, just analyzing" --> DONE(["Done: measure, mark & compare freely"])
 
     classDef decision fill:#fef3c7,stroke:#d97706,color:#78350f
@@ -70,6 +70,8 @@ flowchart TD
 
 ## 1. Loading a flight
 
+> **Tip: preload flight data first.** Click **⤓ Preload Flight Data** after picking a year and check every mission you plan to look at. They download and parse once in the background, stay saved on this device, and then open instantly from the **Preloaded missions** list, so you can hop between multiple flights without waiting on processing (even after a page reload).
+
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 
 **Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's f[...]
@@ -91,8 +93,8 @@ All playback lives in the sticky bottom bar:
 | Control | What it does |
 | --- | --- |
 | **`Apply & Run`** | Applies the time window and (re)initializes playback. |
-| **`▶ Play` / `⏸ Pause`** | Start / stop. |
-| **`⏪ / 1x / ⏩`** | Playback speed. |
+| **`Play` / `Pause`** | Start / stop. |
+| **`« / 1x / »`** | Playback speed. |
 | **`↻ Reset`** | Jump back to the start of the window. |
 | **Timeline slider** | Scrub anywhere; the UTC readout updates live. |
 | **8Hz Smoothing** (map header) | Catmull-Rom interpolation between the native 1-second samples for fluid motion instead of stepping. Recommended for training. |
@@ -114,7 +116,7 @@ Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Ba
 
 > **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, st[...]
 
-**Measure & mark:** **📏 Measure** (map header) draws polygon/circle/rectangle for distance & area; **📌 Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to o[...]
+**Measure & mark:** **Measure** (map header) draws polygon/circle/rectangle for distance & area; **Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to o[...]
 
 ---
 
@@ -149,7 +151,7 @@ Current GOES archive products (the picker auto-discovers these from the API, so 
 
 ## 6. Storm best-track overlay
 
-Archive loads automatically draw the storm's **whole-life**, intensity-colored, dashed best-track on both trackers. Toggle it with the **Storm Track** checkbox; the **🌀 Last Storm Observation** car[...]
+Archive loads automatically draw the storm's **whole-life**, intensity-colored, dashed best-track on both trackers. Toggle it with the **Storm Track** checkbox; the **Last Storm Observation** car[...]
 
 ---
 
@@ -167,8 +169,8 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 ## 8. Exporting
 
-- **🌍 Export KML**: saves the flight path for Google Earth / GIS.
-- **🎥 Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progre[...]
+- **Export KML**: saves the flight path for Google Earth / GIS.
+- **Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progre[...]
 
 ---
 
@@ -179,9 +181,9 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 | Archive dropdowns greyed out, **"API Offline"** | The noaa-recon-api is unreachable, so use **manual upload**. Auto-recovers when the API returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
 | A GOES option is greyed out | API offline, **or** the flight is outside that satellite's Earth-disk view (e.g. GOES-West for an Atlantic flight). Try the other GOES or MODIS/VIIRS. |
 | Picked GOES but nothing shows | Products don't auto-select; pick one from **`Choose a product…`** first. |
-| Auto-Sync lands on the wrong time | Click **🔄 Sync Now** again on a clear frame, hide other on-screen timestamps, or switch to **Manual**. |
+| Auto-Sync lands on the wrong time | Click **Sync Now** again on a clear frame, hide other on-screen timestamps, or switch to **Manual**. |
 | Charts/map not updating after a window change | Click **`Apply & Run`**. |
-| Nothing plays | Load a file, then **`Apply & Run`**, then **`▶ Play`**. |
+| Nothing plays | Load a file, then **`Apply & Run`**, then **`Play`**. |
 | Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
 
 ---

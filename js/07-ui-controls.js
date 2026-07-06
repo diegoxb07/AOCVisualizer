@@ -167,11 +167,22 @@
         return _cycloneTex3D;
     }
 
+    // Home camera offset from the aircraft (the orbit target): close enough that the airframe
+    // fills the view on open. The per-frame follow keeps whatever offset the user orbits to;
+    // reset3DView() snaps back to this one.
+    const CAM3D_HOME = { x: 0, y: 0.35, z: 0.85 };
+    function reset3DView() {
+        if (!threeDInitialized || !controls3D) return;
+        camera3D.position.set(controls3D.target.x + CAM3D_HOME.x, controls3D.target.y + CAM3D_HOME.y, controls3D.target.z + CAM3D_HOME.z);
+        controls3D.update();
+    }
+
     function init3D() {
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
-        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000); camera3D.position.set(0, 1.2, 2.4);   // starts close to the aircraft, no scroll-in needed
+        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000);
+        camera3D.position.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);   // starts zoomed into the aircraft, no scroll-in needed
         renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
@@ -180,18 +191,19 @@
         if (typeof setPlaneModel3D === 'function') setPlaneModel3D();
         // Direction arrow: shaft + a cone HEAD whose apex points forward (-Z, this model's nose
         // direction). The cone's local apex is at +Y, so it needs a NEGATIVE X rotation to face -Z.
-        const buildDirectionArrow = (color, scale, standoff) => {
-            const mat = new THREE.MeshBasicMaterial({ color });
+        const buildDirectionArrow = (color, scale, standoff, opacity) => {
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity });
             const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.2, 8), mat); shaft.rotation.x = Math.PI / 2; shaft.position.z = -standoff - 0.6;
             const head = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.4, 8), mat); head.rotation.x = -Math.PI / 2; head.position.z = -standoff - 1.4;
             const group = new THREE.Group(); group.add(shaft, head); group.scale.set(scale, scale, scale);
             return group;
         };
-        // Ground track: blue, standing well out ahead of the airframe so it never overlaps it.
-        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.17, 3.2); scene3D.add(trackArrow3D);
-        // True heading: yellow, also scene-level (not planeGroup3D) so it is never swept up by the
-        // crew-ride fuselage dim/transparency pass. Sits nearer the plane than the track arrow.
-        headingArrow3D = buildDirectionArrow(0xffd400, 0.145, 1.05); scene3D.add(headingArrow3D);
+        // Ground track: blue, standing out ahead of the airframe so it never overlaps it.
+        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.17, 2.3, 1); scene3D.add(trackArrow3D);
+        // True heading: yellow and slightly smaller, nested inside the track arrow's world-space
+        // span, so it hides within the blue when the two agree and appears only when they
+        // diverge; scene-level (not planeGroup3D) so the crew-ride dim pass never touches it.
+        headingArrow3D = buildDirectionArrow(0xffd400, 0.145, 2.76, 0.8); scene3D.add(headingArrow3D);
         scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
         function animate3D() {
             requestAnimationFrame(animate3D); if (controls3D) controls3D.update();

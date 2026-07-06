@@ -61,17 +61,19 @@
         // Vertical load-factor deviation (g): updraft -> heavier (+G, pressed down), downdraft ->
         // lighter (-G, float). Derived from the measured vertical wind, the actual felt vertical G.
         let gz = 0;
-        if (d.vtWnd != null) gz = Math.max(-0.85, Math.min(1.2, d.vtWnd * 0.09));
+        if (d.vtWnd != null) gz = Math.max(-1.35, Math.min(1.5, d.vtWnd * 0.09));   // strong downdrafts reach true negative G, which floats the ragdolls into their belts
         // Turbulence intensity (0..1), the SAME |vtWnd|/3 proxy the airframe's 8Hz micro-motion uses,
         // so the crew buzz/jitter in step with the plane, not just the slow hunch/float postural modes.
         let turb = (d.vtWnd != null) ? Math.min(1, Math.abs(d.vtWnd) / 3.0) : 0;
         return { lat, gz, turb, roll: rollRad, valid: true };
     }
 
-    // Forward dynamics of the pendulum chain in the cabin's apparent-gravity field. Substepped so
-    // it stays stable even when a fast playback speed hands us a large frame dt.
+    // Crew physics step. The Verlet ragdoll engine (js/22-verlet.js) integrates the dummies as
+    // particle skeletons under the same flight-metric field; the pendulum chain below is the
+    // fallback when that file fails to load, keeping the crew alive per the split-file design.
     function stepCabin(dt) {
         if (!cabinSim) initCabinSim();
+        if (typeof verletStepCabin === 'function') { verletStepCabin(dt); return; }
         const f = cabinForcing();
         const sub = Math.min(6, Math.max(1, Math.ceil(dt / 0.02)));
         const h = dt / sub;
@@ -207,27 +209,96 @@
         ctx.fillText('CREW RIDE (rear view)', 7, 6);
     }
 
+    // --- WP-3D interior, laid out from the AOC station diagram (nose to tail: flight deck,
+    // station 1, flight director + navigator consoles, the C3X pair, stations 2-5, the project
+    // seat near the CG, station 7 pair, station 8, then head / dinette / galley). Workstations
+    // are wall desks with a canted screen panel; every position gets a seat, the four crew
+    // figures occupy the pilot, copilot, flight director, and project seats. ---
+    function buildP3Interior(grp, spec, shell) {
+        const deskMat = new THREE.MeshPhongMaterial({ color: 0x2a3442, shininess: 25 });
+        const screenMat = new THREE.MeshPhongMaterial({ color: 0x223140, emissive: 0x11293c, shininess: 60 });
+        const surfMat = new THREE.MeshPhongMaterial({ color: 0x39434f, shininess: 30 });
+        const fs = spec.figScale, floorY = spec.floorY;
+        const seatAt = (x, z) => {
+            const s = new THREE.Group();
+            const pan = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.04, 0.30), shell); pan.position.set(0, 0.085, 0.05);
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.34, 0.05), shell); back.position.set(0, 0.27, 0.17);
+            s.add(pan, back);
+            s.position.set(x, floorY, z); s.scale.set(fs, fs, fs);
+            grp.add(s);
+        };
+        // empty seats (the four crew figures bring their own): FE, station 1, NAV, C3X pair,
+        // stations 2/3/3/4/5, station 7 pair, station 8
+        [[0, -1.62], [-0.105, -1.42], [0.105, -1.06], [-0.105, -1.06], [-0.105, -0.86],
+         [0.105, -0.74], [-0.105, -0.54], [0.105, -0.50], [-0.105, -0.26], [-0.105, 0.16],
+         [0.105, 0.42], [0.105, 0.62], [-0.105, 0.52]].forEach(([x, z]) => seatAt(x, z));
+        // wall workstation desks (side +1 starboard / -1 port) with a canted screen panel
+        const deskAt = (side, z, len) => {
+            const desk = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.02, len), deskMat);
+            desk.position.set(side * 0.155, 0.05, z); grp.add(desk);
+            const scr = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.08, len * 0.72), screenMat);
+            scr.position.set(side * 0.183, 0.10, z); scr.rotation.z = -side * 0.16; grp.add(scr);
+        };
+        [[-1, -1.42, 0.16], [-1, -0.96, 0.34], [-1, -0.54, 0.16], [-1, -0.26, 0.16], [-1, 0.16, 0.16], [-1, 0.52, 0.16],
+         [1, -1.30, 0.16], [1, -1.06, 0.16], [1, -0.74, 0.16], [1, -0.50, 0.16], [1, 0.52, 0.34]].forEach(([s, z, l]) => deskAt(s, z, l));
+        // flight deck: instrument panel across the nose plus the center pedestal
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.10, 0.05), deskMat);
+        panel.position.set(0, 0.06, -1.98); grp.add(panel);
+        const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.08, 0.16), deskMat);
+        pedestal.position.set(0, -0.06, -1.86); grp.add(pedestal);
+        // aft cabin: head closet, dinette (table between facing benches), galley counter
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.14), surfMat);
+        head.position.set(-0.10, floorY + 0.13, 0.88); grp.add(head);
+        const table = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.015, 0.12), surfMat);
+        table.position.set(0.10, 0.02, 1.02); grp.add(table);
+        [0.90, 1.14].forEach(z => {
+            const bench = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.04, 0.08), shell);
+            bench.position.set(0.10, floorY + 0.05, z); grp.add(bench);
+        });
+        const galley = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.16), surfMat);
+        galley.position.set(-0.10, floorY + 0.07, 1.20); grp.add(galley);
+    }
+
     // --- 3D crew: jointed crash-test dummies belted into a hollow cabin trough. Figure layout is
     // sized per airframe from activeCabinSpec() (js/07b-plane-models.js). Fig-local units put the
     // cabin floor at y=0; spec.figScale fits the dummies inside the active fuselage. ---
     function build3DCrew() {
         if (crewGroup3D || typeof planeGroup3D === 'undefined' || !planeGroup3D || typeof THREE === 'undefined') return;
         const spec = (typeof activeCabinSpec === 'function') ? activeCabinSpec()
-            : { floorY: -0.10, halfW: 0.20, figScale: 0.62, seatsZ: [-1.15, -0.42, 0.32, 1.02] };
+            : { floorY: -0.10, halfW: 0.20, shellR: 0.235, figScale: 0.62, seats: [{ x: 0, z: -1.15 }, { x: 0, z: -0.42 }, { x: 0, z: 0.32 }, { x: 0, z: 1.02 }] };
         crewGroup3D = new THREE.Group();
         const shell = new THREE.MeshPhongMaterial({ color: 0x141c26, side: THREE.DoubleSide });
         const seg = new THREE.MeshPhongMaterial({ color: 0xdf8a30 });     // dummy rubber skin
         const joint = new THREE.MeshPhongMaterial({ color: 0x23262b });   // joint hardware + head targets
         const beltMat = new THREE.MeshPhongMaterial({ color: 0xe8b854 });
-        const zs = spec.seatsZ, zc = (zs[0] + zs[zs.length - 1]) / 2, troughLen = zs[zs.length - 1] - zs[0] + 0.55;
-        // hollow cabin trough (floor + low side lips, open top) so the crew sit inside it with
-        // their lower halves still visible
-        const floor = new THREE.Mesh(new THREE.BoxGeometry(spec.halfW * 2 + 0.06, 0.03, troughLen), shell);
-        floor.position.set(0, spec.floorY - 0.015, zc);
-        const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.10, troughLen), shell);
-        wallL.position.set(-(spec.halfW + 0.015), spec.floorY + 0.035, zc);
-        const wallR = wallL.clone(); wallR.position.x = spec.halfW + 0.015;
-        crewGroup3D.add(floor, wallL, wallR);
+        const seats = spec.seats;
+        const shellR = spec.shellR || 0.23;
+        const arc = Math.acos(Math.max(0, Math.min(1, (-spec.floorY - 0.06) / shellR)));
+        // hollow cabin, open above so the crew stay visible when the airframe dims: a lower-arc
+        // shell following the inside of the round hull (so nothing pokes through the skin). With
+        // trough stations it lathes along the hull taper (cockpit to galley); otherwise it is a
+        // straight cylinder segment spanning the seats.
+        if (spec.trough) {
+            crewGroup3D.add(bodyLathe(spec.trough, shell, 24, Math.PI - arc, arc * 2));
+            const t0 = spec.trough[0].z, t1 = spec.trough[spec.trough.length - 1].z;
+            const mainLen = Math.min(t1, 1.05) - t0;
+            const floorMain = new THREE.Mesh(new THREE.BoxGeometry(spec.halfW * 2, 0.03, mainLen), shell);
+            floorMain.position.set(0, spec.floorY - 0.015, t0 + mainLen / 2);
+            crewGroup3D.add(floorMain);
+            if (t1 > 1.05) {   // aft strip narrows with the tail taper
+                const floorAft = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.03, t1 - 1.05), shell);
+                floorAft.position.set(0, spec.floorY - 0.015, (1.05 + t1) / 2);
+                crewGroup3D.add(floorAft);
+            }
+        } else {
+            const zc = (seats[0].z + seats[seats.length - 1].z) / 2, troughLen = seats[seats.length - 1].z - seats[0].z + 0.55;
+            const tub = new THREE.Mesh(new THREE.CylinderGeometry(shellR, shellR, troughLen, 24, 1, true, -arc, arc * 2), shell);
+            tub.rotation.x = Math.PI / 2; tub.position.set(0, 0, zc);
+            const floor = new THREE.Mesh(new THREE.BoxGeometry(spec.halfW * 2, 0.03, troughLen), shell);
+            floor.position.set(0, spec.floorY - 0.015, zc);
+            crewGroup3D.add(tub, floor);
+        }
+        if (spec.interior) buildP3Interior(crewGroup3D, spec, shell);
         const figs = [];
         for (let i = 0; i < CABIN_CREW; i++) {
             const fig = new THREE.Group();
@@ -280,7 +351,7 @@
             upper.add(torso);
             fig.add(seat, back, upper);
             fig.userData = { upper, torso, neck, armL: armL.arm, armR: armR.arm, elbowL: armL.elbow, elbowR: armR.elbow, hipL: legL.hip, hipR: legR.hip, kneeL: legL.knee, kneeR: legR.knee };
-            fig.position.set(0, spec.floorY, zs[i]);
+            fig.position.set(seats[i].x, spec.floorY, seats[i].z);
             fig.scale.set(spec.figScale, spec.figScale, spec.figScale);
             crewGroup3D.add(fig); figs.push(fig);
         }

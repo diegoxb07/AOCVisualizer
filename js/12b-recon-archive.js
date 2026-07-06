@@ -29,8 +29,9 @@
         if (!reconLoadBtn) return;
         const apiDown = reconApiHealthChecked && !reconApiHealthOk;
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
+        // The preload modal carries its own season selector, so it only needs the API alive.
         const preBtn = document.getElementById('reconPreloadBtn');
-        if (preBtn) preBtn.disabled = reconLoadBtn.disabled;
+        if (preBtn) preBtn.disabled = apiDown;
     }
 
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
@@ -83,6 +84,7 @@
         reconYearSelect.options[0].textContent = 'Year…';
         reconYearSelect.disabled = false;
         reconYearSelect.style.cursor = '';
+        syncReconLoadButtonState();   // the preload modal is usable as soon as the API answers
         const spin = document.getElementById('archiveLoadingSpin'); if (spin) spin.remove();
     }
     const reconYearsReady = populateReconYears();
@@ -229,6 +231,7 @@
             reconStormSelect.options[0].textContent = 'Storm…';
             reconStormSelect.disabled = false;
             reconStormSelect.style.cursor = '';
+            syncReconLoadButtonState();   // mission lists just landed, the preload modal is usable now
             setReconStatus(reconStormsForYear.length ? '' : 'No archived recon flights found for ' + year + '.');
         } catch (e) {
             if (req === stormListReqId) {
@@ -401,7 +404,7 @@
         // (another load may replace allParsedData before the storm fetch settles).
         const parsedRef = { rows: allParsedData, stats: lastParseStats };
         stormTrackFetchPromise = loadStormTrackForMission(mission).then(() => {   // fire-and-forget; awaited only by autoLoadSharedMission
-            preloadedMissions.set(mission.mission_id, {
+            savePreloadedMission(mission.mission_id, {
                 mission, parsed: parsedRef, isNc: usedFullRes,
                 storm: stormTrackPoints.length ? { points: stormTrackPoints, meta: stormTrackMeta } : null
             });
@@ -596,13 +599,82 @@
     })();
 
     // --- Mission preloader: download + parse flights in the background (like the satellite tile
-    // pre-cache, but for flight data), held in a session-lifetime cache so switching between
-    // missions is instant. The preloaded list is its own dropdown, no digging through the archive
-    // selectors to remember what was fetched. ---
-    const preloadedMissions = new Map();   // missionId -> { mission, parsed { rows, stats }, isNc, storm }
+    // pre-cache, but for flight data). Records live in a session Map mirrored write-through into
+    // IndexedDB (db aocPreloadedMissions), so preloaded flights survive reloads and open with no
+    // download or parse on any later visit. The preloaded list is its own dropdown; the Preload
+    // button opens a modal where any of the selected year's missions can be queued together. ---
+    const preloadedMissions = new Map();   // missionId -> { mission, parsed { rows, stats }, isNc, storm }; stored-only stubs carry no parsed
+    const PRELOADED_STORE_MAX = 12;        // full-resolution missions are tens of MB each in IndexedDB
+
+    let missionDB = null;
+    const missionStoreReady = new Promise(resolve => {
+        try {
+            const rq = indexedDB.open('aocPreloadedMissions', 1);
+            rq.onupgradeneeded = () => {
+                rq.result.createObjectStore('missions');   // missionId -> full record, rows included
+                rq.result.createObjectStore('meta');       // missionId -> light listing entry for the dropdown
+            };
+            rq.onerror = () => resolve();
+            rq.onsuccess = () => { missionDB = rq.result; resolve(); };
+        } catch (e) { resolve(); }
+    });
+    function missionIdbDelete(id) {
+        if (!missionDB) return;
+        try {
+            const tx = missionDB.transaction(['missions', 'meta'], 'readwrite');
+            tx.objectStore('missions').delete(id); tx.objectStore('meta').delete(id);
+        } catch (e) {}
+    }
+    function missionIdbGet(id) {
+        return new Promise(resolve => {
+            if (!missionDB) return resolve(null);
+            try {
+                const rq = missionDB.transaction('missions').objectStore('missions').get(id);
+                rq.onsuccess = () => resolve(rq.result || null);
+                rq.onerror = () => resolve(null);
+            } catch (e) { resolve(null); }
+        });
+    }
+    // Write-through save + prune: the oldest stored missions past the cap leave IndexedDB (an
+    // in-memory copy, if the session holds one, stays usable until reload).
+    function savePreloadedMission(id, rec) {
+        preloadedMissions.set(id, rec);
+        missionStoreReady.then(() => {
+            if (!missionDB) return;
+            try {
+                const tx = missionDB.transaction(['missions', 'meta'], 'readwrite');
+                tx.objectStore('missions').put(rec, id);
+                tx.objectStore('meta').put({ missionId: id, stormName: (rec.mission && rec.mission.storm_name) || '', isNc: rec.isNc, savedAt: Date.now() }, id);
+                const listRq = tx.objectStore('meta').getAll();
+                listRq.onsuccess = () => {
+                    const metas = (listRq.result || []).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+                    metas.slice(0, Math.max(0, metas.length - PRELOADED_STORE_MAX)).forEach(m => {
+                        missionIdbDelete(m.missionId);
+                        const stub = preloadedMissions.get(m.missionId);
+                        if (stub && !stub.parsed) { preloadedMissions.delete(m.missionId); updatePreloadedSelect(); }
+                    });
+                };
+            } catch (e) {}
+        });
+    }
+    // Startup: list what the store already holds as light stubs; rows stay on disk until opened.
+    missionStoreReady.then(() => {
+        if (!missionDB) return;
+        try {
+            const rq = missionDB.transaction('meta').objectStore('meta').getAll();
+            rq.onsuccess = () => {
+                (rq.result || []).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0)).forEach(m => {
+                    if (!preloadedMissions.has(m.missionId))
+                        preloadedMissions.set(m.missionId, { mission: { mission_id: m.missionId, storm_name: m.stormName }, isNc: m.isNc });
+                });
+                if (preloadedMissions.size) updatePreloadedSelect();
+            };
+        } catch (e) {}
+    });
 
     function updatePreloadedSelect(selectedId) {
         const sel = document.getElementById('preloadedSelect'); if (!sel) return;
+        const keep = selectedId !== undefined ? selectedId : sel.value;
         sel.innerHTML = '<option value="">Preloaded missions…</option>';
         preloadedMissions.forEach((rec, id) => {
             const opt = document.createElement('option'); opt.value = id;
@@ -610,12 +682,13 @@
             sel.appendChild(opt);
         });
         sel.disabled = preloadedMissions.size === 0;
-        sel.value = selectedId || '';
+        sel.value = preloadedMissions.has(keep) ? keep : '';
     }
 
-    async function preloadReconMission(missionId) {
-        if (preloadedMissions.has(missionId)) { setReconStatus(missionId + ' is already preloaded.'); return; }
-        setReconStatus('Preloading ' + missionId + ' in the background…');
+    async function preloadReconMission(missionId, statusFn) {
+        const status = statusFn || setReconStatus;
+        if (preloadedMissions.has(missionId)) { status(missionId + ' is already preloaded.'); return true; }
+        status('Preloading ' + missionId + ' in the background…');
         try {
             const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
@@ -623,7 +696,7 @@
             try {
                 const buf = await fetchArrayBufferWithProgress(
                     RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
-                    (r, t) => setReconStatus('Preloading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
+                    (r, t) => status('Preloading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
                 parsed = await parseFlightSource(buf);
                 if (!parsed.rows.length) throw new Error('no usable rows');
                 isNc = true;
@@ -633,17 +706,30 @@
             if (!parsed.rows.length) throw new Error('no usable rows');
             let storm = null;
             try { storm = await fetchStormTrackData(mission); } catch (e) { }
-            preloadedMissions.set(missionId, { mission, parsed, isNc, storm });
+            savePreloadedMission(missionId, { mission, parsed, isNc, storm });
             updatePreloadedSelect();
-            setReconStatus('Preloaded ' + missionId + '. Pick it from the preloaded list to open it instantly.');
+            status('Preloaded ' + missionId + '. Pick it from the preloaded list to open it instantly.');
+            return true;
         } catch (e) {
-            setReconStatus('Could not preload ' + missionId + ' (' + e.message + ').');
+            status('Could not preload ' + missionId + ' (' + e.message + ').');
+            return false;
         }
     }
 
-    // Open a preloaded mission: no download, no parse, the held rows apply immediately.
-    function openPreloadedMission(missionId) {
-        const rec = preloadedMissions.get(missionId); if (!rec) return;
+    // Open a preloaded mission: no download, no parse. A stored-only stub from a previous visit
+    // pulls its record out of IndexedDB first, then applies like a session-cached one.
+    async function openPreloadedMission(missionId) {
+        let rec = preloadedMissions.get(missionId); if (!rec) return;
+        if (!rec.parsed) {
+            setReconStatus('Opening ' + missionId + ' from the on-device store…');
+            const stored = await missionIdbGet(missionId);
+            if (!stored || !stored.parsed) {
+                setReconStatus('The stored copy of ' + missionId + ' is gone. Preload it again.');
+                preloadedMissions.delete(missionId); missionIdbDelete(missionId); updatePreloadedSelect();
+                return;
+            }
+            rec = stored; preloadedMissions.set(missionId, rec);
+        }
         const mission = rec.mission;
         flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
         try {
@@ -664,8 +750,149 @@
     }
 
     (function wirePreload() {
+        const modal = document.getElementById('preloadModal');
+        const checksBox = document.getElementById('preloadMissionChecks');
+        const fill = document.getElementById('preloadFill');
+        const statusEl = document.getElementById('preloadModalStatus');
+        const startBtn = document.getElementById('preloadStartBtn');
+        const yearSel = document.getElementById('preloadYearSelect');
+        let preloadRunning = false;
+        const setModalStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
+        const preloadListCache = {};   // year -> [{ name, missions }] storm groups, fetched once per season
+        let preloadListReq = 0;        // guards a slow season fetch against a newer pick
+
+        const checksNote = text => {
+            checksBox.innerHTML = '';
+            const note = document.createElement('div');
+            note.className = 'text-slate-500';
+            note.textContent = text;
+            checksBox.appendChild(note);
+        };
+
+        // Season storm groups, ordered chronologically by each storm's first mission.
+        async function fetchSeasonGroups(year) {
+            if (preloadListCache[year]) return preloadListCache[year];
+            let groups;
+            if (year === reconYearSelect.value && Object.keys(reconMissionListCache).length) {
+                // the archive dropdowns already prefetched this season's lists
+                groups = Object.entries(reconMissionListCache).map(([name, missions]) => ({ name, missions }));
+            } else {
+                const data = await reconApiJson('/v1/recon/' + year);
+                const storms = (data && data.storms) || [];
+                const lists = await Promise.all(storms.map(s =>
+                    reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
+                groups = storms.map((s, i) => {
+                    const ms = ((lists[i] && lists[i].missions) || []).slice().sort((a, b) => (a.start_unix || 0) - (b.start_unix || 0));
+                    return { name: s.storm_name, missions: ms };
+                }).filter(g => g.missions.length);
+            }
+            groups.sort((a, b) => ((a.missions[0].start_unix || Infinity) - (b.missions[0].start_unix || Infinity)) || a.name.localeCompare(b.name));
+            preloadListCache[year] = groups;
+            return groups;
+        }
+
+        // One block per storm: a group checkbox toggling the whole storm, missions in a
+        // two-column grid beneath it, already-preloaded ones checked and locked.
+        function renderSeason(groups) {
+            checksBox.innerHTML = '';
+            if (!groups.length) { checksNote('No archived recon flights found for this season.'); return; }
+            groups.forEach(gr => {
+                const block = document.createElement('div');
+                const head = document.createElement('label');
+                head.className = 'flex items-center gap-2 cursor-pointer font-semibold text-slate-300';
+                const all = document.createElement('input');
+                all.type = 'checkbox'; all.className = 'accent-blue-500';
+                const title = document.createElement('span');
+                title.textContent = gr.name;
+                const meta = document.createElement('span');
+                meta.className = 'text-slate-500 font-normal';
+                const span = reconDateSpan(gr.missions);
+                meta.textContent = `(${gr.missions.length} flight${gr.missions.length === 1 ? '' : 's'}${span ? ', ' + span : ''})`;
+                head.appendChild(all); head.appendChild(title); head.appendChild(meta);
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-2 gap-x-3 pl-5 mt-0.5';
+                gr.missions.forEach(m => {
+                    const done = preloadedMissions.has(m.mission_id);
+                    const lbl = document.createElement('label');
+                    lbl.className = 'flex items-center gap-2 cursor-pointer min-w-0';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox'; cb.value = m.mission_id; cb.className = 'accent-blue-500 flex-none';
+                    if (done) { cb.checked = true; cb.disabled = true; }
+                    else if (m.mission_id === reconMissionSelect.value) cb.checked = true;
+                    const span = document.createElement('span');
+                    span.className = 'truncate';
+                    span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${done ? ' (preloaded)' : ''}`;
+                    span.title = `${m.flight_date} · ${m.aircraft || m.tail_num || ''} · ${m.obs_count} obs`;
+                    lbl.appendChild(cb); lbl.appendChild(span);
+                    grid.appendChild(lbl);
+                });
+                all.addEventListener('change', () => {
+                    grid.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(cb => { cb.checked = all.checked; });
+                });
+                block.appendChild(head); block.appendChild(grid);
+                checksBox.appendChild(block);
+            });
+        }
+
+        async function loadSeasonIntoModal(year) {
+            const req = ++preloadListReq;
+            if (!year) { checksNote('Pick a season above; its storms and missions appear here.'); return; }
+            checksNote('Loading the ' + year + ' season…');
+            try {
+                const groups = await fetchSeasonGroups(year);
+                if (req !== preloadListReq) return;
+                renderSeason(groups);
+            } catch (e) {
+                if (req === preloadListReq) checksNote('Could not load ' + year + ' (' + e.message + ').');
+            }
+        }
+
+        // The modal carries its own season selector (filled from the same year list as the
+        // archive), so preloading works with nothing picked in the archive cascade.
+        async function openPreloadModal() {
+            if (!modal || !checksBox) return;
+            if (fill) fill.style.width = '0%';
+            setModalStatus(preloadRunning ? 'A preload pass is running…' : 'Check the missions to preload.');
+            modal.style.display = 'flex';
+            await reconYearsReady;
+            if (yearSel && yearSel.options.length <= 1) {
+                yearSel.innerHTML = '<option value="">Year…</option>';
+                [...reconYearSelect.options].slice(1).forEach(o => {
+                    const opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.value;
+                    yearSel.appendChild(opt);
+                });
+            }
+            if (yearSel && !yearSel.value && reconYearSelect.value) yearSel.value = reconYearSelect.value;
+            loadSeasonIntoModal(yearSel ? yearSel.value : '');
+        }
+
+        // Sequential download + parse of everything checked; closing the modal lets it keep
+        // running in the background (progress stays visible in the archive status line).
+        async function runPreload() {
+            if (preloadRunning) { setModalStatus('A preload pass is already running.'); return; }
+            const ids = [...checksBox.querySelectorAll('input[type=checkbox]:checked:not(:disabled)')].map(cb => cb.value);
+            if (!ids.length) { setModalStatus('Nothing checked.'); return; }
+            preloadRunning = true; if (startBtn) startBtn.disabled = true;
+            let ok = 0;
+            for (let i = 0; i < ids.length; i++) {
+                const good = await preloadReconMission(ids[i], msg => { setModalStatus(`(${i + 1}/${ids.length}) ${msg}`); setReconStatus(msg); });
+                if (good) ok++;
+                if (fill) fill.style.width = Math.round((i + 1) / ids.length * 100) + '%';
+            }
+            preloadRunning = false; if (startBtn) startBtn.disabled = false;
+            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Preloaded missions list.`);
+            setReconStatus(`Preloaded ${ok}/${ids.length} missions.`);
+            if (yearSel && yearSel.value) loadSeasonIntoModal(yearSel.value);   // relist so finished missions show checked and locked
+        }
+
         const btn = document.getElementById('reconPreloadBtn');
-        if (btn) btn.addEventListener('click', () => { if (reconMissionSelect.value) preloadReconMission(reconMissionSelect.value); });
+        if (btn) btn.addEventListener('click', openPreloadModal);
+        if (yearSel) yearSel.addEventListener('change', () => loadSeasonIntoModal(yearSel.value));
+        if (startBtn) startBtn.addEventListener('click', runPreload);
+        ['preloadCloseX', 'preloadCloseBtn'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) b.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
+        });
         const sel = document.getElementById('preloadedSelect');
         if (sel) sel.addEventListener('change', () => { if (sel.value) openPreloadedMission(sel.value); });
     })();

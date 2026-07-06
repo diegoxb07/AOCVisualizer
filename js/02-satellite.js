@@ -152,7 +152,7 @@
 
         const closeThresh = satLoadedInfo.isModis ? 90 : 15;
         const within = absMin <= closeThresh;
-        badge.innerHTML = `🛰 ${escapeHtml(satLoadedInfo.layerLabel)}<br>`
+        badge.innerHTML = `${escapeHtml(satLoadedInfo.layerLabel)}<br>`
             + `Image: <b>${imgLabel}</b><br>`
             + (offStr ? `<span style="color:${within ? '#38bdf8' : '#fbbf24'}">${offStr}</span>` : '');
         badge.classList.remove('hidden');
@@ -303,7 +303,7 @@
             sel.classList.toggle('saturate-0', apiDown);
             sel.classList.toggle('opacity-60', apiDown);
         });
-        // Grey out the ⬇ .nc source link with the rest of the archive block. The offline
+        // Grey out the ↓ .nc source link with the rest of the archive block. The offline
         // overlay covering the block is pointer-events-none, so without this the dimmed
         // link would still take clicks through it.
         const srcLink = document.getElementById('reconSourceLink');
@@ -632,7 +632,7 @@
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
-        // The ⏪/⏩ 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
+        // The 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
         const stepCluster = document.getElementById('satStepCluster');
         if (stepCluster) stepCluster.style.display = (in2d && satOn && isGoesLike) ? '' : 'none';
         updateSatDayLabel();
@@ -1092,7 +1092,7 @@
         // Outside this satellite's Earth disk, bail with a clear note (the option is disabled too).
         if (!goesInCoverage(layerDef)) {
             satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true;
-            satUnavailableNote = `🛰 ${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
+            satUnavailableNote = `${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
             updateSatTimeBadge();
             if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             return;

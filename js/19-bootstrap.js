@@ -92,11 +92,11 @@
         }
         if (filteredData.length === 0) return;
         if (isPlaying) {
-            isPlaying = false; playPauseBtn.innerText = "▶ Play"; 
+            isPlaying = false; playPauseBtn.innerText = "Play"; 
             if (videoLoaded) video.pause(); 
             if (animationFrameId) cancelAnimationFrame(animationFrameId); 
         } else { 
-            isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; 
+            isPlaying = true; playPauseBtn.innerText = "Pause"; 
             playbackAccumulator = 0; lastTickTime = performance.now(); 
             
             if (videoSyncMode.value === 'auto' && !hasInitialSyncOccurred) {
@@ -119,7 +119,7 @@
     
     replayBtn.addEventListener('click', function() {
         if (filteredData.length === 0) return;
-        isPlaying = false; playPauseBtn.innerText = "▶ Play"; currentSpeedIdx = 0; updateSpeedDisplay();
+        isPlaying = false; playPauseBtn.innerText = "Play"; currentSpeedIdx = 0; updateSpeedDisplay();
         updateSatelliteOptions();
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
@@ -136,7 +136,7 @@
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
         if (videoLoaded) { video.currentTime = 0; currentIdx = 0; syncTelemetryToVideoClock(); } 
-        else { setTimeout(() => { currentIdx = 0; isPlaying = true; playPauseBtn.innerText = "⏸ Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); masterSyncEngineTick(); }, 30); }
+        else { setTimeout(() => { currentIdx = 0; isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); masterSyncEngineTick(); }, 30); }
     });
 
     function calculateFeatureBBox(feature) {
@@ -191,6 +191,12 @@
     radarVid.style.transformOrigin = 'center center';
     radarVid.style.transition = 'transform 0.1s ease-out';
     vidWrapper.style.overflow = 'hidden';
+
+    // The video panel's ⟲ button drops zoom and pan back to the native fit.
+    document.getElementById('resetVideoZoomBtn').addEventListener('click', () => {
+        vidZoom = 1; vidPanX = 0; vidPanY = 0;
+        radarVid.style.transform = '';
+    });
 
     // Mouse Wheel: Zoom in/out
     vidWrapper.addEventListener('wheel', (e) => {
@@ -459,7 +465,7 @@
         if (!recState || recState.finishing) return;
         recState.finishing = true;
         if (recState.raf) cancelAnimationFrame(recState.raf);
-        isPlaying = false; playPauseBtn.innerText = "▶ Play";
+        isPlaying = false; playPauseBtn.innerText = "Play";
         if (videoLoaded) video.pause();
         try { recState.recorder.stop(); } catch (e) {}
     }
@@ -573,7 +579,7 @@
         if (videoLoaded && filteredData[currentIdx]) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
         updateVisualComponents(currentIdx, false);
 
-        isPlaying = true; playPauseBtn.innerText = "⏸ Pause";
+        isPlaying = true; playPauseBtn.innerText = "Pause";
         playbackAccumulator = 0; lastTickTime = performance.now();
         if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e => {});
 

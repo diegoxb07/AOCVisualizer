@@ -178,6 +178,12 @@
     document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });
 
     function resetMapView() { mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+    // The tracker's ⟲ button resets whichever view is active: 2D pan/zoom, or the 3D orbit
+    // camera back to its home offset on the aircraft.
+    document.getElementById('resetMapZoomBtn').addEventListener('click', () => {
+        if (trackerModeSelect.value === '3d') { if (typeof reset3DView === 'function') reset3DView(); }
+        else resetMapView();
+    });
 
     canvas.addEventListener('mousedown', (e) => { 
         if (trackerModeSelect.value === '3d') return; 

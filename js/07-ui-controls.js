@@ -154,6 +154,7 @@
     // White tropical-cyclone symbol (disc + spiral arms above depression strength) carrying its
     // dark category label, cached per label; the mesh material tints the white per intensity
     // while the label stays dark and readable. Drawn flat on the sea, never billboarded or spun.
+    let stormFixRing3D = null;   // current-fix marker on the 3D best track, positioned per frame
     let _stormSymTex = {};
     function stormSymbolTex(label) {
         if (_stormSymTex[label]) return _stormSymTex[label];
@@ -176,7 +177,7 @@
     // Home camera offset from the aircraft (the orbit target): close enough that the airframe
     // fills the view on open. The per-frame follow keeps whatever offset the user orbits to;
     // reset3DView() snaps back to this one.
-    const CAM3D_HOME = { x: 0, y: 0.35, z: 0.85 };
+    const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
         camera3D.position.set(controls3D.target.x + CAM3D_HOME.x, controls3D.target.y + CAM3D_HOME.y, controls3D.target.z + CAM3D_HOME.z);
@@ -229,7 +230,7 @@
     }
 
     // Altitude source for the 3D map's vertical dimension (track, plane, markers). Its OWN control
-    // (#trackAltSelect, defaults to GPS), independent of the PFD's Press->GPS filter (#toggleGpsAlt),
+    // (#trackAltSelect, defaults to GPS), independent of the PFD's GPS->Press filter (#toggleGpsAlt),
     // which still only governs the PFD altitude tape / point analysis.
     function track3DAltMeters(d) {
         if (!d) return 0;
@@ -313,6 +314,7 @@
         // Storm best-track overlay (js/12b-recon-archive.js), same points as the 2D layer, flattened to
         // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
         // flight's altitude profile.
+        stormFixRing3D = null;
         if (showStormTrack && stormTrackPoints.length > 1) {
             const stormPts = [];
             stormTrackPoints.forEach(p => stormPts.push(get3DCoord(p.lon, p.lat, 0)));
@@ -337,7 +339,7 @@
                 threeMapGroup.add(strip);
             }
             // flat, static cyclone symbol at each fix with its category printed on it
-            const symSize = Math.max(0.45, ribbonW * 1.7);
+            const symSize = Math.max(0.5, ribbonW * 1.9);
             stormTrackPoints.forEach((p, i) => {
                 const geo = new THREE.PlaneGeometry(symSize, symSize);
                 geo.rotateX(-Math.PI / 2);
@@ -347,19 +349,16 @@
                 sym.renderOrder = 2;
                 threeMapGroup.add(sym);
             });
-            // name tag floating over the first fix
-            if (stormTrackMeta && stormTrackMeta.name) {
-                const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;
-                const c2 = cv.getContext('2d');
-                c2.font = '700 40px Inter, ui-sans-serif, sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle';
-                c2.lineWidth = 8; c2.strokeStyle = 'rgba(0,0,0,0.85)';
-                const tag = stormTrackMeta.name.toUpperCase() + ' BEST TRACK';
-                c2.strokeText(tag, 256, 32); c2.fillStyle = '#e2e8f0'; c2.fillText(tag, 256, 32);
-                const lblSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
-                lblSpr.scale.set(Math.max(1.6, ribbonW * 4.5), Math.max(0.2, ribbonW * 0.56), 1);
-                lblSpr.position.copy(stormPts[0]); lblSpr.position.y = Math.max(0.22, ribbonW * 0.9);
-                threeMapGroup.add(lblSpr);
-            }
+            // discreet marker for the best-track fix the status card currently refers to:
+            // a thin flat ring around that fix's symbol, moved by updateStormTrackBadge()
+            // as playback advances
+            const ringGeo = new THREE.RingGeometry(symSize * 0.62, symSize * 0.72, 40);
+            ringGeo.rotateX(-Math.PI / 2);
+            stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+            stormFixRing3D.renderOrder = 3;
+            stormFixRing3D.position.y = 0.09;
+            stormFixRing3D.visible = false;
+            threeMapGroup.add(stormFixRing3D);
         }
         sync3DMarkers();
     }

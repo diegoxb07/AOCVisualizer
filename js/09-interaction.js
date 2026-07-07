@@ -177,13 +177,23 @@
     });
     document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });
 
-    function resetMapView() { mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+    // Reset the 2D view = re-engage follow (zoom in and re-center on the aircraft).
+    function resetMapView() { engageFollowAircraft(); }
     // The tracker's ⟲ button resets whichever view is active: 2D pan/zoom, or the 3D orbit
     // camera back to its home offset on the aircraft.
     document.getElementById('resetMapZoomBtn').addEventListener('click', () => {
         if (trackerModeSelect.value === '3d') { if (typeof reset3DView === 'function') reset3DView(); }
         else resetMapView();
     });
+
+    // The recenter button only surfaces in 2D once the user has panned/zoomed off the aircraft.
+    function updateFollowButton() {
+        const btn = document.getElementById('recenterPlaneBtn');
+        if (!btn) return;
+        btn.style.display = (!followAircraft2D && filteredData.length > 0 && trackerModeSelect.value === '2d') ? '' : 'none';
+    }
+    const recenterBtn = document.getElementById('recenterPlaneBtn');
+    if (recenterBtn) recenterBtn.addEventListener('click', () => engageFollowAircraft());
 
     canvas.addEventListener('mousedown', (e) => { 
         if (trackerModeSelect.value === '3d') return; 
@@ -241,7 +251,7 @@
             }
         }
         if (isMeasuring && (measurePointsGeo.length > 0 || drawnShapes.length > 0)) { liveMouseGeo = geo; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
-        if (isDraggingMap) { mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } 
+        if (isDraggingMap) { disengageFollowAircraft(); mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
     });
     
     canvas.addEventListener('mouseup', (e) => { 
@@ -275,8 +285,8 @@
     
     canvas.addEventListener('wheel', (e) => {
         if (trackerModeSelect.value === '3d') return;
-        e.preventDefault(); if (isMeasuring) liveMouseGeo = null; const delta = e.deltaY > 0 ? 0.9 : 1.1; const rect = canvas.getBoundingClientRect(); const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
-        const newScale = Math.min(Math.max(0.06, mapScale * delta), 40);  // allow zooming way out for a synoptic/whole-basin view
+        e.preventDefault(); disengageFollowAircraft(); if (isMeasuring) liveMouseGeo = null; const delta = e.deltaY > 0 ? 0.9 : 1.1; const rect = canvas.getBoundingClientRect(); const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
+        const newScale = Math.min(Math.max(0.06, mapScale * delta), 400);  // way out for a synoptic/whole-basin view, way in to individual track samples
         mapOffsetX = mouseX - (mouseX - mapOffsetX) * (newScale / mapScale); mapOffsetY = mouseY - (mouseY - mapOffsetY) * (newScale / mapScale);
         mapScale = newScale; bgNeedsUpdate = true; if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }, { passive: false });

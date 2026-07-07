@@ -40,7 +40,7 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const w = c.width / dpr; const h = c.height / dpr; const cx = w / 2; const cy = h / 2;
         ctx.clearRect(0, 0, w, h);
-        const isImperial = document.getElementById('toggleImperial').checked, useGps = !document.getElementById('toggleGpsAlt').checked;
+        const isImperial = !document.getElementById('toggleSI').checked, useGps = !document.getElementById('toggleGpsAlt').checked;
         // The tape prefers IAS like a real G1000 (TAS gets its own data strip below); falls back to TAS.
         const hasAttitude = d.pitch !== null || d.roll !== null, pitch = d.pitch || 0, roll = d.roll || 0;
         const iasVal = (availableMetrics.has('ias') && d.ias !== null) ? d.ias : null;
@@ -140,7 +140,11 @@
             let startAlt = Math.floor((alt - (cy / altPxPerUnit)) / altStep) * altStep; let endAlt = Math.ceil((alt + (cy / altPxPerUnit)) / altStep) * altStep;
             for (let a = startAlt; a <= endAlt; a += altStep) { let y = cy - (a - alt) * altPxPerUnit; ctx.beginPath(); ctx.moveTo(rightX, y); ctx.lineTo(rightX + 8, y); ctx.stroke(); if (a % altMajorStep === 0) ctx.fillText(a, rightX + 12, y); }
         }
-        ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(altUnit, rightX + rightW / 2, 4); ctx.restore();
+        ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(altUnit, rightX + rightW / 2, 4);
+        // small source tag under the unit, naming which altitude the tape is actually showing
+        const altSrc = useGps ? (d.gpsAlt !== null ? 'GPS' : (d.pAlt !== null ? 'PRESS' : (d.radAlt !== null ? 'RAD' : ''))) : (d.pAlt !== null ? 'PRESS' : (d.gpsAlt !== null ? 'GPS' : (d.radAlt !== null ? 'RAD' : '')));
+        if (altSrc) { ctx.font = 'bold ' + Math.max(7, fSize - 4) + 'px sans-serif'; ctx.fillStyle = 'rgba(56,189,248,0.75)'; ctx.fillText(altSrc, rightX + rightW / 2, 5 + fSize); }
+        ctx.restore();
         
         ctx.fillStyle = '#000'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fillRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.strokeRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.fillStyle = alt !== null ? '#fff' : '#888'; ctx.textAlign = 'center'; ctx.font = 'bold ' + fSizeLg + 'px monospace'; ctx.fillText(alt !== null ? alt.toFixed(0) : '---', rightX + rightW / 2 - 2, cy + 1);
 
@@ -212,7 +216,7 @@
         const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
         
-        const isImperial = document.getElementById('toggleImperial').checked;
+        const isImperial = !document.getElementById('toggleSI').checked;
 
         let h = addHUD('TIME (UTC)', `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
         h += addHUD('LATITUDE', `${sf(d.lat, 3)}°N`);
@@ -226,10 +230,9 @@
         let tDisp = d.tempr !== null ? sf(isImperial ? (d.tempr * 9/5 + 32) : d.tempr, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
         let tdDisp = d.dewpt !== null ? sf(isImperial ? (d.dewpt * 9/5 + 32) : d.dewpt, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
         
-        // Core altitude line prefers pressure altitude; GPS altitude is always relegated to the extra
-        // metrics below (it only surfaces here as a fallback when there is no pressure altitude at all).
+        // Core altitude lines: GPS altitude first, pressure altitude beneath it.
+        if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
         if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
-        else if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
         
         if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', `${d.sfcPr !== null ? sf(d.sfcPr, 1) + ' mb' : 'N/A'}`);
         if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', `${d.windSpd !== null ? sf(d.windSpd, 1) + ' kt' : 'N/A'}`);
@@ -242,8 +245,6 @@
         let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
 
-        // GPS altitude always lives in the extra metrics (skipped only if it was the core fallback above).
-        if (availableMetrics.has('gpsAlt') && availableMetrics.has('pAlt')) addExtra('GPS ALT', gAltDisp);
 
         if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'N/A'}`);
         if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'N/A'}`);

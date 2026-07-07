@@ -43,7 +43,7 @@
     let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null
     let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
-    let showStormTrack = true;        // "Show Storm Track" toggle
+    let showStormTrack = false;       // "Storm Track" toggle; off until the user turns it on
     let hoveredStormIdx = -1;         // index into stormTrackPoints currently under the mouse (2D map hover), -1 = none
     let currentPointAnalysisData = null; 
     let tempBaseline = [];

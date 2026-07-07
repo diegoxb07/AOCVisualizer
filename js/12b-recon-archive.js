@@ -31,12 +31,16 @@
         const apiDown = reconApiHealthChecked && !reconApiHealthOk;
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
         // Both pre-cache buttons open modals with their own pickers, so they only need the
-        // archive bootstrap done (year list landed) and the API alive.
-        const ready = reconYearsLanded && !apiDown;
+        // archive bootstrap attempt done (reconYearsLanded flips even when the fetch fails).
+        // The preload modal also takes direct file uploads, so it stays usable with the API down;
+        // batch satellite caching is API-only and closes with it.
         const preBtn = document.getElementById('reconPreloadBtn');
-        if (preBtn) preBtn.disabled = !ready;
+        if (preBtn) preBtn.disabled = !reconYearsLanded;
         const batchBtn = document.getElementById('batchCacheBtn');
-        if (batchBtn) batchBtn.disabled = !ready;
+        if (batchBtn) batchBtn.disabled = !(reconYearsLanded && !apiDown);
+        // Mission search needs the API (it fetches season indexes and loads by id).
+        const searchInput = document.getElementById('missionSearchInput');
+        if (searchInput) searchInput.disabled = !(reconYearsLanded && !apiDown);
     }
 
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
@@ -294,6 +298,112 @@
         if (missionId) loadReconMission(missionId);
     });
 
+    // --- Free-text mission search ------------------------------------------------------------
+    // The Year -> Storm -> Flight cascade is exact but unforgiving: a flight filed under the wrong
+    // storm, or one of the dozens in "Unknown / Training", is easy to lose. This searches a whole
+    // season's missions by any of id / storm / date / aircraft, and loads any full mission id
+    // directly (mission ids are unique across all years, so the storm need not be known).
+    (function wireMissionSearch() {
+        const input = document.getElementById('missionSearchInput');
+        const results = document.getElementById('missionSearchResults');
+        if (!input || !results) return;
+        const MISSION_ID_RE = /^\d{8}[A-Za-z]\d+$/;
+        const yearIndex = {};        // year -> flat [{...mission, storm_name}]; fetched once per year
+        let searchSeq = 0;           // guards a slow index fetch against a newer keystroke
+
+        // Every mission for a season, flattened across its storms (Unknown / Training included).
+        async function fetchYearIndex(year) {
+            if (yearIndex[year]) return yearIndex[year];
+            const data = await reconApiJson('/v1/recon/' + year);
+            const storms = (data && data.storms) || [];
+            const lists = await Promise.all(storms.map(s =>
+                reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
+            const flat = [];
+            storms.forEach((s, i) => ((lists[i] && lists[i].missions) || []).forEach(m => flat.push(Object.assign({ storm_name: s.storm_name }, m))));
+            yearIndex[year] = flat;
+            return flat;
+        }
+
+        function hideResults() { results.classList.add('hidden'); results.innerHTML = ''; }
+        function renderRows(rows) {
+            results.innerHTML = '';
+            results.appendChild(rows);
+            results.classList.remove('hidden');
+        }
+        const rowFrag = () => document.createDocumentFragment();
+        function noteRow(text) {
+            const d = document.createElement('div');
+            d.className = 'px-2.5 py-1.5 text-slate-500 bg-slate-900';
+            d.textContent = text;
+            return d;
+        }
+        function missionRow(m, primary) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'block w-full text-left px-2.5 py-1.5 border-b border-slate-800/70 last:border-b-0 hover:bg-blue-700/50 hover:text-white transition-colors ' + (primary ? 'bg-blue-950/50 text-blue-200 font-semibold' : 'text-slate-200 bg-slate-900');
+            const meta = [m.storm_name, m.flight_date, m.aircraft || m.tail_num].filter(Boolean).join(' · ');
+            b.innerHTML = `<span class="font-semibold">${primary ? '↵ Load ' : ''}${escapeHtml(m.mission_id)}</span>${meta ? ' <span class="text-slate-400 font-normal">· ' + escapeHtml(meta) + '</span>' : ''}`;
+            b.addEventListener('mousedown', (e) => { e.preventDefault(); hideResults(); input.blur(); loadReconMission(m.mission_id); });
+            return b;
+        }
+
+        // Which season(s) to search: any 4-digit year in the query (an 8-digit id/date leads with
+        // one), else the year picked in the cascade.
+        function yearsFor(q) {
+            const set = new Set();
+            (q.match(/(?:19|20)\d{2}/g) || []).forEach(y => set.add(y));
+            if (!set.size && reconYearSelect.value) set.add(reconYearSelect.value);
+            return [...set];
+        }
+
+        async function runSearch() {
+            const raw = input.value.trim();
+            const seq = ++searchSeq;
+            if (!raw) { hideResults(); return; }
+            const idHit = MISSION_ID_RE.test(raw) ? raw.toUpperCase() : null;
+            const years = yearsFor(raw);
+            const frag = rowFrag();
+            if (idHit) frag.appendChild(missionRow({ mission_id: idHit }, true));
+            if (!years.length) {
+                if (!idHit) frag.appendChild(noteRow('Add a year (e.g. 2024), or paste a full mission id, to search.'));
+                renderRows(frag);
+                return;
+            }
+            frag.appendChild(noteRow('Searching ' + years.join(', ') + '…'));
+            renderRows(frag);
+            let pool = [];
+            try {
+                const idx = await Promise.all(years.map(y => fetchYearIndex(y).catch(() => [])));
+                pool = idx.flat();
+            } catch (e) { /* fall through to the empty pool */ }
+            if (seq !== searchSeq) return;   // a newer keystroke already superseded this
+            const tokens = raw.toLowerCase().split(/\s+/).filter(Boolean);
+            const matches = pool.filter(m => {
+                const hay = `${m.mission_id} ${m.storm_name} ${m.flight_date} ${m.aircraft || ''} ${m.tail_num || ''}`.toLowerCase();
+                return tokens.every(t => hay.includes(t));
+            }).sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
+            const out = rowFrag();
+            if (idHit) out.appendChild(missionRow({ mission_id: idHit }, true));
+            const CAP = 60;
+            matches.slice(0, CAP).forEach(m => { if (m.mission_id !== idHit) out.appendChild(missionRow(m, false)); });
+            if (!matches.length && !idHit) out.appendChild(noteRow('No missions match in ' + years.join(', ') + '.'));
+            else if (matches.length > CAP) out.appendChild(noteRow('Showing ' + CAP + ' of ' + matches.length + '; refine the search to narrow it.'));
+            renderRows(out);
+        }
+
+        let searchDebounce = null;
+        input.addEventListener('input', () => { clearTimeout(searchDebounce); searchDebounce = setTimeout(runSearch, 220); });
+        input.addEventListener('focus', () => { if (input.value.trim()) runSearch(); });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); const q = input.value.trim().toUpperCase(); if (MISSION_ID_RE.test(q)) { hideResults(); input.blur(); loadReconMission(q); } }
+            else if (e.key === 'Escape') { hideResults(); input.blur(); }
+        });
+        // Close only on a click outside the search box, so the dropdown stays open while the user
+        // scrolls or hovers its rows (a blur-to-close raced the scroll and shut it mid-reach).
+        const wrap = document.getElementById('missionSearchWrap');
+        document.addEventListener('mousedown', (e) => { if (wrap && !wrap.contains(e.target)) hideResults(); });
+    })();
+
     // Convert one mission's decimated obs ([unix_time, lat, lon, wind_kt, wind_dir, sfmr_kt, alt_m])
     // into the same tab-separated format parseEntireFile() already consumes for uploaded .txt/.nc
     // files, reuses ALL of the existing parse/clean/interpolate pipeline instead of duplicating it.
@@ -349,6 +459,7 @@
             return;
         }
 
+        clearLoadedMedia();
         flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
 
         // Primary path: stream the mission's original full-resolution NetCDF through the API's
@@ -357,27 +468,41 @@
         // ~7-field decimated preview. Falls back to that decimated JSON if the download or parse
         // fails or yields no usable rows.
         let usedFullRes = false;
+        const progWrap = document.getElementById('loadingProgressWrap');
+        const progBar = document.getElementById('loadingProgressBar');
+        const progPct = document.getElementById('loadingProgressPct');
+        const progSpeed = document.getElementById('loadingProgressSpeed');
+        const hideProgress = () => { if (progWrap) progWrap.classList.add('hidden'); if (progBar) progBar.style.width = '0%'; };
         try {
-            if (subtext) subtext.textContent = `Downloading full-resolution NetCDF for ${mission.mission_id}…`;
+            if (subtext) subtext.textContent = `Downloading flight data for ${mission.mission_id}…`;
+            if (progWrap) progWrap.classList.remove('hidden');
+            const dlStart = performance.now();
             const buf = await fetchArrayBufferWithProgress(
                 RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
                 (received, total) => {
                     const pct = Math.round(received / total * 100);
                     const mb = n => (n / 1048576).toFixed(1);
-                    const msg = `Downloading full-resolution NetCDF… ${pct}% (${mb(received)} / ${mb(total)} MB)`;
-                    if (subtext) subtext.textContent = msg;
-                    setReconStatus(msg);
+                    const secs = Math.max(0.05, (performance.now() - dlStart) / 1000);
+                    const speed = (received / 1048576 / secs).toFixed(1);   // MB/s, running average
+                    if (progBar) progBar.style.width = pct + '%';
+                    if (progPct) progPct.textContent = `${pct}% · ${mb(received)} / ${mb(total)} MB`;
+                    if (progSpeed) progSpeed.textContent = `${speed} MB/s`;
+                    if (subtext) subtext.textContent = `Downloading flight data… ${pct}%`;
+                    setReconStatus(`Downloading ${mission.mission_id}… ${pct}% (${mb(received)} / ${mb(total)} MB, ${speed} MB/s)`);
                     // Backgrounded tabs stop repainting, so this text can look frozen while the download
                     // keeps progressing underneath. The document title still updates while hidden, so
                     // mirror the percent there; updateMissionHeader() overwrites it once loading finishes.
                     document.title = `${pct}% ↓ ${mission.mission_id} · AOC Mission Visualizer`;
                 }
             );
-            if (subtext) subtext.textContent = 'Parsing NetCDF variables…';
+            if (progBar) progBar.style.width = '100%';
+            if (subtext) subtext.textContent = 'Parsing flight variables…';
+            hideProgress();
             await parseEntireFile(buf);
             usedFullRes = true;
         } catch (e) {
-            setReconStatus(`Full-res load failed (${e.message}), loading the decimated preview…`);
+            hideProgress();
+            setReconStatus(`Download/parse failed (${e.message}), loading the decimated preview…`);
             try {
                 await parseEntireFile(reconObsToTsv(mission));
             } catch (e2) {
@@ -387,6 +512,7 @@
                 return;
             }
         }
+        hideProgress();
         if (subtext) subtext.textContent = 'Pulling variables...';   // restore the default for the next (manual-upload) use of this overlay
 
         isNcFile = usedFullRes;
@@ -400,10 +526,10 @@
         try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
         if (mission.source_url) {
             reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden');
-            reconSourceLink.title = 'Open the original full-resolution NetCDF from NOAA directly (same file this loaded automatically)';
+            reconSourceLink.title = 'Open the original NetCDF from NOAA directly (same file this loaded automatically)';
         } else { reconSourceLink.classList.add('hidden'); }
 
-        if (usedFullRes) setReconStatus(`Loaded full-resolution ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track…`);
+        if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track…`);
         else setReconStatus(`Loaded ${mission.obs_count} decimated obs for ${mission.mission_id}. Fetching storm track…`);
         // Every archive mission loaded this session joins the preloaded list too, so it can be
         // reopened instantly without an explicit preload. Rows are captured by reference now
@@ -663,7 +789,7 @@
             try {
                 const tx = missionDB.transaction(['missions', 'meta'], 'readwrite');
                 tx.objectStore('missions').put(rec, id);
-                tx.objectStore('meta').put({ missionId: id, stormName: (rec.mission && rec.mission.storm_name) || '', isNc: rec.isNc, savedAt: Date.now() }, id);
+                tx.objectStore('meta').put({ missionId: id, stormName: (rec.mission && rec.mission.storm_name) || '', isNc: rec.isNc, uploaded: !!rec.uploaded, savedAt: Date.now() }, id);
                 const listRq = tx.objectStore('meta').getAll();
                 listRq.onsuccess = () => {
                     const metas = (listRq.result || []).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
@@ -684,7 +810,7 @@
             rq.onsuccess = () => {
                 (rq.result || []).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0)).forEach(m => {
                     if (!preloadedMissions.has(m.missionId))
-                        preloadedMissions.set(m.missionId, { mission: { mission_id: m.missionId, storm_name: m.stormName }, isNc: m.isNc });
+                        preloadedMissions.set(m.missionId, { mission: { mission_id: m.missionId, storm_name: m.stormName }, isNc: m.isNc, uploaded: !!m.uploaded });
                 });
                 if (preloadedMissions.size) updatePreloadedSelect();
             };
@@ -694,10 +820,11 @@
     function updatePreloadedSelect(selectedId) {
         const sel = document.getElementById('preloadedSelect'); if (!sel) return;
         const keep = selectedId !== undefined ? selectedId : sel.value;
-        sel.innerHTML = '<option value="">Preloaded missions…</option>';
+        sel.innerHTML = '<option value="">Loaded Missions…</option>';
         preloadedMissions.forEach((rec, id) => {
             const opt = document.createElement('option'); opt.value = id;
-            opt.textContent = `${boldUnicode(id)} · ${rec.mission.storm_name || ''}${rec.isNc ? '' : ' (preview)'}`;
+            const tag = rec.uploaded ? ' (uploaded)' : (rec.isNc ? '' : ' (preview)');
+            opt.textContent = `${boldUnicode(id)}${rec.mission.storm_name ? ' · ' + rec.mission.storm_name : ''}${tag}`;
             sel.appendChild(opt);
         });
         sel.disabled = preloadedMissions.size === 0;
@@ -754,7 +881,8 @@
             rec = stored; preloadedMissions.set(missionId, rec);
         }
         const mission = rec.mission;
-        flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
+        clearLoadedMedia();
+        flightMetaData = { id: mission.storm_name ? `${mission.mission_id} (${mission.storm_name})` : mission.mission_id, date: mission.flight_date || 'Unknown', aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
         try {
             applyParsedFlight(rec.parsed);
         } catch (e) {
@@ -762,6 +890,14 @@
             return;
         }
         isNcFile = rec.isNc;
+        if (rec.uploaded) {
+            // An uploaded file is not an archive mission: no share link, no source URL, no storm track.
+            reconArchiveMeta = null;
+            updateMissionHeader();
+            refreshStormTrackDisplay();
+            setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
+            return;
+        }
         reconArchiveMeta = { missionId: mission.mission_id, stormName: mission.storm_name, stormId: mission.storm_id, aircraft: mission.aircraft, tailNum: mission.tail_num, sourceUrl: mission.source_url };
         updateMissionHeader();
         try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
@@ -886,7 +1022,44 @@
                 });
             }
             if (yearSel && !yearSel.value && reconYearSelect.value) yearSel.value = reconYearSelect.value;
+            if (isReconApiDown()) {
+                if (yearSel) yearSel.disabled = true;
+                checksNote('The recon archive is unreachable, so seasons cannot be listed. Uploaded files still preload normally.');
+                return;
+            }
+            if (yearSel) yearSel.disabled = false;
             loadSeasonIntoModal(yearSel ? yearSel.value : '');
+        }
+
+        // Sequential parse + store of user-picked flight files, the offline counterpart to the
+        // archive checkboxes. Each file becomes a preloaded record keyed by its base filename.
+        async function preloadUploadedFiles(files) {
+            const list = [...files].filter(f => /\.(txt|nc)$/i.test(f.name));
+            if (!list.length) { setModalStatus('No .txt or .nc files picked.'); return; }
+            let ok = 0;
+            for (let i = 0; i < list.length; i++) {
+                const f = list[i];
+                const id = f.name.replace(/\.(txt|nc)$/i, '');
+                setModalStatus(`(${i + 1}/${list.length}) Parsing ${f.name}…`);
+                try {
+                    const isNc = /\.nc$/i.test(f.name);
+                    const parsed = await parseFlightSource(isNc ? await f.arrayBuffer() : await f.text());
+                    if (!parsed.rows.length) throw new Error('no usable rows');
+                    const dm = id.match(/^(\d{4})(\d{2})(\d{2})([a-zA-Z])?/);
+                    const tail = dm && dm[4] ? dm[4].toUpperCase() : '';
+                    const aircraft = { H: 'NOAA42 (WP-3D Orion)', I: 'NOAA43 (WP-3D Orion)', N: 'NOAA49 (Gulfstream IV-SP)' }[tail] || '';
+                    savePreloadedMission(id, {
+                        mission: { mission_id: id, storm_name: '', flight_date: dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : '', aircraft },
+                        parsed, isNc, storm: null, uploaded: true
+                    });
+                    updatePreloadedSelect();
+                    ok++;
+                } catch (e) {
+                    setModalStatus(`(${i + 1}/${list.length}) Could not preload ${f.name} (${e.message}).`);
+                }
+                if (fill) fill.style.width = Math.round((i + 1) / list.length * 100) + '%';
+            }
+            setModalStatus(`Done: ${ok}/${list.length} uploaded file${list.length === 1 ? '' : 's'} preloaded. They stay on this device and open from the Loaded Missions list.`);
         }
 
         // Sequential download + parse of everything checked; closing the modal lets it keep
@@ -903,13 +1076,18 @@
                 if (fill) fill.style.width = Math.round((i + 1) / ids.length * 100) + '%';
             }
             preloadRunning = false; if (startBtn) startBtn.disabled = false;
-            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Preloaded missions list.`);
+            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Loaded Missions list.`);
             setReconStatus(`Preloaded ${ok}/${ids.length} missions.`);
             if (yearSel && yearSel.value) loadSeasonIntoModal(yearSel.value);   // relist so finished missions show checked and locked
         }
 
         const btn = document.getElementById('reconPreloadBtn');
         if (btn) btn.addEventListener('click', openPreloadModal);
+        const fileInput = document.getElementById('preloadFileInput');
+        if (fileInput) fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) preloadUploadedFiles(fileInput.files);
+            fileInput.value = '';
+        });
         if (yearSel) yearSel.addEventListener('change', () => loadSeasonIntoModal(yearSel.value));
         if (startBtn) startBtn.addEventListener('click', runPreload);
         ['preloadCloseX', 'preloadCloseBtn'].forEach(id => {

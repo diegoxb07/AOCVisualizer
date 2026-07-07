@@ -60,10 +60,14 @@ select { padding-left: 14px !important; }
    slightly larger + brighter. text-transform/letter-spacing override the parent's uppercase styling. */
 .panel-subhead { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: #e2e8f0; }
 
-/* Long product names ("Band 7, Shortwave IR …") ellipsize while the picker is CLOSED so they
-   can't shove the fullscreen button and map controls off the header; the open dropdown list
-   still shows every option's full text (native select behavior), plus a hover tooltip. */
-#satBandSelect { max-width: 172px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* The satellite cluster keeps one constant footprint so the header controls never move: alone,
+   the layer select owns the full width; once a product picker appears (.split, toggled wherever
+   #satBandSelect's display changes), the two selects share the same total. Long product names
+   ellipsize while a picker is CLOSED; the open dropdown list still shows every option's full
+   text (native select behavior), plus a hover tooltip. */
+#satelliteSelect { width: 176px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#satControlGroup.split #satelliteSelect { width: 86px; }
+#satBandSelect { width: 86px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* Fullscreen behavior (functional, do not simplify) */
 :fullscreen { background-color: var(--ink); overflow-y: auto; padding: 24px; padding-bottom: 140px; }

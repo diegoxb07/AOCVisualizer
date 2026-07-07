@@ -475,8 +475,32 @@
         g.strokeStyle = '#e8ecef'; g.lineWidth = 6;
         posts.forEach(u => { g.beginPath(); g.moveTo(256 * u, 0); g.lineTo(256 * u, glassTop); g.stroke(); });
         if (eyebrows) {
-            g.fillStyle = '#10151b';
-            [[28, 58], [170, 58]].forEach(([x, w]) => g.fillRect(x, glassTop + 10, w, 18));
+            // Two eyebrow windows above the main glass, shaped to the WP-3D flight deck (1st.jpg):
+            // a right-triangle-ish quad (four sides) tall on the OUTBOARD edge with a 90-degree
+            // corner at its base, the top sloping down toward the center, tilted a few degrees.
+            // Each pane sits near its own outboard edge of the windshield (not toward the middle),
+            // and the two mirror each other so both lean outboard.
+            const eyebrow = (cx, mirror) => {
+                g.save();
+                g.translate(cx, glassTop + 21);
+                g.rotate(-0.16);             // lean the thick aft base up toward the roof
+                if (mirror) g.scale(-1, 1);
+                // Texture v (canvas y) runs FORWARD (top) → AFT (bottom) with flipY off, so a wedge
+                // that's a narrow point at the top and a wide base at the bottom is thin forward and
+                // thick aft; the tilt swings that thick base toward the roof. Large, but each pane
+                // stays over its own side (outboard) window, not spanning toward the middle.
+                const w = 30, h = 20;
+                g.beginPath();
+                g.moveTo(-6, -h);            // forward edge, narrow (inboard)
+                g.lineTo(6, -h);             // forward edge, narrow (outboard)
+                g.lineTo(w, h);              // aft-outboard corner (thick base)
+                g.lineTo(-w, h);             // aft-inboard corner (thick base, toward the roof)
+                g.closePath();
+                g.fillStyle = '#10151b'; g.fill();
+                g.restore();
+            };
+            eyebrow(210, false);   // starboard, above the starboard side window
+            eyebrow(46, true);     // port, above the port side window
         }
         return makePlaneTexture(cv);
     }
@@ -527,7 +551,9 @@
         const tex = fuselageTexture({
             len: 4.75, z0: -2.30, antiGlareZ: -2.08,
             paintLivery: (g, vOf) => {
-                const top = z => liveryCurve(z, [[-2.072, 0.145], [-1.341, 0.250]]);
+                // the top edge descends in one continuous slope all the way forward, meeting the
+                // underbelly right before the radome; no flat run along the nose
+                const top = z => liveryCurve(z, [[-2.28, 0.015], [-1.341, 0.250]]);
                 const bot = z => liveryCurve(z, [[-1.843, 0], [-1.341, 0.187]]);
                 paintSweep(g, 512, 1024, vOf, -2.32, 1.765, top, bot, NOAA_LIV.navy);
                 strokeSweep(g, 512, 1024, vOf, -2.32, 1.765, z => top(z) + 0.0155, NOAA_LIV.sky, 6.5);
@@ -552,28 +578,31 @@
             { z: 2.20, r: 0.115, y: 0.105 }, { z: 2.45, r: 0.086, y: 0.125 }
         ], mats.hull, 48));
 
-        // glossy black radome: a smooth continuation of the white nose taper (its base radius
-        // matches the hull's front station exactly, so the paint just changes color at the seam)
-        // rounding down to the search-radar tip
+        // glossy black radome: a SHORT, rounded nose bulb (not a long Concorde point), its base
+        // radius matching the hull's front station so the paint just changes color at the seam, and
+        // it blunts to a rounded tip close ahead of the windshield
         const radomeMat = new THREE.MeshPhongMaterial({ color: 0x121417, shininess: 95 });
         grp.add(bodyLathe([
-            { z: -2.58, r: 0.030, y: -0.055 }, { z: -2.52, r: 0.085, y: -0.048 }, { z: -2.42, r: 0.120, y: -0.041 },
-            { z: -2.34, r: 0.140, y: -0.034 }, { z: -2.27, r: 0.150, y: -0.030 }
+            { z: -2.45, r: 0.058, y: -0.052 }, { z: -2.41, r: 0.100, y: -0.046 }, { z: -2.36, r: 0.129, y: -0.039 },
+            { z: -2.31, r: 0.145, y: -0.033 }, { z: -2.27, r: 0.150, y: -0.030 }
         ], radomeMat, 32));
-        // the lathe is an open surface, so a small cap closes the radome point
-        const radomeTip = new THREE.Mesh(new THREE.SphereGeometry(0.030, 12, 10), radomeMat);
-        radomeTip.position.set(0, -0.055, -2.58); grp.add(radomeTip);
+        // the lathe is an open surface, so a rounded cap closes the blunt radome tip
+        const radomeTip = new THREE.Mesh(new THREE.SphereGeometry(0.058, 14, 12), radomeMat);
+        radomeTip.position.set(0, -0.052, -2.45); grp.add(radomeTip);
 
         // wraparound windshield glass standing near-vertically on the steep forehead (a real
         // P-3 windshield is upright with only a slight rake), with the two corner roof panes
+        // eyebrows arg is false: the small corner eyebrow windows are omitted for now (they read
+        // worse than without at this scale); the eyebrow-drawing branch in windshieldTexture stays
+        // for a future pass.
         addWindshieldBand(grp, [
             { z: -2.065, r: 0.209, y: -0.011 }, { z: -2.02, r: 0.245, y: -0.003 }, { z: -1.96, r: 0.254, y: 0.001 }
-        ], 0.78, [0.31, 0.5, 0.69], true);
+        ], 0.62, [0.31, 0.5, 0.69], false);
 
         // instrumented nose boom (gust probe): finely candy-striped, exiting from the SIDE of
         // the nose (the radome's starboard flank) with a touch of up-tilt
         const boomGrp = new THREE.Group();
-        boomGrp.position.set(0.10, -0.035, -2.42); boomGrp.rotation.x = 0.05;
+        boomGrp.position.set(0.10, -0.035, -2.34); boomGrp.rotation.x = 0.05;
         const boomRed = new THREE.MeshPhongMaterial({ color: 0xd23b2f, shininess: 40 });
         const boomSegs = 14, boomLen = 0.60, segLen = boomLen / boomSegs;
         for (let bi = 0; bi < boomSegs; bi++) {

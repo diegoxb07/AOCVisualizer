@@ -547,6 +547,15 @@
         maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected, build its full timeframe now
     }
 
+    // Keeps the satellite cluster's footprint constant (the .split rule in app.css): the layer
+    // select gives up half its width to the product picker instead of the header row growing
+    // and wrapping. Call after any change to #satBandSelect's display.
+    function syncSatSplit() {
+        const grp = document.getElementById('satControlGroup');
+        const band = document.getElementById('satBandSelect');
+        if (grp && band) grp.classList.toggle('split', band.style.display !== 'none');
+    }
+
     function updateBandOptions() {
         const satSelect = document.getElementById('satelliteSelect');
         const bandSelect = document.getElementById('satBandSelect');
@@ -557,6 +566,7 @@
         if (satSelect.value === 'none') {
             bandSelect.innerHTML = '';
             bandSelect.style.display = 'none';
+            syncSatSplit();
             return;
         }
 
@@ -565,6 +575,7 @@
             bandSelect.innerHTML = '';
             if (layerDef.isReconApi && !isReconApiAvailable()) {
                 bandSelect.style.display = 'none';
+                syncSatSplit();
                 return;
             }
             // Archive-GOES layers can trigger a full-timeframe cache build (maybeAutoPrecacheSatellite),
@@ -603,6 +614,7 @@
                 });
             }
             bandSelect.style.display = '';
+            syncSatSplit();
             // A rebuild must not silently drop an active selection (the 60s product-list
             // poll and flight reloads land here), the placeholder is only for fresh picks.
             if (prevBand && [...bandSelect.options].some(o => o.value === prevBand)) bandSelect.value = prevBand;
@@ -797,12 +809,13 @@
     // Request a recon-api GOES tile and poll until it renders. Resolves to
     // { canvas, box:{minLon,minLat,maxLon,maxLat}, scanStartMs } or { error }.
     // `product` (e.g. 'sandwich'/'geocolor') is a composite, when given, band/cmap are ignored
-    // server-side and bbox (center/dims) isn't supported yet, so it's always a slower full-disk render.
+    // server-side. Composites accept the same center/dims bbox as a single band now, so send it
+    // whenever one was computed (caller only computes it for bbox-capable products).
     async function fetchReconApiTile({ band, cmap, product, timeIso, center, dims, unit, satellite }) {
         const params = new URLSearchParams({ time: timeIso });
         if (product) { params.set('product', product); } else { params.set('band', band); params.set('cmap', cmap); }
         if (satellite) params.set('satellite', satellite);
-        if (center && !product) { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
+        if (center) { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
         // While a batch/precache pass is running, ride its AbortController so a Cancel click kills any
         // in-flight request immediately instead of waiting out the current poll tick.
         const signal = (batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined;
@@ -1109,12 +1122,13 @@
         satUnavailableNote = null;
 
         // Warm the buckets around the playhead in the background so scrubbing stays smooth.
-        // Composite products (sandwich/geocolor) don't support bbox yet, full-disk only.
+        // bboxSupported is read from the /products discovery endpoint (bands and composites both
+        // report it); a false there means a genuinely full-disk-only product, none current.
         const bboxSupported = bandObj.bboxSupported !== false;
         if (bboxSupported) preloadSatAround(absSeconds);
 
         // Square bbox (km) centered on the flight, covering its extent + margin, within the API's range.
-        // Composites skip this entirely and render the whole disk.
+        // Only a full-disk-only product (bboxSupported false) skips this and renders the whole disk.
         const geom = bboxSupported ? computeReconTileGeom() : null;
         const centerStr = geom ? geom.centerStr : null, dimsKm = geom ? geom.dimsKm : null;
         const timeIso = goesTimeStr(bucketMs);

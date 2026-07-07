@@ -1,4 +1,4 @@
-/* Mission Visualizer, OCR sync lock + KML export
+/* Mission Visualizer, OCR sync lock
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
@@ -107,24 +107,3 @@
 
     document.getElementById('forceSyncBtn').addEventListener('click', () => performImmediateOcrLock({ silent: false }));
 
-    document.getElementById('exportKmlBtn').addEventListener('click', () => {
-        if (filteredData.length === 0) return;
-        const useGps = document.getElementById('toggleGpsAlt').checked;
-        let kmlCoords = filteredData.map(d => {
-            const altM = useGps ? (d.gpsAlt !== null ? d.gpsAlt : (d.pAlt !== null ? d.pAlt : 0)) : (d.pAlt !== null ? d.pAlt : (d.gpsAlt !== null ? d.gpsAlt : 0));
-            return `${d.lon},${d.lat},${altM}`;
-        }).join('\n');
-
-        const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>Flight Track: ${flightMetaData.id}</name>
-    <Style id="trackStyle"><LineStyle><color>ff0000ff</color><width>4</width></LineStyle></Style>
-    <Placemark><name>Flight Path</name><styleUrl>#trackStyle</styleUrl><LineString><extrude>1</extrude><tessellate>1</tessellate><altitudeMode>absolute</altitudeMode><coordinates>
-          ${kmlCoords}
-        </coordinates></LineString></Placemark>
-  </Document>
-</kml>`;
-        const blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `FlightTrack_${flightMetaData.id}.kml`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    });

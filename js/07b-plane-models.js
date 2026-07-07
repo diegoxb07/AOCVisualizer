@@ -20,21 +20,30 @@
     const NOAA_LIV = { white: '#f2f5f7', navy: '#1b4a94', sky: '#7ec8ec', black: '#1d2126', dark: '#2b3540', metal: '#aab4bd', prop: '#23272c' };
 
     // Cabin geometry the crew view sizes itself from, per airframe (plane-local units).
-    // shellR = the cabin shell's radius, just inside the hull skin, so nothing pokes through;
-    // seats = the crew figures' {x, z} (P-3: pilot + copilot up front, flight director at his
-    // console, project seat near the CG, per the AOC station diagram); trough = shell stations
-    // following the hull taper, so the cabin can reach the cockpit and galley without poking out.
+    // seats = every seat on the aircraft as {x, z}, one crew figure in each. The P-3 list is
+    // the AOC seating diagram's 19 positions in its numbering, laid out as ROWS down the cabin
+    // with a flight-computer rack standing between each row (buildP3Interior): 1 pilot +
+    // 2 copilot side by side, 3 flight engineer at the pedestal, then single-seat rows
+    // alternating sides of the aisle (4 station 1, 5 FD, 6 NAV), the C3X pair 7-8 sitting
+    // two-abreast on the PORT side (aisle to their right), 9 station 3 single, the station 3
+    // pair 10-11 two-abreast on the STARBOARD side (aisle to their left), 12 station 4,
+    // 13 project seat on the centerline at the CG, 14 station 5, the station 7 pair 15-16
+    // two-abreast port again, 17 station 8, and the dinette booth 18-19 facing the aft table.
     const PLANE_CABIN_SPECS = {
         p3:  {
-            floorY: -0.12, halfW: 0.20, shellR: 0.235, figScale: 0.58,
-            seats: [{ x: -0.075, z: -1.82 }, { x: 0.075, z: -1.82 }, { x: 0.105, z: -1.30 }, { x: 0.105, z: -0.10 }],
-            trough: [
-                { z: -1.95, r: 0.227, y: 0 }, { z: -1.55, r: 0.235, y: 0 }, { z: 0.60, r: 0.235, y: 0 },
-                { z: 1.20, r: 0.205, y: 0.02 }, { z: 1.50, r: 0.172, y: 0.045 }
+            floorY: -0.12, halfW: 0.20, figScale: 0.40,
+            seats: [
+                { x: -0.075, z: -1.82 }, { x: 0.075, z: -1.82 }, { x: 0, z: -1.68 },
+                { x: -0.09, z: -1.38 }, { x: 0.09, z: -1.14 }, { x: -0.09, z: -0.90 },
+                { x: -0.145, z: -0.66 }, { x: -0.03, z: -0.66 },
+                { x: 0.09, z: -0.42 }, { x: 0.03, z: -0.18 }, { x: 0.145, z: -0.18 },
+                { x: -0.09, z: 0.04 }, { x: 0, z: 0.26 }, { x: 0.09, z: 0.48 },
+                { x: -0.145, z: 0.72 }, { x: -0.03, z: 0.72 }, { x: 0.09, z: 0.90 },
+                { x: -0.09, z: 1.06 }, { x: -0.09, z: 1.26 }
             ],
             interior: true
         },
-        giv: { floorY: -0.08, halfW: 0.15, shellR: 0.178, figScale: 0.50, seats: [{ x: 0, z: -0.85 }, { x: 0, z: -0.35 }, { x: 0, z: 0.15 }, { x: 0, z: 0.65 }] }
+        giv: { floorY: -0.08, halfW: 0.15, figScale: 0.40, seats: [{ x: 0, z: -0.85 }, { x: 0, z: -0.35 }, { x: 0, z: 0.15 }, { x: 0, z: 0.65 }] }
     };
     function activeCabinSpec() { return PLANE_CABIN_SPECS[planeModelType3D] || PLANE_CABIN_SPECS.p3; }
 
@@ -207,12 +216,39 @@
         return tex;
     }
 
-    // Horizontal band around the hull on both sides, mirrored across the belly seam (u and 1-u),
-    // between height fractions uLo..uHi (0 = belly, 0.5 = crown) over stations v0..v1.
-    function paintSideBand(g, W, H, uLo, uHi, v0, v1, color) {
-        g.fillStyle = color;
-        g.fillRect(W * uLo, v0 * H, W * (uHi - uLo), (v1 - v0) * H);
-        g.fillRect(W * (1 - uHi), v0 * H, W * (uHi - uLo), (v1 - v0) * H);
+    // Piecewise-smoothstep height curve through [z, u] anchors, clamped at the ends; the u
+    // building block for livery sweeps that rise, dive, or wrap along the hull.
+    function liveryCurve(z, pts) {
+        if (z <= pts[0][0]) return pts[0][1];
+        for (let i = 0; i < pts.length - 1; i++) {
+            const z0 = pts[i][0], u0 = pts[i][1], z1 = pts[i + 1][0], u1 = pts[i + 1][1];
+            if (z <= z1) { const t = (z - z0) / (z1 - z0); return u0 + (u1 - u0) * t * t * (3 - 2 * t); }
+        }
+        return pts[pts.length - 1][1];
+    }
+
+    // Fill the hull region between two height curves over z0..z1, mirrored onto both sides
+    // across the belly seam (u and 1-u). A bottom curve that reaches 0 makes the two sides
+    // meet at the seam, wrapping the paint under the belly.
+    function paintSweep(g, W, H, vOf, z0, z1, topU, botU, color) {
+        const N = 72;
+        [u => u, u => 1 - u].forEach(m => {
+            g.fillStyle = color; g.beginPath();
+            for (let i = 0; i <= N; i++) { const z = z0 + (z1 - z0) * i / N; const x = W * m(topU(z)), y = vOf(z) * H; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+            for (let i = N; i >= 0; i--) { const z = z0 + (z1 - z0) * i / N; g.lineTo(W * m(botU(z)), vOf(z) * H); }
+            g.closePath(); g.fill();
+        });
+    }
+
+    // Pinstripe following a height curve over z0..z1, on both sides.
+    function strokeSweep(g, W, H, vOf, z0, z1, uOf, color, lw) {
+        const N = 72;
+        g.strokeStyle = color; g.lineWidth = lw;
+        [u => u, u => 1 - u].forEach(m => {
+            g.beginPath();
+            for (let i = 0; i <= N; i++) { const z = z0 + (z1 - z0) * i / N; const x = W * m(uOf(z)), y = vOf(z) * H; if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+            g.stroke();
+        });
     }
 
     // Registration or title text on both hull sides at height band u (right side; left mirrors to
@@ -286,8 +322,10 @@
             noaaEmblemImage().then(logo => {
                 if (!logo) return;
                 const r = spec.emblem.r || 22;
-                // a touch crown-ward of the window line, riding above the cheatline like the real livery
-                const xf = spec.emblem.side === 'left' ? [0.700, 1, -1] : [0.300, -1, 1];
+                // height on the hull as the right-side u (the left side mirrors it); defaults to
+                // a touch crown-ward of the window line, riding above the cheatline
+                const u0 = spec.emblem.u != null ? spec.emblem.u : 0.300;
+                const xf = spec.emblem.side === 'left' ? [1 - u0, 1, -1] : [u0, -1, 1];
                 g.save(); g.translate(W * xf[0], vOf(spec.emblem.z) * H);
                 g.rotate(Math.PI / 2); g.scale(xf[1], xf[2]);
                 g.drawImage(logo, -r, -r, r * 2, r * 2); g.restore();
@@ -393,14 +431,31 @@
     // dividing the panes; u runs across the wraparound arc, v up the glass (v=1 is the crown
     // edge). eyebrows reserves a white roof strip above the glass carrying the two small corner
     // panes the WP-3D flight deck has.
-    function windshieldTexture(posts, eyebrows) {
+    function windshieldTexture(posts, eyebrows, gulfPanes) {
         const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
         const g = cv.getContext('2d');
-        const glassTop = eyebrows ? 92 : 125;
         g.fillStyle = '#e8ecef'; g.fillRect(0, 0, 256, 128);
-        g.fillStyle = '#10151b'; g.fillRect(3, 3, 250, glassTop - 3);
-        const grad = g.createLinearGradient(0, 0, 0, glassTop);
+        const grad = g.createLinearGradient(0, 0, 0, 110);
         grad.addColorStop(0, 'rgba(140,170,200,0.28)'); grad.addColorStop(0.55, 'rgba(140,170,200,0.06)'); grad.addColorStop(1, 'rgba(140,170,200,0.18)');
+        if (gulfPanes) {
+            // the Gulfstream windshield: two TALL center panes, and a clearly smaller, shorter
+            // side pane at each end sitting low in the band, straight against the frame inboard
+            // and rounded on its upper-outboard corner. Canvas y runs up the visor, so that
+            // corner is the rect's larger-y pair here.
+            const pane = (x, y, w, h, radii) => {
+                g.beginPath(); g.roundRect(x, y, w, h, radii);
+                g.fillStyle = '#10151b'; g.fill();
+                g.beginPath(); g.roundRect(x, y, w, h, radii);
+                g.fillStyle = grad; g.fill();
+            };
+            pane(84, 6, 40, 62, [3, 3, 4, 4]);
+            pane(132, 6, 40, 62, [3, 3, 4, 4]);
+            pane(26, 6, 42, 62, [3, 3, 4, 24]);
+            pane(188, 6, 42, 62, [3, 3, 24, 4]);
+            return makePlaneTexture(cv);
+        }
+        const glassTop = eyebrows ? 92 : 108;   // a real white roof frame; eyebrows widens it for the corner panes
+        g.fillStyle = '#10151b'; g.fillRect(3, 3, 250, glassTop - 3);
         g.fillStyle = grad; g.fillRect(3, 3, 250, glassTop - 3);
         g.strokeStyle = '#e8ecef'; g.lineWidth = 6;
         posts.forEach(u => { g.beginPath(); g.moveTo(256 * u, 0); g.lineTo(256 * u, glassTop); g.stroke(); });
@@ -415,8 +470,8 @@
     // forehead stations a skin's thickness proud of the hull so the glass follows the nose
     // curvature exactly. stations = hull forehead stations with the outward offset already
     // applied; arc = half-angle of the wrap; posts = frame-post positions across the glass.
-    function addWindshieldBand(grp, stations, arc, posts, eyebrows) {
-        const mat = new THREE.MeshPhongMaterial({ map: windshieldTexture(posts, eyebrows), shininess: 90, side: THREE.DoubleSide });
+    function addWindshieldBand(grp, stations, arc, posts, eyebrows, gulfPanes) {
+        const mat = new THREE.MeshPhongMaterial({ map: windshieldTexture(posts, eyebrows, gulfPanes), shininess: 90, side: THREE.DoubleSide });
         grp.add(bodyLathe(stations, mat, 24, Math.PI - arc, arc * 2));
     }
 
@@ -447,23 +502,30 @@
     // tall fin with dorsal fillet, and the tail Doppler radar boom.
     function buildP3Model(reg) {
         const grp = new THREE.Group();
-        const L = 5.2, Z0 = -2.6;
-        // Livery: white hull and belly; the navy flank band runs below the window line with a
-        // sky pinstripe between them, flowing aft into the all-navy tail.
+        // Livery: white hull and belly aft; the navy flank band runs below the window line and
+        // keeps going forward into the nose, wrapping down under it so the nose underbelly is
+        // navy against the black radome, with the sky pinstripe riding the band's upper edge
+        // the whole way. Aft it flows into the all-navy tail.
+        // The texture's z frame MUST match the hull lathe's station span (-2.30..2.45), because
+        // bodyLathe maps texture v to the lathe's own z fraction; a nominal frame here shifts
+        // every painted feature away from the 3D meshes (bubbles, radome) it must line up with.
         const tex = fuselageTexture({
-            len: L, z0: Z0, antiGlareZ: -2.22,
+            len: 4.75, z0: -2.30, antiGlareZ: -1.953,
             paintLivery: (g, vOf) => {
-                const v0 = vOf(-2.08), v1 = vOf(1.85);
-                paintSideBand(g, 512, 1024, 0.187, 0.250, v0, v1, NOAA_LIV.navy);
-                paintSideBand(g, 512, 1024, 0.259, 0.272, v0, v1, NOAA_LIV.sky);
+                const top = z => liveryCurve(z, [[-2.072, 0.145], [-1.341, 0.250]]);
+                const bot = z => liveryCurve(z, [[-1.843, 0], [-1.341, 0.187]]);
+                paintSweep(g, 512, 1024, vOf, -2.32, 1.765, top, bot, NOAA_LIV.navy);
+                strokeSweep(g, 512, 1024, vOf, -2.32, 1.765, z => top(z) + 0.0155, NOAA_LIV.sky, 6.5);
             },
-            windows: [{ z: -0.90 }, { z: -0.45, drop: true }, { z: 0.00 }, { z: 0.40 }],
+            windows: [{ z: -0.747 }, { z: -0.336, drop: true }, { z: 0.075 }, { z: 0.440 }],
             windowStyle: 'oval',
-            tailWrap: { zTop: 1.42, slope: 1.5 },
-            reg: { text: reg, z: 1.76, u: 0.235, color: '#ffffff', px: 14 },
-            emblem: { z: -1.40, side: 'left', r: 19 }
+            tailWrap: { zTop: 1.372, slope: 1.37 },
+            reg: { text: reg, z: 1.683, u: 0.235, color: '#ffffff', px: 14 },
+            // centered in the TRUE midpoint of the two forward bubble meshes (-1.55/-1.25),
+            // sized well under their 0.236 gap so clear white shows on both sides
+            emblem: { z: -1.40, side: 'left', r: 16 }
         });
-        const mats = planeMats(tex, finTexture(0.68, { x0: 0.15, xs: 0.72, c0: 0.24, cs: 0.74 }));
+        const mats = planeMats(tex, finTexture(0.68, { x0: 0.15, xs: 0.72, c0: 0.24, cs: 0.92 }));
 
         // hull starts behind the radome; the crown climbs steeply between -2.06 and -1.90 (the
         // forehead face) with the windshield band riding that slope, and the aft body funnels
@@ -483,16 +545,19 @@
             { z: -2.58, r: 0.030, y: -0.055 }, { z: -2.52, r: 0.085, y: -0.048 }, { z: -2.42, r: 0.120, y: -0.041 },
             { z: -2.34, r: 0.140, y: -0.034 }, { z: -2.27, r: 0.150, y: -0.030 }
         ], radomeMat, 32));
+        // the lathe is an open surface, so a small cap closes the radome point
+        const radomeTip = new THREE.Mesh(new THREE.SphereGeometry(0.030, 12, 10), radomeMat);
+        radomeTip.position.set(0, -0.055, -2.58); grp.add(radomeTip);
 
         // wraparound windshield glass on the forehead, with the two small corner roof panes
         addWindshieldBand(grp, [
             { z: -2.17, r: 0.182, y: -0.021 }, { z: -2.06, r: 0.223, y: -0.008 }, { z: -1.93, r: 0.250, y: 0 }
         ], 0.78, [0.31, 0.5, 0.69], true);
 
-        // instrumented nose boom (gust probe): finely candy-striped, exiting slightly off-center
-        // from the radome's upper shoulder with a touch of up-tilt
+        // instrumented nose boom (gust probe): finely candy-striped, exiting from the SIDE of
+        // the nose (the radome's starboard flank) with a touch of up-tilt
         const boomGrp = new THREE.Group();
-        boomGrp.position.set(0.045, -0.045, -2.46); boomGrp.rotation.x = 0.05;
+        boomGrp.position.set(0.10, -0.035, -2.42); boomGrp.rotation.x = 0.05;
         const boomRed = new THREE.MeshPhongMaterial({ color: 0xd23b2f, shininess: 40 });
         const boomSegs = 14, boomLen = 0.60, segLen = boomLen / boomSegs;
         for (let bi = 0; bi < boomSegs; bi++) {
@@ -532,9 +597,10 @@
         const boomCap = new THREE.Mesh(new THREE.SphereGeometry(0.076, 14, 12), mats.navy);
         boomCap.position.set(0, 0.128, 2.87); grp.add(boomCap);
 
-        // lower-fuselage C-band radome (the big belly dome) + chin radome, both dark sensor hardware
-        const belly = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 18), mats.dark);
-        belly.scale.set(0.22, 0.085, 0.40); belly.position.set(0, -0.235, 0.15); grp.add(belly);
+        // the MMR: the big circular black radar disk on the FORWARD underbelly, between the
+        // wing and the navy nose wrap; plus the chin radome under the flight deck
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 18), radomeMat);
+        belly.scale.set(0.20, 0.055, 0.23); belly.position.set(0, -0.242, -1.20); grp.add(belly);
         const chin = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), mats.dark);
         chin.scale.set(0.10, 0.07, 0.14); chin.position.set(0, -0.185, -2.05); grp.add(chin);
 
@@ -613,42 +679,53 @@
     // tail Doppler radar tube out the tail cone.
     function buildGIVModel(reg) {
         const grp = new THREE.Group();
-        const L = 4.4, Z0 = -2.2;
-        // Livery: white hull and belly, the low sky cheatline pair down the side, and the navy
-        // tail sweeping diagonally down-forward over the aft fuselage; registration rides the
-        // starboard engine nacelle, not the hull.
+        // Livery: one navy sweep, drawn to the N49RF photos. Aft, the navy sits well above the
+        // tail radar (the tail cone is white at the TDR's level); going forward the sweep
+        // narrows into a THIN band diving diagonally across the side at about the fifth window,
+        // then runs forward as the navy underbelly, ending where the two sides' diagonals
+        // CONVERGE under the belly still at thickness (a blunt rounded stop under the flight
+        // deck, not a hairline pinch; white under the nose). The sky stripe is bold and rides
+        // the navy's upper edge the whole way. Registration is on the starboard engine
+        // nacelle, not the hull.
+        // The texture's z frame MUST match the hull lathe's station span (-2.16..1.98), because
+        // bodyLathe maps texture v to the lathe's own z fraction; a nominal frame here shifts
+        // every painted feature away from the 3D geometry it must line up with.
         const tex = fuselageTexture({
-            len: L, z0: Z0, antiGlareZ: null,
+            len: 4.14, z0: -2.16, antiGlareZ: null,
             paintLivery: (g, vOf) => {
-                const v0 = vOf(-1.95), v1 = vOf(1.60);
-                paintSideBand(g, 512, 1024, 0.150, 0.163, v0, v1, NOAA_LIV.navy);
-                paintSideBand(g, 512, 1024, 0.171, 0.185, v0, v1, NOAA_LIV.sky);
+                // the belly stripe holds full thickness to its forward end, then drops to the
+                // seam over a very short run: two solid thick bands meeting bluntly, no point
+                const top = z => liveryCurve(z, [[-1.454, 0.001], [-1.393, 0.06], [-1.078, 0.075], [-0.560, 0.15], [-0.015, 0.43], [0.333, 0.50]]);
+                const bot = z => liveryCurve(z, [[-0.673, 0], [-0.372, 0.17], [-0.015, 0.36], [0.428, 0.31], [1.133, 0.34], [1.773, 0.38]]);
+                paintSweep(g, 512, 1024, vOf, -1.454, 1.98, top, bot, NOAA_LIV.navy);
+                strokeSweep(g, 512, 1024, vOf, -1.436, 1.698, z => Math.min(top(z) + 0.009, 0.492), NOAA_LIV.sky, 9);
             },
-            windows: [{ z: -1.25 }, { z: -1.02 }, { z: -0.79 }, { z: -0.56 }, { z: -0.33 }],
+            windows: [{ z: -1.266 }, { z: -1.050 }, { z: -0.833 }, { z: -0.617 }, { z: -0.400 }],
             windowStyle: 'circle', windowR: 6,
-            tailWrap: { zTop: 1.05, slope: 1.7 },
-            emblem: { z: -1.40, side: 'right', r: 22 }
+            emblem: { z: -1.407, side: 'right', r: 22, u: 0.325 }
         });
-        const mats = planeMats(tex, finTexture(0.66, { x0: 0.18, xs: 0.62, c0: 0.24, cs: 0.74 }));
+        const mats = planeMats(tex, finTexture(0.66, { x0: 0.18, xs: 0.62, c0: 0.22, cs: 1.0 }));
 
-        // nose runs out the cone-like radar tip into a long plateau; the forehead then rises
-        // abruptly so the windshield stands up as a real visor, more raked than the WP-3D's
-        // but nowhere near lying along the nose
+        // nose rounds off into a short radar tip (fuller than a point, nowhere near the WP-3D's
+        // radome bulb) and runs a plateau; the forehead then rises abruptly so the windshield
+        // stands up as a real visor, more raked than the WP-3D's but not lying along the nose
         grp.add(bodyLathe([
-            { z: -2.20, r: 0.016, y: -0.052 }, { z: -2.08, r: 0.052, y: -0.050 }, { z: -1.96, r: 0.085, y: -0.046 },
-            { z: -1.86, r: 0.104, y: -0.042 }, { z: -1.74, r: 0.118, y: -0.037 }, { z: -1.64, r: 0.153, y: -0.017 },
+            { z: -2.16, r: 0.042, y: -0.051 }, { z: -2.10, r: 0.070, y: -0.049 }, { z: -2.02, r: 0.092, y: -0.046 },
+            { z: -1.92, r: 0.106, y: -0.043 }, { z: -1.82, r: 0.113, y: -0.040 }, { z: -1.74, r: 0.118, y: -0.037 },
+            { z: -1.64, r: 0.153, y: -0.017 },
             { z: -1.55, r: 0.176, y: -0.007 }, { z: -1.40, r: 0.186, y: -0.001 },
             { z: -1.20, r: 0.190, y: 0 }, { z: 0.65, r: 0.19, y: 0 },
             { z: 1.25, r: 0.155, y: 0.03 }, { z: 1.70, r: 0.10, y: 0.068 }, { z: 1.98, r: 0.066, y: 0.086 }
         ], mats.hull, 48));
-        // rounded cap closing the very tip of the nose
-        const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), mats.white);
-        noseTip.position.set(0, -0.052, -2.20); grp.add(noseTip);
+        // rounded cap closing the nose
+        const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.042, 14, 12), mats.white);
+        noseTip.position.set(0, -0.051, -2.16); grp.add(noseTip);
 
-        // wraparound windshield glass riding the forehead rise at the plateau's end
+        // wraparound windshield riding the forehead rise, kept SHORT vertically: two center
+        // panes with a smaller, round-cornered pane at each end (the gulfPanes texture layout)
         addWindshieldBand(grp, [
-            { z: -1.74, r: 0.126, y: -0.036 }, { z: -1.645, r: 0.158, y: -0.018 }, { z: -1.55, r: 0.182, y: -0.006 }
-        ], 0.76, [0.28, 0.5, 0.72]);
+            { z: -1.745, r: 0.127, y: -0.0365 }, { z: -1.665, r: 0.152, y: -0.0215 }, { z: -1.585, r: 0.174, y: -0.0095 }
+        ], 0.80, null, false, true);
 
         // swept wings + winglets, flap/aileron grooves on both faces
         const wing = { rootChord: 0.74, tipChord: 0.19, halfSpan: 1.85, sweepDeg: 30, dihedralDeg: 3, thick: 0.09, mat: mats.white, root: { x: 0, y: -0.13, z: -0.48 }, grooves: { hinge: 0.72, seps: [0.14, 0.60, 0.95] } };
@@ -681,16 +758,17 @@
             pylon.position.set(side * 0.215, 0.06, 1.24); grp.add(pylon);
         });
 
-        // T-tail: fin decal, bullet fairing, stabilizer across the top, rudder/elevator grooves
+        // T-tail, all navy up to the tail radar: fin decal, navy bullet fairing, navy
+        // stabilizers across the top with darker elevator grooves
         const fin = finPanel({ height: 0.74, rootChord: 0.62, tipChord: 0.36, sweepDeg: 38, thick: 0.07, mat: mats.fin });
         fin.position.set(0, 0.13, 1.62); grp.add(fin);
         // flag ahead of the rudder hinge line, so the rudder groove never cuts through it
         addFinFlags(grp, { halfThick: 0.031, y: 0.72, z: 2.20 });
         const finTipZ = 1.62 + Math.tan(38 * Math.PI / 180) * 0.74, finTipY = 0.13 + 0.74;
-        const htail = { rootChord: 0.36, tipChord: 0.16, halfSpan: 0.68, sweepDeg: 25, dihedralDeg: 0, thick: 0.08, mat: mats.white, root: { x: 0, y: finTipY, z: finTipZ }, grooves: { hinge: 0.62, seps: [0.12, 0.94] } };
+        const htail = { rootChord: 0.36, tipChord: 0.16, halfSpan: 0.68, sweepDeg: 25, dihedralDeg: 0, thick: 0.08, mat: mats.white, root: { x: 0, y: finTipY, z: finTipZ }, grooves: { hinge: 0.62, seps: [0.12, 0.94], base: NOAA_LIV.navy, line: '#12336b' } };
         grp.add(wingPanel({ ...htail, side: 1 }));
         grp.add(wingPanel({ ...htail, side: -1 }));
-        const bullet = bodyLathe([{ z: -0.10, r: 0.012 }, { z: 0.02, r: 0.038 }, { z: 0.30, r: 0.036 }, { z: 0.46, r: 0.012 }], mats.white, 14);
+        const bullet = bodyLathe([{ z: -0.10, r: 0.012 }, { z: 0.02, r: 0.038 }, { z: 0.30, r: 0.036 }, { z: 0.46, r: 0.012 }], mats.navy, 14);
         bullet.position.set(0, finTipY, finTipZ - 0.04); grp.add(bullet);
 
         // tail Doppler radar: a stub a third of the fuselage's thickness that the funneled tail
@@ -701,6 +779,9 @@
         tdrCap.position.set(0, 0.088, 2.34); grp.add(tdrCap);
 
         addAntennas(grp, mats.white, [[-1.1, 0.19, true], [0.2, 0.195, true]]);
+        // the whole airframe compresses along its length to the real G-IV's stubby
+        // length-to-span proportions; every child (wings, tail, decals, windshield) rides along
+        grp.scale.z = 0.88;
         return grp;
     }
 

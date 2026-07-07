@@ -81,7 +81,7 @@
     function parseFlightTextToRows(rawText) {
         const stats = {
             dataLines: 0, parsed: 0, rows: 0, timeSource: null,
-            dropped: { shortLine: 0, noTime: 0, badPosition: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0 },
+            dropped: { shortLine: 0, noTime: 0, badPosition: 0, noSpeed: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0 },
             derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0 }
         };
         const lines = rawText.split('\n');
@@ -154,12 +154,18 @@
         if (tempParsedData.length === 0) return { rows: [], stats };
         tempParsedData.sort((a,b) => a.absSeconds - b.absSeconds);
         let cleaned = [];
-        // Cleanup drops rows below 20 kt airspeed (ramp idle, normally unused, and it slows playback)
-        // and erroneous rows (duplicate timestamps, GPS teleports, hour-plus gaps); everything else,
-        // including slow taxi above 20 kt, is part of the record. Rows with no airspeed are kept.
+        // Cleanup drops rows below 20 kt airspeed (ramp idle, normally unused, and it slows playback),
+        // rows with NO airspeed reading when the file carries an airspeed channel (unfilled .nc
+        // padding; positionless rows are already gone via badPosition above), and erroneous rows
+        // (duplicate timestamps, GPS teleports, hour-plus gaps); everything else, including slow
+        // taxi above 20 kt, is part of the record. A file with no airspeed channel at all (the
+        // archive's decimated fallback track) keeps every row, there is no basis to filter it.
+        const hasSpeedChannel = ['tas.d', 'tasref', 'taskt.d', 'taskt.1', 'iaskt.d', 'casaddukt.1', 'ias.d']
+            .some(k => hMap[k] !== undefined);
         for (let i = 0; i < tempParsedData.length; i++) {
             let current = tempParsedData[i];
             const spd = current.tas !== null ? current.tas : current.ias;
+            if (hasSpeedChannel && spd === null) { stats.dropped.noSpeed++; continue; }
             if (spd !== null && spd < 20) { stats.dropped.preTakeoff++; continue; }
             if (cleaned.length === 0) { current.computedVsi = 0; cleaned.push(current); continue; }
             let prev = cleaned[cleaned.length - 1]; let dt = current.absSeconds - prev.absSeconds;
@@ -195,6 +201,7 @@
         if (d.gapReset) drops.push(fmt(d.gapReset) + ' before a data gap over 1 hr');
         if (d.noTime) drops.push(fmt(d.noTime) + ' with no valid time');
         if (d.badPosition) drops.push(fmt(d.badPosition) + ' with no valid position');
+        if (d.noSpeed) drops.push(fmt(d.noSpeed) + ' with no airspeed reading');
         if (d.shortLine) drops.push(fmt(d.shortLine) + ' malformed lines');
         if (d.error) drops.push(fmt(d.error) + ' unreadable lines');
         if (drops.length) out.push('filtered out: ' + drops.join(', '));

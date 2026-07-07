@@ -131,8 +131,9 @@ section('Time handling');
 // ---------------------------------------------------------------------------------------------
 section('Row filters count what they drop');
 {
-    // Rows below 20 kt airspeed (ramp idle) are filtered and counted; 20 kt and above is kept,
-    // as are rows with no airspeed at all.
+    // Rows below 20 kt airspeed (ramp idle) are filtered and counted; 20 kt and above is kept.
+    // A row with NO airspeed reading in a file that carries an airspeed channel is unfilled
+    // padding (.nc fill rows) and is dropped and counted separately.
     const r = parseFlightTextToRows(tsv(H, [
         ['9', '59', '58', '20.000', '-60.000', '5', '50', '90', '10', '20'],
         ['9', '59', '59', '20.000', '-60.000', '12', '50', '90', '10', '20'],
@@ -141,10 +142,21 @@ section('Row filters count what they drop');
         ['10', '0', '2', '20.002', '-60.002', '200', '50', '90', '3000', '20'],
         ['10', '0', '3', '20.003', '-60.003', '', '50', '90', '3000', '20'],
     ]));
-    check('sub-20kt rows filtered, faster rows kept', r.rows.length, 3);
+    check('sub-20kt rows filtered, faster rows kept', r.rows.length, 2);
     check('sub-20kt filtering counted for the data report', r.stats.dropped.preTakeoff, 3);
     check('playback starts at the first moving sample', r.rows[0].tas, 30);
-    check('rows with no airspeed are kept', r.rows[2].tas, null);
+    check('airspeed-less row dropped when the file has an airspeed channel', r.stats.dropped.noSpeed, 1);
+}
+{
+    // A file with no airspeed channel at all (the archive's decimated fallback track) keeps
+    // every row; there is no basis to filter it.
+    const r = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'WSkt.d', 'WD.d', 'ALTref', 'X1', 'X2'], [
+        ['10', '0', '0', '20.000', '-60.000', '50', '90', '3000', '', ''],
+        ['10', '0', '1', '20.001', '-60.001', '50', '90', '3000', '', ''],
+        ['10', '0', '2', '20.002', '-60.002', '50', '90', '3000', '', ''],
+    ]));
+    check('file without an airspeed channel keeps all rows', r.rows.length, 3);
+    check('nothing counted as airspeed-less in that file', r.stats.dropped.noSpeed, 0);
 }
 {
     // Dateline crossing survives (a realistic 1 Hz step), a genuine teleport is dropped and counted.

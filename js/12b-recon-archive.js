@@ -496,12 +496,25 @@
     // Nearest best-track fix to the current playback time (points are chronological, ~6h apart).
     function nearestStormPoint(ms) {
         if (!stormTrackPoints.length) return null;
-        let best = stormTrackPoints[0], bestDiff = Math.abs(best.ms - ms);
+        let bestIdx = 0, bestDiff = Math.abs(stormTrackPoints[0].ms - ms);
         for (let i = 1; i < stormTrackPoints.length; i++) {
             const diff = Math.abs(stormTrackPoints[i].ms - ms);
-            if (diff < bestDiff) { bestDiff = diff; best = stormTrackPoints[i]; }
+            if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
         }
-        return { point: best, diffMs: bestDiff };
+        return { point: stormTrackPoints[bestIdx], idx: bestIdx, diffMs: bestDiff };
+    }
+
+    // The fix the status card refers to; both trackers mark it with a discreet thin ring
+    // (drawStormTrack2D in 2D, stormFixRing3D in 3D), kept in step with the card here.
+    let currentStormFixIdx = -1;
+    function setCurrentStormFix(idx) {
+        currentStormFixIdx = idx;
+        if (typeof stormFixRing3D === 'undefined' || !stormFixRing3D) return;
+        const p = idx >= 0 ? stormTrackPoints[idx] : null;
+        if (!p) { stormFixRing3D.visible = false; return; }
+        const c = get3DCoord(p.lon, p.lat, 0);
+        stormFixRing3D.position.x = c.x; stormFixRing3D.position.z = c.z;
+        stormFixRing3D.visible = true;
     }
 
     // Per-frame storm status card (left side, next to the archive controls, not an on-map overlay),
@@ -511,11 +524,12 @@
         const body = document.getElementById('stormStatusBody');
         if (!card || !body) return;
         if (!showStormTrack || stormTrackPoints.length === 0 || !stormTrackMeta || flightMetaData.date === 'Unknown' || filteredData.length === 0) {
-            card.classList.add('hidden'); return;
+            card.classList.add('hidden'); setCurrentStormFix(-1); return;
         }
-        const row = filteredData[currentIdx]; if (!row) { card.classList.add('hidden'); return; }
+        const row = filteredData[currentIdx]; if (!row) { card.classList.add('hidden'); setCurrentStormFix(-1); return; }
         const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
-        const near = nearestStormPoint(flightMs); if (!near) { card.classList.add('hidden'); return; }
+        const near = nearestStormPoint(flightMs); if (!near) { card.classList.add('hidden'); setCurrentStormFix(-1); return; }
+        setCurrentStormFix(near.idx);
         const p = near.point;
         const windTxt = p.windKt != null ? `${p.windKt}kt` : '-';
         const presTxt = p.pressureMb != null ? `${p.pressureMb}mb` : '-';

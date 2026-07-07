@@ -141,6 +141,14 @@
             ctx.fillText(lbl, 0, 0.5);
             ctx.restore();
         });
+        // discreet thin ring on the fix the status card currently refers to
+        if (typeof currentStormFixIdx !== 'undefined' && currentStormFixIdx >= 0 && stormTrackPoints[currentStormFixIdx]) {
+            const p = stormTrackPoints[currentStormFixIdx];
+            ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
+            ctx.beginPath(); ctx.arc(0, 0, 12, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(226,232,240,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+        }
         ctx.restore();
     }
 

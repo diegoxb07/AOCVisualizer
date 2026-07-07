@@ -40,7 +40,7 @@
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const w = c.width / dpr; const h = c.height / dpr; const cx = w / 2; const cy = h / 2;
         ctx.clearRect(0, 0, w, h);
-        const isImperial = document.getElementById('toggleImperial').checked, useGps = document.getElementById('toggleGpsAlt').checked;
+        const isImperial = document.getElementById('toggleImperial').checked, useGps = !document.getElementById('toggleGpsAlt').checked;
         // The tape prefers IAS like a real G1000 (TAS gets its own data strip below); falls back to TAS.
         const hasAttitude = d.pitch !== null || d.roll !== null, pitch = d.pitch || 0, roll = d.roll || 0;
         const iasVal = (availableMetrics.has('ias') && d.ias !== null) ? d.ias : null;

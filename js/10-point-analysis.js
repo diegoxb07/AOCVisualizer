@@ -5,7 +5,7 @@
     function processPointAnalysisPlotting(dataRow) {
         document.getElementById('pointAnalysisModal').style.display = 'flex'; currentPointAnalysisData = dataRow; 
         const targetPr = dataRow.pressure !== null ? dataRow.pressure : (dataRow.sfcPr !== null ? dataRow.sfcPr : 850);
-        const isImperial = document.getElementById('toggleImperial').checked; const useGps = document.getElementById('toggleGpsAlt').checked;
+        const isImperial = document.getElementById('toggleImperial').checked; const useGps = !document.getElementById('toggleGpsAlt').checked;
         
         let rhCalc = null;
         if (dataRow.tempr !== null && dataRow.dewpt !== null) {
@@ -53,7 +53,7 @@
 
     function downloadPointAnalysis() {
         if (!currentPointAnalysisData) return;
-        const d = currentPointAnalysisData, isImperial = document.getElementById('toggleImperial').checked, useGps = document.getElementById('toggleGpsAlt').checked;
+        const d = currentPointAnalysisData, isImperial = document.getElementById('toggleImperial').checked, useGps = !document.getElementById('toggleGpsAlt').checked;
         const targetPr = d.pressure !== null ? d.pressure : (d.sfcPr !== null ? d.sfcPr : 850);
         const sf = (val, dec=1) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
 

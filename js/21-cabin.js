@@ -261,8 +261,9 @@
         kitchen.position.set(-0.10, floorY + 0.07, 1.30); grp.add(kitchen);
         const bench = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.26), deskMat);
         bench.position.set(0.10, floorY + 0.045, 1.30); grp.add(bench);
+        // sits a hair below the main cabin floor plane, coplanar strips z-fight and flicker
         const aftFloor = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.03, 0.52), surfMat);
-        aftFloor.position.set(0, floorY - 0.015, 1.26); grp.add(aftFloor);
+        aftFloor.position.set(0, floorY - 0.021, 1.26); grp.add(aftFloor);
     }
 
     // --- 3D crew: jointed crash-test dummies belted into a hollow cabin trough. Figure layout is

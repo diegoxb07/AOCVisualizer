@@ -132,7 +132,7 @@
 
         updateMissionHeader();
 
-        ['startTimeInput', 'endTimeInput', 'playPauseBtn', 'exportKmlBtn', 'exportClipBtn'].forEach(id => document.getElementById(id).disabled = false);
+        ['startTimeInput', 'endTimeInput', 'playPauseBtn', 'exportClipBtn'].forEach(id => document.getElementById(id).disabled = false);
         document.getElementById('startTimeInput').value = allParsedData[0].time;
         document.getElementById('endTimeInput').value = allParsedData[allParsedData.length-1].time;
 

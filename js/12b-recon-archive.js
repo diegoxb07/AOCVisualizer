@@ -25,13 +25,18 @@
     const reconSourceLink = document.getElementById('reconSourceLink');
     const reconArchiveStatus = document.getElementById('reconArchiveStatus');
 
+    let reconYearsLanded = false;   // flips when the archive year list arrives; gates the pre-cache buttons
     function syncReconLoadButtonState() {
         if (!reconLoadBtn) return;
         const apiDown = reconApiHealthChecked && !reconApiHealthOk;
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
-        // The preload modal carries its own season selector, so it only needs the API alive.
+        // Both pre-cache buttons open modals with their own pickers, so they only need the
+        // archive bootstrap done (year list landed) and the API alive.
+        const ready = reconYearsLanded && !apiDown;
         const preBtn = document.getElementById('reconPreloadBtn');
-        if (preBtn) preBtn.disabled = apiDown;
+        if (preBtn) preBtn.disabled = !ready;
+        const batchBtn = document.getElementById('batchCacheBtn');
+        if (batchBtn) batchBtn.disabled = !ready;
     }
 
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
@@ -84,8 +89,9 @@
         reconYearSelect.options[0].textContent = 'Year…';
         reconYearSelect.disabled = false;
         reconYearSelect.style.cursor = '';
-        syncReconLoadButtonState();   // the preload modal is usable as soon as the API answers
-        const spin = document.getElementById('archiveLoadingSpin'); if (spin) spin.remove();
+        reconYearsLanded = true;
+        syncReconLoadButtonState();   // the pre-cache buttons open up with the year list
+        ['archiveLoadingSpin', 'preloadBtnSpin', 'batchBtnSpin'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
     }
     const reconYearsReady = populateReconYears();
 
@@ -441,7 +447,6 @@
             const track = await fetchStormTrackData(mission);
             stormTrackPoints = track.points; stormTrackMeta = track.meta;
             setReconStatus(`Loaded ${mission.mission_id} + ${stormTrackPoints.length} obs best-track for ${track.meta.name}.`);
-            if (typeof showToast === 'function') showToast(`${track.meta.name}'s whole-life best track is on the map: the dashed line with cyclone symbols, labeled at its first fix.`, 7000);
         } catch (e) {
             setReconStatus(`Loaded ${mission.mission_id}. No best-track found for ${mission.storm_name} (${e.message}).`);
         }

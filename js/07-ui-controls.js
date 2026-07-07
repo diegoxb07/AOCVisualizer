@@ -151,20 +151,26 @@
         return /\d{8}N\d/i.test(id) || /gulfstream|\bg-?iv\b|\bn49/i.test(ac + ' ' + id);
     }
 
-    let storm3DIcons = [];      // cyclone sprite materials on the 3D best-track, spun by the render loop
-    let _cycloneTex3D = null;
-    // Shared white tropical-cyclone symbol (disc + two spiral arms); sprites tint it per intensity.
-    function cycloneTex3D() {
-        if (_cycloneTex3D) return _cycloneTex3D;
-        const cv = document.createElement('canvas'); cv.width = 64; cv.height = 64;
+    // White tropical-cyclone symbol (disc + spiral arms above depression strength) carrying its
+    // dark category label, cached per label; the mesh material tints the white per intensity
+    // while the label stays dark and readable. Drawn flat on the sea, never billboarded or spun.
+    let _stormSymTex = {};
+    function stormSymbolTex(label) {
+        if (_stormSymTex[label]) return _stormSymTex[label];
+        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
         const c = cv.getContext('2d');
         c.strokeStyle = '#ffffff'; c.fillStyle = '#ffffff'; c.lineCap = 'round';
-        c.beginPath(); c.arc(32, 32, 9, 0, Math.PI * 2); c.fill();
-        c.lineWidth = 7;
-        c.beginPath(); c.arc(32, 32, 18, -0.3, 1.6); c.stroke();
-        c.beginPath(); c.arc(32, 32, 18, Math.PI - 0.3, Math.PI + 1.6); c.stroke();
-        _cycloneTex3D = new THREE.CanvasTexture(cv);
-        return _cycloneTex3D;
+        c.beginPath(); c.arc(64, 64, 34, 0, Math.PI * 2); c.fill();
+        if (label !== 'TD') {
+            c.lineWidth = 13;
+            c.beginPath(); c.arc(64, 64, 44, -0.3, 1.5); c.stroke();
+            c.beginPath(); c.arc(64, 64, 44, Math.PI - 0.3, Math.PI + 1.5); c.stroke();
+        }
+        c.fillStyle = '#0b1220'; c.font = '700 36px sans-serif';
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(label, 64, 66);
+        _stormSymTex[label] = new THREE.CanvasTexture(cv);
+        return _stormSymTex[label];
     }
 
     // Home camera offset from the aircraft (the orbit target): close enough that the airframe
@@ -209,7 +215,6 @@
             requestAnimationFrame(animate3D); if (controls3D) controls3D.update();
             // props spin only while playback runs; pausing freezes them with everything else
             if (typeof planeSpinners3D !== 'undefined' && isPlaying) for (let i = 0; i < planeSpinners3D.length; i++) planeSpinners3D[i].rotation.z += 0.3;
-            for (let i = 0; i < storm3DIcons.length; i++) storm3DIcons[i].rotation -= 0.02;   // cyclone icons turn slowly
             renderer3D.render(scene3D, camera3D);
         }
         animate3D(); threeDInitialized = true;
@@ -308,24 +313,65 @@
         // Storm best-track overlay (js/12b-recon-archive.js), same points as the 2D layer, flattened to
         // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
         // flight's altitude profile.
-        storm3DIcons = [];
         if (showStormTrack && stormTrackPoints.length > 1) {
-            const stormPts = [], stormColors = [];
-            stormTrackPoints.forEach(p => {
-                stormPts.push(get3DCoord(p.lon, p.lat, 0));
-                const hex = stormWindColor(p.windKt); const c = new THREE.Color(hex); stormColors.push(c.r, c.g, c.b);
-            });
-            const stormGeom = new THREE.BufferGeometry().setFromPoints(stormPts); stormGeom.setAttribute('color', new THREE.Float32BufferAttribute(stormColors, 3));
-            const stormMat = new THREE.LineDashedMaterial({ vertexColors: true, linewidth: 2, dashSize: 0.3, gapSize: 0.2 });
-            const stormTrack3D = new THREE.Line(stormGeom, stormMat); stormTrack3D.computeLineDistances(); threeMapGroup.add(stormTrack3D);
-            // spinning cyclone icon at every best-track fix, tinted by the same intensity ramp as
-            // the 2D symbols, so the dashed line is unmistakably the storm
+            const stormPts = [];
+            stormTrackPoints.forEach(p => stormPts.push(get3DCoord(p.lon, p.lat, 0)));
+            // flat dashed ribbon laid on the sea surface, one strip per fix-to-fix leg
+            // (shortened to leave the gap), intensity-colored like the 2D layer; the width
+            // scales with the track's own extent so it stays readable at the zoom that frames it
+            const bb = new THREE.Box3().setFromPoints(stormPts);
+            const span = bb.getSize(new THREE.Vector3()).length();
+            const ribbonW = Math.max(0.2, span * 0.0022);
+            for (let i = 0; i < stormPts.length - 1; i++) {
+                const a = stormPts[i], b = stormPts[i + 1];
+                const dx = b.x - a.x, dz = b.z - a.z;
+                const legLen = Math.hypot(dx, dz) * 0.72;
+                if (legLen < 0.01) continue;
+                const geo = new THREE.PlaneGeometry(ribbonW, legLen);
+                geo.rotateX(-Math.PI / 2);   // lay the strip flat; its length axis runs along z
+                const strip = new THREE.Mesh(geo,
+                    new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(stormTrackPoints[i].windKt)), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+                strip.position.copy(a).lerp(b, 0.5); strip.position.y = 0.03;
+                strip.rotation.y = Math.atan2(dx, dz);
+                strip.renderOrder = 1;   // symbols draw after the ribbon, whatever the camera angle
+                threeMapGroup.add(strip);
+            }
+            // flat, static cyclone symbol at each fix with its category printed on it
+            const symSize = Math.max(0.45, ribbonW * 1.7);
             stormTrackPoints.forEach((p, i) => {
-                const mat = new THREE.SpriteMaterial({ map: cycloneTex3D(), color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, opacity: 0.9, depthWrite: false });
-                const spr = new THREE.Sprite(mat);
-                spr.scale.set(0.14, 0.14, 1);
-                spr.position.copy(stormPts[i]); spr.position.y = 0.03;
-                threeMapGroup.add(spr); storm3DIcons.push(mat);
+                const geo = new THREE.PlaneGeometry(symSize, symSize);
+                geo.rotateX(-Math.PI / 2);
+                const sym = new THREE.Mesh(geo,
+                    new THREE.MeshBasicMaterial({ map: stormSymbolTex(stormCatLabel(p.windKt)), color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+                sym.position.copy(stormPts[i]); sym.position.y = 0.06;
+                sym.renderOrder = 2;
+                threeMapGroup.add(sym);
+            });
+            // vertical dotted column rising to the flight path's altitude from each fix NEAR
+            // the flight, so those observations read directly against the track flying above
+            // them (far-away fixes stay clean); stacked thin cylinders make the dashes, since
+            // WebGL lines cannot be thick
+            let colTop = 0;
+            const flightXZ = [];
+            for (let i = 0; i < filteredData.length; i += 50) {
+                const d = filteredData[i];
+                colTop = Math.max(colTop, track3DAltMeters(d) / 250);
+                const c = get3DCoord(d.lon, d.lat, 0);
+                flightXZ.push([c.x, c.z]);
+            }
+            if (colTop < 4) colTop = 4;
+            const fb = new THREE.Box3().setFromPoints(flightXZ.map(([x, z]) => new THREE.Vector3(x, 0, z)));
+            const nearDist = Math.max(6, fb.getSize(new THREE.Vector3()).length() * 0.35);
+            const dashLen = colTop / 15, dashR = Math.max(0.03, ribbonW * 0.06);
+            stormTrackPoints.forEach((p, i) => {
+                const near = flightXZ.some(([fx, fz]) => (fx - stormPts[i].x) * (fx - stormPts[i].x) + (fz - stormPts[i].z) * (fz - stormPts[i].z) < nearDist * nearDist);
+                if (!near) return;
+                const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, opacity: 0.45, depthWrite: false });
+                for (let d = 0; d < 15; d += 2) {
+                    const dash = new THREE.Mesh(new THREE.CylinderGeometry(dashR, dashR, dashLen, 6, 1), mat);
+                    dash.position.set(stormPts[i].x, (d + 0.5) * dashLen, stormPts[i].z);
+                    threeMapGroup.add(dash);
+                }
             });
             // name tag floating over the first fix
             if (stormTrackMeta && stormTrackMeta.name) {
@@ -336,8 +382,8 @@
                 const tag = stormTrackMeta.name.toUpperCase() + ' BEST TRACK';
                 c2.strokeText(tag, 256, 32); c2.fillStyle = '#e2e8f0'; c2.fillText(tag, 256, 32);
                 const lblSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthWrite: false }));
-                lblSpr.scale.set(1.6, 0.2, 1);
-                lblSpr.position.copy(stormPts[0]); lblSpr.position.y = 0.22;
+                lblSpr.scale.set(Math.max(1.6, ribbonW * 4.5), Math.max(0.2, ribbonW * 0.56), 1);
+                lblSpr.position.copy(stormPts[0]); lblSpr.position.y = Math.max(0.22, ribbonW * 0.9);
                 threeMapGroup.add(lblSpr);
             }
         }

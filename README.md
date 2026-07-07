@@ -1,7 +1,7 @@
 # Mission Visualizer
 
 This video telemetry tool replays flight-level instrument data together with synced radar
-(**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, and KML / video clip ex[...]
+(**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, and video clip ex[...]
 
 Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser, API-backend optional.
 
@@ -35,7 +35,6 @@ flowchart TD
     SATGOES --> PLAY
     SATPOLAR --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
-    EXPORT -- "Google Earth" --> KML["Export KML"]
     EXPORT -- "Briefing video" --> CLIP["Record Clip (.webm)"]
     EXPORT -- "No, just analyzing" --> DONE(["Done: measure, mark & compare freely"])
 
@@ -46,7 +45,7 @@ flowchart TD
     classDef playback fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef term fill:#e2e8f0,stroke:#475569,color:#0f172a
     class ARCHIVE,MMR,WINDOW,SAT,FROMARC,EXPORT decision
-    class LOADARC,UPLOAD,LOADED,KML data
+    class LOADARC,UPLOAD,LOADED data
     class VIDEO,CLIP mmr
     class SATGOES,SATPOLAR sat
     class TRIM,PLAY playback
@@ -169,7 +168,6 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 ## 8. Exporting
 
-- **Export KML**: saves the flight path for Google Earth / GIS.
 - **Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progre[...]
 
 ---

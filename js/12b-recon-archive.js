@@ -724,6 +724,10 @@
     // Open a preloaded mission: no download, no parse. A stored-only stub from a previous visit
     // pulls its record out of IndexedDB first, then applies like a session-cached one.
     async function openPreloadedMission(missionId) {
+        // The preloaded list rehydrates from IndexedDB while later script files are still
+        // loading, so on a slow connection a stub can be opened before the playback engine
+        // (js/18-engine.js and beyond) has executed; wait out the page load first.
+        if (document.readyState !== 'complete') await new Promise(r => window.addEventListener('load', r, { once: true }));
         let rec = preloadedMissions.get(missionId); if (!rec) return;
         if (!rec.parsed) {
             setReconStatus('Opening ' + missionId + ' from the on-device store…');

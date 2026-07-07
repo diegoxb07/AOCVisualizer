@@ -20,26 +20,35 @@
     const NOAA_LIV = { white: '#f2f5f7', navy: '#1b4a94', sky: '#7ec8ec', black: '#1d2126', dark: '#2b3540', metal: '#aab4bd', prop: '#23272c' };
 
     // Cabin geometry the crew view sizes itself from, per airframe (plane-local units).
-    // seats = every seat on the aircraft as {x, z}, one crew figure in each. The P-3 list is
-    // the AOC seating diagram's 19 positions in its numbering, laid out as ROWS down the cabin
-    // with a flight-computer rack standing between each row (buildP3Interior): 1 pilot +
-    // 2 copilot side by side, 3 flight engineer at the pedestal, then single-seat rows
-    // alternating sides of the aisle (4 station 1, 5 FD, 6 NAV), the C3X pair 7-8 sitting
-    // two-abreast on the PORT side (aisle to their right), 9 station 3 single, the station 3
-    // pair 10-11 two-abreast on the STARBOARD side (aisle to their left), 12 station 4,
-    // 13 project seat on the centerline at the CG, 14 station 5, the station 7 pair 15-16
-    // two-abreast port again, 17 station 8, and the dinette booth 18-19 facing the aft table.
+    // seats = every seat on the aircraft as {x, z, rot?}, one crew figure in each (rot turns a
+    // seat, the aft-facing one). The P-3 list follows the AOC walkthrough; his aisle sides are
+    // FACING FORWARD (left = port, right = starboard), the figures are sized so a two-abreast
+    // pair, the aisle, and the single across all fit the cross-section (the aisle is always
+    // present), and rows run nose to tail:
+    //   cockpit: pilot (port) + copilot abreast, flight engineer behind on the centerline (the
+    //   upside-down triangle), jumpseat behind the pilot with no computer;
+    //   one row of two seats just aft, across the aisle from each other, computers in front;
+    //   an empty machinery passage;
+    //   7-8 a pair on the starboard side with 9 alone across on port, equal computers each;
+    //   10-11 a pair on port right behind 9 (machinery across the aisle);
+    //   12 alone on port FACING AFT, its computer aft of it facing forward, with the overwing
+    //   emergency window in the empty stretch aft of it;
+    //   13 (no computer, port) across from 15 (computer, starboard), the dropsonde launcher
+    //   in the gap behind 15;
+    //   16-17 a pair on starboard with computers, 18 (no computer) in the SAME row across on
+    //   port by the aft bubble window, the bathroom behind 16-17, and the galley at the tail
+    //   (kitchen port, bench seating starboard). Seats 14 and 19 do not exist as positions.
     const PLANE_CABIN_SPECS = {
         p3:  {
-            floorY: -0.12, halfW: 0.20, figScale: 0.40,
+            floorY: -0.12, halfW: 0.20, figScale: 0.34,
             seats: [
-                { x: -0.075, z: -1.82 }, { x: 0.075, z: -1.82 }, { x: 0, z: -1.68 },
-                { x: -0.09, z: -1.38 }, { x: 0.09, z: -1.14 }, { x: -0.09, z: -0.90 },
-                { x: -0.145, z: -0.66 }, { x: -0.03, z: -0.66 },
-                { x: 0.09, z: -0.42 }, { x: 0.03, z: -0.18 }, { x: 0.145, z: -0.18 },
-                { x: -0.09, z: 0.04 }, { x: 0, z: 0.26 }, { x: 0.09, z: 0.48 },
-                { x: -0.145, z: 0.72 }, { x: -0.03, z: 0.72 }, { x: 0.09, z: 0.90 },
-                { x: -0.09, z: 1.06 }, { x: -0.09, z: 1.26 }
+                { x: -0.07, z: -1.86 }, { x: 0.07, z: -1.86 }, { x: 0, z: -1.72 }, { x: -0.07, z: -1.58 },
+                { x: -0.105, z: -1.25 }, { x: 0.105, z: -1.25 },
+                { x: 0.060, z: -0.85 }, { x: 0.162, z: -0.85 }, { x: -0.105, z: -0.85 },
+                { x: -0.060, z: -0.58 }, { x: -0.162, z: -0.58 },
+                { x: -0.105, z: -0.40, rot: Math.PI },
+                { x: -0.105, z: 0.075 }, { x: 0.105, z: 0.075 },
+                { x: 0.060, z: 0.80 }, { x: 0.155, z: 0.80 }, { x: -0.105, z: 0.80 }
             ],
             interior: true
         },

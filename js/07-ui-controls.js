@@ -347,32 +347,6 @@
                 sym.renderOrder = 2;
                 threeMapGroup.add(sym);
             });
-            // vertical dotted column rising to the flight path's altitude from each fix NEAR
-            // the flight, so those observations read directly against the track flying above
-            // them (far-away fixes stay clean); stacked thin cylinders make the dashes, since
-            // WebGL lines cannot be thick
-            let colTop = 0;
-            const flightXZ = [];
-            for (let i = 0; i < filteredData.length; i += 50) {
-                const d = filteredData[i];
-                colTop = Math.max(colTop, track3DAltMeters(d) / 250);
-                const c = get3DCoord(d.lon, d.lat, 0);
-                flightXZ.push([c.x, c.z]);
-            }
-            if (colTop < 4) colTop = 4;
-            const fb = new THREE.Box3().setFromPoints(flightXZ.map(([x, z]) => new THREE.Vector3(x, 0, z)));
-            const nearDist = Math.max(6, fb.getSize(new THREE.Vector3()).length() * 0.35);
-            const dashLen = colTop / 15, dashR = Math.max(0.03, ribbonW * 0.06);
-            stormTrackPoints.forEach((p, i) => {
-                const near = flightXZ.some(([fx, fz]) => (fx - stormPts[i].x) * (fx - stormPts[i].x) + (fz - stormPts[i].z) * (fz - stormPts[i].z) < nearDist * nearDist);
-                if (!near) return;
-                const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, opacity: 0.45, depthWrite: false });
-                for (let d = 0; d < 15; d += 2) {
-                    const dash = new THREE.Mesh(new THREE.CylinderGeometry(dashR, dashR, dashLen, 6, 1), mat);
-                    dash.position.set(stormPts[i].x, (d + 0.5) * dashLen, stormPts[i].z);
-                    threeMapGroup.add(dash);
-                }
-            });
             // name tag floating over the first fix
             if (stormTrackMeta && stormTrackMeta.name) {
                 const cv = document.createElement('canvas'); cv.width = 512; cv.height = 64;

@@ -228,27 +228,41 @@
             const scr = new THREE.Mesh(new THREE.BoxGeometry(w * 0.72, 0.09, 0.012), screenMat);
             scr.position.set(x, floorY + 0.115, z + 0.048); grp.add(scr);
         };
-        // one rack ahead of each workstation row: station 1, FD, NAV, the C3X pair (wide),
-        // station 3, the station 3 pair (wide), station 4, station 5, the station 7 pair
-        // (wide), station 8
-        [[-0.09, -1.55, 0.15], [0.09, -1.31, 0.15], [-0.09, -1.07, 0.15],
-         [-0.09, -0.83, 0.24], [0.09, -0.59, 0.15], [0.09, -0.35, 0.24],
-         [-0.09, -0.13, 0.15], [0.09, 0.31, 0.15], [-0.09, 0.55, 0.24],
-         [0.09, 0.73, 0.15]].forEach(([x, z, w]) => rackAt(x, z, w));
+        // every working seat gets the SAME standard computer, one rack directly ahead of it
+        // (the aft-facing seat 12 gets its rack aft, screen turned forward toward the sitter):
+        // the post-cockpit row, 7-8-9, 10-11, 15, and 16-17. The jumpseat, 13, and 18 have none.
+        [[-0.105, -1.38, 0.10], [0.105, -1.38, 0.10],
+         [0.060, -0.98, 0.10], [0.162, -0.98, 0.10], [-0.105, -0.98, 0.10],
+         [-0.060, -0.71, 0.10], [-0.162, -0.71, 0.10],
+         [0.105, -0.06, 0.10],
+         [0.060, 0.665, 0.10], [0.155, 0.665, 0.10]].forEach(([x, z, w]) => rackAt(x, z, w));
+        const rack12 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.18, 0.09), deskMat);
+        rack12.position.set(-0.105, floorY + 0.09, -0.255); grp.add(rack12);
+        const scr12 = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.09, 0.012), screenMat);
+        scr12.position.set(-0.105, floorY + 0.115, -0.303); grp.add(scr12);
         // flight deck: instrument panel across the nose, throttle pedestal between the pilots
         // reaching back to the flight engineer's seat
         const panel = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.08, 0.05), deskMat);
-        panel.position.set(0, -0.02, -1.96); grp.add(panel);
+        panel.position.set(0, -0.02, -2.00); grp.add(panel);
         const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.14), deskMat);
-        pedestal.position.set(0, -0.085, -1.77); grp.add(pedestal);
-        // aft cabin: head closet on the port side, the dinette booth's table between its two
-        // facing seats, galley across on starboard
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.26, 0.14), surfMat);
-        head.position.set(-0.10, floorY + 0.13, 0.90); grp.add(head);
-        const table = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.015, 0.10), surfMat);
-        table.position.set(-0.09, -0.02, 1.16); grp.add(table);
-        const galley = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.16), surfMat);
-        galley.position.set(0.10, floorY + 0.07, 1.20); grp.add(galley);
+        pedestal.position.set(0, -0.085, -1.81); grp.add(pedestal);
+        // dropsonde launcher: a slim tube in the gap behind seat 15, its raised end pointing
+        // FORWARD at the seat and its lower end punching down-outboard through the starboard
+        // hull into the air, where the sondes drop out
+        const sonde = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.30, 10), new THREE.MeshPhongMaterial({ color: 0xaab4bd, shininess: 70 }));
+        sonde.position.set(0.15, -0.15, 0.30);
+        sonde.rotation.x = -0.65; sonde.rotation.z = 0.25;
+        grp.add(sonde);
+        // aft compartments: bathroom on the starboard side behind seats 16-17, then the galley
+        // at the tail (kitchen counter port, bench seating starboard) with its own floor strip
+        const bath = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.26, 0.20), surfMat);
+        bath.position.set(0.10, floorY + 0.13, 1.05); grp.add(bath);
+        const kitchen = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.14, 0.26), surfMat);
+        kitchen.position.set(-0.10, floorY + 0.07, 1.30); grp.add(kitchen);
+        const bench = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.26), deskMat);
+        bench.position.set(0.10, floorY + 0.045, 1.30); grp.add(bench);
+        const aftFloor = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.03, 0.52), surfMat);
+        aftFloor.position.set(0, floorY - 0.015, 1.26); grp.add(aftFloor);
     }
 
     // --- 3D crew: jointed crash-test dummies belted into a hollow cabin trough. Figure layout is
@@ -326,6 +340,7 @@
             fig.add(seat, back, upper);
             fig.userData = { upper, torso, neck, armL: armL.arm, armR: armR.arm, elbowL: armL.elbow, elbowR: armR.elbow, hipL: legL.hip, hipR: legR.hip, kneeL: legL.knee, kneeR: legR.knee };
             fig.position.set(seats[i].x, spec.floorY, seats[i].z);
+            fig.rotation.y = seats[i].rot || 0;
             fig.scale.set(spec.figScale, spec.figScale, spec.figScale);
             crewGroup3D.add(fig); figs.push(fig);
         }

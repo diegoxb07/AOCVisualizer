@@ -39,6 +39,9 @@
         const endEl = document.getElementById('endTimeInput');
         if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
         if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
+        // The time inputs only exist for manual syncing; everywhere else the window and offset
+        // come from the data and the video clock, so the fields stay out of the header.
+        document.querySelectorAll('.manual-sync-field').forEach(el => { el.style.display = isAuto ? 'none' : ''; });
     }
 
     function evaluateAutoSyncDefault() {
@@ -188,10 +191,14 @@
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
-        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.1, 50000);
+        // Near clip is tiny so the camera can dolly right up to the crew figures (the airframe is
+        // scaled 0.06, so a seated dummy is only ~0.03 world units and used to clip before you could
+        // get close); the huge near/far span rides a logarithmic depth buffer to stay z-fight-free.
+        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.008, 50000);
         camera3D.position.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);   // starts zoomed into the aircraft, no scroll-in needed
-        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
+        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
+        controls3D.minDistance = 0.02;   // let the user get right in on the crew without dollying through the target
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
         planeGroup3D = new THREE.Group(); planeGroup3D.scale.set(0.06, 0.06, 0.06); scene3D.add(planeGroup3D);
         // the airframe itself (WP-3D or G-IV per the loaded flight) is built by js/07b-plane-models.js
@@ -226,7 +233,9 @@
         const centerLon = (plotMinLon + plotMaxLon) / 2 || 0, centerLat = (plotMinLat + plotMaxLat) / 2 || 0, scaleMult = 20;
         // wrapLon (js/15-map-render.js) keeps dateline-crossing flights continuous here too;
         // safe because build3DScene only renders flight-adjacent features (never the far seam).
-        const x = (wrapLon(lon) - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 250; return new THREE.Vector3(x, y, z);
+        // Altitude is exaggerated ~8x against the horizontal scale (20 units/deg = 0.181 units/km,
+        // /690 = 1.45 units/km) so climbs read at a believable angle without the track gluing flat.
+        const x = (wrapLon(lon) - centerLon) * scaleMult, z = -(lat - centerLat) * scaleMult, y = (altMeters || 0) / 690; return new THREE.Vector3(x, y, z);
     }
 
     // Altitude source for the 3D map's vertical dimension (track, plane, markers). Its OWN control
@@ -263,7 +272,7 @@
                 new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: 0.75 }));
             ring.rotation.x = -Math.PI / 2; ring.position.set(top.x, 0.012, top.z);
             threeMarkersGroup.add(ring);
-            const bead = new THREE.Mesh(new THREE.OctahedronGeometry(0.055),
+            const bead = new THREE.Mesh(new THREE.OctahedronGeometry(0.018),
                 new THREE.MeshPhongMaterial({ color: col, emissive: col, emissiveIntensity: 0.35 }));
             bead.position.copy(top); bead.userData = { dataPoint: d };
             threeMarkersGroup.add(bead);
@@ -323,7 +332,7 @@
             // scales with the track's own extent so it stays readable at the zoom that frames it
             const bb = new THREE.Box3().setFromPoints(stormPts);
             const span = bb.getSize(new THREE.Vector3()).length();
-            const ribbonW = Math.max(0.2, span * 0.0022);
+            const ribbonW = Math.max(0.16, span * 0.0017);
             for (let i = 0; i < stormPts.length - 1; i++) {
                 const a = stormPts[i], b = stormPts[i + 1];
                 const dx = b.x - a.x, dz = b.z - a.z;
@@ -339,7 +348,7 @@
                 threeMapGroup.add(strip);
             }
             // flat, static cyclone symbol at each fix with its category printed on it
-            const symSize = Math.max(0.5, ribbonW * 1.9);
+            const symSize = Math.max(0.42, ribbonW * 1.9);
             stormTrackPoints.forEach((p, i) => {
                 const geo = new THREE.PlaneGeometry(symSize, symSize);
                 geo.rotateX(-Math.PI / 2);
@@ -436,7 +445,8 @@
 
             if (satSelect) satSelect.style.display = 'none';
             if (satBandSelect) satBandSelect.style.display = 'none';
-            buildSatDayStepper();   
+            syncSatSplit();
+            buildSatDayStepper();
             const satBadge = document.getElementById('satTimeBadge');
             if (satBadge) satBadge.classList.add('hidden');
 
@@ -449,10 +459,12 @@
 
             if (satSelect) satSelect.style.display = '';
             if (satBandSelect && satSelect.value !== 'none') satBandSelect.style.display = '';
-            buildSatDayStepper();   
+            syncSatSplit();
+            buildSatDayStepper();
 
             setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { updateVisualComponents(currentIdx); } }, 50);
         }
+        if (typeof updateFollowButton === 'function') updateFollowButton();
     });
 
     document.getElementById('satelliteSelect').addEventListener('change', () => {
@@ -508,7 +520,7 @@
         if (filteredData.length > 0) { const pfd = document.getElementById('pfdOverlay'); pfd.style.display = e.target.checked ? 'block' : 'none'; resizeCanvasLayout(); updateVisualComponents(currentIdx); }
     });
 
-    document.getElementById('toggleImperial').addEventListener('change', () => { if (filteredData.length > 0) { buildChartLayout(); updateVisualComponents(currentIdx); } });
+    document.getElementById('toggleSI').addEventListener('change', () => { if (filteredData.length > 0) { buildChartLayout(); updateVisualComponents(currentIdx); } });
     document.getElementById('toggleGpsAlt').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '3d') build3DScene(); updateVisualComponents(currentIdx); } });
     
     videoSyncMode.addEventListener('change', (e) => {

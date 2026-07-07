@@ -88,8 +88,8 @@
             cabinSim.occ.forEach(o => {
                 const jitL = f.turb * (0.6 * Math.sin(ts * 11.0 * Math.PI + o.jphase) + 0.4 * Math.sin(ts * 17.3 * Math.PI + o.jphase * 2.1));
                 const jitV = f.turb * (0.5 * Math.sin(ts * 9.5 * Math.PI + o.jphase * 1.7) + 0.5 * Math.sin(ts * 15.1 * Math.PI + o.jphase * 0.9));
-                const aLat = f.lat * o.gain + jitL * 0.05;
-                const aVert = Math.max(0.15, 1 + f.gz * o.gain + jitV * 0.05);   // apparent vertical g (load factor): heavier limbs in +G, lighter in -G, plus buzz
+                const aLat = f.lat * o.gain + jitL * 0.12;
+                const aVert = Math.max(0.15, 1 + f.gz * o.gain + jitV * 0.12);   // apparent vertical g (load factor): heavier limbs in +G, lighter in -G, plus buzz
                 const alpha = Math.atan2(aLat, aVert);   // apparent-gravity tilt from seat-up
                 const gApp = Math.hypot(aLat, aVert);    // apparent-gravity magnitude (g)
                 // torso lateral: gravity torque toward apparent-gravity direction + muscle spring to upright + damping
@@ -105,8 +105,9 @@
                 // sprung toward the upper-arm line, so the arm articulates instead of swinging rigid
                 o.foreV += (-o.wGF * o.wGF * gApp * Math.sin(o.fore - alpha) - o.wPF * o.wPF * (o.fore - o.arm) - 2 * o.zF * o.wGF * o.foreV) * h;
                 o.fore  += o.foreV * h;
-                // torso fore-aft: hunch FORWARD under sustained +G (pushed down), extend slightly under -G (kept gentle)
-                const pTarget = gzEff > 0 ? Math.min(0.42, gzEff * 0.8 * o.gain) : Math.max(-0.13, gzEff * 0.28 * o.gain);
+                // torso fore-aft: +G no longer bows the torso forward (it slumps vertically instead,
+                // handled in the renderers), only a slight extend/lean-back under -G is kept
+                const pTarget = gzEff > 0 ? gzEff * 0.08 * o.gain : Math.max(-0.13, gzEff * 0.28 * o.gain);
                 o.torsoPV += (-o.wPfa * o.wPfa * (o.torsoP - pTarget) - 2 * o.zPfa * o.wPfa * o.torsoPV) * h;
                 o.torsoP  += o.torsoPV * h;
                 // pelvis vertical: -G floats up against the belt, +G compresses into the cushion (G-relative
@@ -124,13 +125,15 @@
 
     // --- 2D rear-view cutaway: jointed crash-test dummy, belted to the seat ---
     function drawSeated2D(ctx, x, seatY, s, torsoLen, o) {
-        const beltLift = o.pelY * 55 * s;                         // + = float against the belt (-G),, = compress into seat (+G)
-        const hunch = Math.max(0, o.torsoP);                      // fore-aft forward hunch (+G); in rear view it foreshortens + drops the torso
+        const beltLift = o.pelY * 55 * s;                         // + = float against the belt (-G), - = compress into seat (+G)
+        const hunch = Math.max(0, o.torsoP);                      // small residual fore-aft lean
+        const sink = o.cushMax ? Math.max(0, -o.pelY / o.cushMax) : 0;   // 0..1 as +G presses the body down
         const hipY = seatY - s * 3 - beltLift;
-        const L = torsoLen * (1 - 0.16 * hunch);                  // hunch foreshortens the torso
-        const shX = x + Math.sin(o.torso) * L, shY = hipY - Math.cos(o.torso) * L + hunch * s * 2.0;   // shoulders drop when hunched
+        const L = torsoLen * (1 - 0.10 * hunch);                  // slight foreshorten with any lean
+        // +G reads as a vertical slump: the shoulders and head sag DOWN (not a forward bow)
+        const shX = x + Math.sin(o.torso) * L, shY = hipY - Math.cos(o.torso) * L + (hunch * 2.0 + sink * 2.6) * s;
         const nl = L * 0.4;
-        const headX = shX + Math.sin(o.head) * nl, headY = shY - Math.cos(o.head) * nl;
+        const headX = shX + Math.sin(o.head) * nl, headY = shY - Math.cos(o.head) * nl + sink * s * 2.2;
         const jointDot = (jx, jy) => { ctx.fillStyle = '#23262b'; ctx.beginPath(); ctx.arc(jx, jy, s * 1.3, 0, Math.PI * 2); ctx.fill(); };
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         // seat: cushion + short back (fixed, grounding the figure)
@@ -246,12 +249,12 @@
         panel.position.set(0, -0.02, -2.00); grp.add(panel);
         const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.06, 0.14), deskMat);
         pedestal.position.set(0, -0.085, -1.81); grp.add(pedestal);
-        // dropsonde launcher: a slim tube in the gap behind seat 15, its raised end pointing
-        // FORWARD at the seat and its lower end punching down-outboard through the starboard
-        // hull into the air, where the sondes drop out
+        // dropsonde launcher: a slim tube beside the aisle behind seat 15, its raised end pointing
+        // FORWARD at the seat and its lower end punching down through the hull belly into the air,
+        // where the sondes drop out
         const sonde = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.30, 10), new THREE.MeshPhongMaterial({ color: 0xaab4bd, shininess: 70 }));
-        sonde.position.set(0.15, -0.15, 0.30);
-        sonde.rotation.x = -0.65; sonde.rotation.z = 0.25;
+        sonde.position.set(0.11, -0.15, 0.30);
+        sonde.rotation.x = -0.65;
         grp.add(sonde);
         // aft compartments: bathroom on the starboard side behind seats 16-17, then the galley
         // at the tail (kitchen counter port, bench seating starboard) with its own floor strip
@@ -363,12 +366,17 @@
             const fig = crewGroup3D.userData.figs[i]; if (!fig) return;
             const u = fig.userData;
             u.torso.rotation.z = o.torso;                        // lateral lean (plane local frame)
-            u.torso.rotation.x = -o.torsoP - o.pelY * 0.25;      // hunch FORWARD (toward nose) under +G; slight float flex
+            // +G reads as a vertical SLUMP (sink + heavy head), not a forward bow: the torso keeps
+            // its data-driven fore-aft lean only, the body sinks via upper.position.y, and the head
+            // droops under the load.
+            u.torso.rotation.x = -o.torsoP;
+            const sink = o.cushMax ? Math.max(0, -o.pelY / o.cushMax) : 0;   // 0..1 as +G presses the body into the cushion
             u.neck.rotation.z = o.head - o.torso;                // head lags/leads the torso on its own hinge
+            u.neck.rotation.x = sink * 0.34;                     // heavy head sinks/nods under load
             u.armL.rotation.z = o.arm; u.armR.rotation.z = o.arm;
             const bend = o.fore - o.arm;                         // forearm swings about the elbow relative to the upper arm
             u.elbowL.rotation.z = bend; u.elbowR.rotation.z = bend;
-            u.upper.position.y = o.pelY > 0 ? o.pelY * 0.5 : o.pelY * 0.22;
+            u.upper.position.y = o.pelY > 0 ? o.pelY * 0.5 : o.pelY * 0.32;
             // negative G floats the body against the belt AND lifts the legs: knees rise about the
             // hips, shins dangle, and the feet leave the floor
             const lift = Math.max(0, o.pelY / o.beltCap);

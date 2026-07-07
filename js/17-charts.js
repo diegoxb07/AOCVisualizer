@@ -3,7 +3,7 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     function createDatasetConfig(metricKey, hidden = false) { 
-        const isImp = document.getElementById('toggleImperial').checked;
+        const isImp = !document.getElementById('toggleSI').checked;
         const def = METRIC_DEFS[metricKey]; 
         let label = getMetricLabel(metricKey, isImp);
         return { 
@@ -38,15 +38,20 @@
                 else chart.canvas.style.cursor = 'crosshair';
             },
             scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
-            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 14, usePointStyle: true, pointStyle: 'line',
-                // deselected datasets read as a calm dimmed slate instead of struck-through text,
-                // so every available variable stays legible whether it is plotted or not
+            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded',
+                // Each variable gets a checkbox-style swatch: a filled square in its series color
+                // when plotted, an empty outlined square when not, so it reads as clickable either
+                // way. Never struck through; deselected text dims to a calm slate instead.
                 generateLabels: (chart) => {
                     const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
                     items.forEach(it => {
                         const off = it.hidden;
                         it.hidden = false;
-                        if (off) { it.fontColor = '#526075'; it.strokeStyle = '#3d4a5c'; it.fillStyle = '#3d4a5c'; }
+                        it.lineWidth = 1.5;
+                        // strokeStyle carries the series (line) color from the default builder; fill
+                        // the swatch with it when selected, leave it hollow (outline only) when not.
+                        if (off) { it.fontColor = '#64748b'; it.fillStyle = 'rgba(0,0,0,0)'; it.strokeStyle = '#64748b'; }
+                        else { it.fillStyle = it.strokeStyle; }
                     });
                     return items;
                 } }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
@@ -81,7 +86,7 @@
     function buildChartLayout() {
         if (masterChartInstance) masterChartInstance.destroy(); Object.values(customCharts).forEach(c => c.destroy()); customCharts = {};
         const labelsTimeline = filteredData.map(d => `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
-        const isImp = document.getElementById('toggleImperial').checked;
+        const isImp = !document.getElementById('toggleSI').checked;
 
         masterChartInstance = new Chart(document.getElementById('parameterChart').getContext('2d'), { type: 'line', data: { labels: labelsTimeline, datasets: [] }, options: getBaseChartOptions('Master Scale Comparison', { enforceIntegers: false, minRange: 2, isMaster: true }), plugins: [markerPlugin] });
         buildMasterMenu();
@@ -126,7 +131,7 @@
     }
 
     function buildDropdownMenus() {
-        const isImp = document.getElementById('toggleImperial').checked;
+        const isImp = !document.getElementById('toggleSI').checked;
         Object.keys(customCharts).forEach(id => {
             const menu = document.getElementById(`menu-${id}`); if(!menu) return; menu.innerHTML = ''; const chart = customCharts[id]; if(!chart) return;
             const activeKeys = chart.data.datasets.map(ds => ds.metricKey);
@@ -153,7 +158,7 @@
     }
 
     function toggleMetricInSubChart(chartId, metricKey) {
-        const isImp = document.getElementById('toggleImperial').checked;
+        const isImp = !document.getElementById('toggleSI').checked;
         const chart = customCharts[chartId]; const existIdx = chart.data.datasets.findIndex(ds => ds.metricKey === metricKey);
         if (existIdx > -1) chart.data.datasets.splice(existIdx, 1); 
         else { 

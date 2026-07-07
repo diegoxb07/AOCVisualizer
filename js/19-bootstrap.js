@@ -600,7 +600,7 @@
     (function persistDisplayPrefs() {
         // NOTE: 'toggleCabin' (Crew Ride) is deliberately NOT persisted, it always starts OFF on
         // load/refresh, so the checkbox can never come back checked-but-not-running after a reload.
-        const PREF_IDS = ['toggleImperial', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
+        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
         try {
             const saved = JSON.parse(localStorage.getItem(KEY) || '{}');

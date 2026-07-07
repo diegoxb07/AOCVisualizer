@@ -53,6 +53,25 @@
         }, 50);
     });
 
+    // Unloads the MMR video and clears both upload drop zones. Switching flights from the archive
+    // or the preloaded list starts clean; a stale video belongs to the previous flight and its
+    // sync offset is meaningless against the new one.
+    function clearLoadedMedia() {
+        document.getElementById('fileInput').value = '';
+        resetDropZone('dataDropZone', 'dataDropLabel', 'Choose File/Drag & Drop');
+        if (!videoLoaded) return;
+        video.pause();
+        try { URL.revokeObjectURL(video.src); } catch (e) {}
+        video.removeAttribute('src'); video.load();
+        videoLoaded = false;
+        document.getElementById('videoPlaceholder').style.display = '';
+        document.getElementById('videoInput').value = '';
+        resetDropZone('videoDropZone', 'videoDropLabel', 'Choose File/Drag & Drop');
+        videoSyncMode.disabled = true;
+        const vsi = document.getElementById('videoStartInput'); vsi.value = '000000'; vsi.disabled = true;
+        speeds = [1, 2, 4, 8, 16, 32, 64, 128]; currentSpeedIdx = 0; updateSpeedDisplay();
+    }
+
     // The shared ?v= cache-buster, read off this page's own script tags so the worker URL stays in
     // step with the single version string in index.html.
     function assetVer() {
@@ -148,6 +167,9 @@
 
         evaluateAutoSyncDefault();
         applySyncModeLock();
+
+        // New flight: start zoomed in on the aircraft and following it (js/15-map-render.js).
+        if (typeof engageFollowAircraft === 'function') engageFollowAircraft();
 
         if (filteredData.length > 0 && !isPlaying) {
             isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now();

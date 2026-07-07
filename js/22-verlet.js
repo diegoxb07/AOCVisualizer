@@ -110,9 +110,9 @@
         // the neck at peak G) or the dummy topples; the margin above it sets how far real G
         // leans the segment. Hanging parts (arms) are gravity-stable and stay nearly free.
         const tone = (k, part, below) => body.tones.push({ a: id[part], tx: RAG_POSE[part][0], ty: RAG_POSE[part][1], tz: RAG_POSE[part][2], k, below: !!below });
-        tone(320, 'pelvis', true);   // the seat cushion: compresses under +G, lets -G float the body into the belt
-        tone(70 / o.gain, 'chest'); tone(140 / o.gain, 'head');
-        tone(40, 'shL'); tone(40, 'shR');
+        tone(210, 'pelvis', true);   // the seat cushion: compresses under +G, lets -G float the body into the belt
+        tone(55 / o.gain, 'chest'); tone(108 / o.gain, 'head');
+        tone(32, 'shL'); tone(32, 'shR');
         tone(6, 'elL'); tone(6, 'elR');
         tone(2.5 / o.gain, 'haL'); tone(2.5 / o.gain, 'haR');
         tone(60, 'knL'); tone(60, 'knR'); tone(60, 'ftL'); tone(60, 'ftR');
@@ -168,18 +168,18 @@
             const body = _ragBodies[i];
             const jitL = f.turb * (0.6 * Math.sin(ts * 11.0 * Math.PI + o.jphase) + 0.4 * Math.sin(ts * 17.3 * Math.PI + o.jphase * 2.1));
             const jitV = f.turb * (0.5 * Math.sin(ts * 9.5 * Math.PI + o.jphase * 1.7) + 0.5 * Math.sin(ts * 15.1 * Math.PI + o.jphase * 0.9));
-            const aLat = (f.lat * o.gain + jitL * 0.05) * RAG_G;
+            const aLat = (f.lat * o.gain + jitL * 0.12) * RAG_G;
             // apparent gravity in the seat frame: negative-G data genuinely points it upward,
             // which is what lifts the body into the belt and the limbs off their rests
-            const aVert = -(1 + f.gz * o.gain + jitV * 0.05) * RAG_G;
-            for (let n = 0; n < sub; n++) body.step(h, aLat, aVert, 0, 0.985, 5, body.floorAt);
+            const aVert = -(1 + f.gz * o.gain + jitV * 0.12) * RAG_G;
+            for (let n = 0; n < sub; n++) body.step(h, aLat, aVert, 0, 0.99, 5, body.floorAt);
             // write the skeleton back as the renderers' joint angles, relative to the settled
             // pose and bounded to the articulation the meshes can express (a floating arm may
             // sweep overhead in the sim; the elbow bend it hands the renderer stays sane)
             const raw = _ragExtract(body), b = body.base;
             o.torso = _clamp(raw.torso - b.torso, -1.0, 1.0);
             o.head = _clamp(raw.head - b.head, -0.9, 0.9);
-            o.torsoP = _clamp(raw.torsoP - b.torsoP, -0.30, 0.60);
+            o.torsoP = _clamp(raw.torsoP - b.torsoP, -0.30, 0.16);   // forward bow capped low; +G slumps vertically, not forward
             o.arm = _clamp(raw.arm - b.arm, -1.25, 1.25);
             o.fore = o.arm + _clamp(_wrapPi(raw.fore - raw.arm - (b.fore - b.arm)), -1.4, 1.4);
             o.pelY = _clamp(raw.pelY - b.pelY, -o.cushMax, o.beltCap);

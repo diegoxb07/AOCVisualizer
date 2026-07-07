@@ -4,7 +4,7 @@
 
     function toggleMasterMetric(metricKey, isChecked) {
         if (isChecked) {
-            const isImp = document.getElementById('toggleImperial').checked; const newDs = createDatasetConfig(metricKey, false); 
+            const isImp = !document.getElementById('toggleSI').checked; const newDs = createDatasetConfig(metricKey, false); 
             newDs.data = filteredData.map(d => getConvertedVal(d[metricKey], metricKey, isImp));
             masterChartInstance.data.datasets.push(newDs);
         } else {
@@ -23,7 +23,7 @@
 
     function buildMasterMenu() {
         const menu = document.getElementById('menu-masterChart'); if (!menu) return;
-        menu.innerHTML = ''; const isImp = document.getElementById('toggleImperial').checked;
+        menu.innerHTML = ''; const isImp = !document.getElementById('toggleSI').checked;
         const activeKeys = masterChartInstance ? masterChartInstance.data.datasets.map(ds => ds.metricKey) : [];
 
         const clearAllItem = document.createElement('div'); clearAllItem.className = 'dropdown-item'; clearAllItem.style.color = '#ef4444'; clearAllItem.style.fontWeight = 'bold'; clearAllItem.innerText = '✕ Clear All';

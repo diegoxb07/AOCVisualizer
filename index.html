@@ -34,8 +34,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260707v">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260707v">
+    <link rel="stylesheet" href="css/fonts.css?v=20260708h">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260708h">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -43,7 +43,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260707v">
+    <link rel="stylesheet" href="css/app.css?v=20260708h">
 </head>
 <body class="text-slate-200 font-sans antialiased selection:bg-slate-700 selection:text-white">
 
@@ -51,9 +51,19 @@
     <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-5"></div>
     <h2 class="text-white text-xl md:text-2xl font-bold tracking-widest">PROCESSING FLIGHT DATA</h2>
     <p id="loadingOverlaySubtext" class="text-blue-400 text-sm mt-2 font-mono opacity-80">Pulling variables...</p>
+    <div id="loadingProgressWrap" class="hidden w-72 max-w-[80vw] mt-4">
+        <div class="h-2 bg-slate-800 rounded-full overflow-hidden"><div id="loadingProgressBar" class="h-full bg-blue-500 transition-all duration-150" style="width:0%"></div></div>
+        <div class="flex justify-between text-[11px] text-slate-400 font-mono mt-1.5">
+            <span id="loadingProgressPct">0%</span>
+            <span id="loadingProgressSpeed"></span>
+        </div>
+    </div>
 </div>
 
-<button id="fullscreenBtn" class="fixed top-4 right-4 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full border border-blue-500 hover:bg-blue-500 transition-colors shadow-lg z-[9999]">⛶ Fullscreen</button>
+<div class="fixed top-4 right-4 z-[9999] flex items-center gap-2">
+    <button id="resetAppBtn" title="Clear the loaded flight, video, and overlays and start fresh" class="px-3 py-1.5 bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white rounded-full text-xs font-semibold shadow-lg transition-colors whitespace-nowrap">↺ Reset</button>
+    <button id="fullscreenBtn" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-full border border-blue-500 hover:bg-blue-500 transition-colors shadow-lg">⛶ Fullscreen</button>
+</div>
 
 <section class="p-4 md:p-6 max-w-[1600px] mx-auto space-y-4" id="mainContainer">
     <header class="relative mb-4">
@@ -62,72 +72,83 @@
             <div class="w-px h-9 bg-white/10 shrink-0"></div>
             <div class="min-w-0">
                 <h1 class="text-white text-xl md:text-2xl font-bold tracking-tight leading-none truncate">Mission Visualizer</h1>
-                <p id="brandSub">NOAA Aircraft Operations Center &middot; Science Branch</p>
+                <p id="brandSub">Aircraft Operations Center &middot; Science Branch</p>
             </div>
         </div>
     </header>
 
     <div class="bg-slate-950/55 border border-white/[0.05] rounded-2xl p-5 relative">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8">
-            <div class="lg:col-span-4 flex flex-col justify-center gap-4">
-                <div>
-                    <div id="loadFlightDataGroup" class="relative flex items-center gap-2 mb-2 min-h-[28px]">
+        <div class="flex flex-col gap-4">
+            <!-- Band 1: mission-loading controls, laid out as a horizontal console. The Recon Archive
+                 cluster fills the width; the MMR-upload and batch clusters sit as divider-separated
+                 panels to its right. -->
+            <div class="flex flex-col lg:flex-row lg:items-stretch gap-4 lg:gap-5">
+                <div class="flex-1 min-w-0">
+                    <div id="loadFlightDataGroup" class="relative flex flex-wrap items-center gap-2 mb-2 min-h-[28px]">
                         <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider shrink-0">
-                            <span id="loadFlightDataLabel" class="text-blue-400">Load a Mission</span>
-                            <span class="text-slate-500 text-[10px] normal-case tracking-normal font-medium">NOAA recon archive</span>
+                            <span id="loadFlightDataLabel" class="text-blue-400">1. Load a Mission</span>
+                            <span class="text-slate-500 text-[10px] normal-case tracking-normal font-medium">Recon Archive</span>
                         </label>
                         <div id="dataDropZone" title="Manual upload (.txt or .nc)" class="relative flex items-center gap-1 shrink-0 bg-slate-800 border border-dashed border-slate-600 rounded px-2 py-1 hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
                             <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                             <span class="text-[10px] text-slate-400 normal-case group-hover:text-blue-300 transition-colors whitespace-nowrap">or upload:</span>
                             <span id="dataDropLabel" class="text-[10px] text-slate-300 font-medium normal-case group-hover:text-blue-300 transition-colors truncate max-w-[70px]">Choose File</span>
                         </div>
-                        <button id="resetAppBtn" title="Clear the loaded flight, video, and overlays and start fresh" class="ml-auto shrink-0 px-2 py-1 bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700 hover:text-white rounded text-[10px] font-semibold normal-case transition-colors whitespace-nowrap">↺ Reset</button>
                     </div>
 
                     <div id="archiveLoadBlock" class="relative border-l-2 border-l-blue-500/60 pl-2.5">
                         <div id="archiveLoadingSpin" class="absolute inset-0 z-20 flex items-center justify-center bg-slate-900/40 rounded">
                             <div class="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
-                        <div class="grid grid-cols-3 gap-1.5">
-                            <select id="reconYearSelect" disabled style="cursor:progress" class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div id="archiveApiControls" class="relative flex flex-wrap items-center gap-1.5">
+                            <!-- Free-text search across a year's missions (id, storm, date, aircraft), and a
+                                 direct load for any full mission id, so a flight filed under the wrong storm
+                                 or buried in Unknown / Training is still findable. -->
+                            <div id="missionSearchWrap" class="relative w-full">
+                                <input type="text" id="missionSearchInput" disabled autocomplete="off" placeholder="Search a mission by id, storm, or date (paste a full id to load it directly)" title="Type a full mission id to load it directly, or a year plus a storm name / date to search that season" class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-slate-500" />
+                                <div id="missionSearchResults" class="hidden absolute left-0 right-0 top-full mt-1 z-40 max-h-64 overflow-y-auto bg-slate-900 border border-slate-700 rounded shadow-lg text-[11px]"></div>
+                            </div>
+                            <select id="reconYearSelect" disabled style="cursor:progress" class="flex-1 min-w-[92px] bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 <option value="">Loading…</option>
                             </select>
-                            <select id="reconStormSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            <select id="reconStormSelect" disabled class="flex-1 min-w-[110px] bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 <option value="">Storm…</option>
                             </select>
-                            <select id="reconMissionSelect" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                            <select id="reconMissionSelect" disabled class="flex-1 min-w-[110px] bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                 <option value="">Flight…</option>
                             </select>
-                        </div>
-                        <div class="relative flex items-center gap-2 mt-2">
-                            <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 bg-blue-600 text-white border border-blue-500 hover:bg-blue-500 rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600">⤓ Load Flight + Storm Track</button>
+                            <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 min-w-[180px] bg-blue-600 text-white border border-blue-500 hover:bg-blue-500 rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600">⤓ Load Flight + Storm Track</button>
                             <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF from NOAA (for full flight-level detail which is richer than the quick-load track)" class="hidden shrink-0 bg-slate-800 text-blue-300 border border-slate-700 hover:bg-blue-700 hover:text-white rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">↓ .nc</a>
+                            <!-- Covers only the API-backed archive pickers while the API is down; the preloaded
+                                 dropdown and status line below stay usable for on-device missions. -->
+                            <div id="uploadApiOfflineToastWrapper" class="hidden absolute inset-0 z-20 flex flex-row items-center justify-center gap-2 bg-slate-950/90 rounded pointer-events-none">
+                                <span id="uploadApiOfflineToast" class="px-2.5 py-1 rounded-full border border-red-400/70 bg-red-950 text-[11px] font-semibold text-red-200 shadow-md whitespace-nowrap">API Offline</span>
+                                <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">↑ use manual upload instead</span>
+                            </div>
                         </div>
-                        <select id="preloadedSelect" disabled title="Missions loaded or preloaded this session; picking one reopens it instantly, no download or parse wait" class="w-full mt-1.5 bg-slate-800 text-slate-200 border border-slate-700 rounded px-1.5 py-1 text-[10px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
-                            <option value="">Preloaded missions…</option>
-                        </select>
-                        <span id="reconArchiveStatus" class="block text-[10px] text-slate-500 leading-tight mt-1">Pick a year to browse every archived NOAA hurricane-hunter mission.</span>
-                        <!-- Covers the archive controls while the API is down. -->
-                        <div id="uploadApiOfflineToastWrapper" class="hidden absolute inset-0 z-20 flex flex-row items-center justify-center gap-2 bg-slate-950/90 rounded pointer-events-none">
-                            <span id="uploadApiOfflineToast" class="px-2.5 py-1 rounded-full border border-red-400/70 bg-red-950 text-[11px] font-semibold text-red-200 shadow-md whitespace-nowrap">API Offline</span>
-                            <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">↑ use manual upload instead</span>
+                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                            <select id="preloadedSelect" disabled title="Missions loaded or preloaded this session; picking one reopens it instantly, no download or parse wait" class="flex-1 min-w-[180px] bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1.5 text-xs outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                <option value="">Loaded Missions…</option>
+                            </select>
+                            <span id="reconArchiveStatus" class="flex-1 min-w-[200px] text-[10px] text-slate-500 leading-tight">Pick a year to browse every archived NOAA hurricane-hunter mission.</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 border-t border-slate-800 pt-3">
-                <div>
+                <div class="lg:w-52 shrink-0 lg:border-l lg:border-slate-800 lg:pl-5 flex flex-col">
                     <label class="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">
-                        <span class="text-slate-300">Upload MMR to Sync (.mp4)</span>
+                        <span class="text-blue-400">Optional: Upload MMR </span>
                     </label>
                     <div id="videoDropZone" class="relative flex items-center justify-center w-full h-10 bg-slate-800 border-2 border-dashed border-slate-600 rounded-md hover:border-blue-500 hover:bg-slate-700 transition-colors cursor-pointer group">
                         <input type="file" id="videoInput" accept="video/mp4" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                         <span id="videoDropLabel" class="text-xs text-slate-300 font-medium group-hover:text-blue-300 transition-colors px-2 truncate">Choose File/Drag &amp; Drop</span>
                     </div>
+                    <span class="text-[10px] text-slate-500 leading-snug mt-1.5">MMR syncs on its own, .mp4 files only.</span>
                 </div>
-                <div class="flex flex-col items-center justify-center gap-1 pt-2">
+
+                <div class="lg:w-56 shrink-0 lg:border-l lg:border-slate-800 lg:pl-5 flex flex-col gap-1.5">
                     <div class="relative w-full">
-                        <button id="reconPreloadBtn" disabled title="Download and parse missions from any season now; they are saved on this device and open instantly, including after a reload" class="w-full bg-slate-800 text-blue-300 border border-slate-700 hover:bg-blue-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⤓ Preload Flight Data</button>
+                        <button id="reconPreloadBtn" disabled title="Download and parse missions from any season now; they are saved on this device and open instantly, including after a reload" class="w-full bg-slate-800 text-blue-300 border border-slate-700 hover:bg-blue-700 hover:text-white rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⤓ Pre-load Flight Data</button>
                         <div id="preloadBtnSpin" class="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 rounded">
                             <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
@@ -138,46 +159,49 @@
                             <div class="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
                     </div>
-                    <span class="text-[10px] text-slate-400 text-center leading-snug">can pre-load flight-data/sat-images for multiple flights at a time! ^</span>
-                </div>
+                    <span class="text-[10px] text-slate-400 leading-snug">Preload flight data and satellite imagery for several flights at once.</span>
                 </div>
             </div>
 
-            <div class="lg:col-span-8 flex flex-col justify-center border-t lg:border-t-0 lg:border-l border-slate-800 pt-5 lg:pt-0 lg:pl-8">
-                <div class="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-5">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 flex-grow w-full">
-                        <div class="flex flex-col items-center">
-                            <label class="block w-full text-center text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data Start Time (HHMMSS)</label>
-                            <input type="text" id="startTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
-                        </div>
-                        <div class="flex flex-col items-center">
-                            <label class="block w-full text-center text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider">Flight-Data End Time (HHMMSS)</label>
-                            <input type="text" id="endTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
-                        </div>
-                        <div class="relative flex flex-col items-center">
-                            <label class="block w-full text-center text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate">Video Sync Mode</label>
-                            <select id="videoSyncMode" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none transition-colors shadow-sm">
-                                <option value="manual">Manual Time Input</option>
-                                <option value="auto">Auto-Sync (MMR)</option>
-                            </select>
-                        </div>
-                        <div class="flex flex-col items-center">
-                            <label class="block w-full text-center text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wider truncate" title="Video Start UTC (Only in Manual Mode) (HHMMSS)">MMR Start Time</label>
-                            <input type="text" id="videoStartInput" value="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
-                        </div>
+            <!-- Band 2: video sync mode (with the manual-only time fields) on the left, clip/share on the right. -->
+            <div class="flex flex-col sm:flex-row sm:items-end gap-3 border-t border-slate-800 pt-4">
+                <div class="flex flex-wrap items-end gap-3">
+                    <div class="flex flex-col w-48">
+                        <label class="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">MMR Sync Mode</label>
+                        <select id="videoSyncMode" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none transition-colors shadow-sm">
+                            <option value="auto" selected>Auto-Sync (Default)</option>
+                            <option value="manual">Manual Time Input</option>
+                        </select>
                     </div>
-                    <div class="flex flex-col items-end shrink-0 sm:ml-2 pb-1 sm:pb-0 gap-2">
-                        <button id="exportClipBtn" disabled class="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded border border-slate-600 transition-colors shadow-sm whitespace-nowrap">Record Clip</button>
-                        <button id="shareLinkBtn" disabled title="Copy a link that reopens this mission at the current playback moment and tracker view" class="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded border border-slate-600 transition-colors shadow-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">Share Link</button>
+                    <!-- Manual-mode fields: shown by applySyncModeLock only while the sync mode is Manual. -->
+                    <div class="manual-sync-field flex flex-col w-40" style="display:none">
+                        <label class="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Flight Start (HHMMSS)</label>
+                        <input type="text" id="startTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
+                    </div>
+                    <div class="manual-sync-field flex flex-col w-40" style="display:none">
+                        <label class="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider">Flight End (HHMMSS)</label>
+                        <input type="text" id="endTimeInput" placeholder="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
+                    </div>
+                    <div class="manual-sync-field flex flex-col w-40" style="display:none">
+                        <label class="text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wider" title="Video Start UTC (HHMMSS)">MMR Start (HHMMSS)</label>
+                        <input type="text" id="videoStartInput" value="000000" disabled class="w-full bg-slate-800 text-slate-200 border border-slate-700 rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-blue-500 focus:outline-none transition-colors" />
                     </div>
                 </div>
+                <div class="flex items-center gap-2 sm:ml-auto">
+                    <button id="exportClipBtn" disabled class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded border border-slate-600 transition-colors shadow-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">Record Clip</button>
+                    <button id="shareLinkBtn" disabled title="Copy a link that reopens this mission at the current playback moment and tracker view" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded border border-slate-600 transition-colors shadow-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">Share Link</button>
+                </div>
+            </div>
+
+            <!-- Band 3: loaded-mission status strip + parser ledger, full width. -->
+            <div>
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2" id="missionStatusStrip">
-                    <div class="status-chip"><span class="chip-k">Flight Data Detected</span><span class="chip-v" id="hdrRange">Waiting</span></div>
+                    <div class="status-chip"><span class="chip-k">Flight Data Window</span><span class="chip-v" id="hdrRange">Waiting</span></div>
                     <div class="status-chip"><span class="chip-k">Flight ID</span><span class="chip-v" id="hdrFlightId">-</span></div>
                     <div class="status-chip"><span class="chip-k">Aircraft</span><span class="chip-v" id="hdrAircraft">-</span></div>
                     <div class="status-chip"><span class="chip-k">Flight Date</span><span class="chip-v" id="hdrDate">-</span></div>
                 </div>
-                <!-- Parser honesty ledger: what was filtered out of the loaded file and which values are derived. -->
+                <!-- Parser ledger: what was filtered out of the loaded file and which values are derived. -->
                 <div id="dataReportLine" class="hidden text-[10px] text-slate-500 font-mono leading-snug mt-2"></div>
             </div>
         </div>
@@ -201,7 +225,7 @@
                                 <input type="checkbox" id="toggle8Hz" class="accent-blue-500 w-3 h-3 mr-1"> 8Hz Smoothing
                             </label>
                             <label id="stormTrackToggleLabel" style="display:none;" class="items-center normal-case text-blue-300 font-bold text-[10px] cursor-pointer whitespace-nowrap flex-none">
-                                <input type="checkbox" id="toggleStormTrack" checked class="accent-blue-400 w-3 h-3 mr-1"> Storm Track
+                                <input type="checkbox" id="toggleStormTrack" class="accent-blue-400 w-3 h-3 mr-1"> Storm Track
                             </label>
                             <select id="trackerModeSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                                 <option value="2d">2D Map Tracker</option>
@@ -251,6 +275,9 @@
                             <span class="spin"></span>
                             <span>Fetching satellite&hellip;</span>
                         </div>
+                        <!-- Appears only after the user pans/zooms away from the followed aircraft; clicking
+                             re-centers the map on the plane and resumes following it. -->
+                        <button id="recenterPlaneBtn" style="display:none;" title="Re-center the map on the aircraft and keep following it" class="absolute left-1/2 -translate-x-1/2 bottom-4 z-[2400] px-3.5 py-1.5 bg-blue-600 text-white border border-blue-400 hover:bg-blue-500 rounded-full text-xs font-semibold shadow-lg transition-colors whitespace-nowrap">&#9678; Recenter on Aircraft</button>
                         <div id="mapInfoStack" class="absolute top-14 right-3 z-[2400] flex flex-col items-end gap-1.5 pointer-events-none text-right">
                             <div id="satTimeBadge" class="hidden bg-slate-950/85 border border-blue-500/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-200 leading-tight"></div>
                             <div id="stormStatusCard" class="hidden bg-slate-950/85 border border-blue-300/60 rounded px-2.5 py-1 text-[10px] font-mono text-blue-100 leading-tight">
@@ -455,7 +482,7 @@
                 <label id="gpsAltContainer" class="filter-lbl filter-child child-off"><input type="checkbox" id="toggleGpsAlt" class="filter-cb" /> GPS&#8594;Press Alt</label>
             </div>
             <div class="filter-col">
-                <label class="filter-lbl"><input type="checkbox" id="toggleImperial" class="filter-cb" /> Imperial Units</label>
+                <label class="filter-lbl"><input type="checkbox" id="toggleSI" class="filter-cb" /> S.I Units</label>
                 <label class="filter-lbl"><input type="checkbox" id="simpleTrackerIcon" class="filter-cb" /> Simple Icon (2D)</label>
             </div>
             <div class="filter-col">
@@ -491,13 +518,18 @@
 <div id="preloadModal" class="modal-overlay">
     <div class="modal-card">
         <button id="preloadCloseX" class="absolute top-4 right-4 bg-transparent border-none text-slate-500 text-2xl cursor-pointer hover:text-white transition-colors focus:outline-none">✕</button>
-        <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2">Preload Flight Data</h2>
-        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Pick a season, then check missions (or a whole storm). Each is downloaded at full resolution and parsed now, then saved on this device, so it opens instantly from the Preloaded missions list, including after a reload. Closing this window does not stop a running pass.</p>
+        <h2 class="text-white text-lg font-bold border-b border-slate-700 pb-2">Pre-load Flight Data</h2>
+        <p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Pick a season and check missions (or a whole storm), or upload your own flight files. Each is parsed now and saved on this device, so it opens instantly from the Loaded Missions list, including after a reload. Closing this window does not stop a running pass.</p>
         <div class="flex items-center gap-2 mt-3">
             <span class="text-xs text-slate-300 font-semibold">Season:</span>
             <select id="preloadYearSelect" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                 <option value="">Loading…</option>
             </select>
+            <span class="text-[11px] text-slate-500 mx-1">or</span>
+            <label class="flex items-center gap-1.5 bg-slate-800 text-blue-300 border border-slate-700 hover:bg-blue-700 hover:text-white rounded px-2 py-1 text-[11px] font-semibold cursor-pointer transition-colors">
+                Upload files (.txt / .nc)
+                <input type="file" id="preloadFileInput" accept=".txt,.nc" multiple class="hidden" />
+            </label>
         </div>
         <div id="preloadMissionChecks" class="mt-3 max-h-[45vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-slate-200 select-none"></div>
         <div class="mt-3 h-2 bg-slate-800 rounded overflow-hidden"><div id="preloadFill" class="h-full bg-blue-500 transition-all" style="width:0%"></div></div>
@@ -593,31 +625,31 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260707v"></script>
-    <script src="js/01-state.js?v=20260707v"></script>
-    <script src="js/02-satellite.js?v=20260707v"></script>
-    <script src="js/03-metrics.js?v=20260707v"></script>
-    <script src="js/04-geo-measure.js?v=20260707v"></script>
-    <script src="js/05-interpolation.js?v=20260707v"></script>
-    <script src="js/06-ocr.js?v=20260707v"></script>
-    <script src="js/07-ui-controls.js?v=20260707v"></script>
-    <script src="js/07b-plane-models.js?v=20260707v"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260707v"></script>
-    <script src="js/09-interaction.js?v=20260707v"></script>
-    <script src="js/10-point-analysis.js?v=20260707v"></script>
-    <script src="js/11-layout.js?v=20260707v"></script>
-    <script src="js/11b-parser-core.js?v=20260707v"></script>
-    <script src="js/12-file-parsing.js?v=20260707v"></script>
-    <script src="js/12b-recon-archive.js?v=20260707v"></script>
-    <script src="js/13-charts-master.js?v=20260707v"></script>
-    <script src="js/14-filters-sync.js?v=20260707v"></script>
-    <script src="js/15-map-render.js?v=20260707v"></script>
-    <script src="js/16-pfd-hud.js?v=20260707v"></script>
-    <script src="js/17-charts.js?v=20260707v"></script>
-    <script src="js/18-engine.js?v=20260707v"></script>
-    <script src="js/19-bootstrap.js?v=20260707v"></script>
-    <script src="js/20-ui-polish.js?v=20260707v"></script>
-    <script src="js/21-cabin.js?v=20260707v"></script>
-    <script src="js/22-verlet.js?v=20260707v"></script>
+    <script src="js/00-var-catalog.js?v=20260708h"></script>
+    <script src="js/01-state.js?v=20260708h"></script>
+    <script src="js/02-satellite.js?v=20260708h"></script>
+    <script src="js/03-metrics.js?v=20260708h"></script>
+    <script src="js/04-geo-measure.js?v=20260708h"></script>
+    <script src="js/05-interpolation.js?v=20260708h"></script>
+    <script src="js/06-ocr.js?v=20260708h"></script>
+    <script src="js/07-ui-controls.js?v=20260708h"></script>
+    <script src="js/07b-plane-models.js?v=20260708h"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260708h"></script>
+    <script src="js/09-interaction.js?v=20260708h"></script>
+    <script src="js/10-point-analysis.js?v=20260708h"></script>
+    <script src="js/11-layout.js?v=20260708h"></script>
+    <script src="js/11b-parser-core.js?v=20260708h"></script>
+    <script src="js/12-file-parsing.js?v=20260708h"></script>
+    <script src="js/12b-recon-archive.js?v=20260708h"></script>
+    <script src="js/13-charts-master.js?v=20260708h"></script>
+    <script src="js/14-filters-sync.js?v=20260708h"></script>
+    <script src="js/15-map-render.js?v=20260708h"></script>
+    <script src="js/16-pfd-hud.js?v=20260708h"></script>
+    <script src="js/17-charts.js?v=20260708h"></script>
+    <script src="js/18-engine.js?v=20260708h"></script>
+    <script src="js/19-bootstrap.js?v=20260708h"></script>
+    <script src="js/20-ui-polish.js?v=20260708h"></script>
+    <script src="js/21-cabin.js?v=20260708h"></script>
+    <script src="js/22-verlet.js?v=20260708h"></script>
 </body>
 </html>

@@ -44,6 +44,7 @@
 
     let mapScale = 1, mapOffsetX = 0, mapOffsetY = 0;
     let isDraggingMap = false, dragStartX = 0, dragStartY = 0;
+    let followAircraft2D = true;   // 2D map keeps the plane centered until the user pans/zooms away
     let playbackAccumulator = 0;
     let speeds = [1, 2, 4, 8, 16, 32, 64, 128]; 
     let currentSpeedIdx = 0;

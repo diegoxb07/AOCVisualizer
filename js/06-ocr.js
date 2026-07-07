@@ -36,6 +36,19 @@
         el.classList.toggle('show', !!hunting);
     }
 
+    // Inverse of markDropZoneLoaded: returns a drop zone to its dashed waiting state.
+    function resetDropZone(zoneId, labelId, text) {
+        const zone = document.getElementById(zoneId);
+        const label = document.getElementById(labelId);
+        if (!zone || !label) return;
+        zone.classList.add('bg-slate-800', 'border-dashed', 'hover:border-blue-500', 'hover:bg-slate-700');
+        zone.classList.remove('bg-slate-950/40', 'border-solid', 'hover:border-slate-500', 'hover:bg-slate-950/60');
+        label.classList.add('text-slate-300', 'group-hover:text-blue-300');
+        label.classList.remove('text-slate-200', 'group-hover:text-slate-100');
+        label.textContent = text;
+        label.removeAttribute('title');
+    }
+
     // --- Mark a drop zone as "file loaded": turn it gray + show the filename small ---
     function markDropZoneLoaded(zoneId, labelId, filename) {
         const zone = document.getElementById(zoneId);

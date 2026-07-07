@@ -24,10 +24,66 @@
         const lons = rawLons.map(wrapLon);
         const minLon = Math.min(...lons), maxLon = Math.max(...lons), minLat = Math.min(...lats), maxLat = Math.max(...lats);
         const centerLon = (minLon + maxLon)/2; const centerLat = (minLat + maxLat)/2;
-        deltaLon = (maxLon - minLon)*1.6 || 0.2; deltaLat = (maxLat - minLat)*1.6 || 0.2; 
-        const cosLat = Math.cos(centerLat * Math.PI/180); const canvasRatio = cssW / cssH; const dataRatio = (deltaLon * cosLat) / deltaLat;
+        deltaLon = (maxLon - minLon)*1.6 || 0.2; deltaLat = (maxLat - minLat)*1.6 || 0.2;
+        const cosLat = Math.cos(centerLat * Math.PI/180);
+        // Default framing is never tighter than a 200 km radius around the flight; wheel/drag
+        // (mapScale/mapOffset) still override it for closer looks.
+        const minSpanDeg = 400 / 111;
+        deltaLat = Math.max(deltaLat, minSpanDeg);
+        deltaLon = Math.max(deltaLon, minSpanDeg / Math.max(0.2, cosLat));
+        const canvasRatio = cssW / cssH; const dataRatio = (deltaLon * cosLat) / deltaLat;
         if (dataRatio > canvasRatio) deltaLat = (deltaLon * cosLat) / canvasRatio; else deltaLon = (deltaLat * canvasRatio) / cosLat;
         plotMinLon = centerLon - deltaLon/2; plotMaxLon = centerLon + deltaLon/2; plotMinLat = centerLat - deltaLat/2; plotMaxLat = centerLat + deltaLat/2;
+    }
+
+    // The user's live pan/zoom is stored as pixel offsets (mapOffsetX/Y) and a scale relative to
+    // the current canvas size and base frame; a resize or a base reframe (fullscreen, window
+    // resize) changes both and the same pixels then point at a different place, so the view jumps.
+    // Capturing the viewport as geography (its center lon/lat and visible lon span) and re-applying
+    // it after keeps what the user was looking at fixed across the change.
+    function isMapPanned() { return mapScale !== 1 || mapOffsetX !== 0 || mapOffsetY !== 0; }
+    function getMapViewportGeo() {
+        if (!deltaLon || !deltaLat || !cssW || !cssH) return null;
+        const lxC = (cssW / 2 - mapOffsetX) / mapScale, lyC = (cssH / 2 - mapOffsetY) / mapScale;
+        return {
+            cLon: plotMinLon + (lxC / cssW) * deltaLon,
+            cLat: plotMinLat + ((cssH - lyC) / cssH) * deltaLat,
+            spanLon: deltaLon / mapScale   // visible degrees of longitude, the zoom level in geo terms
+        };
+    }
+    function applyMapViewportGeo(v) {
+        if (!v || !deltaLon || !cssW || !cssH) return;
+        mapScale = deltaLon / v.spanLon;
+        mapOffsetX = cssW / 2 - mapScale * getX(v.cLon);
+        mapOffsetY = cssH / 2 - mapScale * getY(v.cLat);
+    }
+
+    // Follow-the-aircraft: the 2D map keeps the current plane position at screen center until the
+    // user pans or zooms (which flips followAircraft2D off and reveals the recenter button).
+    const FOLLOW_SPAN_KM = 220;   // visible width, in km, when following (framed around the plane)
+    function centerMapOnPlane2D(d) {
+        if (!d || !cssW || !cssH) return;
+        mapOffsetX = cssW / 2 - mapScale * getX(d.lon);
+        mapOffsetY = cssH / 2 - mapScale * getY(d.lat);
+    }
+    // Engage follow and zoom into the plane. Called on load and by the recenter button.
+    function engageFollowAircraft() {
+        followAircraft2D = true;
+        if (filteredData.length && deltaLon) {
+            const d = filteredData[Math.max(0, Math.min(currentIdx, filteredData.length - 1))];
+            const spanDeg = FOLLOW_SPAN_KM / (111.32 * Math.max(0.2, Math.cos(d.lat * Math.PI / 180)));
+            mapScale = Math.min(400, Math.max(0.06, deltaLon / spanDeg));
+            centerMapOnPlane2D(d);
+        }
+        bgNeedsUpdate = true;
+        if (typeof updateFollowButton === 'function') updateFollowButton();
+        if (filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+    // Called by the pan/zoom handlers: stop following and surface the recenter button.
+    function disengageFollowAircraft() {
+        if (!followAircraft2D) return;
+        followAircraft2D = false;
+        if (typeof updateFollowButton === 'function') updateFollowButton();
     }
 
     // Projection works in LOGICAL css pixels; the renderers apply the DPR base transform.
@@ -108,7 +164,7 @@
     function drawStormTrack2D() {
         if (!showStormTrack || stormTrackPoints.length < 2) return;
         ctx.save();
-        ctx.lineWidth = 2 / mapScale; ctx.globalAlpha = 0.85; ctx.setLineDash([6 / mapScale, 4 / mapScale]);
+        ctx.lineWidth = 2 / mapScale; ctx.globalAlpha = 0.95; ctx.setLineDash([6 / mapScale, 4 / mapScale]);
         for (let i = 1; i < stormTrackPoints.length; i++) {
             const a = stormTrackPoints[i - 1], b = stormTrackPoints[i];
             ctx.beginPath(); ctx.strokeStyle = stormWindColor(b.windKt); ctx.moveTo(getX(a.lon), getY(a.lat)); ctx.lineTo(getX(b.lon), getY(b.lat)); ctx.stroke();
@@ -121,7 +177,7 @@
             const hovered = i === hoveredStormIdx;
             const col = stormWindColor(p.windKt), lbl = stormCatLabel(p.windKt);
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            ctx.globalAlpha = hovered ? 1.0 : 0.82;
+            ctx.globalAlpha = hovered ? 1.0 : 0.9;
             if (!lbl) {   // unknown intensity: keep a plain small fix marker
                 ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
                 ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -135,20 +191,14 @@
             }
             ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
             ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
-            ctx.fillStyle = '#111827';
+            // the fix the status card currently refers to carries a white label; every other fix dark
+            const isCurrent = typeof currentStormFixIdx !== 'undefined' && i === currentStormFixIdx;
+            ctx.fillStyle = isCurrent ? '#ffffff' : '#111827';
             ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             ctx.fillText(lbl, 0, 0.5);
             ctx.restore();
         });
-        // discreet thin ring on the fix the status card currently refers to
-        if (typeof currentStormFixIdx !== 'undefined' && currentStormFixIdx >= 0 && stormTrackPoints[currentStormFixIdx]) {
-            const p = stormTrackPoints[currentStormFixIdx];
-            ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            ctx.beginPath(); ctx.arc(0, 0, 12, 0, 2 * Math.PI);
-            ctx.strokeStyle = 'rgba(226,232,240,0.6)'; ctx.lineWidth = 1.5; ctx.stroke();
-            ctx.restore();
-        }
         ctx.restore();
     }
 
@@ -177,17 +227,67 @@
         ctx.restore();
     }
     
+    // Sutherland-Hodgman ring clip against a lon/lat box in the plot's lon domain (shift applied
+    // first). Zoomed in far, the raw world rings project to paths millions of device px across
+    // and the rasterizer silently drops them whole, visible land included; clipping every ring
+    // to a padded view box keeps path extents small. The pad puts the clip's artificial box-edge
+    // segments (and their strokes) outside the visible area.
+    function clipRingToBox(ring, shift, box) {
+        let out = [];
+        for (const c of ring) out.push([c[0] + shift, c[1]]);
+        const planes = [[1, 0, box.minLon], [-1, 0, -box.maxLon], [0, 1, box.minLat], [0, -1, -box.maxLat]];
+        for (const [a, b, k] of planes) {
+            if (!out.length) return out;
+            const inp = out; out = [];
+            for (let i = 0; i < inp.length; i++) {
+                const P = inp[i], Q = inp[(i + 1) % inp.length];
+                const dP = a * P[0] + b * P[1] - k, dQ = a * Q[0] + b * Q[1] - k;
+                if (dP >= 0) out.push(P);
+                if ((dP >= 0) !== (dQ >= 0)) { const t = dP / (dP - dQ); out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); }
+            }
+        }
+        return out;
+    }
+
+    // Geometry clipping kicks in past this zoom; below it the raw paths are small enough for the
+    // rasterizer and the draw stays byte-identical to the unclipped output.
+    const MAP_CLIP_MIN_SCALE = 6;
+    function mapClipBox() {
+        if (mapScale <= MAP_CLIP_MIN_SCALE) return null;
+        const v = getVisibleGeoBounds(); if (!v) return null;
+        const padLon = (v.maxLon - v.minLon) * 0.5, padLat = (v.maxLat - v.minLat) * 0.5;
+        return { minLon: v.minLon - padLon, maxLon: v.maxLon + padLon, minLat: v.minLat - padLat, maxLat: v.maxLat + padLat };
+    }
+
     function renderBackground() {
-        if (!bgCanvas.width || !bgCanvas.height) return; 
+        if (!bgCanvas.width || !bgCanvas.height) return;
         bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#0b1220'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
+        const clipBox = mapClipBox();
+        const xOf = lon => ((lon - plotMinLon) / deltaLon) * cssW;   // lon already in the plot domain
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
         if (satImageLoaded && isSatOn && satImage.width > 0) {
             bgCtx.globalAlpha = 0.92;
             if (satImageBox) {
-                const dx = getX(satImageBox.minLon), dy = getY(satImageBox.maxLat), dw = getX(satImageBox.maxLon) - getX(satImageBox.minLon), dh = getY(satImageBox.minLat) - getY(satImageBox.maxLat);
-                bgCtx.drawImage(satImage, dx, dy, dw, dh);
+                const sMinLon = wrapLon(satImageBox.minLon), sMaxLon = wrapLon(satImageBox.maxLon);
+                // At high zoom the full-box destination rect is blown up hundreds of times and
+                // overflows the rasterizer, so draw only the visible slice via a source crop.
+                // Skipped when the wrap puts the box across the lon-domain seam (order inverts);
+                // the plain path below still handles that case.
+                if (clipBox && sMinLon < sMaxLon) {
+                    const iMinLon = Math.max(sMinLon, clipBox.minLon), iMaxLon = Math.min(sMaxLon, clipBox.maxLon);
+                    const iMinLat = Math.max(satImageBox.minLat, clipBox.minLat), iMaxLat = Math.min(satImageBox.maxLat, clipBox.maxLat);
+                    if (iMinLon < iMaxLon && iMinLat < iMaxLat) {
+                        const fw = satImage.width / (sMaxLon - sMinLon), fh = satImage.height / (satImageBox.maxLat - satImageBox.minLat);
+                        bgCtx.drawImage(satImage,
+                            (iMinLon - sMinLon) * fw, (satImageBox.maxLat - iMaxLat) * fh, (iMaxLon - iMinLon) * fw, (iMaxLat - iMinLat) * fh,
+                            xOf(iMinLon), getY(iMaxLat), xOf(iMaxLon) - xOf(iMinLon), getY(iMinLat) - getY(iMaxLat));
+                    }
+                } else {
+                    const dx = getX(satImageBox.minLon), dy = getY(satImageBox.maxLat), dw = getX(satImageBox.maxLon) - getX(satImageBox.minLon), dh = getY(satImageBox.minLat) - getY(satImageBox.maxLat);
+                    bgCtx.drawImage(satImage, dx, dy, dw, dh);
+                }
             } else { bgCtx.drawImage(satImage, 0, 0, cssW, cssH); }
             bgCtx.globalAlpha = 1.0;
         }
@@ -196,17 +296,28 @@
             // Draw the whole world, cull off-screen, and repeat it shifted ±360 so a dateline-centered
             // or zoomed-out view shows continuous land instead of an empty seam. Projects with the
             // raw (unwrapped) x, wrapping would cancel the shift.
-            const getXShift = (lon, shift) => (((lon + shift) - plotMinLon) / deltaLon) * cssW;
+            const getXShift = (lon, shift) => xOf(lon + shift);
+            // Clipped rings lose the data's repeated closing point, so close the subpath for the
+            // stroke; the unclipped branch keeps the original untouched draw.
+            const traceRing = (ring, shift) => {
+                if (!clipBox) {
+                    ring.forEach((coord, i) => { const x = getXShift(coord[0], shift); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); });
+                    return;
+                }
+                const pts = clipRingToBox(ring, shift, clipBox);
+                pts.forEach((p, i) => { const x = xOf(p[0]); const y = getY(p[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); });
+                if (pts.length) bgCtx.closePath();
+            };
             for (const shift of [0, -360, 360]) {
                 mapFeatures.forEach(feature => {
                     if (!isBoxInView(feature.properties.bbox, shift)) return;
                     const geom = feature.geometry; if (!geom) return;
                     const isState = feature.properties && feature.properties.isState === true;
                     if (geom.type === 'Polygon') {
-                        bgCtx.beginPath(); geom.coordinates.forEach(ring => { ring.forEach((coord, i) => { const x = getXShift(coord[0], shift); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); });
+                        bgCtx.beginPath(); geom.coordinates.forEach(ring => traceRing(ring, shift));
                         if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke();
                     } else if (geom.type === 'MultiPolygon') {
-                        geom.coordinates.forEach(poly => { bgCtx.beginPath(); poly.forEach(ring => { ring.forEach((coord, i) => { const x = getXShift(coord[0], shift); const y = getY(coord[1]); if (i === 0) bgCtx.moveTo(x, y); else bgCtx.lineTo(x, y); }); });
+                        geom.coordinates.forEach(poly => { bgCtx.beginPath(); poly.forEach(ring => traceRing(ring, shift));
                         if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke(); });
                     }
                 });
@@ -217,6 +328,9 @@
 
     function renderMapEngineFrame(idx, visualRow) {
         if (!canvas.width || !canvas.height) return;
+        // Follow mode keeps the plane centered every frame; recenter (and mark the background dirty
+        // since the pan moved) before drawing.
+        if (followAircraft2D && (visualRow || filteredData[idx])) { centerMapOnPlane2D(visualRow || filteredData[idx]); bgNeedsUpdate = true; }
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1.0; ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (bgNeedsUpdate) renderBackground();
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(bgCanvas, 0, 0);   // bgCanvas is already device-res
@@ -234,14 +348,24 @@
             lastX = curX; lastY = curY;
         }
         
-        ctx.beginPath(); ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
+        // Future (not-yet-flown) track, faint grey. Normally one continuous path, but zoomed in far
+        // that single path spans a device-pixel extent the rasterizer drops whole (the same failure
+        // the polygon clip fixes), so past the clip threshold stroke it per on-screen segment.
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
+        const clipHi = mapScale > MAP_CLIP_MIN_SCALE;
+        const onScreen = (x, y) => { const sx = mapOffsetX + mapScale * x, sy = mapOffsetY + mapScale * y; return sx > -cssW && sx < 2 * cssW && sy > -cssH && sy < 2 * cssH; };
+        ctx.beginPath();
         lastX = getX(filteredData[idx].lon); lastY = getY(filteredData[idx].lat); ctx.moveTo(lastX, lastY);
-        for (let i = idx + 1; i < filteredData.length; i++) { 
+        for (let i = idx + 1; i < filteredData.length; i++) {
             let curX = getX(filteredData[i].lon), curY = getY(filteredData[i].lat);
             if (Math.abs(curX - lastX) < 1 && Math.abs(curY - lastY) < 1 && i !== filteredData.length - 1) continue;
-            ctx.lineTo(curX, curY); lastX = curX; lastY = curY;
-        } 
-        ctx.stroke(); ctx.globalAlpha = 1.0;
+            if (clipHi) {
+                if (onScreen(curX, curY) || onScreen(lastX, lastY)) { ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(curX, curY); ctx.stroke(); }
+            } else { ctx.lineTo(curX, curY); }
+            lastX = curX; lastY = curY;
+        }
+        if (!clipHi) ctx.stroke();
+        ctx.globalAlpha = 1.0;
 
         const targetSpacing = getBarbSpacingPx();
         let lastBarbIdx = -1;
@@ -277,7 +401,7 @@
             if (document.getElementById('simpleTrackerIcon').checked) {
                 ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#e2e4e8'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
-                const planeScale = 0.22 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
+                const planeScale = 0.15 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
                 // ground-track (blue) and true-heading (yellow) arrows ahead of the plane, the
                 // same pair the 3D tracker flies: translucent so the dynamic wind barb stays
                 // readable through them, the heading arrow nesting inside the track arrow
@@ -299,7 +423,10 @@
 
             if (d.windDir !== null && d.windSpd !== null) {
                 let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
-                const noseDist = 5.5 * zoomFactor / mapScale; let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist; let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
+                // sit just off the glyph's nose tip (glyph nose is at ~x=25 in its local frame, so
+                // the tip in the scaled frame tracks planeScale); the barb itself keeps its own
+                // size (drawWindBarbFrame's isDynamic scale is independent of the glyph scale).
+                const noseDist = 3.75 * zoomFactor / mapScale; let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist; let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
                 drawWindBarbFrame(noseX, noseY, d.windDir, d.windSpd, mapScale, true);
             }
         }

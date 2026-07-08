@@ -193,11 +193,11 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { di
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
 
 /* Sticky media bar + resize handle (functional) */
-.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.8); }
+.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 25px 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.8); }
 .media-content-wrapper { overflow: hidden; }
 
-.media-resize-handle { position: absolute; bottom: -7px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
-.media-resize-handle::before { content: ""; position: absolute; left: 35%; right: 35%; top: 50%; transform: translateY(-50%); height: 5px; border-radius: 3px; background: var(--border-strong); transition: background 0.15s, height 0.15s, left 0.15s, right 0.15s; }
+.media-resize-handle { position: absolute; bottom: 4px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
+.media-resize-handle::before { content: ""; position: absolute; left: 35%; right: 35%; top: 50%; transform: translateY(-50%); height: 10px; border-radius: 3px; background: var(--border-strong); transition: background 0.15s, height 0.15s, left 0.15s, right 0.15s; }
 .media-resize-handle .grip { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: var(--text-muted); font-size: 18px; font-weight: 700; line-height: 0; letter-spacing: 3px; transition: color 0.15s; background: var(--bg); padding: 0 6px; }
 .media-resize-handle:hover::before, .sticky-media-bar.resizing .media-resize-handle::before { background: var(--accent); height: 6px; left: 20%; right: 20%; }
 .media-resize-handle:hover .grip, .sticky-media-bar.resizing .media-resize-handle .grip { color: var(--accent); }

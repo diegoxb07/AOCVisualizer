@@ -13,48 +13,11 @@
    (planeGroup3D applies the world scale). Fuselage textures map u around the hull (0 = belly,
    0.5 = top) and v along it (0 = nose, 1 = tail). */
 
-    let planeModelGroup3D = null;    // airframe-only group inside planeGroup3D (crew and arrows live outside it)
+    let planeModelGroup3D = null;    // airframe-only group inside planeGroup3D (the direction arrows live outside it)
     let planeModelType3D = null;     // 'p3' | 'giv'
     let planeSpinners3D = [];        // propeller groups, spun by the 3D render loop
 
-    const NOAA_LIV = { white: '#f2f5f7', navy: '#1b4a94', sky: '#7ec8ec', black: '#1d2126', dark: '#2b3540', metal: '#aab4bd', prop: '#23272c' };
-
-    // Cabin geometry the crew view sizes itself from, per airframe (plane-local units).
-    // seats = every seat on the aircraft as {x, z, rot?}, one crew figure in each (rot turns a
-    // seat, the aft-facing one). The P-3 list follows the AOC walkthrough; his aisle sides are
-    // FACING FORWARD (left = port, right = starboard), the figures are sized so a two-abreast
-    // pair, the aisle, and the single across all fit the cross-section (the aisle is always
-    // present), and rows run nose to tail:
-    //   cockpit: pilot (port) + copilot abreast, flight engineer behind on the centerline (the
-    //   upside-down triangle), jumpseat behind the pilot with no computer;
-    //   one row of two seats just aft, across the aisle from each other, computers in front;
-    //   an empty machinery passage;
-    //   7-8 a pair on the starboard side with 9 alone across on port, equal computers each;
-    //   10-11 a pair on port right behind 9 (machinery across the aisle);
-    //   12 alone on port FACING AFT, its computer aft of it facing forward, with the overwing
-    //   emergency window in the empty stretch aft of it;
-    //   13 (no computer, port) across from 15 (computer, starboard), the dropsonde launcher
-    //   in the gap behind 15;
-    //   16-17 a pair on starboard with computers, 18 (no computer) in the SAME row across on
-    //   port by the aft bubble window, the bathroom behind 16-17, and the galley at the tail
-    //   (kitchen port, bench seating starboard). Seats 14 and 19 do not exist as positions.
-    const PLANE_CABIN_SPECS = {
-        p3:  {
-            floorY: -0.12, halfW: 0.20, figScale: 0.34,
-            seats: [
-                { x: -0.07, z: -1.86 }, { x: 0.07, z: -1.86 }, { x: 0, z: -1.72 }, { x: -0.07, z: -1.58 },
-                { x: -0.105, z: -1.25 }, { x: 0.105, z: -1.25 },
-                { x: 0.060, z: -0.85 }, { x: 0.162, z: -0.85 }, { x: -0.105, z: -0.85 },
-                { x: -0.060, z: -0.58 }, { x: -0.162, z: -0.58 },
-                { x: -0.105, z: -0.40, rot: Math.PI },
-                { x: -0.105, z: 0.075 }, { x: 0.105, z: 0.075 },
-                { x: 0.060, z: 0.80 }, { x: 0.155, z: 0.80 }, { x: -0.105, z: 0.80 }
-            ],
-            interior: true
-        },
-        giv: { floorY: -0.08, halfW: 0.15, figScale: 0.40, seats: [{ x: 0, z: -0.85 }, { x: 0, z: -0.35 }, { x: 0, z: 0.15 }, { x: 0, z: 0.65 }] }
-    };
-    function activeCabinSpec() { return PLANE_CABIN_SPECS[planeModelType3D] || PLANE_CABIN_SPECS.p3; }
+    const NOAA_LIV = { white: '#f2f5f7', navy: '#11356f', sky: '#7ec8ec', black: '#1d2126', dark: '#2b3540', metal: '#aab4bd', prop: '#23272c' };
 
     // Tail registration for the fin decal: NOAA42/43 are the two WP-3Ds, NOAA49 the G-IV.
     function noaaTailReg(type) {
@@ -210,7 +173,6 @@
         const disc = new THREE.Mesh(
             new THREE.CircleGeometry(o.spinnerR * 0.4 + o.bladeLen + 0.01, 28),
             new THREE.MeshBasicMaterial({ color: 0x30343a, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false }));
-        disc.userData.noDim = true;   // stays translucent; the crew-ride dim pass must not touch it
         grp.add(disc);
         return grp;
     }
@@ -632,8 +594,12 @@
         fin.position.set(0, 0.14, 1.55); grp.add(fin);
         // flag ahead of the rudder hinge line, so the rudder groove never cuts through it
         addFinFlags(grp, { halfThick: 0.033, y: 0.86, z: 2.19 });
-        const dorsal = finPanel({ height: 0.24, rootChord: 0.55, tipChord: 0.05, sweepDeg: 62, thick: 0.05, mat: mats.navy });
-        dorsal.position.set(0, 0.16, 1.23); grp.add(dorsal);
+        // Dorsal fillet: a tall spine fairing whose trailing edge runs up the fin's leading edge and
+        // OVERLAPS into the fin (TE reaches z~1.61 at the base, past the fin LE at z 1.55, and follows
+        // the fin's aft sweep up to ~60% of fin height), so the two panels connect with no gap/notch
+        // and the tall fin fairs continuously into the roof spine.
+        const dorsal = finPanel({ height: 0.52, rootChord: 0.75, tipChord: 0.06, sweepDeg: 64, thick: 0.055, mat: mats.navy });
+        dorsal.position.set(0, 0.15, 0.86); grp.add(dorsal);
 
         // tail Doppler radar: a stub a third of the fuselage's thickness that the funneled aft
         // body flows straight into; navy like the rest of the WP-3D tail
@@ -642,12 +608,11 @@
         const boomCap = new THREE.Mesh(new THREE.SphereGeometry(0.076, 14, 12), mats.navy);
         boomCap.position.set(0, 0.128, 2.87); grp.add(boomCap);
 
-        // the MMR: the big circular black radar disk on the FORWARD underbelly, between the
-        // wing and the navy nose wrap; plus the chin radome under the flight deck
-        const belly = new THREE.Mesh(new THREE.SphereGeometry(1, 26, 18), radomeMat);
-        belly.scale.set(0.20, 0.055, 0.23); belly.position.set(0, -0.242, -1.20); grp.add(belly);
-        const chin = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 14), mats.dark);
-        chin.scale.set(0.10, 0.07, 0.14); chin.position.set(0, -0.185, -2.05); grp.add(chin);
+        // the MMR: the big circular black radar disk on the FORWARD underbelly, well forward toward
+        // the nose (between the wing and the navy nose wrap); it hangs proud below the belly so the
+        // dome reads clear of the hull rather than half-sunk into it
+        const belly = new THREE.Mesh(new THREE.SphereGeometry(1, 30, 20), radomeMat);
+        belly.scale.set(0.23, 0.075, 0.30); belly.position.set(0, -0.30, -1.5); grp.add(belly);
 
         // four turboprops: nacelles hang forward of and below the wing, inners longer (gear bays)
         [[0.55, 1.0], [1.08, 0.78]].forEach(([xs, lenF]) => {
@@ -856,8 +821,7 @@
     }
 
     // Build (or swap) the airframe inside planeGroup3D to match the loaded flight. No-ops when the
-    // right model is already up. Crew figures are sized to the airframe, so a swap tears them down;
-    // the cabin loop rebuilds them on its next frame if the Crew Ride toggle is on.
+    // right model is already up.
     function setPlaneModel3D() {
         if (typeof planeGroup3D === 'undefined' || !planeGroup3D || typeof THREE === 'undefined') return;
         const type = (typeof isGulfstreamFlight === 'function' && isGulfstreamFlight()) ? 'giv' : 'p3';
@@ -869,8 +833,5 @@
         planeModelGroup3D = type === 'giv' ? buildGIVModel(reg) : buildP3Model(reg);
         planeModelGroup3D.userData.reg = reg;
         planeGroup3D.add(planeModelGroup3D);
-        if (typeof crewGroup3D !== 'undefined' && crewGroup3D) {
-            planeGroup3D.remove(crewGroup3D); disposePlaneObject3D(crewGroup3D);
-            crewGroup3D = null; _planeBodyMeshes = [];
-        }
+        if (typeof applyPlaneScale === 'function') applyPlaneScale();   // keep real-scale (if on) after a build/swap
     }

@@ -183,8 +183,8 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { di
    once a mission is loaded (JS toggles .lit + .chip-v.on). This is the one place an
    accent-colored border is intentional, a genuine state change, not decoration. */
 .status-chip { display: flex; flex-direction: column; gap: 3px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; min-width: 0; transition: border-color 0.2s, background 0.2s; }
-.status-chip .chip-k { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
-.status-chip .chip-v { font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.status-chip .chip-k { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
+.status-chip .chip-v { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .status-chip .chip-v.on { color: var(--text); }
 .status-chip.lit { background: var(--accent-soft); border: 1px solid var(--accent); }
 .status-chip.lit .chip-v.on { color: var(--text); font-weight: 700; }
@@ -193,7 +193,7 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satelliteSelect { di
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
 
 /* Sticky media bar + resize handle (functional) */
-.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 25px 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); box-shadow: 0 10px 20px -10px rgba(0, 0, 0, 0.8); }
+.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 20px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
 .media-content-wrapper { overflow: hidden; }
 
 .media-resize-handle { position: absolute; bottom: 4px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
@@ -213,18 +213,26 @@ canvas#mapCanvas:active { cursor: grabbing; }
 
 #videoPanel { height: var(--media-h); display: flex; flex-direction: column; overflow: hidden; }
 #videoPanel .media-container { width: 100%; flex-grow: 1; min-height: 0; position: relative; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
-video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; background-color: #000; border-radius: 4px; }
+video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; background-color: var(--bg); border-radius: 4px; }
 
 #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: var(--bg); cursor: grab; z-index: 2; }
 
 /* Idle placeholders (hidden wholesale once data loads, via style.display on the placeholder div) */
 .radar-blip { position: absolute; top: 34%; left: 62%; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blipPulse 3.4s ease-out infinite; }
 @keyframes blipPulse { 0%, 12% { opacity: 1; } 60%, 100% { opacity: 0.12; } }
-.media-idle-title { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
+.media-idle-title { display: block; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
 .media-idle-sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-faint); margin-top: 6px; max-width: 380px; }
 
+/* The processing spinner morphs into a green checkmark once parsing succeeds (js/12 adds .done). */
+#loadingCheck { opacity: 0; }
+#loadingCheck path { stroke-dasharray: 42; stroke-dashoffset: 42; }
+#loadingSpinner.done #loadingRing { animation: none; border-color: #10b981; transition: border-color 0.25s ease; }
+#loadingSpinner.done #loadingCheck { opacity: 1; transition: opacity 0.2s ease; }
+#loadingSpinner.done #loadingCheck path { animation: loadCheckDraw 0.42s ease 0.05s forwards; }
+@keyframes loadCheckDraw { to { stroke-dashoffset: 0; } }
+
 /* In-map overlays: HUD, PFD, pills, badges - flat hairline borders, no accent-tinted glow */
-.overlays-wrapper { position: absolute; top: 44px; bottom: 30px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
+.overlays-wrapper { position: absolute; top: 44px; bottom: 18px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
 #hudOverlay { background-color: color-mix(in oklab, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; line-height: 1.4; color: var(--text); display: none; min-width: 200px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
 #hudOverlay::-webkit-scrollbar { width: 6px; }
 #hudOverlay::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
@@ -236,13 +244,6 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 140px; height: 140px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; transform: scale(var(--hud-scale, 1)); transform-origin: bottom right; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
-/* Crew ride cutaway, top-left of the 2D tracker, shown only when the toggle is on (JS). */
-#cabinOverlay { position: absolute; top: 22px; left: 16px; width: 160px; height: 120px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; overflow: hidden; pointer-events: none; z-index: 2450; transform: scale(var(--hud-scale, 1)); transform-origin: top left; }
-#cabinCanvas { width: 100%; height: 100%; display: block; }
-/* In fullscreen the info stack (sat badge + storm card) sits top-LEFT, so move the crew overlay to
-   the top-RIGHT to clear it. Safe: the crew overlay is 2D-only and #attitudeHud (also top-right in
-   fullscreen) is 3D-only, so the two never show at the same time. */
-#mapPanel:is(:fullscreen, .fake-fs) #cabinOverlay { top: 96px; left: auto; right: 16px; width: 210px; height: 158px; }
 
 /* Non-invasive satellite fetch status, a small pill, not a full-screen cover */
 #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
@@ -307,16 +308,16 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
 /* Bottom command bar */
-.sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: color-mix(in oklab, var(--panel-strip) 94%, transparent); border-top: 1px solid var(--border); padding: 10px 18px; z-index: 2000; box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.8); backdrop-filter: blur(6px); display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; row-gap: 10px; }
+.sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: color-mix(in oklab, var(--panel-strip) 94%, transparent); border-top: 1px solid var(--border); padding: 10px 18px; z-index: 2000; backdrop-filter: blur(6px); display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; row-gap: 10px; }
 
 .cmd-group { display: flex; flex-direction: column; gap: 5px; }
 .cmd-group + .cmd-group { border-left: 1px solid var(--border); padding-left: 8px; }
-.cmd-group > .cmd-label { font-family: 'IBM Plex Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); padding-left: 1px; }
+.cmd-group > .cmd-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); padding-left: 1px; }
 .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
 #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
 #cmdTimelineGroup > .cmd-row { gap: 16px; }
-#cmdTimelineGroup > .cmd-label { font-size: 9px; color: var(--accent); }
+#cmdTimelineGroup > .cmd-label { font-size: 10.5px; color: var(--accent); }
 #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
 #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
@@ -396,5 +397,28 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
    of overlapping it. */
 #recenterPlaneBtn { bottom: 36px !important; }
 
-/* Theme toggle, next to Reset/Fullscreen in the fixed top-right corner */
-#themeToggleBtn { width: 30px; text-align: center; }
+/* Light/dark theme switch: a sliding pill below Fullscreen in the fixed top-right corner. The knob
+   position and which icon lights are driven off [data-theme] on <html>, so the switch reflects the
+   theme set pre-paint by the head script and slides on every toggle. */
+.theme-switch { -webkit-appearance: none; appearance: none; position: relative; width: 56px; height: 26px; flex: none; padding: 0; border: 1px solid var(--border); border-radius: 13px; background: var(--panel-strip); cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+.theme-switch:hover { border-color: var(--border-strong); }
+/* Each icon is centered inside a knob-sized (20px) box parked at that state's knob position, so the
+   glyph always sits dead-center under the circle regardless of its own width. */
+.theme-switch .ts-ico { position: absolute; top: 0; height: 100%; width: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; color: var(--text-faint); pointer-events: none; z-index: 2; transition: color 0.2s; }
+.theme-switch .ts-moon { left: 3px; }
+.theme-switch .ts-sun { right: 3px; }
+/* calc() keeps the knob centered on the icon boxes (left:3px / right:3px, each 20px wide) regardless
+   of box-sizing, so the circle sits dead-center over the moon (dark) and the sun (light). */
+.theme-switch .ts-knob { position: absolute; top: calc(50% - 10px); left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,0.35); z-index: 1; transition: left 0.2s ease; }
+/* Dark (default): knob left, moon rides it. Light: knob right, sun rides it. */
+.theme-switch .ts-moon { color: var(--accent-ink); }
+:root[data-theme="light"] .theme-switch .ts-knob { left: calc(100% - 23px); }
+:root[data-theme="light"] .theme-switch .ts-moon { color: var(--text-faint); }
+:root[data-theme="light"] .theme-switch .ts-sun { color: var(--accent-ink); }
+
+/* Smooth the whole-page brightness change when toggling light/dark, in step with the knob slide.
+   Scoped to a transient class the toggle adds for ~0.4s, so it never lags hover/focus color changes
+   during normal use. */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+    transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, fill 0.35s ease, left 0.35s ease !important;
+}

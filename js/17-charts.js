@@ -44,6 +44,10 @@
                 // way. Never struck through; deselected text dims to a calm slate instead.
                 generateLabels: (chart) => {
                     const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                    // Selected labels sit near-white for the dark panel; in light mode that washes
+                    // out on the near-white chart panel, so flip them to a dark ink. Deselected stay
+                    // a calm slate in both themes (readable on either panel).
+                    const selColor = document.documentElement.dataset.theme === 'light' ? '#1e293b' : '#e2e8f0';
                     items.forEach(it => {
                         const off = it.hidden;
                         it.hidden = false;
@@ -51,7 +55,7 @@
                         // strokeStyle carries the series (line) color from the default builder; fill
                         // the swatch with it when selected, leave it hollow (outline only) when not.
                         if (off) { it.fontColor = '#64748b'; it.fillStyle = 'rgba(0,0,0,0)'; it.strokeStyle = '#64748b'; }
-                        else { it.fillStyle = it.strokeStyle; }
+                        else { it.fontColor = selColor; it.fillStyle = it.strokeStyle; }
                     });
                     return items;
                 } }, onClick: function(e, legendItem, legend) { const ci = legend.chart; const isVisible = ci.isDatasetVisible(legendItem.datasetIndex); ci.setDatasetVisibility(legendItem.datasetIndex, !isVisible); ci.update('none'); if (ci.canvas.id !== 'parameterChart') buildDropdownMenus(); } } }
@@ -79,8 +83,8 @@
                     ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
                 }
             }
-            ctx.restore(); 
-        } 
+            ctx.restore();
+        }
     };
 
     function buildChartLayout() {
@@ -110,12 +114,12 @@
                 return ds;
             });
 
-            customCharts[id] = new Chart(chartCanvas.getContext('2d'), { 
-                type: 'line', 
-                data: { labels: labelsTimeline, datasets: datasets }, 
-                options: getBaseChartOptions(title, config), 
-                plugins: [markerPlugin] 
-            }); 
+            customCharts[id] = new Chart(chartCanvas.getContext('2d'), {
+                type: 'line',
+                data: { labels: labelsTimeline, datasets: datasets },
+                options: getBaseChartOptions(title, config),
+                plugins: [markerPlugin]
+            });
         };
         
         buildSubChart('tempChart', [{key:'tempr'}, {key:'dewpt'}], `Temperature (${isImp ? '°F' : '°C'})`, { enforceIntegers: true, minRange: 5 });

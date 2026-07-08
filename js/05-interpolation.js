@@ -43,9 +43,12 @@
         let turb = 0.10;   // faint baseline only for files with NO vertical-wind channel (never frozen-dead)
         if (d1.vtWnd !== null && d2.vtWnd !== null) turb = Math.min(1, Math.abs(d1.vtWnd + (d2.vtWnd - d1.vtWnd) * t) / 3.0);
         const bandNoise = (ph) => 0.6 * Math.sin(exactSec * 2.3 + ph) + 0.3 * Math.sin(exactSec * 5.9 + ph * 2.1) + 0.1 * Math.sin(exactSec * 11.7 + ph * 3.7);
-        let alt_jitter = bandNoise(0.0) * 0.7 * turb;      // metres  (turbulence-scaled; was a fixed 0.15 m white-noise draw)
-        let pitch_jitter = bandNoise(1.7) * 0.30 * turb;   // degrees (was fixed 0.20)
-        let roll_jitter = bandNoise(3.9) * 0.45 * turb;    // degrees (was fixed 0.10)
+        // Vertical bounce is kept small so the plane rides ON the track (a bigger draw threw it visibly
+        // off/below the line, especially at real scale where the plane is tiny). Turbulence is carried by
+        // the pitch/roll rocking instead, which tilts the airframe without lifting it off the path.
+        let alt_jitter = bandNoise(0.0) * 0.12 * turb;     // metres
+        let pitch_jitter = bandNoise(1.7) * 0.30 * turb;   // degrees
+        let roll_jitter = bandNoise(3.9) * 0.45 * turb;    // degrees
         let p_val = cubic(d0.pitch, d1.pitch, d2.pitch, d3.pitch, t);
         let r_val = cubic(d0.roll, d1.roll, d2.roll, d3.roll, t);
         let pa_val = cubic(d0.pAlt, d1.pAlt, d2.pAlt, d3.pAlt, t);
@@ -65,8 +68,8 @@
             pitch: p_val !== null ? p_val + pitch_jitter : null, roll: r_val !== null ? r_val + roll_jitter : null,
             th: cubicAngle(d0.th, d1.th, d2.th, d3.th, t), gTrack: cubicAngle(d0.gTrack, d1.gTrack, d2.gTrack, d3.gTrack, t),
             pAlt: pa_val !== null ? pa_val + alt_jitter : null, gpsAlt: ga_val !== null ? ga_val + alt_jitter : null, radAlt: ra_val !== null ? ra_val + alt_jitter : null,
-            // Linear (not cubic, avoids inventing phantom gust overshoot) so the vertical-wind forcing
-            // that drives the Crew Ride's float/hunch is continuous, not a 1 Hz step.
+            // Linear (not cubic, avoids inventing phantom gust overshoot) so the vertical-wind signal
+            // that scales the 8Hz micro-motion is continuous, not a 1 Hz step.
             vtWnd: lerp(d1.vtWnd, d2.vtWnd, t)
         };
     }

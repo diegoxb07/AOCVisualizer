@@ -183,7 +183,13 @@
     const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
-        camera3D.position.set(controls3D.target.x + CAM3D_HOME.x, controls3D.target.y + CAM3D_HOME.y, controls3D.target.z + CAM3D_HOME.z);
+        if (realScale3D && typeof realScaleCamDistance === 'function') {
+            // real-scale: keep the home viewing angle but pull in to frame the tiny plane, not the far preset
+            const dir = new THREE.Vector3(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z).normalize().multiplyScalar(realScaleCamDistance());
+            camera3D.position.copy(controls3D.target).add(dir);
+        } else {
+            camera3D.position.set(controls3D.target.x + CAM3D_HOME.x, controls3D.target.y + CAM3D_HOME.y, controls3D.target.z + CAM3D_HOME.z);
+        }
         controls3D.update();
     }
 
@@ -191,14 +197,18 @@
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
-        // Near clip is tiny so the camera can dolly right up to the crew figures (the airframe is
-        // scaled 0.06, so a seated dummy is only ~0.03 world units and used to clip before you could
-        // get close); the huge near/far span rides a logarithmic depth buffer to stay z-fight-free.
-        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.008, 50000);
+        // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so it is
+        // small in world units and used to near-clip before you could get close); the huge near/far
+        // span rides a logarithmic depth buffer to stay z-fight-free.
+        camera3D = new THREE.PerspectiveCamera(45, aspect, 0.001, 50000);
         camera3D.position.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);   // starts zoomed into the aircraft, no scroll-in needed
-        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true }); renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
+        renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true });
+        // Render at the display's true pixel density (capped at 2x) so the 3D view is crisp on retina
+        // screens and, since Record Clip composites this canvas, so recorded 3D footage is sharp too.
+        renderer3D.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+        renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
-        controls3D.minDistance = 0.02;   // let the user get right in on the crew without dollying through the target
+        controls3D.minDistance = 0.02;   // let the user get right in on the aircraft without dollying through the target
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
         planeGroup3D = new THREE.Group(); planeGroup3D.scale.set(0.06, 0.06, 0.06); scene3D.add(planeGroup3D);
         // the airframe itself (WP-3D or G-IV per the loaded flight) is built by js/07b-plane-models.js
@@ -216,7 +226,7 @@
         trackArrow3D = buildDirectionArrow(0x3da5ff, 0.17, 2.3, 1); scene3D.add(trackArrow3D);
         // True heading: yellow and slightly smaller, nested inside the track arrow's world-space
         // span, so it hides within the blue when the two agree and appears only when they
-        // diverge; scene-level (not planeGroup3D) so the crew-ride dim pass never touches it.
+        // diverge; scene-level (not planeGroup3D) so it stays a clean world-space compass pointer.
         headingArrow3D = buildDirectionArrow(0xffd400, 0.145, 2.76, 0.8); scene3D.add(headingArrow3D);
         scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
         function animate3D() {
@@ -227,6 +237,64 @@
         }
         animate3D(); threeDInitialized = true;
     }
+
+    // Real-scale toggle (a Filters checkbox): draw the 3D airframe at its true size against the world
+    // instead of the default enlarged glyph. Real fuselage lengths per type, defaulting to the WP-3D
+    // when the aircraft is unknown; at 20 units/deg the model is tiny, so it only reads once dollied in.
+    let realScale3D = false;
+    let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
+    const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
+    function planeModelLocalLength() {
+        if (typeof planeGroup3D === 'undefined' || !planeGroup3D || typeof planeModelGroup3D === 'undefined' || !planeModelGroup3D || typeof THREE === 'undefined') return 0;
+        // measure the airframe in planeGroup-local units, independent of the group's live attitude/scale
+        const q = planeGroup3D.quaternion.clone(), s = planeGroup3D.scale.clone();
+        planeGroup3D.quaternion.identity(); planeGroup3D.scale.set(1, 1, 1); planeGroup3D.updateMatrixWorld(true);
+        const size = new THREE.Vector3();
+        new THREE.Box3().setFromObject(planeModelGroup3D).getSize(size);
+        planeGroup3D.quaternion.copy(q); planeGroup3D.scale.copy(s); planeGroup3D.updateMatrixWorld(true);
+        return Math.max(size.x, size.z);
+    }
+    function planeScaleFactor() {
+        if (!realScale3D) return 0.06;
+        const localLen = planeModelLocalLength();
+        if (!(localLen > 0)) return 0.06;
+        const isGiv = (typeof isGulfstreamFlight === 'function' && isGulfstreamFlight());
+        const targetWorld = (isGiv ? PLANE_REAL_LEN_M.giv : PLANE_REAL_LEN_M.p3) * 20 / 111319;   // 20 units/deg, ~111.3 km/deg
+        return targetWorld / localLen;
+    }
+    function applyPlaneScale() {
+        if (typeof planeGroup3D === 'undefined' || !planeGroup3D) return;
+        const f = planeScaleFactor();
+        planeGroup3D.scale.set(f, f, f);
+        // (the scene-level ground-track / heading arrows are scaled to match each frame in update3DFrame)
+        // let the user dolly right up to a tiny real-size plane (a gentle floor keeps the enlarged view sane)
+        if (typeof controls3D !== 'undefined' && controls3D) controls3D.minDistance = realScale3D ? 0.005 : 0.02;
+        // A build/swap with real-scale on (incl. a refresh that rebuilds the scene) needs the camera
+        // reframed once the plane is positioned; flag it for update3DFrame rather than dolly a plane
+        // that may not be placed yet.
+        if (realScale3D) _reframeRealScale = true;
+    }
+    // Frame the plane after a real-scale toggle: real-scale dollies in to ~2.5 plane-lengths so the
+    // now-tiny airframe is visible immediately; turning it off restores the default framing distance.
+    // Camera distance that frames the real-size plane to ~64% of the vertical view.
+    function realScaleCamDistance() {
+        const halfLen = Math.max(1e-5, planeModelLocalLength() * planeGroup3D.scale.x * 0.5);
+        const fovR = (camera3D.fov || 45) * Math.PI / 180;
+        return halfLen / Math.tan(fovR * 0.32);
+    }
+    function dollyCameraForScale() {
+        if (typeof controls3D === 'undefined' || !controls3D || typeof camera3D === 'undefined' || !camera3D) return;
+        const dist = realScale3D ? realScaleCamDistance() : Math.hypot(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);
+        const dir = camera3D.position.clone().sub(controls3D.target);
+        if (dir.lengthSq() < 1e-12) dir.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);
+        dir.setLength(dist);
+        camera3D.position.copy(controls3D.target).add(dir);
+        controls3D.update();
+    }
+    (function wireRealScale() {
+        const el = document.getElementById('toggleRealScale');
+        if (el) el.addEventListener('change', () => { realScale3D = el.checked; applyPlaneScale(); dollyCameraForScale(); });
+    })();
 
     function get3DCoord(lon, lat, altMeters) {
         if (isNaN(lon) || isNaN(lat)) return new THREE.Vector3(0,0,0);
@@ -379,6 +447,11 @@
         planeGroup3D.position.copy(pos);
         let t_pitch = d.pitch ?? 0, t_th = d.th ?? 0, t_roll = d.roll ?? 0, t_track = d.gTrack ?? 0;
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
+        // Size both scene-level arrows to the plane's current scale so they stay proportional in
+        // real-scale mode (done here every frame so it holds regardless of arrow/plane build order).
+        const arrowF = planeGroup3D.scale.x / 0.06;
+        trackArrow3D.scale.setScalar(0.17 * arrowF);
+        if (headingArrow3D) headingArrow3D.scale.setScalar(0.145 * arrowF);
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
         // True-heading arrow: same scene-level convention as the ground-track arrow (world position,
         // Y-only rotation, not banked/pitched with the airframe), so it reads as a clean compass pointer.
@@ -394,6 +467,7 @@
         }
         camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
         controls3D.target.copy(pos); controls3D.update();
+        if (_reframeRealScale) { _reframeRealScale = false; dollyCameraForScale(); }   // frame the plane after a real-scale build/refresh
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
     }
 
@@ -450,7 +524,13 @@
             const satBadge = document.getElementById('satTimeBadge');
             if (satBadge) satBadge.classList.add('hidden');
 
-            setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (!threeDInitialized) build3DScene(); updateVisualComponents(currentIdx); } }, 50);
+            setTimeout(() => {
+                resizeCanvasLayout();
+                if (filteredData.length > 0) { if (!threeDInitialized) build3DScene(); updateVisualComponents(currentIdx); }
+                // real-scale was likely toggled while in 2D, where the camera couldn't dolly; frame the
+                // now-tiny plane on entering 3D so it isn't a distant speck.
+                if (realScale3D) dollyCameraForScale();
+            }, 50);
         } else {
             canvas.style.display = 'block'; threeDContainer.style.display = 'none';
             document.getElementById('measureCluster').style.display = 'flex';

@@ -81,7 +81,7 @@
     function parseFlightTextToRows(rawText) {
         const stats = {
             dataLines: 0, parsed: 0, rows: 0, timeSource: null,
-            dropped: { shortLine: 0, noTime: 0, badPosition: 0, noSpeed: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0 },
+            dropped: { shortLine: 0, noTime: 0, badPosition: 0, noSpeed: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0, belowMinAlt: 0 },
             derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0 }
         };
         const lines = rawText.split('\n');
@@ -155,6 +155,7 @@
         tempParsedData.sort((a,b) => a.absSeconds - b.absSeconds);
         let cleaned = [];
         // Cleanup drops rows below 20 kt airspeed (ramp idle, normally unused, and it slows playback),
+        // rows below 200 ft GPS altitude (ground, taxi, and low approach),
         // rows with NO airspeed reading when the file carries an airspeed channel (unfilled .nc
         // padding; positionless rows are already gone via badPosition above), and erroneous rows
         // (duplicate timestamps, GPS teleports, hour-plus gaps); everything else, including slow
@@ -167,6 +168,9 @@
             const spd = current.tas !== null ? current.tas : current.ias;
             if (hasSpeedChannel && spd === null) { stats.dropped.noSpeed++; continue; }
             if (spd !== null && spd < 20) { stats.dropped.preTakeoff++; continue; }
+            // Drop anything below 200 ft (60.96 m) GPS altitude; rows with no GPS-altitude channel
+            // are kept, there is no basis to judge them.
+            if (current.gpsAlt !== null && current.gpsAlt < 60.96) { stats.dropped.belowMinAlt++; continue; }
             if (cleaned.length === 0) { current.computedVsi = 0; cleaned.push(current); continue; }
             let prev = cleaned[cleaned.length - 1]; let dt = current.absSeconds - prev.absSeconds;
             if (dt <= 0) { stats.dropped.dupTime++; continue; }
@@ -196,6 +200,7 @@
         const d = stats.dropped, out = [fmt(stats.rows) + ' samples'];
         const drops = [];
         if (d.preTakeoff) drops.push(fmt(d.preTakeoff) + ' below 20 kt airspeed');
+        if (d.belowMinAlt) drops.push(fmt(d.belowMinAlt) + ' below 200 ft GPS altitude');
         if (d.glitch) drops.push(fmt(d.glitch) + ' GPS position glitches');
         if (d.dupTime) drops.push(fmt(d.dupTime) + ' duplicate timestamps');
         if (d.gapReset) drops.push(fmt(d.gapReset) + ' before a data gap over 1 hr');

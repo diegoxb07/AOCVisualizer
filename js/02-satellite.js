@@ -154,7 +154,7 @@
         const within = absMin <= closeThresh;
         badge.innerHTML = `${escapeHtml(satLoadedInfo.layerLabel)}<br>`
             + `Image: <b>${imgLabel}</b><br>`
-            + (offStr ? `<span style="color:${within ? '#38bdf8' : '#fbbf24'}">${offStr}</span>` : '');
+            + (offStr ? `<span style="color:${within ? 'var(--accent)' : 'var(--text-muted)'}">${offStr}</span>` : '');
         badge.classList.remove('hidden');
     }
 
@@ -282,8 +282,8 @@
             loadFlightDataGroup.classList.toggle('opacity-70', apiDown);
         }
         if (loadFlightDataLabel) {
-            loadFlightDataLabel.classList.toggle('text-blue-400', !apiDown);
-            loadFlightDataLabel.classList.toggle('text-slate-500', apiDown);
+            loadFlightDataLabel.classList.toggle('text-accent', !apiDown);
+            loadFlightDataLabel.classList.toggle('text-faint', apiDown);
         }
         [reconYearSelect, reconStormSelect, reconMissionSelect].forEach(sel => {
             if (!sel) return;
@@ -314,20 +314,16 @@
             srcLink.classList.toggle('pointer-events-none', apiDown);
         }
         if (uploadZone) {
-            uploadZone.classList.toggle('border-blue-400', apiDown);
+            uploadZone.classList.toggle('border-accent', apiDown);
             uploadZone.classList.toggle('border-2', apiDown);
-            uploadZone.classList.toggle('bg-blue-950/65', apiDown);
-            uploadZone.classList.toggle('bg-slate-800', !apiDown);
-            uploadZone.classList.toggle('shadow-[0_0_0_2px_rgba(59,130,246,0.65)]', apiDown);
-            uploadZone.classList.toggle('ring-1', apiDown);
-            uploadZone.classList.toggle('ring-blue-400/80', apiDown);
-            uploadZone.classList.toggle('scale-[1.01]', apiDown);
+            uploadZone.classList.toggle('bg-accent-soft', apiDown);
+            uploadZone.classList.toggle('bg-panel-strip', !apiDown);
             uploadZone.classList.toggle('grayscale-0', apiDown);
             uploadZone.classList.toggle('grayscale', !apiDown);
         }
         if (uploadLabel) {
-            uploadLabel.classList.toggle('text-blue-100', apiDown);
-            uploadLabel.classList.toggle('text-slate-300', !apiDown);
+            uploadLabel.classList.toggle('text-ink', apiDown);
+            uploadLabel.classList.toggle('text-muted', !apiDown);
             uploadLabel.classList.toggle('font-semibold', apiDown);
             uploadLabel.classList.toggle('font-medium', !apiDown);
         }
@@ -1537,7 +1533,7 @@
         const prevChecked = [...wrap.querySelectorAll('input[type="checkbox"]')].map(c => ({ id: c.value, on: c.checked }));
         wrap.innerHTML = '';
         if (layerDef && layerDef.isReconApi && !isReconApiAvailable()) {
-            wrap.innerHTML = '<span class="text-red-300 font-semibold">API offline: archive GOES caching unavailable</span>';
+            wrap.innerHTML = '<span class="text-danger font-semibold">API offline: archive GOES caching unavailable</span>';
             if (startBtn) { startBtn.disabled = true; startBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
             return;
         }
@@ -1548,7 +1544,7 @@
         const curBand = (document.getElementById('satBandSelect') || {}).value;
         bands.forEach((b, i) => {
             const lbl = document.createElement('label'); lbl.className = 'flex items-center gap-1 cursor-pointer';
-            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-blue-500 w-3.5 h-3.5';
+            const cb = document.createElement('input'); cb.type = 'checkbox'; cb.value = b.id; cb.className = 'accent-accent w-3.5 h-3.5';
             const prev = prevChecked.find(p => p.id === b.id);
             if (prev) cb.checked = prev.on;
             else cb.checked = bands.some(x => x.id === curBand) ? (b.id === curBand) : true;

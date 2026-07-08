@@ -333,16 +333,16 @@
         const rowFrag = () => document.createDocumentFragment();
         function noteRow(text) {
             const d = document.createElement('div');
-            d.className = 'px-2.5 py-1.5 text-slate-500 bg-slate-900';
+            d.className = 'px-2.5 py-1.5 text-faint bg-panel';
             d.textContent = text;
             return d;
         }
         function missionRow(m, primary) {
             const b = document.createElement('button');
             b.type = 'button';
-            b.className = 'block w-full text-left px-2.5 py-1.5 border-b border-slate-800/70 last:border-b-0 hover:bg-blue-700/50 hover:text-white transition-colors ' + (primary ? 'bg-blue-950/50 text-blue-200 font-semibold' : 'text-slate-200 bg-slate-900');
+            b.className = 'block w-full text-left px-2.5 py-1.5 border-b border-hairline last:border-b-0 hover:bg-[color-mix(in_oklab,var(--accent)_50%,transparent)] hover:text-ink transition-colors ' + (primary ? 'bg-accent-soft text-accent font-semibold' : 'text-ink bg-panel');
             const meta = [m.storm_name, m.flight_date, m.aircraft || m.tail_num].filter(Boolean).join(' · ');
-            b.innerHTML = `<span class="font-semibold">${primary ? '↵ Load ' : ''}${escapeHtml(m.mission_id)}</span>${meta ? ' <span class="text-slate-400 font-normal">· ' + escapeHtml(meta) + '</span>' : ''}`;
+            b.innerHTML = `<span class="font-semibold">${primary ? '↵ Load ' : ''}${escapeHtml(m.mission_id)}</span>${meta ? ' <span class="text-muted font-normal">· ' + escapeHtml(meta) + '</span>' : ''}`;
             b.addEventListener('mousedown', (e) => { e.preventDefault(); hideResults(); input.blur(); loadReconMission(m.mission_id); });
             return b;
         }
@@ -669,7 +669,7 @@
         const hrsOff = near.diffMs / 3600000;
         body.innerHTML = `${escapeHtml(stormTrackMeta.name)} · <b>${escapeHtml(p.category || p.status || '')}</b><br>`
             + `${escapeHtml(windTxt)} / ${escapeHtml(presTxt)}<br>`
-            + `<span style="color:${hrsOff <= 3 ? '#38bdf8' : '#fbbf24'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
+            + `<span style="color:${hrsOff <= 3 ? 'var(--accent)' : 'var(--text-muted)'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
         card.classList.remove('hidden');
     }
 
@@ -923,7 +923,7 @@
         const checksNote = text => {
             checksBox.innerHTML = '';
             const note = document.createElement('div');
-            note.className = 'text-slate-500';
+            note.className = 'text-faint';
             note.textContent = text;
             checksBox.appendChild(note);
         };
@@ -958,13 +958,13 @@
             groups.forEach(gr => {
                 const block = document.createElement('div');
                 const head = document.createElement('label');
-                head.className = 'flex items-center gap-2 cursor-pointer font-semibold text-slate-300';
+                head.className = 'flex items-center gap-2 cursor-pointer font-semibold text-muted';
                 const all = document.createElement('input');
-                all.type = 'checkbox'; all.className = 'accent-blue-500';
+                all.type = 'checkbox'; all.className = 'accent-accent';
                 const title = document.createElement('span');
                 title.textContent = gr.name;
                 const meta = document.createElement('span');
-                meta.className = 'text-slate-500 font-normal';
+                meta.className = 'text-faint font-normal';
                 const span = reconDateSpan(gr.missions);
                 meta.textContent = `(${gr.missions.length} flight${gr.missions.length === 1 ? '' : 's'}${span ? ', ' + span : ''})`;
                 head.appendChild(all); head.appendChild(title); head.appendChild(meta);
@@ -975,7 +975,7 @@
                     const lbl = document.createElement('label');
                     lbl.className = 'flex items-center gap-2 cursor-pointer min-w-0';
                     const cb = document.createElement('input');
-                    cb.type = 'checkbox'; cb.value = m.mission_id; cb.className = 'accent-blue-500 flex-none';
+                    cb.type = 'checkbox'; cb.value = m.mission_id; cb.className = 'accent-accent flex-none';
                     if (done) { cb.checked = true; cb.disabled = true; }
                     else if (m.mission_id === reconMissionSelect.value) cb.checked = true;
                     const span = document.createElement('span');

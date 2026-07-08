@@ -41,10 +41,10 @@
         const zone = document.getElementById(zoneId);
         const label = document.getElementById(labelId);
         if (!zone || !label) return;
-        zone.classList.add('bg-slate-800', 'border-dashed', 'hover:border-blue-500', 'hover:bg-slate-700');
-        zone.classList.remove('bg-slate-950/40', 'border-solid', 'hover:border-slate-500', 'hover:bg-slate-950/60');
-        label.classList.add('text-slate-300', 'group-hover:text-blue-300');
-        label.classList.remove('text-slate-200', 'group-hover:text-slate-100');
+        zone.classList.add('bg-panel-strip', 'border-dashed', 'hover:border-accent', 'hover:bg-elevated');
+        zone.classList.remove('bg-[color-mix(in_oklab,var(--bg)_40%,transparent)]', 'border-solid', 'hover:border-hairline-strong', 'hover:bg-[color-mix(in_oklab,var(--bg)_60%,transparent)]');
+        label.classList.add('text-muted', 'group-hover:text-accent');
+        label.classList.remove('text-ink', 'group-hover:text-ink');
         label.textContent = text;
         label.removeAttribute('title');
     }
@@ -54,10 +54,10 @@
         const zone = document.getElementById(zoneId);
         const label = document.getElementById(labelId);
         if (!zone || !label) return;
-        zone.classList.remove('bg-slate-800', 'border-slate-600', 'border-dashed', 'hover:border-blue-500', 'hover:bg-slate-700');
-        zone.classList.add('bg-slate-950/40', 'border-slate-600', 'border-solid', 'hover:border-slate-500', 'hover:bg-slate-950/60');
-        label.classList.remove('text-slate-300', 'group-hover:text-blue-300');
-        label.classList.add('text-slate-200', 'group-hover:text-slate-100');
+        zone.classList.remove('bg-panel-strip', 'border-hairline-strong', 'border-dashed', 'hover:border-accent', 'hover:bg-elevated');
+        zone.classList.add('bg-[color-mix(in_oklab,var(--bg)_40%,transparent)]', 'border-hairline-strong', 'border-solid', 'hover:border-hairline-strong', 'hover:bg-[color-mix(in_oklab,var(--bg)_60%,transparent)]');
+        label.classList.remove('text-muted', 'group-hover:text-accent');
+        label.classList.add('text-ink', 'group-hover:text-ink');
         label.textContent = filename;
         label.title = filename;
     }

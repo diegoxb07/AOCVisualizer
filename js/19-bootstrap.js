@@ -280,12 +280,12 @@
         });
         if (masterChartInstance && masterChartInstance.data.datasets.length > 0) clipGraphEntries.push('parameterChart');
         if (clipGraphEntries.length === 0) {
-            list.innerHTML = '<div class="text-[11px] text-slate-500 italic col-span-2 py-1">No graphs with data yet, the clip will record just the tracker.</div>';
+            list.innerHTML = '<div class="text-[11px] text-faint italic col-span-2 py-1">No graphs with data yet, the clip will record just the tracker.</div>';
             return;
         }
         list.innerHTML = clipGraphEntries.map((id, i) =>
-            `<label class="flex items-center gap-2 text-xs text-slate-300 py-1 cursor-pointer">` +
-            `<input type="checkbox" class="clip-graph-chk accent-slate-400 w-3.5 h-3.5" value="${id}" ${i < 4 ? 'checked' : ''}> ${clipGraphName(id)}</label>`
+            `<label class="flex items-center gap-2 text-xs text-muted py-1 cursor-pointer">` +
+            `<input type="checkbox" class="clip-graph-chk accent-muted w-3.5 h-3.5" value="${id}" ${i < 4 ? 'checked' : ''}> ${clipGraphName(id)}</label>`
         ).join('');
     }
 
@@ -619,4 +619,27 @@
             };
             PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', save); });
         } catch (e) { /* localStorage unavailable (private mode), defaults stand */ }
+    })();
+
+    /* ---- Light/dark theme toggle ----
+       documentElement[data-theme] is what css/app.css keys its tokens off; the inline <head>
+       script sets it before first paint (from the same aocVizPrefs blob) so there's no flash.
+       Stored under its own 'theme' key in aocVizPrefs rather than PREF_IDS above, since the
+       toggle isn't a form control that fires a 'change' event. */
+    (function themeToggle() {
+        const KEY = 'aocVizPrefs';
+        const btn = document.getElementById('themeToggleBtn');
+        if (!btn) return;
+        const applyIcon = (theme) => { btn.textContent = theme === 'light' ? '☀' : '☽'; };
+        applyIcon(document.documentElement.dataset.theme || 'dark');
+        btn.addEventListener('click', () => {
+            const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.dataset.theme = next;
+            applyIcon(next);
+            try {
+                const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
+                saved.theme = next;
+                localStorage.setItem(KEY, JSON.stringify(saved));
+            } catch (e) { /* localStorage unavailable (private mode) */ }
+        });
     })();

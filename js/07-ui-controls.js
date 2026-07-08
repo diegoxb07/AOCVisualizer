@@ -10,17 +10,17 @@
         
         zone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            zone.classList.add('border-blue-500', 'bg-slate-700');
+            zone.classList.add('border-accent', 'bg-elevated');
         });
         
         zone.addEventListener('dragleave', (e) => {
             e.preventDefault();
-            zone.classList.remove('border-blue-500', 'bg-slate-700');
+            zone.classList.remove('border-accent', 'bg-elevated');
         });
         
         zone.addEventListener('drop', (e) => {
             e.preventDefault();
-            zone.classList.remove('border-blue-500', 'bg-slate-700');
+            zone.classList.remove('border-accent', 'bg-elevated');
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
                 input.files = e.dataTransfer.files;
                 const event = new Event('change', { bubbles: true });

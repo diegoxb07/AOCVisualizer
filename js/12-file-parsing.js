@@ -8,7 +8,7 @@
 
     let lastParseStats = null;   // stats ledger from the most recent load (see parseFlightTextToRows)
 
-    function showLoadingOverlay() { const l = document.getElementById('loadingOverlay'); l.classList.remove('hidden'); l.classList.add('flex'); }
+    function showLoadingOverlay() { const l = document.getElementById('loadingOverlay'); l.classList.remove('hidden'); l.classList.add('flex'); const s = document.getElementById('loadingSpinner'); if (s) s.classList.remove('done'); const st = document.getElementById('loadingOverlaySubtext'); if (st) st.textContent = 'Pulling variables...'; }
     function hideLoadingOverlay() { const l = document.getElementById('loadingOverlay'); l.classList.add('hidden'); l.classList.remove('flex'); }
 
     document.getElementById('videoInput').addEventListener('change', function(e) {
@@ -177,5 +177,14 @@
             masterSyncEngineTick();
         }
 
-        hideLoadingOverlay();
+        // Success: this runs only once processing is fully done, so morph the spinner to a checkmark
+        // right here and close almost immediately (just long enough for the check to draw), no lingering.
+        const spin = document.getElementById('loadingSpinner');
+        if (spin) {
+            spin.classList.add('done');
+            const st = document.getElementById('loadingOverlaySubtext'); if (st) st.textContent = 'Parsed successfully';
+            setTimeout(hideLoadingOverlay, 480);
+        } else {
+            hideLoadingOverlay();
+        }
     }

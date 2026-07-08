@@ -256,6 +256,7 @@
     // The recorder drives playback through the chosen segment; the user can keep adjusting the view.
     const recordCanvas = document.getElementById('recordCanvas');
     let clipGraphEntries = [];   // graphs offered in the modal this open
+    let clipCustomDefs = [];     // user-built metric combos for this clip only: [{ keys:[...] }]; ids are 'cust:<i>'
     let recState = null;         // active recording state, or null when idle
 
     const CLIP_NAME_FALLBACK = {
@@ -264,13 +265,79 @@
         sfcChart: 'Pressure', thermoChart: 'Thermodynamics', parameterChart: 'Custom Graph'
     };
     function clipChartFor(id) { return id === 'parameterChart' ? masterChartInstance : customCharts[id]; }
+    function clipCustomDef(id) { return (typeof id === 'string' && id.indexOf('cust:') === 0) ? clipCustomDefs[+id.slice(5)] : null; }
     function clipGraphName(id) {
+        const cd = clipCustomDef(id);
+        if (cd) {
+            if (!cd.keys.length) return 'Custom graph';
+            const isImp = !document.getElementById('toggleSI').checked;
+            return cd.keys.map(k => getMetricLabel(k, isImp).replace(/\s*\([^)]*\)\s*$/, '')).join(', ');
+        }
         const titleEl = document.getElementById('title-' + id);
         if (titleEl && titleEl.childNodes[0] && titleEl.childNodes[0].nodeValue) {
             const t = titleEl.childNodes[0].nodeValue.trim();
             if (t) return t;
         }
         return CLIP_NAME_FALLBACK[id] || id;
+    }
+    function clipTimeline() { return filteredData.map(d => `${d.time.slice(0, 2)}:${d.time.slice(2, 4)}:${d.time.slice(4)}`); }
+    function clipDatasetsFor(keys) {
+        const isImp = !document.getElementById('toggleSI').checked;
+        return keys.filter(k => availableMetrics.has(k)).map(k => {
+            const ds = createDatasetConfig(k);
+            ds.data = filteredData.map(d => getConvertedVal(d[k], k, isImp));
+            return ds;
+        });
+    }
+    // Build a throwaway Chart for a custom metric combo, offscreen, for the recording only.
+    function buildClipCustomChart(keys, name) {
+        const cv = document.createElement('canvas'); cv.width = 760; cv.height = 320;
+        const opts = getBaseChartOptions(name, { enforceIntegers: false, minRange: 0 });
+        opts.responsive = false; opts.maintainAspectRatio = false;
+        return new Chart(cv.getContext('2d'), { type: 'line', data: { labels: clipTimeline(), datasets: clipDatasetsFor(keys) }, options: opts, plugins: [markerPlugin] });
+    }
+    let clipPreviewCharts = [];   // live preview charts in the custom-graph builders; torn down each rebuild
+    function destroyClipPreviews() { clipPreviewCharts.forEach(c => { try { c.destroy(); } catch (e) {} }); clipPreviewCharts = []; }
+    function updateClipPreview(chart, keys) { chart.data.datasets = clipDatasetsFor(keys); chart.update('none'); }
+    // Each custom graph is a builder card: variable checkboxes on the left, a live preview on the right.
+    function renderClipCustomList() {
+        const box = document.getElementById('clipCustomList'); if (!box) return;
+        destroyClipPreviews();
+        box.innerHTML = '';
+        const isImp = !document.getElementById('toggleSI').checked;
+        const metrics = [...availableMetrics];
+        clipCustomDefs.forEach((def, i) => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:8px;';
+            const top = document.createElement('div'); top.style.cssText = 'display:flex;gap:10px;';
+            const checks = document.createElement('div');
+            checks.style.cssText = 'flex:0 0 44%;max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;';
+            const prev = document.createElement('div'); prev.style.cssText = 'flex:1;position:relative;height:150px;min-width:0;';
+            const cv = document.createElement('canvas'); prev.appendChild(cv);
+            const opts = getBaseChartOptions('', { enforceIntegers: false, minRange: 0 });
+            if (opts.plugins && opts.plugins.zoom) { opts.plugins.zoom.zoom.wheel.enabled = false; opts.plugins.zoom.zoom.pinch.enabled = false; opts.plugins.zoom.pan.enabled = false; }
+            if (opts.plugins && opts.plugins.legend) opts.plugins.legend.onClick = () => {};
+            const chart = new Chart(cv.getContext('2d'), { type: 'line', data: { labels: clipTimeline(), datasets: clipDatasetsFor(def.keys) }, options: opts, plugins: [] });
+            clipPreviewCharts.push(chart);
+            metrics.forEach(k => {
+                const lbl = document.createElement('label'); lbl.style.cssText = 'display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;';
+                const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'accent-accent'; cb.style.cssText = 'width:13px;height:13px;flex:none;'; cb.checked = def.keys.includes(k);
+                const span = document.createElement('span'); span.textContent = getMetricLabel(k, isImp);
+                if (typeof METRIC_DEFS !== 'undefined' && METRIC_DEFS[k]) span.style.color = METRIC_DEFS[k].color;
+                cb.addEventListener('change', () => {
+                    if (cb.checked) { if (!def.keys.includes(k)) def.keys.push(k); }
+                    else def.keys = def.keys.filter(x => x !== k);
+                    updateClipPreview(chart, def.keys);
+                });
+                lbl.appendChild(cb); lbl.appendChild(span); checks.appendChild(lbl);
+            });
+            top.appendChild(checks); top.appendChild(prev);
+            const rm = document.createElement('button'); rm.type = 'button'; rm.textContent = '✕ Remove graph';
+            rm.className = 'text-faint hover:text-danger'; rm.style.cssText = 'background:none;border:none;cursor:pointer;padding:4px 0 0;font-size:11px;';
+            rm.addEventListener('click', () => { clipCustomDefs.splice(i, 1); renderClipCustomList(); });
+            card.appendChild(top); card.appendChild(rm);
+            box.appendChild(card);
+        });
     }
     function populateClipGraphList() {
         const list = document.getElementById('clipGraphList');
@@ -279,14 +346,22 @@
             if (customCharts[id] && customCharts[id].data.datasets.length > 0) clipGraphEntries.push(id);
         });
         if (masterChartInstance && masterChartInstance.data.datasets.length > 0) clipGraphEntries.push('parameterChart');
+        // Custom graphs are NOT listed here as checkboxes; they live in their own "Custom graphs" editor
+        // below and are always recorded (counted toward the 4-graph total).
         if (clipGraphEntries.length === 0) {
-            list.innerHTML = '<div class="text-[11px] text-faint italic col-span-2 py-1">No graphs with data yet, the clip will record just the tracker.</div>';
+            list.innerHTML = '<div class="text-[11px] text-faint italic col-span-2 py-1">No page graphs with data yet. Use the tracker alone, or add a custom graph below.</div>';
             return;
         }
-        list.innerHTML = clipGraphEntries.map((id, i) =>
-            `<label class="flex items-center gap-2 text-xs text-muted py-1 cursor-pointer">` +
-            `<input type="checkbox" class="clip-graph-chk accent-muted w-3.5 h-3.5" value="${id}" ${i < 4 ? 'checked' : ''}> ${clipGraphName(id)}</label>`
-        ).join('');
+        list.innerHTML = clipGraphEntries.map((id, i) => {
+            let col = '#38bdf8';
+            const ch = clipChartFor(id);
+            const ds = ch && ch.data && ch.data.datasets.length ? ch.data.datasets[0] : null;
+            if (ds && ds.borderColor) col = ds.borderColor;
+            return `<label class="flex items-center gap-2 text-xs text-ink py-1 cursor-pointer">` +
+                `<input type="checkbox" class="clip-graph-chk accent-accent w-3.5 h-3.5" value="${id}">` +
+                `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${col};flex:none;"></span>` +
+                `${clipGraphName(id)}</label>`;
+        }).join('');
     }
 
     document.getElementById('exportClipBtn').addEventListener('click', () => {
@@ -298,9 +373,8 @@
         startSlider.max = endSlider.max = filteredData.length - 1;
         startSlider.value = 0;
         endSlider.value = filteredData.length - 1;
-        const fmt = d => d.time.slice(0,2) + ":" + d.time.slice(2,4) + ":" + d.time.slice(4) + " UTC";
-        document.getElementById('clipStartLbl').innerText = fmt(filteredData[0]);
-        document.getElementById('clipEndLbl').innerText = fmt(filteredData[filteredData.length - 1]);
+        document.getElementById('clipStartTime').value = clipColonTime(filteredData[0].time);
+        document.getElementById('clipEndTime').value = clipColonTime(filteredData[filteredData.length - 1].time);
 
         // Mirror the live tracker mode + satellite menu so they can be chosen here.
         document.getElementById('clipTrackerMode').value = trackerModeSelect.value;
@@ -308,17 +382,62 @@
         const clipSat = document.getElementById('clipSatSelect');
         if (liveSat) { clipSat.innerHTML = liveSat.innerHTML; clipSat.value = liveSat.value; }
 
+        renderClipCustomList();
         populateClipGraphList();
     });
 
-    // Cap the graph selection at 4 (the list is rebuilt each open, so delegate off the stable container).
+    // Total graphs to record = checked page graphs + custom graphs that have metrics picked.
+    function clipTotalGraphs() {
+        // count every custom card (even an empty one) so the builder can't push the total past the cap
+        return document.querySelectorAll('.clip-graph-chk:checked').length + clipCustomDefs.length;
+    }
+
+    document.getElementById('clipAddCustomBtn').addEventListener('click', () => {
+        if (clipTotalGraphs() >= 4) { showToast('You can record up to 4 graphs (page + custom).', 2500); return; }
+        clipCustomDefs.push({ keys: [] });
+        renderClipCustomList();
+    });
+
+    // Cap the total at 4 (page graphs + custom); delegate off the stable container.
     document.getElementById('clipGraphList').addEventListener('change', (e) => {
         if (!e.target || !e.target.classList || !e.target.classList.contains('clip-graph-chk')) return;
-        if (document.querySelectorAll('.clip-graph-chk:checked').length > 4) {
+        if (clipTotalGraphs() > 4) {
             e.target.checked = false;
-            showToast('You can record up to 4 graphs.', 2500);
+            showToast('You can record up to 4 graphs (page + custom).', 2500);
         }
     });
+
+    // --- start/end time fields: colon-formatted while sliding, and typable as HH:MM:SS to jump ---
+    function clipColonTime(t) { t = String(t || '000000').padStart(6, '0'); return t.slice(0, 2) + ':' + t.slice(2, 4) + ':' + t.slice(4, 6); }
+    function clipTimeToSec(t) { t = String(t || '000000').padStart(6, '0'); return (+t.slice(0, 2)) * 3600 + (+t.slice(2, 4)) * 60 + (+t.slice(4, 6)); }
+    function clipParseHHMMSS(str) {
+        const parts = String(str).trim().split(':');
+        if (parts.length < 2) return null;
+        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10), s = parts.length > 2 ? parseInt(parts[2], 10) : 0;
+        if ([h, m, s].some(n => isNaN(n))) return null;
+        return h * 3600 + m * 60 + s;
+    }
+    function clipNearestIdx(sec) {
+        let best = 0, bestD = Infinity;
+        for (let i = 0; i < filteredData.length; i++) { const d = Math.abs(clipTimeToSec(filteredData[i].time) - sec); if (d < bestD) { bestD = d; best = i; } }
+        return best;
+    }
+    function wireClipTimeField(sliderId, fieldId) {
+        const slider = document.getElementById(sliderId), field = document.getElementById(fieldId);
+        if (!slider || !field) return;
+        const sync = () => { const d = filteredData[slider.value]; if (d) field.value = clipColonTime(d.time); };
+        slider.addEventListener('input', sync);
+        const apply = () => {
+            const sec = clipParseHHMMSS(field.value);
+            if (sec == null || !filteredData.length) { sync(); return; }
+            slider.value = clipNearestIdx(sec);
+            sync();
+        };
+        field.addEventListener('change', apply);
+        field.addEventListener('keydown', (e) => { if (e.key === 'Enter') { apply(); field.blur(); } });
+    }
+    wireClipTimeField('clipStartSlider', 'clipStartTime');
+    wireClipTimeField('clipEndSlider', 'clipEndTime');
 
     // --- compositor helpers ---
     function drawImageContain(rctx, img, x, y, w, h) {
@@ -340,67 +459,72 @@
     function drawTrackerInto(rctx, x, y, w, h) {
         const is3D = trackerModeSelect.value === '3d';
         const src = is3D ? (typeof renderer3D !== 'undefined' && renderer3D ? renderer3D.domElement : null) : canvas;
-        rctx.fillStyle = '#0b1220';
+        rctx.fillStyle = (recState && recState.pal) ? recState.pal.trackBg : '#0b1220';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (src && src.width && src.height) drawImageContain(rctx, src, x, y, w, h);
         rctx.restore();
     }
     function drawVideoInto(rctx, x, y, w, h) {
-        rctx.fillStyle = '#000';
+        rctx.fillStyle = (recState && recState.pal) ? recState.pal.videoBg : '#000';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (video && video.videoWidth) drawImageContain(rctx, video, x, y, w, h);
         rctx.restore();
     }
 
-    // Static per-graph stats (min/max of the first visible series over the clip range), computed once at capture start.
-    function computeGraphStats(ch, startIdx, endIdx) {
-        if (!ch || !ch.data || !ch.data.datasets.length) return null;
-        let dsIdx = -1;
-        for (let i = 0; i < ch.data.datasets.length; i++) { if (ch.isDatasetVisible(i)) { dsIdx = i; break; } }
-        if (dsIdx < 0) return null;
-        const ds = ch.data.datasets[dsIdx];
-        let mn = Infinity, mx = -Infinity;
-        const lo = Math.max(0, startIdx), hi = Math.min(ds.data.length - 1, endIdx);
-        for (let i = lo; i <= hi; i++) { const v = ds.data[i]; if (v != null && isFinite(v)) { if (v < mn) mn = v; if (v > mx) mx = v; } }
-        if (!isFinite(mn) || !isFinite(mx)) return null;
-        return { scaleId: ds.yAxisID || 'y', mn, mx, color: ds.borderColor || '#e6edf3' };
-    }
     function clipFmtVal(v) { return Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)); }
-    function drawValTag(rctx, rightX, leftX, Y, top, bot, txt, color, lineColor, bold) {
-        Y = Math.min(bot - 10, Math.max(top + 10, Y));
-        rctx.strokeStyle = lineColor; rctx.lineWidth = 1; rctx.setLineDash([4, 4]);
-        rctx.beginPath(); rctx.moveTo(leftX, Y); rctx.lineTo(rightX, Y); rctx.stroke(); rctx.setLineDash([]);
-        rctx.font = (bold ? '700 13px' : '600 11px') + ' Inter, system-ui, sans-serif';
-        rctx.textBaseline = 'middle'; rctx.textAlign = 'right';
-        const padX = 5, tw = rctx.measureText(txt).width;
-        rctx.fillStyle = 'rgba(11,14,19,0.82)';
-        rctx.fillRect(rightX - tw - padX * 2, Y - 9, tw + padX * 2, 18);
-        rctx.fillStyle = color; rctx.fillText(txt, rightX - padX, Y);
+
+    // The recording follows the app theme so a light-mode chart (whose captured legend text is dark)
+    // reads on a light backing, and a dark-mode chart reads on a dark backing. Fixed once per capture.
+    function recPalette() {
+        const light = document.documentElement.dataset.theme === 'light';
+        return light
+            ? { page: '#e9ebee', slot: '#f6f7f9', slotStroke: '#d3d8dd', name: '#334155', trackBg: '#dfe3e7', videoBg: '#c9ced3', value: '#1e293b' }
+            : { page: '#0b0e13', slot: '#14191f', slotStroke: '#232b35', name: '#aab4be', trackBg: '#0b1220', videoBg: '#000000', value: '#e6edf3' };
     }
-    // Crisp overlay on each recorded graph: yellow recording-bound lines + min/max/in-between value tags.
-    function annotateGraph(rctx, ch, stats, dx, dy, kx, ky, startIdx, endIdx) {
+
+    // Recording-window bounds on each graph: subtle yellow lines at the clip's start/end indices.
+    function annotateGraph(rctx, ch, dx, dy, kx, ky, startIdx, endIdx) {
         const ca = ch.chartArea; if (!ca) return;
         const N = ch.data.labels.length;
         const xCss = idx => ca.left + (ca.right - ca.left) * (N > 1 ? Math.min(1, Math.max(0, idx / (N - 1))) : 0.5);
         const top = dy + ca.top * ky, bot = dy + ca.bottom * ky;
-        rctx.lineWidth = 2; rctx.strokeStyle = '#facc15'; rctx.setLineDash([]);
+        rctx.lineWidth = 1.5; rctx.strokeStyle = 'rgba(250,204,21,0.5)'; rctx.setLineDash([]);
         [startIdx, endIdx].forEach(idx => { const X = dx + xCss(idx) * kx; rctx.beginPath(); rctx.moveTo(X, top); rctx.lineTo(X, bot); rctx.stroke(); });
-        if (!stats) return;
-        const sc = ch.scales[stats.scaleId] || ch.scales.y; if (!sc || !(sc.max > sc.min)) return;
-        const yCss = v => ca.bottom - (ca.bottom - ca.top) * (v - sc.min) / (sc.max - sc.min);
-        const leftX = dx + ca.left * kx, rightX = dx + ca.right * kx;
-        [1 / 3, 2 / 3].forEach(f => { const v = stats.mn + (stats.mx - stats.mn) * f; drawValTag(rctx, rightX, leftX, dy + yCss(v) * ky, top, bot, clipFmtVal(v), 'rgba(190,198,206,0.9)', 'rgba(255,255,255,0.10)', false); });
-        drawValTag(rctx, rightX, leftX, dy + yCss(stats.mx) * ky, top, bot, 'max ' + clipFmtVal(stats.mx), '#38bdf8', 'rgba(56,189,248,0.4)', true);
-        drawValTag(rctx, rightX, leftX, dy + yCss(stats.mn) * ky, top, bot, 'min ' + clipFmtVal(stats.mn), '#f87171', 'rgba(248,113,113,0.4)', true);
+    }
+
+    // Clean readout of each visible series' CURRENT value, top-right of the graph, tracking the
+    // playhead so it updates as the clip plays. Colors match the chart legend; no min/max clutter.
+    function drawCurrentValues(rctx, ch, gx, y, gw) {
+        if (!ch || !ch.data || !ch.data.datasets.length) return;
+        const pal = (recState && recState.pal) || { value: '#e6edf3' };
+        const idx = Math.max(0, Math.min(currentIdx, ch.data.labels.length - 1));
+        const rightX = gx + gw - 14;
+        let ty = y + 9;
+        rctx.textAlign = 'right'; rctx.textBaseline = 'top';
+        rctx.font = '700 16px Inter, system-ui, sans-serif';
+        ch.data.datasets.forEach((ds, i) => {
+            if (!ch.isDatasetVisible(i)) return;
+            const v = ds.data[idx];
+            if (v == null || !isFinite(v)) return;
+            const txt = clipFmtVal(v);
+            // value in the theme ink (always legible), with a series-color dot so it still maps to the line
+            rctx.fillStyle = pal.value;
+            rctx.fillText(txt, rightX, ty);
+            const tw = rctx.measureText(txt).width;
+            rctx.fillStyle = ds.borderColor || pal.value;
+            rctx.beginPath(); rctx.arc(rightX - tw - 9, ty + 8, 4, 0, Math.PI * 2); rctx.fill();
+            ty += 21;
+        });
     }
 
     function drawRecordFrame() {
         if (!recState) return;
         const rctx = recState.ctx, W = recordCanvas.width, H = recordCanvas.height, pad = 20;
+        const pal = recState.pal || recPalette();
         const graphs = recState.graphs, hasGraphs = graphs.length > 0;
-        rctx.fillStyle = '#0b0e13';
+        rctx.fillStyle = pal.page;
         rctx.fillRect(0, 0, W, H);
 
         const mapAreaW = hasGraphs ? Math.round(W * 0.62) : W;
@@ -425,24 +549,30 @@
             const slotH = (H - pad * 2 - gapV * (graphs.length - 1)) / graphs.length;
             graphs.forEach((g, i) => {
                 const y = pad + i * (slotH + gapV);
-                rctx.fillStyle = '#14191f';
+                rctx.fillStyle = pal.slot;
                 roundRectPath(rctx, gx, y, gw, slotH, 10); rctx.fill();
-                rctx.strokeStyle = '#232b35'; rctx.lineWidth = 1;
+                rctx.strokeStyle = pal.slotStroke; rctx.lineWidth = 1;
                 roundRectPath(rctx, gx, y, gw, slotH, 10); rctx.stroke();
-                rctx.fillStyle = '#aab4be'; rctx.font = '600 15px Inter, system-ui, sans-serif';
+                rctx.fillStyle = pal.name; rctx.font = '600 15px Inter, system-ui, sans-serif';
                 rctx.textBaseline = 'top'; rctx.textAlign = 'left';
                 rctx.fillText(g.name, gx + 14, y + 11);
-                const ch = clipChartFor(g.id), cv = ch && ch.canvas;
+                const ch = g.chart || clipChartFor(g.id);
+                if (g.chart) g.chart.render();   // custom charts aren't driven by playback; redraw for the moving playhead
+                const cv = ch && ch.canvas;
                 if (cv && cv.width && cv.height) {
                     const bx = gx + 10, by = y + 38, bw = gw - 20, bh = slotH - 48;
                     const s = Math.min(bw / cv.width, bh / cv.height), dw = cv.width * s, dh = cv.height * s;
                     const dxi = bx + (bw - dw) / 2, dyi = by + (bh - dh) / 2;
                     rctx.drawImage(cv, dxi, dyi, dw, dh);
                     const kx = (cv.width / ch.width) * s, ky = (cv.height / ch.height) * s;
-                    annotateGraph(rctx, ch, g.stats, dxi, dyi, kx, ky, recState.startIdx, recState.endIdx);
+                    annotateGraph(rctx, ch, dxi, dyi, kx, ky, recState.startIdx, recState.endIdx);
+                    drawCurrentValues(rctx, ch, gx, y, gw);
                 }
             });
         }
+
+        // Downscale the 2x supersampled composite into the 1080p capture (stream) canvas.
+        recState.captureCtx.drawImage(recState.superCanvas, 0, 0, W, H);
     }
 
     function setRecordProgress(frac) {
@@ -471,7 +601,11 @@
     }
 
     function pickClipMime() {
-        const opts = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp8', 'video/webm'];
+        // Prefer MP4/H.264 (plays everywhere, more shareable) when the browser can record it, else WebM.
+        const opts = [
+            'video/mp4;codecs=avc1.640029,mp4a.40.2', 'video/mp4;codecs=avc1.640029', 'video/mp4;codecs=avc1', 'video/mp4',
+            'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=vp8', 'video/webm'
+        ];
         for (const o of opts) { if (window.MediaRecorder && MediaRecorder.isTypeSupported(o)) return o; }
         return 'video/webm';
     }
@@ -479,13 +613,16 @@
     document.getElementById('startClipRecordBtn').addEventListener('click', () => {
         if (filteredData.length === 0 || recState) return;
         document.getElementById('clipRecordModal').style.display = 'none';
+        destroyClipPreviews();   // the builder previews are done; free them before recording
 
         let startIdx = parseInt(document.getElementById('clipStartSlider').value);
         let endIdx = parseInt(document.getElementById('clipEndSlider').value);
         if (startIdx > endIdx) { const t = startIdx; startIdx = endIdx; endIdx = t; }
 
-        const graphs = Array.from(document.querySelectorAll('.clip-graph-chk:checked')).slice(0, 4)
-            .map(c => ({ id: c.value, name: clipGraphName(c.value) }));
+        // Record the checked page graphs plus every custom graph that has metrics, capped at 4 total.
+        const fixedGraphs = Array.from(document.querySelectorAll('.clip-graph-chk:checked')).map(c => ({ id: c.value, name: clipGraphName(c.value) }));
+        const customGraphs = clipCustomDefs.map((def, i) => def.keys.length ? { id: 'cust:' + i, name: clipGraphName('cust:' + i) } : null).filter(Boolean);
+        const graphs = fixedGraphs.concat(customGraphs).slice(0, 4);
         const videoStack = document.getElementById('clipVideoStack').value;
 
         // Apply the chosen tracker mode + satellite to the live view (the recorder captures it live).
@@ -529,9 +666,17 @@
     }
 
     function startClipCapture(startIdx, endIdx, graphs, videoStack) {
-        const ctx2d = recordCanvas.getContext('2d');
-        ctx2d.imageSmoothingEnabled = true;
-        ctx2d.imageSmoothingQuality = 'high';
+        // Supersample: draw the composite into an offscreen canvas at 2x, then downscale each frame
+        // into the 1080p capture canvas. Crisper text/edges and cleaner source downsampling, while the
+        // encoder still runs at a reliable 1080p (real-time 4K encode tends to drop frames).
+        const SS = 2;
+        const superCanvas = document.createElement('canvas');
+        superCanvas.width = recordCanvas.width * SS; superCanvas.height = recordCanvas.height * SS;
+        const superCtx = superCanvas.getContext('2d');
+        superCtx.imageSmoothingEnabled = true; superCtx.imageSmoothingQuality = 'high';
+        superCtx.setTransform(SS, 0, 0, SS, 0, 0);   // draw in 1080p logical coords, rasterized at 2x
+        const captureCtx = recordCanvas.getContext('2d');
+        captureCtx.imageSmoothingEnabled = true; captureCtx.imageSmoothingQuality = 'high';
         let stream;
         try { stream = recordCanvas.captureStream(30); }
         catch (e) { showToast('Recording is not supported in this browser.', 4000); return; }
@@ -547,7 +692,7 @@
         // High bitrate keeps the 1080p composite (upscaled tracker + graphs) crisp instead of mushy.
         let recorder;
         const mime = pickClipMime();
-        try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 16000000 }); }
+        try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 25000000 }); }
         catch (e) {
             try { recorder = new MediaRecorder(stream, { mimeType: mime }); }
             catch (e2) { showToast('Could not start the recorder: ' + e2.message, 4000); return; }
@@ -557,21 +702,23 @@
         recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
         recorder.onstop = () => {
             stream.getVideoTracks().forEach(t => t.stop());
-            const blob = new Blob(chunks, { type: 'video/webm' });
+            const isMp4 = mime.indexOf('mp4') !== -1;
+            const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `MissionClip_${flightMetaData.id}_${filteredData[recState.startIdx].time}.webm`;
+            a.download = `MissionClip_${flightMetaData.id}_${filteredData[recState.startIdx].time}.${isMp4 ? 'mp4' : 'webm'}`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 4000);
             document.getElementById('recordProgress').classList.remove('show');
+            recState.graphs.forEach(g => { if (g.chart) { try { g.chart.destroy(); } catch (e) {} } });
             recState = null;
             showToast('Recording saved to your downloads.', 4000);
         };
 
-        // Precompute each graph's min/max over the clip range once (static for the whole recording).
-        graphs.forEach(g => { g.stats = computeGraphStats(clipChartFor(g.id), startIdx, endIdx); });
-
-        recState = { recorder, stream, ctx: ctx2d, startIdx, endIdx, graphs, videoStack, raf: null, finishing: false };
+        // Build a throwaway chart per selected custom graph now that the recorder exists (the early
+        // returns above would otherwise leak these offscreen charts). recState.onstop destroys them.
+        graphs.forEach(g => { const cd = clipCustomDef(g.id); if (cd && cd.keys.length) g.chart = buildClipCustomChart(cd.keys, g.name); });
+        recState = { recorder, stream, ctx: superCtx, superCanvas, captureCtx, pal: recPalette(), startIdx, endIdx, graphs, videoStack, raf: null, finishing: false };
 
         // Seek the playhead to the clip start and begin playback.
         currentIdx = startIdx;
@@ -591,6 +738,17 @@
     }
 
     document.getElementById('recordStopBtn').addEventListener('click', finishRecording);
+    document.getElementById('clipRecordCloseX').addEventListener('click', destroyClipPreviews);   // free builder previews on ✕ close
+
+    // Click anywhere on a modal's dimmed backdrop (not its card) to close it, so the ✕ is never the
+    // only way out of a long dialog. mousedown target === the overlay means the card was not clicked.
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('mousedown', (e) => {
+            if (e.target !== overlay) return;
+            overlay.style.display = 'none';
+            if (overlay.id === 'clipRecordModal') destroyClipPreviews();
+        });
+    });
 
 
     /* ---- Remembered display preferences ----
@@ -598,9 +756,7 @@
        Restoring dispatches 'change' so each control's normal handler runs; all of them
        no-op safely when no flight is loaded yet. */
     (function persistDisplayPrefs() {
-        // NOTE: 'toggleCabin' (Crew Ride) is deliberately NOT persisted, it always starts OFF on
-        // load/refresh, so the checkbox can never come back checked-but-not-running after a reload.
-        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
+        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'toggleRealScale', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
         try {
             const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -630,12 +786,28 @@
         const KEY = 'aocVizPrefs';
         const btn = document.getElementById('themeToggleBtn');
         if (!btn) return;
-        const applyIcon = (theme) => { btn.textContent = theme === 'light' ? '☀' : '☽'; };
-        applyIcon(document.documentElement.dataset.theme || 'dark');
+        // The switch itself (knob position, lit icon) is CSS-driven off [data-theme]; only the
+        // ARIA state is mirrored here (checked = light). Do not write btn.textContent, it would
+        // wipe the knob/icon spans.
+        const syncAria = () => btn.setAttribute('aria-checked', document.documentElement.dataset.theme === 'light' ? 'true' : 'false');
+        syncAria();
+        let themeAnimTimer = null;
         btn.addEventListener('click', () => {
-            const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-            document.documentElement.dataset.theme = next;
-            applyIcon(next);
+            const root = document.documentElement;
+            // Fade the token-driven colors across the switch (see css/app.css .theme-anim), then drop
+            // the class so it never affects ordinary hover/focus color changes.
+            root.classList.add('theme-anim');
+            clearTimeout(themeAnimTimer);
+            themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 420);
+            const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+            root.dataset.theme = next;
+            syncAria();
+            // Legend label colors are theme-aware (js/17-charts.js generateLabels), baked at build
+            // time, so rebuild the legends on toggle. update('none') re-runs generateLabels without
+            // animation; the zoom plugin preserves any pan/zoom across it.
+            try {
+                if (typeof customCharts !== 'undefined') Object.values(customCharts).forEach(c => c && c.update('none'));
+            } catch (e) { /* charts not built yet */ }
             try {
                 const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
                 saved.theme = next;

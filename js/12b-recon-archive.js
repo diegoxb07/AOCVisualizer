@@ -820,7 +820,7 @@
     function updatePreloadedSelect(selectedId) {
         const sel = document.getElementById('preloadedSelect'); if (!sel) return;
         const keep = selectedId !== undefined ? selectedId : sel.value;
-        sel.innerHTML = '<option value="">Loaded Missions…</option>';
+        sel.innerHTML = '<option value="">Previously Loaded Missions…</option>';
         preloadedMissions.forEach((rec, id) => {
             const opt = document.createElement('option'); opt.value = id;
             const tag = rec.uploaded ? ' (uploaded)' : (rec.isNc ? '' : ' (preview)');
@@ -1059,7 +1059,7 @@
                 }
                 if (fill) fill.style.width = Math.round((i + 1) / list.length * 100) + '%';
             }
-            setModalStatus(`Done: ${ok}/${list.length} uploaded file${list.length === 1 ? '' : 's'} preloaded. They stay on this device and open from the Loaded Missions list.`);
+            setModalStatus(`Done: ${ok}/${list.length} uploaded file${list.length === 1 ? '' : 's'} preloaded. They stay on this device and open from the Previously Loaded Missions list.`);
         }
 
         // Sequential download + parse of everything checked; closing the modal lets it keep
@@ -1076,7 +1076,7 @@
                 if (fill) fill.style.width = Math.round((i + 1) / ids.length * 100) + '%';
             }
             preloadRunning = false; if (startBtn) startBtn.disabled = false;
-            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Loaded Missions list.`);
+            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Previously Loaded Missions list.`);
             setReconStatus(`Preloaded ${ok}/${ids.length} missions.`);
             if (yearSel && yearSel.value) loadSeasonIntoModal(yearSel.value);   // relist so finished missions show checked and locked
         }

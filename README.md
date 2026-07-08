@@ -52,7 +52,7 @@ flowchart TD
     class START,DONE term
     %% linkStyle numbers = edge definition order above; update them if edges are added or reordered
     linkStyle 1,6,8,12,13 stroke:#059669,stroke-width:2px
-    linkStyle 2,7,9,14,15,21 stroke:#dc2626,stroke-width:2px
+    linkStyle 2,7,9,14,15,20 stroke:#dc2626,stroke-width:2px
 ```
 
 ---
@@ -191,7 +191,6 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 | Doc | Read it for |
 | --- | --- |
 | **[API & Connectivity](docs/CONNECTIVITY.md)** | What the external API does, how the app detects online vs. offline, and exactly what still works (and what's disabled) in each state. |
-| **[CLAUDE.md](CLAUDE.md)** | Deep architecture / developer reference (code layout, rendering, sync engine, data model). |
 
 ---
 

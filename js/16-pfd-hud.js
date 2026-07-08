@@ -213,7 +213,7 @@
     }
 
     function renderHUD(d) {
-        const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'N/A';
+        const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'NaN';
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
         
         const isImperial = !document.getElementById('toggleSI').checked;
@@ -222,20 +222,20 @@
         h += addHUD('LATITUDE', `${sf(d.lat, 3)}°N`);
         h += addHUD('LONGITUDE', `${sf(Math.abs(d.lon), 3)}°W`);
         
-        let pAltDisp = d.pAlt !== null ? sf(isImperial ? d.pAlt * 3.28084 : d.pAlt, 0) + (isImperial ? ' ft' : ' m') : 'N/A';
-        let gAltDisp = d.gpsAlt !== null ? sf(isImperial ? d.gpsAlt * 3.28084 : d.gpsAlt, 0) + (isImperial ? ' ft' : ' m') : 'N/A';
-        let rAltDisp = d.radAlt !== null ? sf(isImperial ? d.radAlt * 3.28084 : d.radAlt, 0) + (isImperial ? ' ft' : ' m') : 'N/A';
-        let dValueDisp = d.dValue !== null ? sf(isImperial ? d.dValue * 3.28084 : d.dValue, 0) + (isImperial ? ' ft' : ' m') : 'N/A';
+        let pAltDisp = d.pAlt !== null ? sf(isImperial ? d.pAlt * 3.28084 : d.pAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
+        let gAltDisp = d.gpsAlt !== null ? sf(isImperial ? d.gpsAlt * 3.28084 : d.gpsAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
+        let rAltDisp = d.radAlt !== null ? sf(isImperial ? d.radAlt * 3.28084 : d.radAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
+        let dValueDisp = d.dValue !== null ? sf(isImperial ? d.dValue * 3.28084 : d.dValue, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
         
-        let tDisp = d.tempr !== null ? sf(isImperial ? (d.tempr * 9/5 + 32) : d.tempr, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
-        let tdDisp = d.dewpt !== null ? sf(isImperial ? (d.dewpt * 9/5 + 32) : d.dewpt, 1) + (isImperial ? ' °F' : ' °C') : 'N/A';
+        let tDisp = d.tempr !== null ? sf(isImperial ? (d.tempr * 9/5 + 32) : d.tempr, 1) + (isImperial ? ' °F' : ' °C') : 'NaN';
+        let tdDisp = d.dewpt !== null ? sf(isImperial ? (d.dewpt * 9/5 + 32) : d.dewpt, 1) + (isImperial ? ' °F' : ' °C') : 'NaN';
         
         // Core altitude lines: GPS altitude first, pressure altitude beneath it.
         if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
         if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
         
-        if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', `${d.sfcPr !== null ? sf(d.sfcPr, 1) + ' mb' : 'N/A'}`);
-        if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', `${d.windSpd !== null ? sf(d.windSpd, 1) + ' kt' : 'N/A'}`);
+        if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', `${d.sfcPr !== null ? sf(d.sfcPr, 1) + ' mb' : 'NaN'}`);
+        if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', `${d.windSpd !== null ? sf(d.windSpd, 1) + ' kt' : 'NaN'}`);
         if (availableMetrics.has('tempr')) h += addHUD('AMBIENT TEMP', tDisp, true);
         if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', tdDisp, true);
         
@@ -246,22 +246,22 @@
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
 
 
-        if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'N/A'}`);
-        if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'N/A'}`);
-        if (availableMetrics.has('driftAngle')) addExtra('DRIFT ANGLE', `${d.driftAngle !== null ? sf(d.driftAngle, 1) + '°' : 'N/A'}`);
-        if (availableMetrics.has('alpha')) addExtra('ALPHA (AOA)', `${d.alpha !== null ? sf(d.alpha, 2) + '°' : 'N/A'}`);
-        if (availableMetrics.has('beta')) addExtra('BETA (SLIP)', `${d.beta !== null ? sf(d.beta, 2) + '°' : 'N/A'}`);
-        if (availableMetrics.has('accZ')) addExtra('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'N/A'}`);
+        if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'NaN'}`);
+        if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'NaN'}`);
+        if (availableMetrics.has('driftAngle')) addExtra('DRIFT ANGLE', `${d.driftAngle !== null ? sf(d.driftAngle, 1) + '°' : 'NaN'}`);
+        if (availableMetrics.has('alpha')) addExtra('ALPHA (AOA)', `${d.alpha !== null ? sf(d.alpha, 2) + '°' : 'NaN'}`);
+        if (availableMetrics.has('beta')) addExtra('BETA (SLIP)', `${d.beta !== null ? sf(d.beta, 2) + '°' : 'NaN'}`);
+        if (availableMetrics.has('accZ')) addExtra('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'NaN'}`);
         if (availableMetrics.has('radAlt')) addExtra('RADAR ALT', rAltDisp);
         if (availableMetrics.has('dValue')) addExtra('D-VALUE', dValueDisp);
-        if (availableMetrics.has('tas')) addExtra('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'N/A'}`);
-        if (availableMetrics.has('ias')) addExtra('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'N/A'}`);
-        if (availableMetrics.has('th')) addExtra('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'N/A'}`);
-        if (availableMetrics.has('gTrack')) addExtra('GROUND TRACK', `${d.gTrack !== null ? sf(d.gTrack, 1) + '°' : 'N/A'}`);
-        if (availableMetrics.has('vtWnd')) addExtra('VERT WIND', `${d.vtWnd !== null ? sf(isImperial ? d.vtWnd * 2.23694 : d.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'N/A'}`);
-        if (availableMetrics.has('mixRate')) addExtra('MIXING RATIO', `${d.mixRate !== null ? sf(d.mixRate, 2) + ' g/kg' : 'N/A'}`);
-        if (availableMetrics.has('thetaE')) addExtra('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'N/A'}`, true);
-        if (availableMetrics.has('pressure')) addExtra('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'N/A'}`);
+        if (availableMetrics.has('tas')) addExtra('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'NaN'}`);
+        if (availableMetrics.has('ias')) addExtra('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'NaN'}`);
+        if (availableMetrics.has('th')) addExtra('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'NaN'}`);
+        if (availableMetrics.has('gTrack')) addExtra('GROUND TRACK', `${d.gTrack !== null ? sf(d.gTrack, 1) + '°' : 'NaN'}`);
+        if (availableMetrics.has('vtWnd')) addExtra('VERT WIND', `${d.vtWnd !== null ? sf(isImperial ? d.vtWnd * 2.23694 : d.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'NaN'}`);
+        if (availableMetrics.has('mixRate')) addExtra('MIXING RATIO', `${d.mixRate !== null ? sf(d.mixRate, 2) + ' g/kg' : 'NaN'}`);
+        if (availableMetrics.has('thetaE')) addExtra('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'NaN'}`, true);
+        if (availableMetrics.has('pressure')) addExtra('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'NaN'}`);
 
         const prevScroll = hud.scrollTop;
         hud.innerHTML = `<div id="hudCore">${coreHtml}</div><div id="hudExtra">${extraHtml}</div>`;

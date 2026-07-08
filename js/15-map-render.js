@@ -60,7 +60,7 @@
 
     // Follow-the-aircraft: the 2D map keeps the current plane position at screen center until the
     // user pans or zooms (which flips followAircraft2D off and reveals the recenter button).
-    const FOLLOW_SPAN_KM = 220;   // visible width, in km, when following (framed around the plane)
+    const FOLLOW_SPAN_KM = 360;   // visible width, in km, when following (framed around the plane)
     function centerMapOnPlane2D(d) {
         if (!d || !cssW || !cssH) return;
         mapOffsetX = cssW / 2 - mapScale * getX(d.lon);

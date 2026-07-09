@@ -23,8 +23,8 @@ flowchart TD
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
     MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
+    MMR --> SAT
     MMR -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
-    TRIM -- "Yes" --> SAT
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Was the flight loaded from<br>the archive in step 1?"}
     FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive)<br>pick a product to pre-cache the flight"]

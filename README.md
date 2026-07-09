@@ -26,7 +26,7 @@ flowchart TD
     MMR -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Is the API<br>online?"}
-    FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive) AND MODIS/VIIRS<br>pick a GOES sat to pre-cache the flight"]
+    FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive) AND MODIS/VIIRS<br>pick a GOES sat to pre-cache them"]
     FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
     SAT -- "No" --> PLAY["<b>Play</b>, scroll through timeline, filters: change speed,<br>toggle 8Hz Smoothing / PFD / S.I Units"]
     SATGOES --> PLAY

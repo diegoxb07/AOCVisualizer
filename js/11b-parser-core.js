@@ -28,11 +28,16 @@
 
     // Convert a NetCDF ArrayBuffer into the same tab-separated text the .txt parser consumes.
     // Shared by the single-file .nc loader, the parse worker, and the multi-flight batch sat-cache.
-    function ncArrayBufferToTsv(data) {
+    // onProgress (optional): called with { phase, ... } as decoding advances, so the loader overlay
+    // can show which variable is being processed. no-op for the tests, batch, and main thread callers.
+    function ncArrayBufferToTsv(data, onProgress) {
+        const report = (typeof onProgress === 'function') ? onProgress : function () {};
         const nc = new netcdfjs(data);
         const varNames = nc.variables.map(v => v.name); const varsData = {}; let numRows = 0;
+        report({ phase: 'open', total: varNames.length });
 
-        varNames.forEach(name => {
+        varNames.forEach((name, vi) => {
+            report({ phase: 'var', name: name, index: vi + 1, total: varNames.length });
             let rawData = nc.getDataVariable(name); let variableDef = nc.variables.find(v => v.name === name);
             let scaleFactor = 1, addOffset = 0, fillValues = [];
             if (variableDef && variableDef.attributes) {
@@ -66,6 +71,7 @@
             varsData['time'] = timeArr;
         }
 
+        report({ phase: 'rows', numRows: numRows });
         let tsvStr = finalVarNames.join('\t') + '\n';
         for (let i = 0; i < numRows; i++) { let row = []; for (let j = 0; j < finalVarNames.length; j++) { let val = varsData[finalVarNames[j]][i]; row.push(val !== undefined && val !== null ? val : ''); } tsvStr += row.join('\t') + '\n'; }
         return tsvStr;

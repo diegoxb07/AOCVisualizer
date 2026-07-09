@@ -298,7 +298,7 @@
     }
     let clipPreviewCharts = [];   // live preview charts in the custom-graph builders; torn down each rebuild
     function destroyClipPreviews() { clipPreviewCharts.forEach(c => { try { c.destroy(); } catch (e) {} }); clipPreviewCharts = []; }
-    function updateClipPreview(chart, keys) { chart.data.datasets = clipDatasetsFor(keys); chart.update('none'); }
+    function updateClipCustomChart(chart, keys) { chart.data.datasets = clipDatasetsFor(keys); chart.update('none'); }
     // Each custom graph is a builder card: variable checkboxes on the left, a live preview on the right.
     function renderClipCustomList() {
         const box = document.getElementById('clipCustomList'); if (!box) return;
@@ -308,7 +308,7 @@
         const metrics = [...availableMetrics];
         clipCustomDefs.forEach((def, i) => {
             const card = document.createElement('div');
-            card.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:8px;';
+            card.style.cssText = 'border:1px solid var(--border);border-radius:6px;padding:8px;display:flex;flex-direction:column;';
             const top = document.createElement('div'); top.style.cssText = 'display:flex;gap:10px;';
             const checks = document.createElement('div');
             checks.style.cssText = 'flex:0 0 44%;max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;';
@@ -327,13 +327,13 @@
                 cb.addEventListener('change', () => {
                     if (cb.checked) { if (!def.keys.includes(k)) def.keys.push(k); }
                     else def.keys = def.keys.filter(x => x !== k);
-                    updateClipPreview(chart, def.keys);
+                    updateClipCustomChart(chart, def.keys);
                 });
                 lbl.appendChild(cb); lbl.appendChild(span); checks.appendChild(lbl);
             });
             top.appendChild(checks); top.appendChild(prev);
             const rm = document.createElement('button'); rm.type = 'button'; rm.textContent = '✕ Remove graph';
-            rm.className = 'text-faint hover:text-danger'; rm.style.cssText = 'background:none;border:none;cursor:pointer;padding:4px 0 0;font-size:11px;';
+            rm.className = 'text-faint hover:text-danger'; rm.style.cssText = 'align-self:flex-end;background:none;border:none;cursor:pointer;padding:6px 2px 0;font-size:11px;';
             rm.addEventListener('click', () => { clipCustomDefs.splice(i, 1); renderClipCustomList(); });
             card.appendChild(top); card.appendChild(rm);
             box.appendChild(card);
@@ -341,6 +341,10 @@
     }
     function populateClipGraphList() {
         const list = document.getElementById('clipGraphList');
+        // detach the persistent "+ add customized graphs" button before the innerhtml reset so its
+        // click listener survives. it is re-appended inside this container as a full width cell below.
+        const addBtn = document.getElementById('clipAddCustomBtn');
+        if (addBtn && addBtn.parentElement) addBtn.parentElement.removeChild(addBtn);
         clipGraphEntries = [];
         Object.keys(customCharts).forEach(id => {
             if (customCharts[id] && customCharts[id].data.datasets.length > 0) clipGraphEntries.push(id);
@@ -349,19 +353,25 @@
         // Custom graphs are NOT listed here as checkboxes; they live in their own "Custom graphs" editor
         // below and are always recorded (counted toward the 4-graph total).
         if (clipGraphEntries.length === 0) {
-            list.innerHTML = '<div class="text-[11px] text-faint italic col-span-2 py-1">No page graphs with data yet. Use the tracker alone, or add a custom graph below.</div>';
-            return;
+            list.innerHTML = '<div class="text-[11px] text-faint italic py-1" style="grid-column:1/-1;">No page graphs with data yet. Use the tracker alone, or add a custom graph below.</div>';
+        } else {
+            list.innerHTML = clipGraphEntries.map((id, i) => {
+                let col = '#38bdf8';
+                const ch = clipChartFor(id);
+                const ds = ch && ch.data && ch.data.datasets.length ? ch.data.datasets[0] : null;
+                if (ds && ds.borderColor) col = ds.borderColor;
+                return `<label class="flex items-center gap-2 text-xs text-ink py-1 cursor-pointer">` +
+                    `<input type="checkbox" class="clip-graph-chk accent-accent w-3.5 h-3.5" value="${id}">` +
+                    `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${col};flex:none;"></span>` +
+                    `${clipGraphName(id)}</label>`;
+            }).join('');
         }
-        list.innerHTML = clipGraphEntries.map((id, i) => {
-            let col = '#38bdf8';
-            const ch = clipChartFor(id);
-            const ds = ch && ch.data && ch.data.datasets.length ? ch.data.datasets[0] : null;
-            if (ds && ds.borderColor) col = ds.borderColor;
-            return `<label class="flex items-center gap-2 text-xs text-ink py-1 cursor-pointer">` +
-                `<input type="checkbox" class="clip-graph-chk accent-accent w-3.5 h-3.5" value="${id}">` +
-                `<span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${col};flex:none;"></span>` +
-                `${clipGraphName(id)}</label>`;
-        }).join('');
+        if (addBtn) {
+            const cell = document.createElement('div');
+            cell.style.cssText = 'grid-column:1/-1;margin-top:4px;';
+            cell.appendChild(addBtn);
+            list.appendChild(cell);
+        }
     }
 
     document.getElementById('exportClipBtn').addEventListener('click', () => {
@@ -384,6 +394,7 @@
 
         renderClipCustomList();
         populateClipGraphList();
+        initClipFramePreviews();
     });
 
     // Total graphs to record = checked page graphs + custom graphs that have metrics picked.
@@ -438,6 +449,137 @@
     }
     wireClipTimeField('clipStartSlider', 'clipStartTime');
     wireClipTimeField('clipEndSlider', 'clipEndTime');
+
+    // start and end frame previews: a self contained 2d mini tracker plus mmr still at each chosen
+    // point, so the range can be dialed in without leaving the modal to scrub the main view.
+    let clipFrameProj = null;   // lon/lat bounds of the loaded flight, fit once per modal open
+
+    function buildClipFrameProjection() {
+        clipFrameProj = null;
+        if (!filteredData.length) return;
+        let loMin = Infinity, loMax = -Infinity, laMin = Infinity, laMax = -Infinity;
+        for (const d of filteredData) {
+            if (d.lon < loMin) loMin = d.lon; if (d.lon > loMax) loMax = d.lon;
+            if (d.lat < laMin) laMin = d.lat; if (d.lat > laMax) laMax = d.lat;
+        }
+        const cosLat = Math.max(0.1, Math.cos(((laMin + laMax) / 2) * Math.PI / 180));
+        clipFrameProj = { loMin, loMax, laMin, laMax, cosLat };
+    }
+
+    // draws the whole track faint plus the flown portion (colored like the live tracker) with a plane
+    // dot at idx, into a small canvas. independent of the live map engine, so it never disturbs it
+    // and is always 2d regardless of the live tracker mode.
+    function drawClipFrameTrack(cv, idx) {
+        if (!cv) return;
+        const rctx = cv.getContext('2d');
+        const pal = recPalette();
+        const dpr = window.devicePixelRatio || 1;
+        const rect = cv.getBoundingClientRect();
+        const W = Math.max(1, Math.round(rect.width)), H = Math.max(1, Math.round(rect.height));
+        if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+        rctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        rctx.clearRect(0, 0, W, H);
+        rctx.fillStyle = pal.trackBg; rctx.fillRect(0, 0, W, H);
+        if (!clipFrameProj || !filteredData.length) return;
+
+        const pad = 10, p = clipFrameProj;
+        const lonSpan = Math.max(1e-4, (p.loMax - p.loMin) * p.cosLat);
+        const latSpan = Math.max(1e-4, (p.laMax - p.laMin));
+        const s = Math.min((W - 2 * pad) / lonSpan, (H - 2 * pad) / latSpan);
+        const drawW = lonSpan * s, drawH = latSpan * s;
+        const ox = (W - drawW) / 2, oy = (H - drawH) / 2;
+        const px = lon => ox + (lon - p.loMin) * p.cosLat * s;
+        const py = lat => oy + drawH - (lat - p.laMin) * s;
+
+        rctx.lineJoin = rctx.lineCap = 'round';
+        // whole track, faint
+        rctx.strokeStyle = pal.name; rctx.globalAlpha = 0.3; rctx.lineWidth = 1.25;
+        rctx.beginPath();
+        for (let i = 0; i < filteredData.length; i++) { const x = px(filteredData[i].lon), y = py(filteredData[i].lat); i ? rctx.lineTo(x, y) : rctx.moveTo(x, y); }
+        rctx.stroke();
+        // flown portion up to idx, colored like the live path
+        rctx.globalAlpha = 0.95; rctx.lineWidth = 2;
+        let lx = px(filteredData[0].lon), ly = py(filteredData[0].lat);
+        for (let i = 1; i <= idx && i < filteredData.length; i++) {
+            const x = px(filteredData[i].lon), y = py(filteredData[i].lat);
+            rctx.beginPath(); rctx.strokeStyle = getPathColorHex(filteredData[i], i); rctx.moveTo(lx, ly); rctx.lineTo(x, y); rctx.stroke();
+            lx = x; ly = y;
+        }
+        // plane marker at idx
+        const d = filteredData[Math.min(idx, filteredData.length - 1)];
+        const mx = px(d.lon), my = py(d.lat);
+        const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#38bdf8').trim();
+        rctx.globalAlpha = 1;
+        rctx.beginPath(); rctx.arc(mx, my, 4.5, 0, Math.PI * 2);
+        rctx.fillStyle = accent; rctx.fill();
+        rctx.lineWidth = 2; rctx.strokeStyle = pal.trackBg; rctx.stroke();
+    }
+
+    // seek a preview video element to the mmr time that lines up with flight index idx (same offset
+    // the real recording uses). waits for metadata if the element hasn't loaded yet.
+    function seekClipFrameVideo(vEl, idx) {
+        if (!vEl || !filteredData[idx]) return;
+        const doSeek = () => {
+            const dur = vEl.duration || 0;
+            let t = filteredData[idx].absSeconds - videoStartSeconds;
+            if (t < 0) t = 0;
+            if (dur && t > dur - 0.05) t = Math.max(0, dur - 0.05);
+            try { vEl.currentTime = t; } catch (e) {}
+        };
+        if (vEl.readyState >= 1 && !isNaN(vEl.duration)) doSeek();
+        else vEl.addEventListener('loadedmetadata', doSeek, { once: true });
+    }
+
+    function updateClipFramePreview(which) {
+        if (!filteredData.length) return;
+        const isStart = which === 'start';
+        const slider = document.getElementById(isStart ? 'clipStartSlider' : 'clipEndSlider');
+        const idx = Math.max(0, Math.min(filteredData.length - 1, parseInt(slider.value) || 0));
+        const d = filteredData[idx]; if (!d) return;
+        document.getElementById(isStart ? 'clipPreviewStartTime' : 'clipPreviewEndTime').textContent = clipColonTime(d.time);
+        drawClipFrameTrack(document.getElementById(isStart ? 'clipPreviewStartTrack' : 'clipPreviewEndTrack'), idx);
+        if (videoLoaded) seekClipFrameVideo(document.getElementById(isStart ? 'clipPreviewStartVideo' : 'clipPreviewEndVideo'), idx);
+    }
+
+    function initClipFramePreviews() {
+        buildClipFrameProjection();
+        const row = document.getElementById('clipPreviewRow');
+        row.classList.toggle('no-video', !videoLoaded);
+        const sv = document.getElementById('clipPreviewStartVideo'), ev = document.getElementById('clipPreviewEndVideo');
+        const src = videoLoaded ? (video.currentSrc || video.src) : '';
+        [sv, ev].forEach(v => {
+            if (src) { if (v.getAttribute('src') !== src) { v.src = src; v.load(); } v.muted = true; }
+            else { try { v.removeAttribute('src'); v.load(); } catch (e) {} }
+        });
+        updateClipFramePreview('start');
+        updateClipFramePreview('end');
+    }
+
+    function pauseClipFramePreviews() {
+        ['clipPreviewStartVideo', 'clipPreviewEndVideo'].forEach(id => { const v = document.getElementById(id); if (v) { try { v.pause(); } catch (e) {} } });
+    }
+
+    // keep end at or after start: dragging or typing one past the other clamps it to the other instead
+    // of crossing, so the end point can never sit before the start point. runs after wireClipTimeField's
+    // own sync, then rewrites the moved time field to the clamped value and refreshes that side's preview.
+    function clipSyncField(which) {
+        const slider = document.getElementById(which === 'start' ? 'clipStartSlider' : 'clipEndSlider');
+        const field = document.getElementById(which === 'start' ? 'clipStartTime' : 'clipEndTime');
+        const d = filteredData[parseInt(slider.value) || 0];
+        if (d && field) field.value = clipColonTime(d.time);
+    }
+    function onClipRangeInput(which) {
+        const ss = document.getElementById('clipStartSlider'), es = document.getElementById('clipEndSlider');
+        const sv = parseInt(ss.value) || 0, ev = parseInt(es.value) || 0;
+        if (which === 'start' && sv > ev) ss.value = ev;        // start can't pass end
+        else if (which === 'end' && ev < sv) es.value = sv;      // end can't fall before start
+        clipSyncField(which);
+        updateClipFramePreview(which);
+    }
+    document.getElementById('clipStartSlider').addEventListener('input', () => onClipRangeInput('start'));
+    document.getElementById('clipEndSlider').addEventListener('input', () => onClipRangeInput('end'));
+    document.getElementById('clipStartTime').addEventListener('change', () => onClipRangeInput('start'));
+    document.getElementById('clipEndTime').addEventListener('change', () => onClipRangeInput('end'));
 
     // --- compositor helpers ---
     function drawImageContain(rctx, img, x, y, w, h) {
@@ -614,6 +756,7 @@
         if (filteredData.length === 0 || recState) return;
         document.getElementById('clipRecordModal').style.display = 'none';
         destroyClipPreviews();   // the builder previews are done; free them before recording
+        pauseClipFramePreviews();   // stop the start and end frame stills too
 
         let startIdx = parseInt(document.getElementById('clipStartSlider').value);
         let endIdx = parseInt(document.getElementById('clipEndSlider').value);
@@ -738,7 +881,7 @@
     }
 
     document.getElementById('recordStopBtn').addEventListener('click', finishRecording);
-    document.getElementById('clipRecordCloseX').addEventListener('click', destroyClipPreviews);   // free builder previews on ✕ close
+    document.getElementById('clipRecordCloseX').addEventListener('click', () => { destroyClipPreviews(); pauseClipFramePreviews(); });   // free builder and frame previews on close
 
     // Click anywhere on a modal's dimmed backdrop (not its card) to close it, so the ✕ is never the
     // only way out of a long dialog. mousedown target === the overlay means the card was not clicked.
@@ -746,7 +889,7 @@
         overlay.addEventListener('mousedown', (e) => {
             if (e.target !== overlay) return;
             overlay.style.display = 'none';
-            if (overlay.id === 'clipRecordModal') destroyClipPreviews();
+            if (overlay.id === 'clipRecordModal') { destroyClipPreviews(); pauseClipFramePreviews(); }
         });
     });
 

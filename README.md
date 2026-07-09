@@ -88,7 +88,6 @@ All playback lives in the sticky bottom bar:
 
 | Control | What it does |
 | --- | --- |
-| **`Apply & Run`** | Applies the time window and (re)initializes playback. |
 | **`Play` / `Pause`** | Start / stop. |
 | **`« / 1x / »`** | Playback speed. |
 | **`↻ Reset`** | Jump back to the start of the window. |
@@ -127,10 +126,10 @@ Load a cockpit/radar **`.mp4`** in **Upload MMR to Sync**. Two sync modes:
 
 ## 5. Satellite overlays
 
-Pick a layer from the **Sat:** dropdown in the map header (options auto-populate from the flight's date and location).
+Open the **Satellite** picker in the map header: choose a satellite, then its product appears right below to pick. A **tile-opacity slider** at the top of the picker fades the imagery up or down against a clashing basemap, and for GOES products a small **color-scale legend** (brightness temperature or reflectance, with units) sits in the top-left of the 2D player. Options auto-populate from the flight's date and location.
 
 - **MODIS / VIIRS (polar, NASA GIBS)**: any date back to each mission's start. Keyed to a calendar day; a **day-stepper** moves between days and overpass times are looked up automatically.
-- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from NOAA's S3 archive for the flight's **historical** date. Pick a **product** from the `Choose a product…` picker (spectral b[...]
+- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from NOAA's S3 archive for the flight's **historical** date, refreshed on a 10-minute interval. Choose a **product** in the picker (spectral bands plus Sandwich / GeoColor composites); a product the API can't currently serve shows as **unavailable** rather than vanishing, and only that product greys out.
 - **⤓ Pre-Cache Satellite Imagery** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
 
 Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):
@@ -159,8 +158,6 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 **8 Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds is turbulence-aware, scaled to the recorded vertical wind, so calm leg[...]
 
-**Crew Ride** (filters, *experimental*) is an optional novelty: seatbelted crew figures that lean with the flight's *real* lateral G and roll, **float** up against the belt in negative-G, **hunch** do[...]
-
 ---
 
 ## 8. Exporting
@@ -175,10 +172,10 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 | --- | --- |
 | Archive dropdowns greyed out, **"API Offline"** | The noaa-recon-api is unreachable, so use **manual upload**. Auto-recovers when the API returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
 | A GOES option is greyed out | API offline, **or** the flight is outside that satellite's Earth-disk view (e.g. GOES-West for an Atlantic flight). Try the other GOES or MODIS/VIIRS. |
-| Picked GOES but nothing shows | Products don't auto-select; pick one from **`Choose a product…`** first. |
+| Picked GOES but nothing shows | Products don't auto-select; pick a product in the **Satellite** picker first. |
 | Auto-Sync lands on the wrong time | Click **Sync Now** again on a clear frame, hide other on-screen timestamps, or switch to **Manual**. |
-| Charts/map not updating after a window change | Click **`Apply & Run`**. |
-| Nothing plays | Load a file, then **`Apply & Run`**, then **`Play`**. |
+| Charts/map not updating after a window change | Click **`Play`** (it applies the current time window). |
+| Nothing plays | Load a file, then click **`Play`**. |
 | Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
 
 ---

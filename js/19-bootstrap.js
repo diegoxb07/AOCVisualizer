@@ -83,13 +83,101 @@
     document.getElementById('skipBack10Btn').addEventListener('click', () => skipFlightMinutes(-10));
     document.getElementById('skipFwd10Btn').addEventListener('click', () => skipFlightMinutes(10));
 
-    // Reset = a clean reload. Strip the shareable ?mission=/t=/view= params first; the reload-type
-    // guard in js/12b-recon-archive.js is the backstop that keeps a reload from re-loading
-    // the mission anyway. Display prefs (localStorage) persist by design.
-    document.getElementById('resetAppBtn').addEventListener('click', () => {
+    // "Reset" used to be a full page reload, but a reload drops real (page) fullscreen because
+    // re-entering fullscreen needs a fresh user gesture a reload can't carry. So instead we reset in
+    // place: tear the loaded flight, video, satellite overlay, charts and map/3d view back to the
+    // fresh-load state, reusing the same teardown helpers the app uses when switching flights, and
+    // never touching fullscreen. Things that survive a real reload (display prefs in aocVizPrefs, the
+    // preloaded-mission list, the satellite tile cache, the basemap geojson) are left alone here too,
+    // so the result matches what an F5 would land on: the empty landing state with the same prefs.
+    function resetAppToDefault() {
+        // drop the shareable ?mission=/t=/view= params (same as the old reset, minus the reload).
         try { const u = new URL(window.location.href); ['mission', 't', 'view'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u); } catch (e) {}
-        location.reload();
-    });
+
+        // stop playback and any pending sync/render timers.
+        isPlaying = false; playPauseBtn.innerText = 'Play';
+        if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+        [scrubSyncTimeout, scrubDebounceTimer, slideSyncTimer, satDebounceTimer].forEach(t => { if (t) clearTimeout(t); });
+        scrubSyncTimeout = null; scrubDebounceTimer = null; slideSyncTimer = null; satDebounceTimer = null;
+        playbackAccumulator = 0; lastTickTime = 0; videoPlaybackAccumulator = 0; videoStartSeconds = 0;
+
+        // stop any running multi-flight satellite cache pass (requestCacheCancel is trapped in the batch
+        // IIFE, so replicate its teardown here) and clear the tile preloader queue.
+        if (batchCaching) {
+            batchCacheCancel = true; batchCachePass++;
+            if (batchCacheAbortController) { try { batchCacheAbortController.abort(); } catch (e) {} }
+            batchCaching = false; batchCacheAbortController = null;
+            if (typeof setSatelliteControlsLocked === 'function') setSatelliteControlsLocked(false);
+            if (typeof hideSatPrefetchBar === 'function') hideSatPrefetchBar();
+        }
+        if (typeof resetSatPreload === 'function') resetSatPreload();
+
+        // unload the MMR video (revokes its object URL, resets both drop zones + speeds) and drop its zoom/pan.
+        if (typeof clearLoadedMedia === 'function') clearLoadedMedia();
+        currentSpeedIdx = 0; if (typeof updateSpeedDisplay === 'function') updateSpeedDisplay();
+        vidZoom = 1; vidPanX = 0; vidPanY = 0; if (radarVid) radarVid.style.transform = '';
+
+        // tear down every chart (master + per-metric sub-charts + any clip-preview charts).
+        if (masterChartInstance) { try { masterChartInstance.destroy(); } catch (e) {} }
+        masterChartInstance = null;
+        Object.values(customCharts).forEach(c => { try { c.destroy(); } catch (e) {} }); customCharts = {};
+        if (typeof destroyClipPreviews === 'function') destroyClipPreviews();
+
+        // clear the loaded flight, storm-track, analysis, measure and scrub state.
+        allParsedData = []; filteredData = []; availableMetrics.clear(); currentIdx = 0; _lastStaticIdx = -1;
+        customMarkers = []; tempBaseline = []; lastParseStats = null;
+        flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
+        reconArchiveMeta = null; stormTrackPoints = []; stormTrackMeta = null;
+        showStormTrack = false; hoveredStormIdx = -1; currentPointAnalysisData = null;
+        window._appliedWindow = undefined;
+        isMeasuring = false; measurePointsGeo = []; drawnShapes = []; liveMouseGeo = null;
+        isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1;
+        isScrubbing = false; activeScrubChart = null;
+        hasInitialSyncOccurred = false; forceOcrSyncNextTick = false; lastOcrVideoTime = 0;
+
+        // reset the map view + satellite draw state, and put the satellite picker back to Off.
+        mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; followAircraft2D = true; bgNeedsUpdate = true;
+        satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; lastSatFetchTime = '';
+        satTileOpacity = 0.92;
+        const opSlider = document.getElementById('satOpacitySlider'); if (opSlider) opSlider.value = 92;
+        const opVal = document.getElementById('satOpacityVal'); if (opVal) opVal.textContent = '92%';
+        const satSel = document.getElementById('satelliteSelect'); if (satSel) satSel.value = 'none';
+        const bandSel = document.getElementById('satBandSelect'); if (bandSel) bandSel.value = '';
+        if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();   // repopulate for "no flight": hides band + legend, refreshes the picker button
+
+        // wipe the tracker canvases; clear the 3d scene's dynamic content if it was ever built.
+        try { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); } catch (e) {}
+        const pfdC = document.getElementById('pfdCanvas');
+        if (pfdC && pfdC.getContext) { const pc = pfdC.getContext('2d'); pc.clearRect(0, 0, pfdC.width, pfdC.height); }
+        if (threeDInitialized) {
+            while (threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]);
+            if (typeof sync3DMarkers === 'function') sync3DMarkers();   // customMarkers is [] now, so this empties the marker group
+            [planeGroup3D, trackArrow3D, headingArrow3D, stormFixRing3D].forEach(o => { if (o) o.visible = false; });
+            attitudeHud.innerHTML = '';
+        }
+
+        // restore the fresh-load UI: show placeholders, hide the flight-only overlays, re-disable controls.
+        mapPlaceholder.style.display = '';
+        hud.style.display = 'none';
+        const pfdOv = document.getElementById('pfdOverlay'); if (pfdOv) pfdOv.style.display = 'none';
+        const stormLbl = document.getElementById('stormTrackToggleLabel'); if (stormLbl) stormLbl.style.display = 'none';
+        const stormCb = document.getElementById('toggleStormTrack'); if (stormCb) stormCb.checked = false;
+        const dataLine = document.getElementById('dataReportLine'); if (dataLine) dataLine.classList.add('hidden');
+        const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
+        const badge = document.getElementById('satTimeBadge'); if (badge) badge.classList.add('hidden');
+        if (ocrIndicator) ocrIndicator.style.display = 'none';
+        ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn','startTimeInput','endTimeInput','exportClipBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+        const startI = document.getElementById('startTimeInput'); if (startI) startI.value = '';
+        const endI = document.getElementById('endTimeInput'); if (endI) endI.value = '';
+        const vsi = document.getElementById('videoStartInput'); if (vsi) { vsi.value = '000000'; vsi.disabled = true; }
+        timelineSlider.min = 0; timelineSlider.max = 100; timelineSlider.value = 0;
+        if (timelineTimeDisplay) timelineTimeDisplay.textContent = '00:00:00 UTC';
+        updateMissionHeader();            // blanks the header chips + resets document.title
+        updateMasterGraphVisibility();    // master chart gone -> show the "create a graph" prompt
+        if (typeof syncMediaGridLayout === 'function') syncMediaGridLayout();
+    }
+
+    document.getElementById('resetAppBtn').addEventListener('click', resetAppToDefault);
 
     playPauseBtn.addEventListener('click', function() {
         // Fold the old "Apply & Run" into Play: when starting playback in manual mode, if the start/end

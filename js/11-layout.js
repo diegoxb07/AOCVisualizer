@@ -55,6 +55,24 @@
         }
     });
 
+    // collapses the mmr panel out of the media bar whenever no video is loaded, so the
+    // flight player spans the full media width at the same height. called after a video
+    // loads or clears, and re-runs the map resize and redraw to fill the new width.
+    function syncMediaGridLayout() {
+        const grid = document.getElementById('mediaGrid');
+        if (!grid) return;
+        grid.classList.toggle('no-video', !videoLoaded);
+        resizeCanvasLayout();
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            const keepView = isMapPanned() ? getMapViewportGeo() : null;
+            calculateMapScales();
+            if (keepView) applyMapViewportGeo(keepView);
+            bgNeedsUpdate = true;
+            renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+        }
+        if (filteredData.length > 0 && document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
+    }
+
     (function setupMediaResize() {
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');
         if (!handle || !bar) return;

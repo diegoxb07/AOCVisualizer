@@ -15,6 +15,7 @@
         if (!e.target.files[0]) return;
         markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true;
+        syncMediaGridLayout();
         speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
         if (allParsedData.length > 0) document.getElementById('videoStartInput').value = allParsedData[0].time;
@@ -70,6 +71,7 @@
         videoSyncMode.disabled = true;
         const vsi = document.getElementById('videoStartInput'); vsi.value = '000000'; vsi.disabled = true;
         speeds = [1, 2, 4, 8, 16, 32, 64, 128]; currentSpeedIdx = 0; updateSpeedDisplay();
+        syncMediaGridLayout();
     }
 
     // The shared ?v= cache-buster, read off this page's own script tags so the worker URL stays in
@@ -83,28 +85,42 @@
     // Parse a flight source (TSV string, or an .nc ArrayBuffer) into { rows, stats }, off the main
     // thread so the page never freezes on a big file. Falls back to parsing on the main thread when
     // workers are unavailable (e.g. file://). Rejects with the parse error for the caller to report.
+    // reflect the worker's decode progress in the loading overlay subtext (see ncArrayBufferToTsv).
+    function updateParseProgress(p) {
+        const st = document.getElementById('loadingOverlaySubtext');
+        if (!st || !p) return;
+        if (p.phase === 'open') st.textContent = `Reading ${p.total} NetCDF variables…`;
+        else if (p.phase === 'var') st.textContent = `Processing variable ${p.index}/${p.total}: ${p.name}`;
+        else if (p.phase === 'rows') st.textContent = `Assembling ${Number(p.numRows).toLocaleString()} data rows…`;
+    }
+
     function parseFlightSource(source) {
         const onMainThread = () => {
-            const tsv = typeof source === 'string' ? source : ncArrayBufferToTsv(source);
+            if (source && typeof source !== 'string' && source.byteLength === 0)
+                throw new Error('parse worker failed and the file buffer was already handed off — please re-select the file');
+            const tsv = typeof source === 'string' ? source : ncArrayBufferToTsv(source, updateParseProgress);
             return parseFlightTextToRows(tsv);
         };
         return new Promise((resolve, reject) => {
-            let w;
+            let w, settled = false;
             try { w = new Worker('js/parse-worker.js' + assetVer()); }
             catch (e) { try { resolve(onMainThread()); } catch (err) { reject(err); } return; }
             w.onmessage = (e) => {
-                w.terminate();
+                if (e.data && e.data.progress) { updateParseProgress(e.data.progress); return; }  // live decode feedback
+                settled = true; w.terminate();
                 if (e.data && e.data.error) reject(new Error(e.data.error)); else resolve(e.data);
             };
-            // Worker infrastructure failure (script blocked / failed to load): parse here instead.
+            // worker infrastructure failure (script blocked or failed to load) before a result: parse here.
             w.onerror = () => {
-                w.terminate();
+                if (settled) return;
+                settled = true; w.terminate();
                 try { resolve(onMainThread()); } catch (err) { reject(err); }
             };
-            // Clone rather than transfer the buffer: a transfer detaches it here, and the
-            // main-thread fallback in onerror still needs a readable copy.
+            // transfer the .nc arraybuffer to the worker instead of cloning it. a structured clone copy of a
+            // large netcdf buffer runs on the main thread and froze the loading spinner mid load. strings
+            // (tsv) can't be transferred, so they're cloned, which is cheap.
             if (typeof source === 'string') w.postMessage({ tsv: source });
-            else w.postMessage({ nc: source });
+            else w.postMessage({ nc: source }, [source]);
         });
     }
 

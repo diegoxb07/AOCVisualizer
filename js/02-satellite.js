@@ -254,6 +254,7 @@
     let reconApiHealthReason = '';
 
     function isReconApiDown() {
+        if (window.DEMO_FORCE_API_OFFLINE) return true;   // temp demo toggle, remove when asked
         return reconApiHealthChecked ? !reconApiHealthOk : false;
     }
 
@@ -320,6 +321,7 @@
             uploadZone.classList.toggle('bg-panel-strip', !apiDown);
             uploadZone.classList.toggle('grayscale-0', apiDown);
             uploadZone.classList.toggle('grayscale', !apiDown);
+            uploadZone.classList.toggle('data-drop-emph', apiDown);   // enlarge it while the api is the only way in
         }
         if (uploadLabel) {
             uploadLabel.classList.toggle('text-ink', apiDown);
@@ -330,6 +332,9 @@
         if (uploadApiOfflineToastWrapper) {
             uploadApiOfflineToastWrapper.classList.toggle('hidden', !apiDown);
         }
+        // the "use manual upload instead" hint sits below the upload button, only while offline
+        const manualUploadHint = document.getElementById('manualUploadHint');
+        if (manualUploadHint) manualUploadHint.classList.toggle('hidden', !apiDown);
         // The batch modal, if already open, has its own satellite dropdown/band checks/Start button
         // that need the same API-down treatment, refresh them in place rather than waiting for the
         // user to close and reopen the modal.
@@ -392,14 +397,10 @@
         const inCov = goesInCoverage(layerDef);
         opt.disabled = !inCov;
         if (!inCov) { opt.textContent = `${layerDef.baseLabel}, out of view`; return; }
-        const row = (filteredData[currentIdx] || filteredData[Math.floor(filteredData.length / 2)]);
-        const ms = row ? goesBucketMs(layerDef, row.absSeconds) : null;
-        if (ms != null) {
-            const d = new Date(ms);
-            opt.textContent = `${layerDef.baseLabel} [~${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}Z]`;
-        } else {
-            opt.textContent = layerDef.baseLabel;
-        }
+        // archive goes streams a frame on a fixed scan cadence, so label the interval rather than an
+        // estimated scan time.
+        const cad = layerDef.cadenceMin || 10;
+        opt.textContent = `${layerDef.baseLabel} [${cad}min intervals]`;
     }
 
     function computeSatFetchBox(extent) {
@@ -479,19 +480,21 @@
                     const hh = String(fmtDate.getUTCHours()).padStart(2, '0');
                     const mm = String(fmtDate.getUTCMinutes()).padStart(2, '0');
                     opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z]`;
-                    
+
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
                         satLoadedInfo.imageTimeMs = midMs;
                         satLoadedInfo.modisTimePending = false;
                         satLoadedInfo.modisExact = true;
                         updateSatTimeBadge();
                     }
+                    if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 } else {
                     opt.textContent = `${layerDef.baseLabel} [Daily]`;
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
                         satLoadedInfo.modisTimePending = false;
                         updateSatTimeBadge();
                     }
+                    if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 }
             });
         }
@@ -541,6 +544,7 @@
 
         updateSatelliteDropdownTimes();
         maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected, build its full timeframe now
+        if (typeof refreshSatPicker === 'function') refreshSatPicker();
     }
 
     // Keeps the satellite cluster's footprint constant (the .split rule in app.css): the layer
@@ -592,8 +596,11 @@
                     defs.forEach(b => {
                         const opt = document.createElement('option');
                         opt.value = b.id;
-                        opt.textContent = b.name;
+                        // a product the api isn't currently serving stays listed but disabled, labelled
+                        // "unavailable", so it reads as temporarily offline rather than silently vanishing.
+                        opt.textContent = b.available === false ? b.name + ' (unavailable)' : b.name;
                         opt.title = b.name;   // full name on hover, the closed select ellipsizes long ones (CSS max-width)
+                        if (b.available === false) opt.disabled = true;
                         og.appendChild(opt);
                     });
                     bandSelect.appendChild(og);
@@ -604,17 +611,20 @@
                 layerDef.bands.forEach(b => {
                     const opt = document.createElement('option');
                     opt.value = b.id;
-                    opt.textContent = b.name;
+                    opt.textContent = b.available === false ? b.name + ' (unavailable)' : b.name;
                     opt.title = b.name;
+                    if (b.available === false) opt.disabled = true;
                     bandSelect.appendChild(opt);
                 });
             }
             bandSelect.style.display = '';
             syncSatSplit();
-            // A rebuild must not silently drop an active selection (the 60s product-list
-            // poll and flight reloads land here), the placeholder is only for fresh picks.
-            if (prevBand && [...bandSelect.options].some(o => o.value === prevBand)) bandSelect.value = prevBand;
+            // a rebuild must not silently drop an active selection (the 60s product list poll and flight
+            // reloads land here), the placeholder is only for fresh picks. skip restoring a now unavailable
+            // product so we don't re-select a disabled option.
+            if (prevBand && [...bandSelect.options].some(o => o.value === prevBand && !o.disabled)) bandSelect.value = prevBand;
         }
+        if (typeof refreshSatPicker === 'function') refreshSatPicker();
     }
 
     let _satStepperWired = false;
@@ -729,13 +739,26 @@
             }));
             const allProducts = bandDefs.concat(productDefs);
             if (!allProducts.length) throw new Error('empty payload');
+            // per product availability, fully driven by the api (nothing hardcoded): keep the union of
+            // every product the api has served this session and flag each by whether it's in the current
+            // response. a product that drops out is kept but marked unavailable, so when the api is online
+            // but one product is offline, only that product greys out while the satellite and its other
+            // products stay usable. a fully down api disables the whole satellite (isReconApiAvailable).
+            const availableIds = new Set(allProducts.map(p => p.id));
+            allProducts.forEach(p => { p.available = true; reconProductUnion.set(p.id, p); });
+            reconProductUnion.forEach((def, id) => { if (!availableIds.has(id)) def.available = false; });
+            const unionProducts = [...reconProductUnion.values()].sort((a, b) => {
+                if (!!a.isComposite !== !!b.isComposite) return a.isComposite ? 1 : -1;   // bands first, composites last
+                return (a.band || 0) - (b.band || 0);
+            });
             GIBS_LAYERS.forEach(layerDef => {
                 if (!layerDef.isReconApi) return;
-                layerDef.bands = allProducts;
+                layerDef.bands = unionProducts;
                 const spacecraft = data.satellites && data.satellites[layerDef.satellite];
                 if (spacecraft && spacecraft.length && spacecraft[0].start) layerDef.minDate = spacecraft[0].start;
             });
-            const fp = JSON.stringify([allProducts, data.satellites]);
+            // include availability in the fingerprint so the dropdown rebuilds when a product goes on or offline.
+            const fp = JSON.stringify([unionProducts.map(p => [p.id, p.available]), data.satellites]);
             const changed = fp !== _lastProductsFingerprint;
             _lastProductsFingerprint = fp;
             setReconApiHealth(true, 'ok');   // rebuilds the dropdowns itself on a health transition
@@ -748,10 +771,16 @@
         }
     }
     let _lastProductsFingerprint = '';
+    const reconProductUnion = new Map();   // id to product def (with .available), union across api polls
     loadSatelliteProducts();
     setInterval(() => {
         if (document.visibilityState === 'visible') loadSatelliteProducts();
     }, 60000);
+
+    // temp demo: force the api-offline ui (offline toast + enlarged upload) so it can be shown off.
+    // remove this block, and the flag check in isReconApiDown, when asked.
+    window.DEMO_FORCE_API_OFFLINE = true;
+    updateReconApiUiState();
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {
@@ -1540,7 +1569,7 @@
         if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
         // Full-disk-only composites (sandwich/geocolor) can't be cached by area like everything else
         // here, batch caching is always a bbox around each flight. They're still viewable live.
-        const bands = ((layerDef && layerDef.bands) ? layerDef.bands : []).filter(b => b.bboxSupported !== false);
+        const bands = ((layerDef && layerDef.bands) ? layerDef.bands : []).filter(b => b.bboxSupported !== false && b.available !== false);
         const curBand = (document.getElementById('satBandSelect') || {}).value;
         bands.forEach((b, i) => {
             const lbl = document.createElement('label'); lbl.className = 'flex items-center gap-1 cursor-pointer';

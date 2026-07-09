@@ -138,27 +138,32 @@
     function populateFlightChecks() {
         const box = $('fsFlightChecks');
         if (!box) return;
+        // detach the persistent "load more flights" button before the innerhtml reset so its listener
+        // survives, then re-append it inside this container below the checkboxes.
+        const moreBtn = $('fsPreloadBtn');
+        if (moreBtn && moreBtn.parentElement) moreBtn.parentElement.removeChild(moreBtn);
         box.innerHTML = '';
         fsFlights = fsSearchableFlights();
         if (!fsFlights.length) {
             box.innerHTML = '<div style="color:var(--text-faint);padding:4px 0;">No flights loaded yet. Load a mission or use Pre-load Flight Data, then search across them.</div>';
-            return;
+        } else {
+            fsFlights.forEach((f) => {
+                const label = document.createElement('label');
+                label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;padding:1px 0;';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = f.id;
+                cb.checked = true;
+                cb.className = 'fs-check accent-accent flex-none';
+                const span = document.createElement('span');
+                span.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);';
+                span.textContent = f.label + (f.preview ? '   (preview: limited metrics)' : '');
+                label.appendChild(cb);
+                label.appendChild(span);
+                box.appendChild(label);
+            });
         }
-        fsFlights.forEach((f) => {
-            const label = document.createElement('label');
-            label.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;padding:1px 0;';
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = f.id;
-            cb.checked = true;
-            cb.className = 'fs-check accent-accent flex-none';
-            const span = document.createElement('span');
-            span.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);';
-            span.textContent = f.label + (f.preview ? '   (preview: limited metrics)' : '');
-            label.appendChild(cb);
-            label.appendChild(span);
-            box.appendChild(label);
-        });
+        if (moreBtn) { moreBtn.style.marginTop = '6px'; box.appendChild(moreBtn); }
     }
 
     function openModal() {

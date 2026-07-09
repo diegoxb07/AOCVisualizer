@@ -7,7 +7,10 @@ importScripts('../lib/netcdfjs.min.js', '11b-parser-core.js' + self.location.sea
 
 self.onmessage = (e) => {
     try {
-        const tsv = e.data.nc ? ncArrayBufferToTsv(e.data.nc) : e.data.tsv;
+        // forward decode progress to the page so the loading overlay can show which variable is being
+        // processed. the main thread is free during this worker phase, so the spinner keeps animating.
+        const onProgress = (p) => self.postMessage({ progress: p });
+        const tsv = e.data.nc ? ncArrayBufferToTsv(e.data.nc, onProgress) : e.data.tsv;
         self.postMessage(parseFlightTextToRows(tsv));
     } catch (err) {
         self.postMessage({ error: String((err && err.message) || err) });

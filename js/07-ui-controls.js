@@ -519,6 +519,7 @@
 
             if (satSelect) satSelect.style.display = 'none';
             if (satBandSelect) satBandSelect.style.display = 'none';
+            if (typeof closeSatPicker === 'function') closeSatPicker();   // popover has no place in 3d mode
             syncSatSplit();
             buildSatDayStepper();
             const satBadge = document.getElementById('satTimeBadge');
@@ -562,6 +563,7 @@
             maybeAutoPrecacheSatellite();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
+        if (typeof refreshSatPicker === 'function') refreshSatPicker();
     });
 
     document.getElementById('satBandSelect').addEventListener('change', () => {
@@ -575,7 +577,143 @@
             maybeAutoPrecacheSatellite();
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
+        if (typeof refreshSatPicker === 'function') refreshSatPicker();
     });
+
+    // combined satellite and product picker popover.
+    // a single button opens a popover: pick a satellite, its products appear right under it to pick
+    // consecutively. it reads and writes the two hidden native selects (satelliteSelect, satBandSelect)
+    // and fires their 'change' events, so the whole satellite engine (fetch, day stepper, caching,
+    // coverage and scan time labels) keeps working unchanged. satPickerExpanded is the layer whose
+    // product list is currently open in the panel.
+    let satPickerExpanded = null;
+
+    function updateSatPickerButton() {
+        const sat = document.getElementById('satelliteSelect');
+        const band = document.getElementById('satBandSelect');
+        const btn = document.getElementById('satPickerBtn');
+        const lbl = document.getElementById('satPickerBtnLabel');
+        if (!sat || !btn || !lbl) return;
+        if (sat.value === 'none') { lbl.textContent = 'Sat: Off'; btn.classList.remove('sat-on'); return; }
+        const def = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === sat.value) : null;
+        const base = def ? def.baseLabel : sat.value;
+        let prod = '';
+        if (band && band.value) { const o = band.options[band.selectedIndex]; prod = o ? o.textContent : ''; }
+        lbl.textContent = prod ? `${base} · ${prod}` : base;
+        btn.classList.add('sat-on');
+    }
+
+    function renderSatPickerPanel() {
+        const list = document.getElementById('satPickerList');
+        const sat = document.getElementById('satelliteSelect');
+        const band = document.getElementById('satBandSelect');
+        if (!list || !sat) return;
+        const activeSat = sat.value, activeBand = band ? band.value : '';
+        let html = `<button type="button" class="sat-pick-off${activeSat === 'none' ? ' active' : ''}" data-off="1">Off (no overlay)</button>`;
+        for (const opt of sat.options) {
+            if (opt.value === 'none') continue;
+            const def = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === opt.value) : null;
+            const expanded = satPickerExpanded === opt.value && !opt.disabled;
+            const isActive = activeSat === opt.value;
+            html += `<div class="sat-pick-sat${opt.disabled ? ' disabled' : ''}${isActive ? ' active' : ''}">`;
+            html += `<button type="button" class="sat-pick-sat-row"${opt.disabled ? ' disabled' : ` data-sat="${opt.value}"`}>`
+                 +  `<span class="sat-pick-caret">${opt.disabled ? '' : (expanded ? '▾' : '▸')}</span>`
+                 +  `<span class="sat-pick-name">${escapeHtml(opt.textContent)}</span>`
+                 +  (opt.disabled ? `<span class="sat-pick-tag">unavailable</span>` : ``)
+                 +  `</button>`;
+            if (expanded && def && def.bands) {
+                const renderBand = b => {
+                    const unavail = b.available === false;   // api online but this product isn't being served
+                    return `<button type="button" class="sat-pick-prod${(isActive && activeBand === b.id) ? ' active' : ''}${unavail ? ' unavailable' : ''}"`
+                        + (unavail ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`) + `>`
+                        + `<span class="sat-pick-name">${escapeHtml(b.name)}</span>`
+                        + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : ``) + `</button>`;
+                };
+                html += `<div class="sat-pick-products">`;
+                if (def.isReconApi) {
+                    const spectral = def.bands.filter(b => !b.isComposite), comps = def.bands.filter(b => b.isComposite);
+                    if (spectral.length) html += `<div class="sat-pick-group">Spectral Bands</div>` + spectral.map(renderBand).join('');
+                    if (comps.length) html += `<div class="sat-pick-group">Composites</div>` + comps.map(renderBand).join('');
+                } else {
+                    html += def.bands.map(renderBand).join('');
+                }
+                html += `</div>`;
+            }
+            html += `</div>`;
+        }
+        list.innerHTML = html;
+    }
+
+    function refreshSatPicker() {
+        updateSatPickerButton();
+        const panel = document.getElementById('satPickerPanel');
+        if (panel && !panel.classList.contains('hidden')) renderSatPickerPanel();
+    }
+
+    // the panel is position:fixed (see app.css) so it escapes the map header's z-20 stacking context
+    // and layers above the pfd and hud overlays. anchor it under the button, right aligned to it.
+    function positionSatPicker() {
+        const panel = document.getElementById('satPickerPanel'), btn = document.getElementById('satPickerBtn');
+        if (!panel || !btn || panel.classList.contains('hidden')) return;
+        const r = btn.getBoundingClientRect();
+        panel.style.top = (r.bottom + 4) + 'px';
+        panel.style.left = 'auto';
+        panel.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+    }
+    function openSatPicker() {
+        const panel = document.getElementById('satPickerPanel');
+        if (!panel) return;
+        const sat = document.getElementById('satelliteSelect');
+        if (sat && sat.value !== 'none') satPickerExpanded = sat.value;   // open with the active layer expanded already
+        renderSatPickerPanel();
+        panel.classList.remove('hidden');
+        positionSatPicker();
+    }
+    function closeSatPicker() { const p = document.getElementById('satPickerPanel'); if (p) p.classList.add('hidden'); }
+
+    // apply a satellite and product together: set the satellite (which rebuilds its band options via
+    // the 'change' handler), then the product, so imagery only loads once a product is actually chosen.
+    function satPickerChooseProduct(satValue, bandId) {
+        const sat = document.getElementById('satelliteSelect'), band = document.getElementById('satBandSelect');
+        if (!sat || !band) return;
+        if (sat.value !== satValue) { sat.value = satValue; sat.dispatchEvent(new Event('change')); }
+        if (band.value !== bandId) { band.value = bandId; band.dispatchEvent(new Event('change')); }
+        closeSatPicker();
+    }
+    function satPickerChooseOff() {
+        const sat = document.getElementById('satelliteSelect');
+        if (sat && sat.value !== 'none') { sat.value = 'none'; sat.dispatchEvent(new Event('change')); }
+        closeSatPicker();
+    }
+
+    (function wireSatPicker() {
+        const btn = document.getElementById('satPickerBtn'), list = document.getElementById('satPickerList');
+        if (!btn || !list) return;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const panel = document.getElementById('satPickerPanel');
+            if (panel && panel.classList.contains('hidden')) openSatPicker(); else closeSatPicker();
+        });
+        list.addEventListener('click', (e) => {
+            if (e.target.closest('[data-off]')) { satPickerChooseOff(); return; }
+            const prod = e.target.closest('[data-band]');
+            if (prod) { satPickerChooseProduct(prod.getAttribute('data-sat'), prod.getAttribute('data-band')); return; }
+            const row = e.target.closest('.sat-pick-sat-row[data-sat]');
+            if (row) { const v = row.getAttribute('data-sat'); satPickerExpanded = (satPickerExpanded === v) ? null : v; renderSatPickerPanel(); }
+        });
+        // outside click or esc closes, like the measure popover.
+        document.addEventListener('mousedown', (e) => {
+            const panel = document.getElementById('satPickerPanel');
+            if (!panel || panel.classList.contains('hidden')) return;
+            if (panel.contains(e.target) || btn.contains(e.target)) return;
+            closeSatPicker();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSatPicker(); });
+        // keep the fixed panel glued to the button as the page or media bar scrolls or the window resizes.
+        window.addEventListener('resize', positionSatPicker);
+        window.addEventListener('scroll', positionSatPicker, true);
+        updateSatPickerButton();
+    })();
 
     pathColorSelect.addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });
     barbColorSelect.addEventListener('change', () => { if (filteredData.length > 0) { if (threeDInitialized) build3DScene(); renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } });

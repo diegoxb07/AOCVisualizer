@@ -18,7 +18,7 @@ You can use this flowchart in case you are unsure of what to do:
 flowchart TD
     START(["Open the app"]) --> ARCHIVE{"Archive dropdowns available?<br>(Year / Storm / Flight)"}
     ARCHIVE -- "Yes" --> LOADARC["Pick <b>Year → Storm → Flight</b><br>click <b>⤓ Load Flight + Storm Track</b><br>(full-res NetCDF + storm best-track)"]
-    ARCHIVE -- "No, API Offline banner" --> UPLOAD["Drop your <b>.nc</b> or <b>.txt</b> file<br>on the <b>or upload:</b> zone"]
+    ARCHIVE -- "No, API Offline banner" --> UPLOAD["Drop your <b>.nc</b> file<br>on the <b>or upload:</b> zone"]
     LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
@@ -75,7 +75,7 @@ Both paths feed the **same** parser, so the map, charts, PFD, and export behave 
 
 **Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's f[...]
 
-**Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) or a tab-separated AOC **`.txt`** log on the **"or upload:"** zone. Manually loaded fligh[...]
+**Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded fligh[...]
 
 > Archive controls greyed out with an **"API Offline"** banner mean the archive service is unreachable, and one should use manual upload. It re-checks every ~60 s and can re-enable itself. Details: **[...]
 

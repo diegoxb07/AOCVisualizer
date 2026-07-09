@@ -254,7 +254,6 @@
     let reconApiHealthReason = '';
 
     function isReconApiDown() {
-        if (window.DEMO_FORCE_API_OFFLINE) return true;   // temp demo toggle, remove when asked
         return reconApiHealthChecked ? !reconApiHealthOk : false;
     }
 
@@ -776,11 +775,6 @@
     setInterval(() => {
         if (document.visibilityState === 'visible') loadSatelliteProducts();
     }, 60000);
-
-    // temp demo: force the api-offline ui (offline toast + enlarged upload) so it can be shown off.
-    // remove this block, and the flag check in isReconApiDown, when asked.
-    window.DEMO_FORCE_API_OFFLINE = true;
-    updateReconApiUiState();
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {

@@ -35,8 +35,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260709l">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260709l">
+    <link rel="stylesheet" href="css/fonts.css?v=20260709s">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260709s">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260709l">
+    <link rel="stylesheet" href="css/app.css?v=20260709s">
 </head>
 <body class="font-sans antialiased">
 
@@ -64,7 +64,7 @@
     </div>
 </div>
 
-<div class="fixed top-4 right-4 z-[9999] flex flex-col items-end gap-2">
+<div id="topRightControls" class="fixed top-4 right-4 z-[9999] flex flex-col items-end gap-2">
     <div class="flex items-center gap-2">
         <button id="helpBtn" type="button" onclick="document.getElementById('helpModal').style.display='flex'" title="Help & feature guide" aria-label="Help and feature guide" class="flex items-center justify-center bg-panel-strip border border-hairline hover:bg-elevated rounded shadow-lg transition-colors" style="width:34px;height:30px;">
             <span aria-hidden="true" style="display:flex;align-items:center;justify-content:center;width:20px;height:20px;border:2px solid var(--accent);border-radius:50%;color:var(--accent);font-size:12px;font-weight:700;line-height:1;">?</span>
@@ -114,11 +114,13 @@
                         </div>
                     </div>
 
-                    <div id="archiveLoadBlock" class="relativepl-2.5">
-                        <div id="archiveLoadingSpin" class="absolute inset-0 z-20 flex items-center justify-center bg-[color-mix(in_oklab,var(--panel)_40%,transparent)] rounded">
-                            <div class="w-14 h-14 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
-                        </div>
+                    <div id="archiveLoadBlock" class="relative">
                         <div id="archiveApiControls" class="relative flex flex-wrap items-center gap-1.5">
+                            <!-- loading cover only over the api pickers (matches the offline toast), so the
+                                 offline-usable Previously Loaded + Metrics Across Flights row below stays clickable -->
+                            <div id="archiveLoadingSpin" class="absolute inset-0 z-20 flex items-center justify-center bg-[color-mix(in_oklab,var(--panel)_40%,transparent)] rounded">
+                                <div class="w-14 h-14 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
+                            </div>
                             <!-- Free-text search across a year's missions (id, storm, date, aircraft), and a
                                  direct load for any full mission id, so a flight filed under the wrong storm
                                  or buried in Unknown / Training is still findable. -->
@@ -185,13 +187,6 @@
             <!-- Band 2: video sync mode (with the manual-only time fields) on the left, clip/share on the right. -->
             <div class="flex flex-col sm:flex-row sm:items-end gap-3 border-t border-hairline pt-4">
                 <div class="flex flex-wrap items-end gap-3">
-                    <div class="flex flex-col w-48">
-                        <label class="text-[10px] font-semibold text-muted mb-1.5 uppercase tracking-wider">MMR Sync Mode</label>
-                        <select id="videoSyncMode" disabled class="w-full bg-panel-strip text-ink border border-hairline rounded px-3 py-1.5 text-xs focus:border-accent focus:outline-none transition-colors shadow-sm">
-                            <option value="auto" selected>Auto-Sync (Default)</option>
-                            <option value="manual">Manual Time Input</option>
-                        </select>
-                    </div>
                     <!-- Manual-mode fields: shown by applySyncModeLock only while the sync mode is Manual. -->
                     <div class="manual-sync-field flex flex-col w-40" style="display:none">
                         <label class="text-xs font-semibold text-muted mb-1.5 uppercase tracking-wider">Flight Start (HHMMSS)</label>
@@ -206,7 +201,14 @@
                         <input type="text" id="videoStartInput" value="000000" disabled class="w-full bg-panel-strip text-ink border border-hairline rounded px-3 py-1.5 text-xs font-mono text-center shadow-sm focus:border-accent focus:outline-none transition-colors" />
                     </div>
                 </div>
-                <div class="flex items-center gap-2 sm:ml-auto">
+                <div class="flex items-end gap-2 sm:ml-auto">
+                    <div class="flex flex-col w-48">
+                        <label class="text-[10px] font-semibold text-muted mb-1.5 uppercase tracking-wider">MMR Sync Mode</label>
+                        <select id="videoSyncMode" disabled class="w-full bg-panel-strip text-ink border border-hairline rounded px-3 py-1.5 text-xs focus:border-accent focus:outline-none transition-colors shadow-sm">
+                            <option value="auto" selected>Auto-Sync (Default)</option>
+                            <option value="manual">Manual Time Input</option>
+                        </select>
+                    </div>
                     <button id="exportClipBtn" disabled class="px-4 py-2 bg-elevated hover:bg-elevated text-ink text-xs font-bold rounded border border-hairline-strong transition-colors shadow-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">Record Clip</button>
                     <button id="shareLinkBtn" disabled title="Copy a link that reopens this mission at the current playback moment and tracker view" class="px-4 py-2 bg-elevated hover:bg-elevated text-ink text-xs font-bold rounded border border-hairline-strong transition-colors shadow-sm whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">Share Link</button>
                 </div>
@@ -278,10 +280,8 @@
                                     <select id="satBandSelect" style="display:none;" title="Satellite Spectral Band">
                                     </select>
                                 </span>
-                                <div id="satPickerPanel" class="hidden sat-picker-panel">
-                                    <div class="sat-picker-head">Satellite Overlay</div>
-                                    <div id="satPickerList" class="sat-picker-list"></div>
-                                </div>
+                                <!-- #satPickerPanel lives at <body> level (see near the modals) so its fixed
+                                     position escapes this header's z-20 stacking context and layers above the map overlays -->
                                 <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-panel border border-hairline border-l-2 border-l-[var(--accent)] rounded px-1.5 py-1 shadow-lg">
                                     <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-panel-strip hover:bg-elevated text-ink rounded border border-hairline text-[11px] leading-none">‹</button>
                                     <span id="satDayLabel" class="text-[10px] font-mono text-accent min-w-[78px] text-center leading-tight"></span>
@@ -311,6 +311,9 @@
                         <!-- Appears only after the user pans/zooms away from the followed aircraft; clicking
                              re-centers the map on the plane and resumes following it. -->
                         <button id="recenterPlaneBtn" style="display:none;" title="Re-center the map on the aircraft and keep following it" class="absolute left-1/2 -translate-x-1/2 bottom-4 z-[2400] px-2 py-1 bg-accent text-accent-ink border border-accent hover:bg-accent rounded text-[10px] font-semibold shadow-lg transition-colors whitespace-nowrap">&#9678; Recenter on Aircraft</button>
+                        <!-- vertical color-scale legend for the active satellite product, built by
+                             updateSatColorLegend() in js/02-satellite.js from the api colortable endpoint -->
+                        <div id="satColorLegend" class="hidden"></div>
                         <div id="mapInfoStack" class="absolute top-14 right-3 z-[2400] flex flex-col items-end gap-1.5 pointer-events-none text-right">
                             <div id="satTimeBadge" class="hidden bg-[color-mix(in_oklab,var(--bg)_85%,transparent)] border border-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2.5 py-1 text-[10px] font-mono text-accent leading-tight"></div>
                             <div id="stormStatusCard" class="hidden bg-[color-mix(in_oklab,var(--bg)_85%,transparent)] border border-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2.5 py-1 text-[10px] font-mono text-ink leading-tight">
@@ -360,6 +363,8 @@
             </div>
         </div>
         <div class="media-resize-handle" id="mediaResizeHandle" title="Drag to resize the tracker & video (drag all the way down to collapse)"><span class="grip">⋯</span></div>
+        <!-- collapser: sits on the drag grip's line at the bottom right, so it adds no extra row -->
+        <button id="mediaCollapseBtn" type="button" title="Collapse or expand the media players" aria-expanded="true" class="media-collapse-btn px-2 py-0.5 bg-panel-strip text-muted border border-hairline hover:bg-elevated hover:text-ink rounded text-[11px] font-semibold transition-colors whitespace-nowrap leading-tight">&#9650; Collapse media</button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
@@ -800,6 +805,20 @@
     </div>
 </div>
 
+<!-- satellite picker popover, kept at body level so its position:fixed z-index sits above the map
+     overlays (pfd, sat info, storm info) instead of being trapped in the map header's stacking context.
+     positionSatPicker() anchors it under #satPickerBtn. -->
+<div id="satPickerPanel" class="hidden sat-picker-panel">
+    <div class="sat-picker-head">Satellite Overlay</div>
+    <!-- tile opacity slider, above all the products, to dial back a color clash with the basemap -->
+    <div class="sat-opacity-row">
+        <span class="sat-opacity-label">Tile opacity</span>
+        <input type="range" id="satOpacitySlider" min="20" max="100" value="92" title="Satellite tile opacity">
+        <span id="satOpacityVal" class="sat-opacity-val">92%</span>
+    </div>
+    <div id="satPickerList" class="sat-picker-list"></div>
+</div>
+
 <!-- Offscreen canvas the clip recorder captures from, plus its progress pill -->
 <canvas id="recordCanvas" width="1920" height="1080" style="display:none;"></canvas>
 <div id="recordProgress">
@@ -813,30 +832,30 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260709l"></script>
-    <script src="js/01-state.js?v=20260709l"></script>
-    <script src="js/02-satellite.js?v=20260709l"></script>
-    <script src="js/03-metrics.js?v=20260709l"></script>
-    <script src="js/04-geo-measure.js?v=20260709l"></script>
-    <script src="js/05-interpolation.js?v=20260709l"></script>
-    <script src="js/06-ocr.js?v=20260709l"></script>
-    <script src="js/07-ui-controls.js?v=20260709l"></script>
-    <script src="js/07b-plane-models.js?v=20260709l"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260709l"></script>
-    <script src="js/09-interaction.js?v=20260709l"></script>
-    <script src="js/10-point-analysis.js?v=20260709l"></script>
-    <script src="js/11-layout.js?v=20260709l"></script>
-    <script src="js/11b-parser-core.js?v=20260709l"></script>
-    <script src="js/12-file-parsing.js?v=20260709l"></script>
-    <script src="js/12b-recon-archive.js?v=20260709l"></script>
-    <script src="js/13-charts-master.js?v=20260709l"></script>
-    <script src="js/14-filters-sync.js?v=20260709l"></script>
-    <script src="js/15-map-render.js?v=20260709l"></script>
-    <script src="js/16-pfd-hud.js?v=20260709l"></script>
-    <script src="js/17-charts.js?v=20260709l"></script>
-    <script src="js/18-engine.js?v=20260709l"></script>
-    <script src="js/18b-flight-search.js?v=20260709l"></script>
-    <script src="js/19-bootstrap.js?v=20260709l"></script>
-    <script src="js/20-ui-polish.js?v=20260709l"></script>
+    <script src="js/00-var-catalog.js?v=20260709s"></script>
+    <script src="js/01-state.js?v=20260709s"></script>
+    <script src="js/02-satellite.js?v=20260709s"></script>
+    <script src="js/03-metrics.js?v=20260709s"></script>
+    <script src="js/04-geo-measure.js?v=20260709s"></script>
+    <script src="js/05-interpolation.js?v=20260709s"></script>
+    <script src="js/06-ocr.js?v=20260709s"></script>
+    <script src="js/07-ui-controls.js?v=20260709s"></script>
+    <script src="js/07b-plane-models.js?v=20260709s"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260709s"></script>
+    <script src="js/09-interaction.js?v=20260709s"></script>
+    <script src="js/10-point-analysis.js?v=20260709s"></script>
+    <script src="js/11-layout.js?v=20260709s"></script>
+    <script src="js/11b-parser-core.js?v=20260709s"></script>
+    <script src="js/12-file-parsing.js?v=20260709s"></script>
+    <script src="js/12b-recon-archive.js?v=20260709s"></script>
+    <script src="js/13-charts-master.js?v=20260709s"></script>
+    <script src="js/14-filters-sync.js?v=20260709s"></script>
+    <script src="js/15-map-render.js?v=20260709s"></script>
+    <script src="js/16-pfd-hud.js?v=20260709s"></script>
+    <script src="js/17-charts.js?v=20260709s"></script>
+    <script src="js/18-engine.js?v=20260709s"></script>
+    <script src="js/18b-flight-search.js?v=20260709s"></script>
+    <script src="js/19-bootstrap.js?v=20260709s"></script>
+    <script src="js/20-ui-polish.js?v=20260709s"></script>
 </body>
 </html>

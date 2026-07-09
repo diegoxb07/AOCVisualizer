@@ -90,6 +90,10 @@ button { transition: background-color 0.15s, border-color 0.15s, color 0.15s, op
 .hover\:border-hairline-strong:hover { border-color: var(--border-strong); }
 .hover\:border-accent:hover { border-color: var(--accent); }
 .focus\:border-accent:focus { border-color: var(--accent); }
+/* the .border-* rules above use the border-color shorthand and load AFTER tailwind's
+   .border-t-transparent, so they were painting the ring's top edge solid too, leaving spinner rings
+   with no gap (so they looked static even while spinning). restore the transparent top here. */
+.border-t-transparent { border-top-color: transparent; }
 .accent-accent { accent-color: var(--accent); }
 .accent-muted { accent-color: var(--text-muted); }
 .group:hover .group-hover\:text-accent { color: var(--accent); }
@@ -142,6 +146,10 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
    z-20 stacking context so the panel layers above the pfd and hud overlays (z-2500) and scrolls. */
 .sat-picker-panel { position: fixed; z-index: 3200; width: 250px; max-height: 340px; overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
 .sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 2px 4px 6px; }
+.sat-opacity-row { display: flex; align-items: center; gap: 6px; padding: 4px 4px 7px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.sat-opacity-label { font-size: 10px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.sat-opacity-row input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 3px; cursor: pointer; }
+.sat-opacity-val { font-size: 10px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 .sat-picker-list { display: flex; flex-direction: column; gap: 2px; }
 .sat-pick-off, .sat-pick-sat-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
 .sat-pick-off { font-weight: 600; }
@@ -228,7 +236,12 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { displ
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
 
 /* Sticky media bar + resize handle (functional) */
-.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 20px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+/* collapser: on the drag grip's line at the bottom right (grip stays centered), so it adds no extra
+   row. z-index above the resize handle so its clicks collapse instead of starting a drag. */
+.media-collapse-btn { position: absolute; bottom: 6px; right: 6px; z-index: 1001; }
+.sticky-media-bar.collapsed { min-height: 26px; padding-bottom: 6px; margin-bottom: 16px; }
+.sticky-media-bar.collapsed #mediaBarContent, .sticky-media-bar.collapsed .media-resize-handle { display: none; }
 .media-content-wrapper { overflow: hidden; }
 
 .media-resize-handle { position: absolute; bottom: 4px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
@@ -288,6 +301,24 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* Non-invasive satellite fetch status, a small pill, not a full-screen cover */
 #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
+
+/* satellite product color-scale legend: compact vertical bar tucked into the top-left corner of the
+   2d player, clear of the sat/storm info (top right), pfd (bottom right), and hud (bottom left). */
+#satColorLegend { position: absolute; left: 8px; top: 8px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+#satColorLegend.hidden { display: none; }
+#satColorLegend .leg-title { font-size: 8px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 3px; text-align: center; }
+#satColorLegend .leg-body { position: relative; display: flex; gap: 4px; height: 124px; }
+#satColorLegend .leg-bar { width: 12px; flex: none; border-radius: 3px; box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--border) 80%, transparent); }
+#satColorLegend .leg-ticks { position: relative; flex: 1 1 auto; }
+#satColorLegend .leg-ticks span { position: absolute; left: 0; transform: translateY(-50%); font-size: 8px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
+#satColorLegend .leg-unit { text-align: center; font-size: 8px; font-weight: 700; color: var(--text-muted); margin-top: 6px; }
+/* mmr uploaded means a narrower two-column map, so tuck the legend further into the corner and shrink it */
+#mediaGrid:not(.no-video) #satColorLegend { top: 5px; left: 5px; width: 50px; padding: 3px 4px; }
+#mediaGrid:not(.no-video) #satColorLegend .leg-title { font-size: 7.5px; margin-bottom: 2px; }
+#mediaGrid:not(.no-video) #satColorLegend .leg-body { height: 100px; gap: 3px; }
+#mediaGrid:not(.no-video) #satColorLegend .leg-bar { width: 10px; }
+#mediaGrid:not(.no-video) #satColorLegend .leg-ticks span { font-size: 7.5px; }
+#mediaGrid:not(.no-video) #satColorLegend .leg-unit { font-size: 7.5px; margin-top: 4px; }
 #satLoadingOverlay.show { display: flex; }
 #satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 
@@ -432,6 +463,9 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    /* loading spinners are essential progress feedback, so keep them spinning even with reduced motion */
+    .animate-spin { animation-duration: 1s !important; animation-iteration-count: infinite !important; }
+    .spin { animation-duration: 0.8s !important; animation-iteration-count: infinite !important; }
 }
 
 /* Scrollbars */

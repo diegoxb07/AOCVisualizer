@@ -11,6 +11,7 @@
     
     let satImage = new Image();
     let satImageLoaded = false;
+    let satTileOpacity = 0.92;   // satellite tile draw opacity, controlled by the opacity slider in the sat picker
     let lastSatFetchTime = "";
     let satLoadedInfo = null;
     let satImageBox = null;
@@ -25,6 +26,7 @@
     let batchCaching = false;                // a multi-flight local sat-cache pass is running
     let batchCacheCancel = false;            // user asked to stop the current pass
     let batchCacheAbortController = null;    // aborts the in-flight recon-api request/poll on Cancel
+    let batchCachePass = 0;                  // bumped per pass; a Cancel invalidates the running pass so its teardown no-ops
     // Smooth scrubbing: a background preloader warms the buckets around the playhead into the cache.
     const satFetchInFlight = new Map();      // fetchId -> in-flight Promise (dedupe live + preload + prefetch)
     let satPreloadQueue = [];                // upcoming buckets queued to warm around the playhead

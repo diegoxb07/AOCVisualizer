@@ -8,7 +8,16 @@
 
     let lastParseStats = null;   // stats ledger from the most recent load (see parseFlightTextToRows)
 
-    function showLoadingOverlay() { const l = document.getElementById('loadingOverlay'); l.classList.remove('hidden'); l.classList.add('flex'); const s = document.getElementById('loadingSpinner'); if (s) s.classList.remove('done'); const st = document.getElementById('loadingOverlaySubtext'); if (st) st.textContent = 'Pulling variables...'; }
+    function showLoadingOverlay() {
+        const l = document.getElementById('loadingOverlay'); l.classList.remove('hidden'); l.classList.add('flex');
+        const s = document.getElementById('loadingSpinner'); if (s) s.classList.remove('done');   // spin fresh, never open on the previous load's checkmark
+        const st = document.getElementById('loadingOverlaySubtext'); if (st) st.textContent = 'Pulling variables...';
+        // clear any stale download-progress state from a previous load (the leftover 100% bar / percent)
+        const pw = document.getElementById('loadingProgressWrap'); if (pw) pw.classList.add('hidden');
+        const pb = document.getElementById('loadingProgressBar'); if (pb) pb.style.width = '0%';
+        const pp = document.getElementById('loadingProgressPct'); if (pp) pp.textContent = '0%';
+        const ps = document.getElementById('loadingProgressSpeed'); if (ps) ps.textContent = '';
+    }
     function hideLoadingOverlay() { const l = document.getElementById('loadingOverlay'); l.classList.add('hidden'); l.classList.remove('flex'); }
 
     document.getElementById('videoInput').addEventListener('change', function(e) {

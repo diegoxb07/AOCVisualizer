@@ -34,11 +34,19 @@
         // Set the cancel flag AND abort whatever request/poll is currently in flight, so the pass
         // actually stops within a tick instead of finishing out its current (up to 30s) poll wait.
         const requestCacheCancel = () => {
+            if (!batchCaching) return;
+            // full, immediate teardown so the user can use the satellite controls right away instead of
+            // waiting for the loop to unwind. bumping the pass invalidates the running loop (it stops on
+            // its next check and skips its own teardown), and the abort kills the in-flight tile fetch.
             batchCacheCancel = true;
-            if (batchCacheAbortController) batchCacheAbortController.abort();
-            // Instant feedback, the loop needs a beat to unwind the in-flight tile.
-            const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Stopping…';
-            const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Stopping…';
+            batchCachePass++;
+            if (batchCacheAbortController) { try { batchCacheAbortController.abort(); } catch (e) {} }
+            batchCaching = false; batchCacheAbortController = null;
+            if (typeof setSatelliteControlsLocked === 'function') setSatelliteControlsLocked(false);
+            const sb = document.getElementById('batchCacheStartBtn'); if (sb) sb.textContent = 'Start caching';
+            const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Stopped';
+            const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Cache stopped.';
+            if (typeof hideSatPrefetchBar === 'function') setTimeout(hideSatPrefetchBar, 800);
         };
         const pillCancel = document.getElementById('satPrefetchCancel');
         if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) requestCacheCancel(); });

@@ -76,7 +76,7 @@
     (function setupMediaResize() {
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');
         if (!handle || !bar) return;
-        const MIN_H = 44, MAX_H = 900;  // stops at just enough height to keep the panel titles visible, not fully gone
+        const MIN_H = 240, MAX_H = 900;  // keep the players usable when dragging; use the collapse button to fully hide them
         // The hard ceiling: the panels must never grow under the sticky bottom bar, or the
         // drag handle ends up unreachable and the layout is stuck big with no way to shrink.
         // 60px ≈ media-bar padding + the handle itself + a small breathing gap above the bar.
@@ -125,6 +125,23 @@
         }
         window.addEventListener('resize', clampMediaToViewport);
         clampMediaToViewport();
+    })();
+
+    // collapser button above the player titles: toggles a collapsed class that hides the media
+    // players. on expand the map was display:none, so recompute its size and redraw.
+    (function setupMediaCollapse() {
+        const btn = document.getElementById('mediaCollapseBtn'), bar = document.getElementById('stickyMediaBar');
+        if (!btn || !bar) return;
+        btn.addEventListener('click', () => {
+            const collapsed = bar.classList.toggle('collapsed');
+            btn.setAttribute('aria-expanded', String(!collapsed));
+            btn.innerHTML = collapsed ? '&#9660; Show media' : '&#9650; Collapse media';
+            if (!collapsed) {
+                resizeCanvasLayout();
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+                if (filteredData.length > 0 && document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
+            }
+        });
     })();
 
     // timeToSeconds/toHHMMSS live in js/11b-parser-core.js (shared with the parse worker and tests).

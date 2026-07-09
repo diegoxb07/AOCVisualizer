@@ -1,7 +1,7 @@
 # Mission Visualizer
 
 This video telemetry tool replays flight-level instrument data together with optional synced radar
-(**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, video recording, and much much more!
+(**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, video recording, and much, much, more!
 
 Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser, API-backend optional.
 

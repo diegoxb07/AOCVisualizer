@@ -23,7 +23,6 @@ flowchart TD
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
     MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
-    MMR --> SAT
     MMR -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Was the flight loaded from<br>the archive in step 1?"}
@@ -42,15 +41,15 @@ flowchart TD
     classDef sat fill:#cffafe,stroke:#0891b2,color:#164e63
     classDef playback fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef term fill:#e2e8f0,stroke:#475569,color:#0f172a
-    class ARCHIVE,MMR,WINDOW,SAT,FROMARC,EXPORT decision
+    class ARCHIVE,MMR,SAT,FROMARC,EXPORT decision
     class LOADARC,UPLOAD,LOADED data
     class VIDEO,CLIP mmr
     class SATGOES,SATPOLAR sat
-    class TRIM,PLAY playback
+    class PLAY playback
     class START,DONE term
     %% linkStyle numbers = edge definition order above; update them if edges are added or reordered
-    linkStyle 1,6,8,12,13 stroke:#059669,stroke-width:2px
-    linkStyle 2,7,9,14,15,20 stroke:#dc2626,stroke-width:2px
+    linkStyle 1,6,9,10 stroke:#059669,stroke-width:2px
+    linkStyle 2,7,11,12,17 stroke:#dc2626,stroke-width:2px
 ```
 
 ---

@@ -334,6 +334,20 @@
         // the "use manual upload instead" hint sits below the upload button, only while offline
         const manualUploadHint = document.getElementById('manualUploadHint');
         if (manualUploadHint) manualUploadHint.classList.toggle('hidden', !apiDown);
+        // when offline, relocate the manual-upload cluster to cover the dead archive pickers (next to the
+        // "API Offline" pill) instead of leaving it up in the label row; move it back when online.
+        const manualUploadWrap = document.getElementById('manualUploadWrap');
+        const loadGroup = document.getElementById('loadFlightDataGroup');
+        if (manualUploadWrap && loadGroup && uploadApiOfflineToastWrapper) {
+            const target = apiDown ? uploadApiOfflineToastWrapper : loadGroup;
+            if (manualUploadWrap.parentElement !== target) {
+                manualUploadWrap.style.pointerEvents = apiDown ? 'auto' : '';
+                target.appendChild(manualUploadWrap);
+            }
+        }
+        // "API Offline" cover over the season dropdown in the pre-load flight data modal
+        const preloadApiOfflineToast = document.getElementById('preloadApiOfflineToast');
+        if (preloadApiOfflineToast) preloadApiOfflineToast.classList.toggle('hidden', !apiDown);
         // The batch modal, if already open, has its own satellite dropdown/band checks/Start button
         // that need the same API-down treatment, refresh them in place rather than waiting for the
         // user to close and reopen the modal.

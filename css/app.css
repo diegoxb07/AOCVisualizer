@@ -133,6 +133,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* when the recon api is offline, manual upload is the only way in, so enlarge the upload button
    to make it obvious. toggled by updateReconApiUiState in js/02-satellite.js. */
 #dataDropZone.data-drop-emph { padding: 7px 12px; gap: 6px; }
+/* while offline the manual-upload cluster is relocated over the archive pickers (js/02-satellite.js);
+   center it in the overlay (the "API Offline" pill stays left in the flow underneath) */
+#uploadApiOfflineToastWrapper #manualUploadWrap { position: absolute; left: 33%; top: 42%; transform: translate(-50%, -50%); }
 #dataDropZone.data-drop-emph span { font-size: 12px; }
 #dataDropZone.data-drop-emph #dataDropLabel { max-width: 200px; }
 

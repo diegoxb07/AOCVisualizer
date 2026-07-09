@@ -478,9 +478,11 @@
     const setFakePanel = (panel) => {
         mapPanel.classList.toggle('fake-fs', panel === mapPanel);
         videoPanel.classList.toggle('fake-fs', panel === videoPanel);
-        // The main top-right button sits exactly on the pinned panel's own ⛶ and would steal its
-        // clicks, so hide it while a panel is pinned; Esc still exits real fullscreen.
-        fullscreenBtn.style.display = panel ? 'none' : '';
+        // the whole top-right sticky cluster (help, reset, theme, fullscreen) sits over the pinned
+        // panel's own header buttons and would steal their clicks, so hide the cluster while a panel
+        // is pinned; the panel's own header buttons and esc still work.
+        const topRight = document.getElementById('topRightControls');
+        if (topRight) topRight.style.display = panel ? 'none' : '';
         refreshAfterViewChange();
     };
     fullscreenBtn.addEventListener('click', () => {
@@ -546,6 +548,7 @@
             setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { updateVisualComponents(currentIdx); } }, 50);
         }
         if (typeof updateFollowButton === 'function') updateFollowButton();
+        if (typeof updateSatColorLegend === 'function') updateSatColorLegend();   // hide in 3d, show in 2d
     });
 
     document.getElementById('satelliteSelect').addEventListener('change', () => {
@@ -564,6 +567,7 @@
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
         if (typeof refreshSatPicker === 'function') refreshSatPicker();
+        if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
     });
 
     document.getElementById('satBandSelect').addEventListener('change', () => {
@@ -578,6 +582,7 @@
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }
         if (typeof refreshSatPicker === 'function') refreshSatPicker();
+        if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
     });
 
     // combined satellite and product picker popover.
@@ -667,6 +672,7 @@
         if (sat && sat.value !== 'none') satPickerExpanded = sat.value;   // open with the active layer expanded already
         renderSatPickerPanel();
         panel.classList.remove('hidden');
+        panel.scrollTop = 0;   // always reopen scrolled to the top (opacity slider + first products)
         positionSatPicker();
     }
     function closeSatPicker() { const p = document.getElementById('satPickerPanel'); if (p) p.classList.add('hidden'); }
@@ -712,6 +718,13 @@
         // keep the fixed panel glued to the button as the page or media bar scrolls or the window resizes.
         window.addEventListener('resize', positionSatPicker);
         window.addEventListener('scroll', positionSatPicker, true);
+        // satellite tile opacity: redraw the map background at the new alpha as the user drags
+        const opacitySlider = document.getElementById('satOpacitySlider'), opacityVal = document.getElementById('satOpacityVal');
+        if (opacitySlider) opacitySlider.addEventListener('input', () => {
+            satTileOpacity = (parseInt(opacitySlider.value) || 92) / 100;
+            if (opacityVal) opacityVal.textContent = opacitySlider.value + '%';
+            if (filteredData.length > 0 && trackerModeSelect.value === '2d') { bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+        });
         updateSatPickerButton();
     })();
 

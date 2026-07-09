@@ -443,7 +443,8 @@
     }
 
     async function loadReconMission(missionId) {
-        const loader = document.getElementById('loadingOverlay'); loader.classList.remove('hidden'); loader.classList.add('flex');
+        showLoadingOverlay();   // resets the spinner (no stale checkmark), subtext, and any leftover progress bar
+        const loader = document.getElementById('loadingOverlay');
         const subtext = document.getElementById('loadingOverlaySubtext');
         syncReconLoadButtonState();
         setReconStatus('Fetching mission ' + missionId + '…');
@@ -770,6 +771,17 @@
             tx.objectStore('missions').delete(id); tx.objectStore('meta').delete(id);
         } catch (e) {}
     }
+    // Forget every previously loaded flight: clears the in-memory list and both IndexedDB stores so the
+    // "Previously Loaded Missions" dropdown starts empty (the currently open flight stays loaded).
+    function clearAllPreloadedMissions() {
+        preloadedMissions.clear();
+        missionStoreReady.then(() => {
+            if (!missionDB) return;
+            try { const tx = missionDB.transaction(['missions', 'meta'], 'readwrite'); tx.objectStore('missions').clear(); tx.objectStore('meta').clear(); } catch (e) {}
+        });
+        updatePreloadedSelect();
+        if (typeof showToast === 'function') showToast('Cleared the previously loaded flights list.', 4000);
+    }
     function missionIdbGet(id) {
         return new Promise(resolve => {
             if (!missionDB) return resolve(null);
@@ -827,6 +839,11 @@
             opt.textContent = `${boldUnicode(id)}${rec.mission.storm_name ? ' · ' + rec.mission.storm_name : ''}${tag}`;
             sel.appendChild(opt);
         });
+        // reset-all option pinned at the bottom, only when there's something to clear
+        if (preloadedMissions.size > 0) {
+            const sep = document.createElement('option'); sep.disabled = true; sep.textContent = '──────────'; sel.appendChild(sep);
+            const rst = document.createElement('option'); rst.value = '__resetLoaded__'; rst.textContent = '↺ Reset loaded flights'; sel.appendChild(rst);
+        }
         sel.disabled = preloadedMissions.size === 0;
         sel.value = preloadedMissions.has(keep) ? keep : '';
     }
@@ -1095,5 +1112,12 @@
             if (b) b.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
         });
         const sel = document.getElementById('preloadedSelect');
-        if (sel) sel.addEventListener('change', () => { if (sel.value) openPreloadedMission(sel.value); });
+        if (sel) sel.addEventListener('change', () => {
+            if (sel.value === '__resetLoaded__') {
+                sel.value = '';   // never leave the reset row selected
+                if (confirm('Clear all previously loaded flights from this device? The flight open right now stays loaded.')) clearAllPreloadedMissions();
+                return;
+            }
+            if (sel.value) openPreloadedMission(sel.value);
+        });
     })();

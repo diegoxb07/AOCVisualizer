@@ -268,7 +268,7 @@
         const xOf = lon => ((lon - plotMinLon) / deltaLon) * cssW;   // lon already in the plot domain
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
         if (satImageLoaded && isSatOn && satImage.width > 0) {
-            bgCtx.globalAlpha = 0.92;
+            bgCtx.globalAlpha = satTileOpacity;
             if (satImageBox) {
                 const sMinLon = wrapLon(satImageBox.minLon), sMaxLon = wrapLon(satImageBox.maxLon);
                 // At high zoom the full-box destination rect is blown up hundreds of times and

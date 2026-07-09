@@ -544,6 +544,7 @@
         updateSatelliteDropdownTimes();
         maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected, build its full timeframe now
         if (typeof refreshSatPicker === 'function') refreshSatPicker();
+        if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
     }
 
     // Keeps the satellite cluster's footprint constant (the .split rule in app.css): the layer
@@ -715,8 +716,9 @@
             const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            // Label each spectral band "Band N, …" and sort by band number; composites are tagged
-            // so the dropdown can group them separately from single-band products.
+            // every band the api returns becomes a product option automatically (no allowlist here), so
+            // new bands like band 2 show up on their own; label each "band n" and sort by band number,
+            // composites are tagged so the dropdown groups them separately from single-band products.
             const bandDefs = (data.bands || [])
                 .slice().sort((a, b) => a.band - b.band)
                 .map(b => ({
@@ -775,6 +777,68 @@
     setInterval(() => {
         if (document.visibilityState === 'visible') loadSatelliteProducts();
     }, 60000);
+
+    // --- satellite product color-scale legend -------------------------------------------------
+    // fetches the api colortable for the active recon product's cmap (cached) and renders a compact
+    // vertical legend on the 2d player, so the color scale (brightness temp, reflectance, water vapor,
+    // etc.) and its unit are labeled. composites and polar layers have no cmap, so no legend for them.
+    const _satColorTableCache = {};
+    async function fetchSatColorTable(cmap) {
+        if (cmap in _satColorTableCache) return _satColorTableCache[cmap];
+        try {
+            const res = await fetch(`${RECON_API_BASE}/v1/satellite/colortable?cmap=${encodeURIComponent(cmap)}`);
+            if (!res.ok) throw new Error('http ' + res.status);
+            const data = await res.json();
+            if (!data || !Array.isArray(data.stops) || !data.stops.length) throw new Error('no stops');
+            // each stop is { <valueKey>, hex }; the value key is temp_c, reflectance_pct, etc.
+            const valKey = Object.keys(data.stops[0]).find(k => k !== 'hex');
+            const stops = data.stops.map(s => ({ v: Number(s[valKey]), hex: s.hex })).filter(s => isFinite(s.v));
+            const ct = stops.length ? { unit: data.unit || '', stops } : null;
+            _satColorTableCache[cmap] = ct;
+            return ct;
+        } catch (e) { _satColorTableCache[cmap] = null; return null; }
+    }
+    function _legendTicks(min, max) {
+        const out = [];
+        for (let i = 0; i <= 4; i++) out.push(Math.round(min + (max - min) * i / 4));
+        return out.filter((v, i) => out.indexOf(v) === i);   // dedupe if the range is tiny
+    }
+    function renderSatColorLegend(legend, bandObj, ct) {
+        const stops = ct.stops.slice().sort((a, b) => a.v - b.v);
+        const min = stops[0].v, max = stops[stops.length - 1].v, span = (max - min) || 1;
+        // gradient top to bottom = min to max value (stop 0 at top)
+        const grad = stops.map(s => `${s.hex} ${(((s.v - min) / span) * 100).toFixed(1)}%`).join(', ');
+        const ticks = _legendTicks(min, max).map(v => {
+            const pos = ((v - min) / span) * 100;   // 0 top, 100 bottom
+            return `<span style="top:${pos.toFixed(1)}%">${v}</span>`;
+        }).join('');
+        const title = (bandObj.name || 'Satellite').replace(/\s*\(.*/, '');   // drop any trailing parenthetical
+        // prefix a degree sign for temperature units (c/f); leave % and others as-is
+        const unit = (ct.unit === 'C' || ct.unit === 'F') ? ('°' + ct.unit) : (ct.unit || '');
+        legend.innerHTML =
+            `<div class="leg-title">${escapeHtml(title)}</div>`
+          + `<div class="leg-body"><div class="leg-bar" style="background:linear-gradient(to bottom, ${grad})"></div>`
+          + `<div class="leg-ticks">${ticks}</div></div>`
+          + `<div class="leg-unit">${escapeHtml(unit)}</div>`;
+    }
+    let _satLegendReqId = 0;
+    async function updateSatColorLegend() {
+        const legend = document.getElementById('satColorLegend');
+        if (!legend) return;
+        const satSel = document.getElementById('satelliteSelect');
+        const bandSel = document.getElementById('satBandSelect');
+        const in2d = !trackerModeSelect || trackerModeSelect.value === '2d';
+        const layerDef = satSel ? GIBS_LAYERS.find(d => d.value === satSel.value) : null;
+        const bandObj = (layerDef && layerDef.bands && bandSel) ? layerDef.bands.find(b => b.id === bandSel.value) : null;
+        // legend only for recon goes products that carry a cmap colortable, in 2d
+        if (!in2d || !layerDef || !layerDef.isReconApi || !bandObj || !bandObj.cmap) { legend.classList.add('hidden'); return; }
+        const reqId = ++_satLegendReqId;
+        const ct = await fetchSatColorTable(bandObj.cmap);
+        if (reqId !== _satLegendReqId) return;   // selection changed while awaiting
+        if (!ct || !ct.stops.length || (trackerModeSelect && trackerModeSelect.value !== '2d')) { legend.classList.add('hidden'); return; }
+        renderSatColorLegend(legend, bandObj, ct);
+        legend.classList.remove('hidden');
+    }
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.
     function loadImageToCanvas(url) {
@@ -1414,27 +1478,26 @@
         }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
+        const myPass = ++batchCachePass;
         batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         showSatPrefetchBar();   // background pill (has its own Cancel) so playback stays usable
         const total = targets.length;
         let done = 0, fetched = 0;
         for (const t of targets) {
-            if (batchCacheCancel) break;
+            if (batchCacheCancel || myPass !== batchCachePass) break;
             if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`); continue; }
             try { const r = await t.run(); if (r && r.canvas) fetched++; } catch (e) {}
             done++;
             setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
         }
-        const cancelled = batchCacheCancel;
+        if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
         batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
-        const msg = cancelled
-            ? `Pre-cache stopped: ${fetched} tile(s) cached.`
-            : `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
-        setBatchProgress(done, total || 1, msg);
-        setTimeout(hideSatPrefetchBar, cancelled ? 800 : 2500);
-        showToast(msg, 6000);
+        const doneMsg = `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
+        setBatchProgress(done, total || 1, doneMsg);
+        setTimeout(hideSatPrefetchBar, 2500);
+        showToast(doneMsg, 6000);
         // Tiles are warm now: draw the current frame's imagery straight from cache.
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
     }
@@ -1480,6 +1543,7 @@
         if (layerDefForCheck && layerDefForCheck.isReconApi && !isReconApiAvailable()) {
             showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
         }
+        const myPass = ++batchCachePass;
         batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         const startBtn = document.getElementById('batchCacheStartBtn');
@@ -1489,9 +1553,10 @@
         // Pass 1: parse every file (sequentially) and build the tile list.
         let allTargets = [], skipped = 0;
         for (let i = 0; i < files.length; i++) {
-            if (batchCacheCancel) break;
+            if (batchCacheCancel || myPass !== batchCachePass) break;
             setBatchProgress(0, 1, `Reading ${i + 1}/${files.length}: ${files[i].name}…`);
             const f = await readFlightFileForBatch(files[i]);
+            if (myPass !== batchCachePass) break;
             if (f.date === 'Unknown' || f.rows.length === 0) { skipped++; continue; }
             const t = batchTargetsForFlight(f.rows, f.date, bandIds, layerValue);
             if (t.length === 0) { skipped++; continue; }   // out of view / before this satellite's data
@@ -1502,7 +1567,7 @@
         const total = allTargets.length;
         let done = 0, fetched = 0, failed = 0;
         for (const t of allTargets) {
-            if (batchCacheCancel) break;
+            if (batchCacheCancel || myPass !== batchCachePass) break;
             if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`); continue; }
             try {
                 const r = await t.run();
@@ -1512,15 +1577,13 @@
             setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
         }
 
-        const cancelled = batchCacheCancel;
+        if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
         batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';
-        const msg = cancelled
-            ? `Local cache stopped: ${fetched} tiles cached.`
-            : `Local cache done: ${fetched} new tile(s) from ${files.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date)` : ''}.`;
+        const msg = `Local cache done: ${fetched} new tile(s) from ${files.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date)` : ''}.`;
         setBatchProgress(done, total || 1, msg);
-        setTimeout(hideSatPrefetchBar, cancelled ? 800 : 2500);   // leave the pill up briefly with the final count
+        setTimeout(hideSatPrefetchBar, 2500);   // leave the pill up briefly with the final count
         showToast(msg, 7000);
     }
 

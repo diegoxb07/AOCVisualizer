@@ -96,18 +96,34 @@
     // workers are unavailable (e.g. file://). Rejects with the parse error for the caller to report.
     // reflect the worker's decode progress in the loading overlay subtext (see ncArrayBufferToTsv).
     function updateParseProgress(p) {
+        if (!p) return;
         const st = document.getElementById('loadingOverlaySubtext');
-        if (!st || !p) return;
-        if (p.phase === 'open') st.textContent = `Reading ${p.total} NetCDF variables…`;
-        else if (p.phase === 'var') st.textContent = `Processing variable ${p.index}/${p.total}: ${p.name}`;
-        else if (p.phase === 'rows') st.textContent = `Assembling ${Number(p.numRows).toLocaleString()} data rows…`;
+        const wrap = document.getElementById('loadingProgressWrap');
+        const bar = document.getElementById('loadingProgressBar');
+        const pct = document.getElementById('loadingProgressPct');
+        const spd = document.getElementById('loadingProgressSpeed');
+        // the worker decodes NetCDF variables one at a time, so index/total is a true fraction; fill the
+        // bar with it so a manual upload shows real parse progress.
+        let frac = null;
+        if (p.phase === 'open') { if (st) st.textContent = `Reading ${p.total} NetCDF variables…`; frac = 0; }
+        else if (p.phase === 'var') { if (st) st.textContent = `Processing variable ${p.index}/${p.total}: ${p.name}`; frac = p.total ? p.index / p.total : 0; }
+        else if (p.phase === 'rows') { if (st) st.textContent = `Assembling ${Number(p.numRows).toLocaleString()} data rows…`; frac = 1; }
+        if (frac === null) return;
+        const percent = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+        if (wrap) wrap.classList.remove('hidden');
+        if (bar) bar.style.width = percent + '%';
+        if (pct) pct.textContent = (p.phase === 'var') ? `${p.index} / ${p.total} variables` : percent + '%';
+        if (spd) spd.textContent = '';
     }
 
-    function parseFlightSource(source) {
+    // onProgress (optional) receives the same {phase,index,total,...} the loading overlay uses; callers
+    // that draw their own bar (the preload modal) pass one, everyone else defaults to updateParseProgress.
+    function parseFlightSource(source, onProgress) {
+        const report = onProgress || updateParseProgress;
         const onMainThread = () => {
             if (source && typeof source !== 'string' && source.byteLength === 0)
                 throw new Error('parse worker failed and the file buffer was already handed off — please re-select the file');
-            const tsv = typeof source === 'string' ? source : ncArrayBufferToTsv(source, updateParseProgress);
+            const tsv = typeof source === 'string' ? source : ncArrayBufferToTsv(source, report);
             return parseFlightTextToRows(tsv);
         };
         return new Promise((resolve, reject) => {
@@ -115,7 +131,7 @@
             try { w = new Worker('js/parse-worker.js' + assetVer()); }
             catch (e) { try { resolve(onMainThread()); } catch (err) { reject(err); } return; }
             w.onmessage = (e) => {
-                if (e.data && e.data.progress) { updateParseProgress(e.data.progress); return; }  // live decode feedback
+                if (e.data && e.data.progress) { report(e.data.progress); return; }  // live decode feedback
                 settled = true; w.terminate();
                 if (e.data && e.data.error) reject(new Error(e.data.error)); else resolve(e.data);
             };
@@ -138,7 +154,7 @@
     function updateDataReport(stats) {
         const line = document.getElementById('dataReportLine');
         if (line) {
-            line.textContent = 'Data report: ' + summarizeParseStats(stats);
+            line.textContent = 'Data info: ' + summarizeParseStats(stats);
             line.classList.remove('hidden');
         }
     }

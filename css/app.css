@@ -172,8 +172,31 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .sat-pick-prod.unavailable:hover { background: transparent; color: var(--text-faint); }
 .sat-pick-tag { margin-left: auto; flex: none; padding: 1px 6px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); border: 1px solid var(--border); border-radius: 999px; }
 
+/* previously-loaded-missions popover: one row per flight, a name button that opens it plus a red
+   × that removes it. mirrors the sat picker's fixed/z-index/panel look so both dropdowns match. */
+.loaded-picker-panel { position: fixed; z-index: 3200; width: 280px; max-width: 90vw; max-height: 340px; overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.loaded-picker-list { display: flex; flex-direction: column; gap: 2px; }
+.loaded-pick-row { display: flex; align-items: center; gap: 4px; border-radius: 4px; }
+.loaded-pick-open { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; text-align: left; background: transparent; border: none; color: var(--text); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loaded-pick-open:hover { background: var(--panel-strip); }
+.loaded-pick-row.active .loaded-pick-open { color: var(--accent); font-weight: 700; }
+.loaded-pick-x { flex: none; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 4px; color: var(--danger); font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.loaded-pick-x:hover { background: color-mix(in oklab, var(--danger) 16%, transparent); color: var(--danger); }
+.loaded-pick-empty { color: var(--text-faint); font-size: 11px; padding: 8px; }
+
 /* Fullscreen behavior (functional, do not simplify) */
 :fullscreen { background-color: var(--bg); overflow-y: auto; padding: 24px; padding-bottom: 140px; }
+/* Real page fullscreen (the ⛶ Fullscreen button fullscreens <html>, not one panel): the fixed
+   reset/theme/help cluster (#topRightControls, top-right, z-9999) would sit on top of the sticky
+   media bar once it sticks to the top. Stick the bar below the cluster's height instead, so the
+   buttons keep their own clear space above the players. 88px clears the cluster: the button row
+   (top-4 = 16px in) plus the theme switch (26px) beneath it. */
+:root:fullscreen .sticky-media-bar { top: 88px; }
+/* Fullscreen a single graph, like the media panels: fill the viewport (the JS also hides the top-right
+   sticky cluster). Toggle off with the ⛶ button again or Esc. */
+.chart-fs { position: fixed; inset: 0; z-index: 4000; margin: 0; border: none; border-radius: 0; background: var(--bg); padding: 18px 18px 24px; }
+.chart-fs #masterGraphWrapper { max-height: none; }
+.chart-fs #masterCreatePrompt { min-height: 40vh; }
 #mapPanel:is(:fullscreen, .fake-fs), #videoPanel:is(:fullscreen, .fake-fs) { padding: 0; border: none; border-radius: 0; background-color: var(--bg); display: flex; flex-direction: column; }
 #mapPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; }
 #mapPanel:is(:fullscreen, .fake-fs) .panel-title, #videoPanel:is(:fullscreen, .fake-fs) .panel-title { padding: 16px; background-color: color-mix(in oklab, var(--panel) 90%, transparent); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid var(--border); }
@@ -242,9 +265,25 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { displ
 .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
 /* collapser: on the drag grip's line at the bottom right (grip stays centered), so it adds no extra
    row. z-index above the resize handle so its clicks collapse instead of starting a drag. */
-.media-collapse-btn { position: absolute; bottom: 6px; right: 6px; z-index: 1001; }
-.sticky-media-bar.collapsed { min-height: 26px; padding-bottom: 6px; margin-bottom: 16px; }
+.media-collapse-btn { position: absolute; bottom: 6px; right: 58px; z-index: 1001; border-color: color-mix(in oklab, var(--accent) 55%, var(--border)); color: var(--accent); font-weight: 700; }
+/* collapsed strip sticks under the fixed top-right cluster, so move the show/collapse button to the
+   left there (nothing is fixed on the left) where it stays clickable; the mini bar pads left to clear it. */
+.sticky-media-bar.collapsed .media-collapse-btn { right: auto; left: 10px; bottom: 8px; }
+.sticky-media-bar.collapsed { min-height: 40px; padding-bottom: 6px; margin-bottom: 16px; }
 .sticky-media-bar.collapsed #mediaBarContent, .sticky-media-bar.collapsed .media-resize-handle { display: none; }
+/* mini playback bar: only in the collapsed media strip, so scrubbing/marking survive the collapse
+   (the full playback bar is hidden by the JS then). the strip is full-width, so its slider is wide
+   and therefore less sensitive than a tiny one. right padding clears the absolute collapse button. */
+.mini-playback-bar { display: none; align-items: center; gap: 8px; padding: 5px 240px 5px 118px; flex-wrap: nowrap; }
+.clip-remove-graph { color: var(--danger); font-weight: 700; transition: color 0.12s; }
+.clip-remove-graph:hover { color: color-mix(in oklab, var(--danger) 78%, #fff); }
+.sticky-media-bar.collapsed .mini-playback-bar { display: flex; }
+.mini-pb-btn { flex: none; padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 5px; border: 1px solid var(--border); background: var(--panel-strip); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s; }
+.mini-pb-btn:hover { background: var(--elevated); color: var(--text); }
+.mini-pb-accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.mini-pb-si { flex: none; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
+.mini-timeline { flex: 1 1 auto; min-width: 100px; accent-color: var(--accent); cursor: pointer; }
+.mini-pb-time { flex: none; font-size: 12px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; color: var(--accent); min-width: 88px; text-align: right; }
 .media-content-wrapper { overflow: hidden; }
 
 .media-resize-handle { position: absolute; bottom: 4px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }

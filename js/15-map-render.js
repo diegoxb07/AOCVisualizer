@@ -261,7 +261,9 @@
 
     function renderBackground() {
         if (!bgCanvas.width || !bgCanvas.height) return;
-        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#0b1220'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        // theme-aware basemap palette (ocean base fill here; land and lines below)
+        const lightMap = document.documentElement.dataset.theme === 'light';
+        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = lightMap ? '#d4e3f0' : '#0e1a29'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
         const clipBox = mapClipBox();
@@ -292,7 +294,16 @@
             bgCtx.globalAlpha = 1.0;
         }
         if (mapFeatures.length > 0) {
-            bgCtx.fillStyle = isSatOn ? 'rgba(37,107,80,0.3)' : '#256b50'; bgCtx.strokeStyle = isSatOn ? 'rgba(220,220,220,0.7)' : '#000000'; bgCtx.lineWidth = 1.5 / mapScale;
+            // muted land over the ocean base, soft coastlines, and fainter internal (state) borders.
+            // over satellite imagery the land goes translucent so the tiles still show through.
+            const landFill = isSatOn ? (lightMap ? 'rgba(70,110,80,0.20)' : 'rgba(40,74,62,0.26)')
+                                     : (lightMap ? '#e4ebdd' : '#22463a');
+            const coastCol = isSatOn ? (lightMap ? 'rgba(45,60,72,0.60)' : 'rgba(214,228,238,0.65)')
+                                     : (lightMap ? '#5e6f7c' : '#7ea8bf');
+            const borderCol = isSatOn ? (lightMap ? 'rgba(45,60,72,0.32)' : 'rgba(214,228,238,0.34)')
+                                      : (lightMap ? 'rgba(94,111,124,0.50)' : 'rgba(126,168,191,0.40)');
+            bgCtx.fillStyle = landFill;
+            const strokeFor = isState => { bgCtx.strokeStyle = isState ? borderCol : coastCol; bgCtx.lineWidth = (isState ? 1.0 : 1.5) / mapScale; };
             // Draw the whole world, cull off-screen, and repeat it shifted ±360 so a dateline-centered
             // or zoomed-out view shows continuous land instead of an empty seam. Projects with the
             // raw (unwrapped) x, wrapping would cancel the shift.
@@ -313,6 +324,7 @@
                     if (!isBoxInView(feature.properties.bbox, shift)) return;
                     const geom = feature.geometry; if (!geom) return;
                     const isState = feature.properties && feature.properties.isState === true;
+                    strokeFor(isState);
                     if (geom.type === 'Polygon') {
                         bgCtx.beginPath(); geom.coordinates.forEach(ring => traceRing(ring, shift));
                         if (!isState) bgCtx.fill('evenodd'); bgCtx.stroke();
@@ -339,32 +351,50 @@
 
         drawStormTrack2D();
 
+        // flight track drawn as the same uniform catmull-rom curve the plane center rides
+        // (getInterpolatedRow), one cubic bezier per 1 Hz segment, so the plane sits on the line through
+        // turns. control points are computed in screen space; cp is a single reused object (setSeg
+        // mutates it) so a long flight doesn't allocate per segment per frame.
+        const _n = filteredData.length;
+        const _gx = j => getX(filteredData[j < 0 ? 0 : (j > _n - 1 ? _n - 1 : j)].lon);
+        const _gy = j => getY(filteredData[j < 0 ? 0 : (j > _n - 1 ? _n - 1 : j)].lat);
+        const cp = { x1: 0, y1: 0, c1x: 0, c1y: 0, c2x: 0, c2y: 0, x2: 0, y2: 0 };
+        const setSeg = (i) => {   // fills cp for the curve filteredData[i-1] -> filteredData[i]
+            const p0x = _gx(i - 2), p0y = _gy(i - 2), p1x = _gx(i - 1), p1y = _gy(i - 1);
+            const p2x = _gx(i), p2y = _gy(i), p3x = _gx(i + 1), p3y = _gy(i + 1);
+            cp.x1 = p1x; cp.y1 = p1y; cp.x2 = p2x; cp.y2 = p2y;
+            cp.c1x = p1x + (p2x - p0x) / 6; cp.c1y = p1y + (p2y - p0y) / 6;
+            cp.c2x = p2x - (p3x - p1x) / 6; cp.c2y = p2y - (p3y - p1y) / 6;
+        };
+
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
-        let lastX = getX(filteredData[0].lon), lastY = getY(filteredData[0].lat);
-        for (let i = 1; i <= idx; i++) { 
-            let curX = getX(filteredData[i].lon), curY = getY(filteredData[i].lat);
-            if (Math.abs(curX - lastX) < 1 && Math.abs(curY - lastY) < 1 && i !== idx) continue;
-            ctx.beginPath(); ctx.strokeStyle = getPathColorHex(filteredData[i], i); ctx.moveTo(lastX, lastY); ctx.lineTo(curX, curY); ctx.stroke();
-            lastX = curX; lastY = curY;
+        for (let i = 1; i <= idx; i++) {
+            setSeg(i);
+            if (Math.abs(cp.x2 - cp.x1) < 1 && Math.abs(cp.y2 - cp.y1) < 1 && i !== idx) continue;
+            ctx.beginPath(); ctx.strokeStyle = getPathColorHex(filteredData[i], i);
+            ctx.moveTo(cp.x1, cp.y1); ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2); ctx.stroke();
         }
-        
-        // Future (not-yet-flown) track, faint grey. Normally one continuous path, but zoomed in far
-        // that single path spans a device-pixel extent the rasterizer drops whole (the same failure
-        // the polygon clip fixes), so past the clip threshold stroke it per on-screen segment.
+
+        // Future (not-yet-flown) track, faint grey, same smooth curve. Normally one continuous path, but
+        // zoomed in far that single path spans a device-pixel extent the rasterizer drops whole (the same
+        // failure the polygon clip fixes), so past the clip threshold stroke it per on-screen segment.
         ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1.5/mapScale; ctx.globalAlpha = 0.3;
         const clipHi = mapScale > MAP_CLIP_MIN_SCALE;
         const onScreen = (x, y) => { const sx = mapOffsetX + mapScale * x, sy = mapOffsetY + mapScale * y; return sx > -cssW && sx < 2 * cssW && sy > -cssH && sy < 2 * cssH; };
-        ctx.beginPath();
-        lastX = getX(filteredData[idx].lon); lastY = getY(filteredData[idx].lat); ctx.moveTo(lastX, lastY);
-        for (let i = idx + 1; i < filteredData.length; i++) {
-            let curX = getX(filteredData[i].lon), curY = getY(filteredData[i].lat);
-            if (Math.abs(curX - lastX) < 1 && Math.abs(curY - lastY) < 1 && i !== filteredData.length - 1) continue;
-            if (clipHi) {
-                if (onScreen(curX, curY) || onScreen(lastX, lastY)) { ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(curX, curY); ctx.stroke(); }
-            } else { ctx.lineTo(curX, curY); }
-            lastX = curX; lastY = curY;
+        if (clipHi) {
+            for (let i = idx + 1; i < filteredData.length; i++) {
+                setSeg(i);
+                if (onScreen(cp.x2, cp.y2) || onScreen(cp.x1, cp.y1)) { ctx.beginPath(); ctx.moveTo(cp.x1, cp.y1); ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2); ctx.stroke(); }
+            }
+        } else {
+            ctx.beginPath(); let started = false;
+            for (let i = idx + 1; i < filteredData.length; i++) {
+                setSeg(i);
+                if (!started) { ctx.moveTo(cp.x1, cp.y1); started = true; }
+                ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2);
+            }
+            if (started) ctx.stroke();
         }
-        if (!clipHi) ctx.stroke();
         ctx.globalAlpha = 1.0;
 
         const targetSpacing = getBarbSpacingPx();

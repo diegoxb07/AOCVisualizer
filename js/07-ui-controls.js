@@ -71,6 +71,9 @@
         let ac = flightMetaData.aircraft; const acEl = document.getElementById('hdrAircraft');
         if (acEl) acEl.title = (ac && ac !== 'Unknown') ? ac : '';
         if (ac && ac !== 'Unknown') { const m = ac.match(/^(NOAA\d+)/); ac = m ? m[1] : ac; }
+        // append the aircraft's NOAA nickname so the chip reads e.g. "NOAA42 (Kermit)"
+        const acNickname = { NOAA42: 'Kermit', NOAA43: 'Miss Piggy', NOAA49: 'Gonzo' }[ac];
+        if (acNickname) ac = ac + ' (' + acNickname + ')';
         set('hdrAircraft', ac); set('hdrDate', flightMetaData.date);
         let range = '';
         if (allParsedData && allParsedData.length) { const a = allParsedData[0].time, b = allParsedData[allParsedData.length-1].time; range = `${a.slice(0,2)}:${a.slice(2,4)} → ${b.slice(0,2)}:${b.slice(2,4)}Z`; }
@@ -233,6 +236,46 @@
             requestAnimationFrame(animate3D); if (controls3D) controls3D.update();
             // props spin only while playback runs; pausing freezes them with everything else
             if (typeof planeSpinners3D !== 'undefined' && isPlaying) for (let i = 0; i < planeSpinners3D.length; i++) planeSpinners3D[i].rotation.z += 0.3;
+            // wind streaks: while playing in 3D, stream the small vertical streaks up on an updraft/bump
+            // and down on a downdraft/dip, with brightness and speed scaled by the vertical bump size.
+            if (windStreaks3D) {
+                const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
+                const vb = (isPlaying && in3d) ? _vertBump : 0, inten = Math.abs(vb);
+                const active = inten > 0.4;   // only clear updrafts/downdrafts, not minor bumps
+                windStreaks3D.visible = active;
+                if (active) {
+                    const dir = vb > 0 ? 1 : -1;   // updraft rises, downdraft falls
+                    const H = WIND_STREAK_H, tnow = performance.now() / 1000, speed = 0.8 + 1.6 * inten;
+                    for (let i = 0; i < windStreaks3D.children.length; i++) {
+                        const ln = windStreaks3D.children[i];
+                        const yy = (((ln.userData.baseY + dir * tnow * speed) % (2 * H)) + (2 * H)) % (2 * H) - H;
+                        ln.position.y = yy;
+                        ln.material.opacity = Math.min(0.9, inten) * (1 - Math.abs(yy) / H);
+                    }
+                }
+            }
+            // country labels: sit at the nearest coastline point to the plane, only while that coast is in
+            // range, and scale with camera distance so they stay a constant readable size at any altitude.
+            if (_countryLabels.length) {
+                const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
+                const show = in3d && camera3D && planeGroup3D && filteredData.length;
+                const px = show ? planeGroup3D.position.x : 0, pz = show ? planeGroup3D.position.z : 0, R0 = 26, R1 = 74;
+                for (let i = 0; i < _countryLabels.length; i++) {
+                    const cl = _countryLabels[i];
+                    if (!show) { cl.sprite.visible = false; continue; }
+                    let best = Infinity, bx = 0, by = 0, bz = 0;
+                    for (let k = 0; k < cl.pts.length; k++) { const p = cl.pts[k]; const dx = px - p.x, dz = pz - p.z, dd = dx * dx + dz * dz; if (dd < best) { best = dd; bx = p.x; by = p.y; bz = p.z; } }
+                    const dist = Math.sqrt(best);
+                    if (dist < R1) {
+                        cl.sprite.visible = true;
+                        const camDist = camera3D.position.distanceTo(cl.sprite.position.set(bx, by, bz)) || 1;
+                        const sc = camDist * 0.032;
+                        cl.sprite.position.y = by + sc * 0.7;
+                        cl.sprite.scale.set(sc * cl.aspect, sc, 1);
+                        cl.mat.opacity = dist <= R0 ? 1 : (R1 - dist) / (R1 - R0);
+                    } else cl.sprite.visible = false;
+                }
+            }
             renderer3D.render(scene3D, camera3D);
         }
         animate3D(); threeDInitialized = true;
@@ -242,6 +285,10 @@
     // instead of the default enlarged glyph. Real fuselage lengths per type, defaulting to the WP-3D
     // when the aircraft is unknown; at 20 units/deg the model is tiny, so it only reads once dollied in.
     let realScale3D = false;
+    let windStreaks3D = null;   // small vertical wind streaks on the plane for updrafts/downdrafts
+    let _vertBump = 0;          // signed vertical bump at the current frame (updraft +, downdraft -)
+    let _borderLines = [];      // { line, mat, box, base } coastline/border lines, faded by distance to the plane
+    let _countryLabels = [];    // { sprite, mat, aspect, pts } country name labels shown near visible coastlines
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -356,35 +403,137 @@
         return [0, -360, 360].some(s => !(bbox[0] + s > viewMaxLon || bbox[2] + s < viewMinLon));
     }
 
+    // A few small world-vertical wind streaks near the plane that rise on an updraft/altitude bump and
+    // fall on a downdraft/dip, so vertical air motion reads on the model. Kept off the rolling plane
+    // group so they stay vertical; positioned and scaled onto the plane each frame (update3DFrame), and
+    // streamed and faded by the signed vertical bump (vertBump) in animate3D.
+    const WIND_STREAK_H = 1.35;   // half-range the streaks stream over, in local space
+    function ensureWindStreaks() {
+        if (windStreaks3D || typeof scene3D === 'undefined' || !scene3D) return;
+        windStreaks3D = new THREE.Group();
+        for (let i = 0; i < 8; i++) {
+            const mat = new THREE.LineBasicMaterial({ color: 0xdfeaf7, transparent: true, opacity: 0, depthWrite: false });
+            const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.5, 0)]);
+            const line = new THREE.Line(geo, mat);
+            const ox = (Math.random() * 2 - 1) * 0.5, oz = (Math.random() * 2 - 1) * 0.5;   // tight cluster near the fuselage
+            const wingShrink = 1 - 0.55 * Math.min(1, Math.abs(ox) / 0.5);   // shorter toward the wingtips
+            line.userData = { ox, oz, baseY: (Math.random() * 2 - 1) * WIND_STREAK_H };
+            line.scale.y = (0.26 + Math.random() * 0.22) * wingShrink;
+            line.position.set(ox, line.userData.baseY, oz);
+            windStreaks3D.add(line);
+        }
+        windStreaks3D.visible = false;
+        scene3D.add(windStreaks3D);
+    }
+    // Plane vertical rate (m/s) over a short window centered on idx; positive is a climb.
+    function planeVertRateMps(idx) {
+        if (!filteredData.length) return 0;
+        const i0 = Math.max(0, idx - 4), i1 = Math.min(filteredData.length - 1, idx + 4);
+        const dt = filteredData[i1].absSeconds - filteredData[i0].absSeconds;
+        return dt > 0 ? (track3DAltMeters(filteredData[i1]) - track3DAltMeters(filteredData[i0])) / dt : 0;
+    }
+    // Signed vertical bump at idx: positive on an updraft/upward bump, negative on a downdraft/dip.
+    // Driven by vertical wind (the updraft/downdraft signal) and the jerk in vertical rate (sudden dips).
+    function vertBump(idx) {
+        const d = filteredData[idx]; if (!d) return 0;
+        let s = (d.vtWnd != null ? d.vtWnd / 5 : 0);
+        const jerk = (planeVertRateMps(idx) - planeVertRateMps(Math.max(0, idx - 3))) / 7;
+        if (Math.abs(jerk) > Math.abs(s)) s = jerk;
+        return Math.max(-1.3, Math.min(1.3, s));
+    }
+
+    // A small text sprite for a country name (white with a dark outline so it reads on any terrain).
+    // The label keeps a constant on-screen size in animate3D by scaling with its camera distance.
+    function countryLabelSprite(name) {
+        const cv = document.createElement('canvas');
+        let c = cv.getContext('2d');
+        c.font = 'bold 40px sans-serif';
+        const w = Math.min(560, Math.ceil(c.measureText(name).width) + 30);
+        cv.width = w; cv.height = 58;
+        c = cv.getContext('2d');
+        c.font = 'bold 40px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.lineWidth = 7; c.strokeStyle = 'rgba(5,12,20,0.92)'; c.strokeText(name, w / 2, 30);
+        c.fillStyle = '#eef4fb'; c.fillText(name, w / 2, 30);
+        const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+        const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
+        const spr = new THREE.Sprite(mat); spr.renderOrder = 5; spr.visible = false;
+        return { sprite: spr, mat, aspect: w / 58, pts: [] };
+    }
+
     function build3DScene() {
         if (!threeDInitialized) init3D();
         // a newly loaded flight may be the other airframe; no-ops when the right model is up
         if (typeof setPlaneModel3D === 'function') setPlaneModel3D();
-        while(threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]); 
-        const landMat = new THREE.MeshBasicMaterial({ color: 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }); const borderMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+        while(threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]);
+        _borderLines = [];
+        // country labels live on the scene (not threeMapGroup), so drop the previous set here.
+        _countryLabels.forEach(cl => { if (cl.sprite.parent) cl.sprite.parent.remove(cl.sprite); if (cl.mat.map) cl.mat.map.dispose(); cl.mat.dispose(); });
+        _countryLabels = [];
+        const landMat = new THREE.MeshBasicMaterial({ color: 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        // bright coastlines and dimmer internal (state) borders, so countries read clearly against the
+        // terrain shading. depthWrite off keeps them from occluding the streaks and each other.
+        const coastMat = new THREE.LineBasicMaterial({ color: 0xf0f6fc, transparent: true, opacity: 0.9, depthWrite: false });
+        const stateMat = new THREE.LineBasicMaterial({ color: 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
+        // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
+        // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
+        // [lon, lat], so terrainElevationMeters takes (c[1], c[0]).
+        const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
+        const borderAlt = c => hasTerrain ? terrainElevationMeters(c[1], c[0]) + 90 : 5;
         const processPolygon = (poly, isState) => {
             const shape = new THREE.Shape();
             poly.forEach((ring, ringIdx) => {
-                const pts = []; ring.forEach(c => pts.push(get3DCoord(c[0], c[1], 5)));
-                const lineGeom = new THREE.BufferGeometry().setFromPoints(pts); threeMapGroup.add(new THREE.Line(lineGeom, borderMat));
-                if (!isState) {
-                    if (ringIdx === 0) { ring.forEach((c, i) => { const pt = get3DCoord(c[0], c[1], 0); if (i === 0) shape.moveTo(pt.x, -pt.z); else shape.lineTo(pt.x, -pt.z); }); } 
+                const pts = []; let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+                ring.forEach(c => { const p = get3DCoord(c[0], c[1], borderAlt(c)); pts.push(p); if (p.x < minx) minx = p.x; if (p.x > maxx) maxx = p.x; if (p.z < minz) minz = p.z; if (p.z > maxz) maxz = p.z; });
+                const mat = (isState ? stateMat : coastMat).clone();   // per-line so update3DFrame can fade each by distance
+                const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat); line.renderOrder = 1; threeMapGroup.add(line);
+                _borderLines.push({ line, mat, box: [minx, maxx, minz, maxz], base: isState ? 0.55 : 0.9 });
+                if (!isState && !hasTerrain) {
+                    if (ringIdx === 0) { ring.forEach((c, i) => { const pt = get3DCoord(c[0], c[1], 0); if (i === 0) shape.moveTo(pt.x, -pt.z); else shape.lineTo(pt.x, -pt.z); }); }
                     else { const hole = new THREE.Path(); ring.forEach((c, i) => { const pt = get3DCoord(c[0], c[1], 0); if (i === 0) hole.moveTo(pt.x, -pt.z); else hole.lineTo(pt.x, -pt.z); }); shape.holes.push(hole); }
                 }
             });
-            if (!isState) { const shapeGeom = new THREE.ShapeGeometry(shape); shapeGeom.rotateX(-Math.PI / 2); shapeGeom.translate(0, 5 / 200, 0); threeMapGroup.add(new THREE.Mesh(shapeGeom, landMat)); }
+            if (!isState && !hasTerrain) { const shapeGeom = new THREE.ShapeGeometry(shape); shapeGeom.rotateX(-Math.PI / 2); shapeGeom.translate(0, 5 / 200, 0); threeMapGroup.add(new THREE.Mesh(shapeGeom, landMat)); }
         };
         mapFeatures.forEach(feature => {
             if (!isBoxInFlightBounds(feature.properties.bbox)) return; 
             const geom = feature.geometry; if (!geom) return;
             const isState = feature.properties && feature.properties.isState === true;
             if (geom.type === 'Polygon') processPolygon(geom.coordinates, isState); else if (geom.type === 'MultiPolygon') geom.coordinates.forEach(poly => processPolygon(poly, isState));
+            // one small name label per country (not states); positioned at the nearest coastline point to
+            // the plane each frame (animate3D) and only shown while that coastline is in range.
+            if (!isState && scene3D && feature.properties && feature.properties.NAME) {
+                const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+                const all = []; polys.forEach(poly => poly.forEach(ring => ring.forEach(cc => all.push(cc))));
+                if (all.length) {
+                    const step = Math.max(1, Math.floor(all.length / 40));
+                    const lbl = countryLabelSprite(feature.properties.NAME);
+                    for (let k = 0; k < all.length; k += step) { const cc = all[k]; lbl.pts.push(get3DCoord(cc[0], cc[1], borderAlt(cc))); }
+                    scene3D.add(lbl.sprite); _countryLabels.push(lbl);
+                }
+            }
         });
+        // elevation-shaded terrain surface from the bundled ETOPO grid, so land and sea floor sit at
+        // real height. null until the grid loads, while the flat coastline map above renders.
+        if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }
         if(filteredData.length > 0) {
+            // densify each 1 Hz segment with the same uniform catmull-rom the plane center rides
+            // (getInterpolatedRow), so the 3D track curves through turns and climbs like the plane.
+            // built once per flight, so the extra vertices are cheap. colors lerp across each segment.
             const pathPts = []; const colors = [];
-            filteredData.forEach((d, idx) => {
-                pathPts.push(get3DCoord(d.lon, d.lat, track3DAltMeters(d))); const [r, g, b] = getPathColorRGB(d, idx); colors.push(r, g, b);
-            });
+            const n = filteredData.length, K = 6;   // sub-samples per 1 Hz segment
+            const coordAt = j => { const d = filteredData[j < 0 ? 0 : (j > n - 1 ? n - 1 : j)]; return get3DCoord(d.lon, d.lat, track3DAltMeters(d)); };
+            const cr = (a, b, c, d, t) => { const t2 = t * t, t3 = t2 * t; return 0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); };
+            for (let i = 0; i < n; i++) {
+                const P0 = coordAt(i - 1), P1 = coordAt(i), P2 = coordAt(i + 1), P3 = coordAt(i + 2);
+                const c1 = getPathColorRGB(filteredData[i], i);
+                const c2 = getPathColorRGB(filteredData[Math.min(i + 1, n - 1)], Math.min(i + 1, n - 1));
+                const steps = (i < n - 1) ? K : 1;   // last point drawn once (no trailing segment)
+                for (let s = 0; s < steps; s++) {
+                    const t = s / K;
+                    pathPts.push(new THREE.Vector3(cr(P0.x, P1.x, P2.x, P3.x, t), cr(P0.y, P1.y, P2.y, P3.y, t), cr(P0.z, P1.z, P2.z, P3.z, t)));
+                    colors.push(c1[0] + (c2[0] - c1[0]) * t, c1[1] + (c2[1] - c1[1]) * t, c1[2] + (c2[2] - c1[2]) * t);
+                }
+            }
             const pathGeom = new THREE.BufferGeometry().setFromPoints(pathPts); pathGeom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             const trackMat = new THREE.LineBasicMaterial({ vertexColors: true, linewidth: 3 }); const coloredTrack3D = new THREE.Line(pathGeom, trackMat); threeMapGroup.add(coloredTrack3D);
         }
@@ -445,6 +594,21 @@
         const d = visualRow || filteredData[idx];
         const pos = get3DCoord(d.lon, d.lat, track3DAltMeters(d));
         planeGroup3D.position.copy(pos);
+        // keep the world-vertical streaks on the plane and sized to it; animate3D streams/fades them.
+        _vertBump = vertBump(idx);
+        ensureWindStreaks();
+        if (windStreaks3D) { windStreaks3D.position.copy(pos); windStreaks3D.scale.setScalar(Math.max(1e-4, planeGroup3D.scale.x) * 4); }
+        // fade coastline/border lines by the plane's distance to each, so only nearby ones show.
+        if (_borderLines.length) {
+            const px = pos.x, pz = pos.z, R0 = 26, R1 = 74;   // full within R0 units (~1.3deg), gone by R1
+            for (let i = 0; i < _borderLines.length; i++) {
+                const b = _borderLines[i], bx = b.box;
+                const dx = Math.max(bx[0] - px, 0, px - bx[1]), dz = Math.max(bx[2] - pz, 0, pz - bx[3]);
+                const dist = Math.hypot(dx, dz);
+                const f = dist <= R0 ? 1 : dist >= R1 ? 0 : (R1 - dist) / (R1 - R0);
+                b.mat.opacity = b.base * f; b.line.visible = f > 0.01;
+            }
+        }
         let t_pitch = d.pitch ?? 0, t_th = d.th ?? 0, t_roll = d.roll ?? 0, t_track = d.gTrack ?? 0;
         planeGroup3D.rotation.set(THREE.MathUtils.degToRad(t_pitch), THREE.MathUtils.degToRad(-t_th), THREE.MathUtils.degToRad(-t_roll), 'YXZ');
         // Size both scene-level arrows to the plane's current scale so they stay proportional in

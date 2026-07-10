@@ -222,7 +222,6 @@
         if (v.tasFromMs) der.push('TAS converted from m/s');
         if (v.iasFromMs) der.push('IAS converted from m/s');
         if (v.radAltFromFeet) der.push('radar altitude converted from feet');
-        if (stats.timeSource && stats.timeSource !== 'HH/MM/SS columns') der.push('time read as ' + stats.timeSource);
         if (der.length) out.push('derived: ' + der.join('; '));
         return out.join(' · ');
     }

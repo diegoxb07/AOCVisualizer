@@ -38,7 +38,13 @@
                 else chart.canvas.style.cursor = 'crosshair';
             },
             scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
-            plugins: { zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded',
+            plugins: { tooltip: { callbacks: { afterTitle: (items) => {
+                // the tooltip title is the sample's time; add its lat/lon underneath (same hover).
+                const d = items.length && filteredData[items[0].dataIndex];
+                if (!d || d.lat == null || d.lon == null) return '';
+                const ns = d.lat >= 0 ? 'N' : 'S', ew = d.lon >= 0 ? 'E' : 'W';
+                return `${Math.abs(d.lat).toFixed(2)}°${ns}, ${Math.abs(d.lon).toFixed(2)}°${ew}`;
+            } } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded',
                 // Each variable gets a checkbox-style swatch: a filled square in its series color
                 // when plotted, an empty outlined square when not, so it reads as clickable either
                 // way. Never struck through; deselected text dims to a calm slate instead.
@@ -203,6 +209,7 @@
             displayStr = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`;
         }
         timelineTimeDisplay.innerText = displayStr;
+        if (typeof syncMiniPlaybackBar === 'function') syncMiniPlaybackBar();   // mirror into the collapsed-media mini bar
 
         const satSel = document.getElementById('satelliteSelect');
         if (satSel && satSel.value !== 'none' && trackerModeSelect.value === '2d' && !isResizingMedia) {

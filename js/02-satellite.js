@@ -94,6 +94,19 @@
             .catch(() => null);
     }
 
+    // Solar elevation (deg) at a lat/lon and UTC instant, good to ~0.5deg, enough to tell day from
+    // night. Standard low-precision NOAA solar-position approximation (declination + equation of time).
+    function solarElevationDeg(latDeg, lonDeg, dateUtc) {
+        const rad = Math.PI / 180;
+        const N = (dateUtc.getTime() - Date.UTC(dateUtc.getUTCFullYear(), 0, 0)) / 86400000;   // fractional day of year
+        const utcH = dateUtc.getUTCHours() + dateUtc.getUTCMinutes() / 60 + dateUtc.getUTCSeconds() / 3600;
+        const decl = -23.44 * Math.cos(rad * (360 / 365) * (N + 10));
+        const B = rad * (360 / 365) * (N - 81);
+        const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);   // minutes
+        const ha = 15 * ((utcH + lonDeg / 15 + eot / 60) - 12);   // hour angle, deg
+        return Math.asin(Math.sin(rad * latDeg) * Math.sin(rad * decl) + Math.cos(rad * latDeg) * Math.cos(rad * decl) * Math.cos(rad * ha)) / rad;
+    }
+
     function updateSatTimeBadge() {
         const badge = document.getElementById('satTimeBadge');
         if (!badge) return;
@@ -155,6 +168,14 @@
         badge.innerHTML = `${escapeHtml(satLoadedInfo.layerLabel)}<br>`
             + `Image: <b>${imgLabel}</b><br>`
             + (offStr ? `<span style="color:${within ? 'var(--accent)' : 'var(--text-muted)'}">${offStr}</span>` : '');
+        // reflective GOES bands (1-6) are daylight-only; warn if the flight point is in darkness now.
+        const nightBandSel = document.getElementById('satBandSelect');
+        const nightLayerDef = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === satSel.value) : null;
+        const nightBandObj = (nightLayerDef && nightLayerDef.bands && nightBandSel) ? nightLayerDef.bands.find(b => b.id === nightBandSel.value) : null;
+        if (nightBandObj && nightBandObj.band >= 1 && nightBandObj.band <= 6 && row.lat != null && row.lon != null
+            && solarElevationDeg(row.lat, row.lon, new Date(flightMs)) < -6) {
+            badge.innerHTML += `<br><span style="color:#fbbf24">⚠ daytime band, it's night at this point (imagery will be dark)</span>`;
+        }
         badge.classList.remove('hidden');
     }
 
@@ -348,6 +369,23 @@
         // "API Offline" cover over the season dropdown in the pre-load flight data modal
         const preloadApiOfflineToast = document.getElementById('preloadApiOfflineToast');
         if (preloadApiOfflineToast) preloadApiOfflineToast.classList.toggle('hidden', !apiDown);
+        // "Preload selected" only downloads the checked ARCHIVE missions, so it's dead while the API is
+        // offline. Disable it then, so users don't click it expecting it to preload their own uploaded
+        // files (those go through the modal's file picker, a separate path). Same apiDownForced dance as
+        // the selects above, so recovery doesn't stomp a disable runPreload set for its own run.
+        const preloadStartBtn = document.getElementById('preloadStartBtn');
+        if (preloadStartBtn) {
+            if (apiDown) {
+                if (preloadStartBtn.dataset.apiDownForced === undefined) preloadStartBtn.dataset.apiDownForced = preloadStartBtn.disabled ? '0' : '1';
+                if (!preloadStartBtn.dataset.defaultTitle) preloadStartBtn.dataset.defaultTitle = preloadStartBtn.title || '';
+                preloadStartBtn.disabled = true;
+                preloadStartBtn.title = 'Archive preloading is unavailable while the API is offline. Uploaded files still preload from the file picker.';
+            } else {
+                if (preloadStartBtn.dataset.apiDownForced === '1') preloadStartBtn.disabled = false;
+                delete preloadStartBtn.dataset.apiDownForced;
+                preloadStartBtn.title = preloadStartBtn.dataset.defaultTitle || '';
+            }
+        }
         // The batch modal, if already open, has its own satellite dropdown/band checks/Start button
         // that need the same API-down treatment, refresh them in place rather than waiting for the
         // user to close and reopen the modal.
@@ -722,12 +760,47 @@
     // request is an async job, it returns a key, then we poll /status until the PNG is ready.
     const RECON_API_BASE = 'https://joshmurdock.net/api';
 
+    // Public-facing API token for the noaa-recon-api. The API owner issued this specifically to be
+    // embedded in this open, client-side tool so archive loading and GOES imagery keep working for
+    // everyone with no sign-in. Like a publishable key it is MEANT to be visible in the page source,
+    // it is not a secret, and is scoped and revocable by the owner. A user with their own token can
+    // override it by setting localStorage 'reconApiToken' (there is deliberately no UI: the default
+    // just works for all users).
+    const RECON_API_TOKEN = '1zjFKbV0yJGWyX5drvrE5ajBEow_trThEemiRAtLJQo';
+    function getReconApiToken() {
+        try { return localStorage.getItem('reconApiToken') || RECON_API_TOKEN; }
+        catch (_) { return RECON_API_TOKEN; }
+    }
+    // Merge the Bearer header into any existing fetch init headers, so every recon-api call carries
+    // the token. Harmless while the API runs open (the server ignores it); required once the owner
+    // turns token auth on. Note: sending Authorization makes these non-simple CORS requests, so the
+    // API must allow the header in its CORS policy, which it does since the token is issued for this
+    // in-browser use.
+    function reconAuthHeaders(extra) {
+        const t = getReconApiToken();
+        return t ? Object.assign({}, extra, { Authorization: 'Bearer ' + t }) : Object.assign({}, extra || {});
+    }
+    // <img> elements can't send an Authorization header, so for the GOES tile PNG we try a normal
+    // (fast, cache-friendly) image load first and, only if that fails (e.g. the endpoint starts
+    // requiring the token), retry by fetching the bytes WITH the header and decoding them via a blob
+    // url. Resolves a canvas, or null on failure (same contract as loadImageToCanvas).
+    async function loadReconImageToCanvas(url) {
+        const direct = await loadImageToCanvas(url);
+        if (direct) return direct;
+        try {
+            const resp = await fetch(url, { headers: reconAuthHeaders() });
+            if (!resp.ok) return null;
+            const obj = URL.createObjectURL(await resp.blob());
+            try { return await loadImageToCanvas(obj); } finally { URL.revokeObjectURL(obj); }
+        } catch (_) { return null; }
+    }
+
     // Discovery endpoint: every band/composite the API can render, plus each spacecraft's active date
     // range. Fetched once at startup; replaces the archive-GOES `bands` fallback in GIBS_LAYERS and
     // refines `minDate`. Falls back to the hardcoded list if the fetch fails.
     async function loadSatelliteProducts() {
         try {
-            const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store' });
+            const res = await fetch(`${RECON_API_BASE}/v1/satellite/products`, { cache: 'no-store', headers: reconAuthHeaders() });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             // every band the api returns becomes a product option automatically (no allowlist here), so
@@ -800,7 +873,7 @@
     async function fetchSatColorTable(cmap) {
         if (cmap in _satColorTableCache) return _satColorTableCache[cmap];
         try {
-            const res = await fetch(`${RECON_API_BASE}/v1/satellite/colortable?cmap=${encodeURIComponent(cmap)}`);
+            const res = await fetch(`${RECON_API_BASE}/v1/satellite/colortable?cmap=${encodeURIComponent(cmap)}`, { headers: reconAuthHeaders() });
             if (!res.ok) throw new Error('http ' + res.status);
             const data = await res.json();
             if (!data || !Array.isArray(data.stops) || !data.stops.length) throw new Error('no stops');
@@ -918,7 +991,7 @@
         const signal = (batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined;
         if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
         try {
-            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal }).then(r => r.json());
+            let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal, headers: reconAuthHeaders() }).then(r => r.json());
             // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
             // Checked both before AND after the sleep so a mid-batch Cancel is noticed within ~3s.
             for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
@@ -930,13 +1003,13 @@
                     if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true });
                 });
                 if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
-                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`, { signal }).then(r => r.json());
+                data = await fetch(`${RECON_API_BASE}/v1/satellite/status/${data.key}`, { signal, headers: reconAuthHeaders() }).then(r => r.json());
             }
             if (!data || data.status !== 'ready') return { error: (data && (data.message || data.status)) || 'no response' };
             // bounds come back as [[lat_s, lon_w], [lat_n, lon_e]] → our {minLon,minLat,maxLon,maxLat}.
             const b = data.bounds;
             const box = { minLat: b[0][0], minLon: b[0][1], maxLat: b[1][0], maxLon: b[1][1] };
-            const c = await loadImageToCanvas(RECON_API_BASE + data.png_url);
+            const c = await loadReconImageToCanvas(RECON_API_BASE + data.png_url);
             if (!c) return { error: 'image load failed' };
             // Reproject the Mercator PNG to equirectangular so it aligns with our lat-linear map.
             const eq = reprojectMercatorToEquirect(c, box);

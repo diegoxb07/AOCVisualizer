@@ -63,7 +63,7 @@
     function setReconStatus(msg) { if (!suppressReconStatus && reconArchiveStatus) reconArchiveStatus.textContent = msg || ''; }
 
     async function reconApiJson(path) {
-        const resp = await fetch(RECON_API_BASE + path);
+        const resp = await fetch(RECON_API_BASE + path, { headers: reconAuthHeaders() });
         const data = await resp.json().catch(() => null);
         if (!resp.ok) {
             // detail can be a string OR structured (FastAPI validation errors), stringify the
@@ -425,7 +425,8 @@
     // Stream a URL's body, reporting real byte progress via onProgress(received, total). Falls back to
     // a plain (progress-less) arrayBuffer() read if the response has no body stream or no Content-Length.
     async function fetchArrayBufferWithProgress(url, onProgress) {
-        const resp = await fetch(url);
+        // only ever called with recon-api mission-download urls, so attach the Bearer token too.
+        const resp = await fetch(url, { headers: reconAuthHeaders() });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const total = parseInt(resp.headers.get('Content-Length') || '0', 10);
         if (!resp.body || !total) return await resp.arrayBuffer();
@@ -573,7 +574,7 @@
         try {
             const track = await fetchStormTrackData(mission);
             stormTrackPoints = track.points; stormTrackMeta = track.meta;
-            setReconStatus(`Loaded ${mission.mission_id} + ${stormTrackPoints.length} obs best-track for ${track.meta.name}.`);
+            setReconStatus(`Loaded ${mission.mission_id} for ${track.meta.name}.`);
         } catch (e) {
             setReconStatus(`Loaded ${mission.mission_id}. No best-track found for ${mission.storm_name} (${e.message}).`);
         }
@@ -773,15 +774,6 @@
     }
     // Forget every previously loaded flight: clears the in-memory list and both IndexedDB stores so the
     // "Previously Loaded Missions" dropdown starts empty (the currently open flight stays loaded).
-    function clearAllPreloadedMissions() {
-        preloadedMissions.clear();
-        missionStoreReady.then(() => {
-            if (!missionDB) return;
-            try { const tx = missionDB.transaction(['missions', 'meta'], 'readwrite'); tx.objectStore('missions').clear(); tx.objectStore('meta').clear(); } catch (e) {}
-        });
-        updatePreloadedSelect();
-        if (typeof showToast === 'function') showToast('Cleared the previously loaded flights list.', 4000);
-    }
     function missionIdbGet(id) {
         return new Promise(resolve => {
             if (!missionDB) return resolve(null);
@@ -829,23 +821,70 @@
         } catch (e) {}
     });
 
-    function updatePreloadedSelect(selectedId) {
-        const sel = document.getElementById('preloadedSelect'); if (!sel) return;
-        const keep = selectedId !== undefined ? selectedId : sel.value;
-        sel.innerHTML = '<option value="">Previously Loaded Missions…</option>';
+    // Previously-loaded-missions picker (custom popover, see index.html #loadedPickerPanel). Each row
+    // is a name button (opens the flight) plus a red × that removes just that flight from this device.
+    let loadedPickerSelectedId = '';   // mission whose row shows active + names the button, '' = none
+
+    function loadedPickerRowLabel(id, rec) {
+        const tag = rec.uploaded ? ' (uploaded)' : (rec.isNc ? '' : ' (preview)');
+        return `${id}${(rec.mission && rec.mission.storm_name) ? ' · ' + rec.mission.storm_name : ''}${tag}`;
+    }
+
+    function renderLoadedPickerPanel() {
+        const listEl = document.getElementById('loadedPickerList'); if (!listEl) return;
+        if (preloadedMissions.size === 0) { listEl.innerHTML = '<div class="loaded-pick-empty">No flights loaded yet.</div>'; return; }
+        let html = '';
         preloadedMissions.forEach((rec, id) => {
-            const opt = document.createElement('option'); opt.value = id;
-            const tag = rec.uploaded ? ' (uploaded)' : (rec.isNc ? '' : ' (preview)');
-            opt.textContent = `${boldUnicode(id)}${rec.mission.storm_name ? ' · ' + rec.mission.storm_name : ''}${tag}`;
-            sel.appendChild(opt);
+            const active = id === loadedPickerSelectedId;
+            html += `<div class="loaded-pick-row${active ? ' active' : ''}">`
+                 +  `<button type="button" class="loaded-pick-open" data-open="${escapeHtml(id)}" title="Open ${escapeHtml(id)}">${escapeHtml(loadedPickerRowLabel(id, rec))}</button>`
+                 +  `<button type="button" class="loaded-pick-x" data-remove="${escapeHtml(id)}" title="Remove this flight from this device" aria-label="Remove ${escapeHtml(id)}">×</button>`
+                 +  `</div>`;
         });
-        // reset-all option pinned at the bottom, only when there's something to clear
-        if (preloadedMissions.size > 0) {
-            const sep = document.createElement('option'); sep.disabled = true; sep.textContent = '──────────'; sel.appendChild(sep);
-            const rst = document.createElement('option'); rst.value = '__resetLoaded__'; rst.textContent = '↺ Reset loaded flights'; sel.appendChild(rst);
+        listEl.innerHTML = html;
+    }
+
+    // drives the custom picker (button label, enabled state, and panel rows) from the preloaded set.
+    function updatePreloadedSelect(selectedId) {
+        if (selectedId !== undefined) loadedPickerSelectedId = selectedId || '';
+        if (!preloadedMissions.has(loadedPickerSelectedId)) loadedPickerSelectedId = '';
+        const btn = document.getElementById('loadedPickerBtn');
+        const lbl = document.getElementById('loadedPickerLabel');
+        if (btn) btn.disabled = preloadedMissions.size === 0;
+        if (lbl) {
+            const rec = loadedPickerSelectedId ? preloadedMissions.get(loadedPickerSelectedId) : null;
+            lbl.textContent = rec ? loadedPickerRowLabel(loadedPickerSelectedId, rec) : 'Previously Loaded Missions…';
         }
-        sel.disabled = preloadedMissions.size === 0;
-        sel.value = preloadedMissions.has(keep) ? keep : '';
+        renderLoadedPickerPanel();
+    }
+
+    function positionLoadedPicker() {
+        const panel = document.getElementById('loadedPickerPanel'), btn = document.getElementById('loadedPickerBtn');
+        if (!panel || !btn || panel.classList.contains('hidden')) return;
+        const r = btn.getBoundingClientRect();
+        panel.style.top = (r.bottom + 4) + 'px';
+        panel.style.left = r.left + 'px';
+        panel.style.right = 'auto';
+        panel.style.width = Math.max(220, r.width) + 'px';
+    }
+    function openLoadedPicker() {
+        const panel = document.getElementById('loadedPickerPanel'); if (!panel) return;
+        renderLoadedPickerPanel();
+        panel.classList.remove('hidden');
+        panel.scrollTop = 0;
+        positionLoadedPicker();
+    }
+    function closeLoadedPicker() { const p = document.getElementById('loadedPickerPanel'); if (p) p.classList.add('hidden'); }
+
+    // Remove one flight from this device: drop it from the session map and IndexedDB, then re-render.
+    function removePreloadedMission(id) {
+        if (!preloadedMissions.has(id)) return;
+        preloadedMissions.delete(id);
+        missionIdbDelete(id);
+        if (loadedPickerSelectedId === id) loadedPickerSelectedId = '';
+        updatePreloadedSelect();
+        if (preloadedMissions.size === 0) closeLoadedPicker();
+        if (typeof setReconStatus === 'function') setReconStatus('Removed ' + id + ' from the loaded flights list.');
     }
 
     async function preloadReconMission(missionId, statusFn) {
@@ -907,6 +946,7 @@
             return;
         }
         isNcFile = rec.isNc;
+        updatePreloadedSelect(missionId);   // reflect the opened flight as the picker's active row + label
         if (rec.uploaded) {
             // An uploaded file is not an archive mission: no share link, no source URL, no storm track.
             reconArchiveMeta = null;
@@ -922,7 +962,7 @@
         stormTrackPoints = rec.storm ? rec.storm.points : [];
         stormTrackMeta = rec.storm ? rec.storm.meta : null;
         refreshStormTrackDisplay();
-        setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples' + (rec.storm ? ', best-track included' : '') + ').');
+        setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
     }
 
     (function wirePreload() {
@@ -1041,10 +1081,12 @@
             if (yearSel && !yearSel.value && reconYearSelect.value) yearSel.value = reconYearSelect.value;
             if (isReconApiDown()) {
                 if (yearSel) yearSel.disabled = true;
+                if (startBtn) startBtn.disabled = true;   // nothing to download offline; steer users to the file picker
                 checksNote('The recon archive is unreachable, so seasons cannot be listed. Uploaded files still preload normally.');
                 return;
             }
             if (yearSel) yearSel.disabled = false;
+            if (startBtn && !preloadRunning) startBtn.disabled = false;
             loadSeasonIntoModal(yearSel ? yearSel.value : '');
         }
 
@@ -1060,7 +1102,15 @@
                 setModalStatus(`(${i + 1}/${list.length}) Parsing ${f.name}…`);
                 try {
                     const isNc = /\.nc$/i.test(f.name);
-                    const parsed = await parseFlightSource(isNc ? await f.arrayBuffer() : await f.text());
+                    // fold each file's own parse fraction into the bar so it advances smoothly within a
+                    // file (the .nc worker reports variable index/total; a .txt parses instantly so it
+                    // just steps).
+                    const parsed = await parseFlightSource(isNc ? await f.arrayBuffer() : await f.text(), (p) => {
+                        let frac = 0;
+                        if (p.phase === 'var' && p.total) frac = p.index / p.total;
+                        else if (p.phase === 'rows') frac = 1;
+                        if (fill) fill.style.width = Math.round((i + frac) / list.length * 100) + '%';
+                    });
                     if (!parsed.rows.length) throw new Error('no usable rows');
                     const dm = id.match(/^(\d{4})(\d{2})(\d{2})([a-zA-Z])?/);
                     const tail = dm && dm[4] ? dm[4].toUpperCase() : '';
@@ -1111,13 +1161,27 @@
             const b = document.getElementById(id);
             if (b) b.addEventListener('click', () => { if (modal) modal.style.display = 'none'; });
         });
-        const sel = document.getElementById('preloadedSelect');
-        if (sel) sel.addEventListener('change', () => {
-            if (sel.value === '__resetLoaded__') {
-                sel.value = '';   // never leave the reset row selected
-                if (confirm('Clear all previously loaded flights from this device? The flight open right now stays loaded.')) clearAllPreloadedMissions();
-                return;
-            }
-            if (sel.value) openPreloadedMission(sel.value);
+        // previously-loaded-missions custom picker: toggle the popover, open a flight on a row click,
+        // remove one on its red × (see updatePreloadedSelect / renderLoadedPickerPanel above).
+        const pickBtn = document.getElementById('loadedPickerBtn');
+        const pickPanel = document.getElementById('loadedPickerPanel');
+        const pickList = document.getElementById('loadedPickerList');
+        if (pickBtn) pickBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (pickPanel && pickPanel.classList.contains('hidden')) openLoadedPicker(); else closeLoadedPicker();
         });
+        if (pickList) pickList.addEventListener('click', (e) => {
+            const rm = e.target.closest('[data-remove]');
+            if (rm) { e.stopPropagation(); removePreloadedMission(rm.getAttribute('data-remove')); return; }
+            const op = e.target.closest('[data-open]');
+            if (op) { closeLoadedPicker(); openPreloadedMission(op.getAttribute('data-open')); }
+        });
+        document.addEventListener('mousedown', (e) => {
+            if (!pickPanel || pickPanel.classList.contains('hidden')) return;
+            if (pickPanel.contains(e.target) || (pickBtn && pickBtn.contains(e.target))) return;
+            closeLoadedPicker();
+        });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLoadedPicker(); });
+        window.addEventListener('resize', positionLoadedPicker);
+        window.addEventListener('scroll', positionLoadedPicker, true);
     })();

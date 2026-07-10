@@ -83,15 +83,13 @@
     document.getElementById('skipBack10Btn').addEventListener('click', () => skipFlightMinutes(-10));
     document.getElementById('skipFwd10Btn').addEventListener('click', () => skipFlightMinutes(10));
 
-    // "Reset" used to be a full page reload, but a reload drops real (page) fullscreen because
-    // re-entering fullscreen needs a fresh user gesture a reload can't carry. So instead we reset in
-    // place: tear the loaded flight, video, satellite overlay, charts and map/3d view back to the
-    // fresh-load state, reusing the same teardown helpers the app uses when switching flights, and
-    // never touching fullscreen. Things that survive a real reload (display prefs in aocVizPrefs, the
-    // preloaded-mission list, the satellite tile cache, the basemap geojson) are left alone here too,
-    // so the result matches what an F5 would land on: the empty landing state with the same prefs.
+    // resets the app to its fresh-load state in place, without a page reload, so real (page) fullscreen
+    // is kept (re-entering fullscreen needs a user gesture a reload can't carry). tears down the loaded
+    // flight, video, satellite overlay, charts and map/3d view via the same helpers used when switching
+    // flights. things that persist across an F5 are left alone: display prefs (aocVizPrefs), the
+    // preloaded-mission list, the satellite tile cache, and the basemap geojson.
     function resetAppToDefault() {
-        // drop the shareable ?mission=/t=/view= params (same as the old reset, minus the reload).
+        // drop the shareable ?mission=/t=/view= params so a later manual F5 also lands on a clean session.
         try { const u = new URL(window.location.href); ['mission', 't', 'view'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u); } catch (e) {}
 
         // stop playback and any pending sync/render timers.
@@ -174,10 +172,91 @@
         if (timelineTimeDisplay) timelineTimeDisplay.textContent = '00:00:00 UTC';
         updateMissionHeader();            // blanks the header chips + resets document.title
         updateMasterGraphVisibility();    // master chart gone -> show the "create a graph" prompt
+
+        // put the dropdowns back to their default state (as a fresh reload would): the previously-loaded
+        // picker back to its "Previously Loaded Missions…" label (the saved list itself stays), the
+        // archive Year->Storm->Mission cascade back to unpicked, and close any open popovers.
+        if (typeof updatePreloadedSelect === 'function') updatePreloadedSelect('');
+        if (typeof closeLoadedPicker === 'function') closeLoadedPicker();
+        if (typeof closeSatPicker === 'function') closeSatPicker();
+        const reconYearSel = document.getElementById('reconYearSelect');
+        if (reconYearSel && reconYearSel.value) { reconYearSel.value = ''; reconYearSel.dispatchEvent(new Event('change')); }
+
         if (typeof syncMediaGridLayout === 'function') syncMediaGridLayout();
     }
 
     document.getElementById('resetAppBtn').addEventListener('click', resetAppToDefault);
+
+    // Mini playback bar (shown in the collapsed media strip): keeps play/pause, scrubbing, marking and
+    // S.I. usable when the full playback bar is collapsed away with the media. The controls proxy the
+    // real ones (so all their logic runs unchanged), and syncMiniPlaybackBar mirrors state back each frame.
+    (function wireMiniPlayback() {
+        const $ = id => document.getElementById(id);
+        const miniSlider = $('miniTimelineSlider');
+        if (!miniSlider) return;
+        const mainSlider = $('timelineSlider'), mainTime = $('timelineTimeDisplay');
+        const miniTime = $('miniTimeDisplay'), miniPlay = $('miniPlayBtn'), miniSI = $('miniToggleSI');
+        // scrubbing: forward to the real slider (its own handlers scrub; the window mouseup ends it).
+        miniSlider.addEventListener('mousedown', () => mainSlider.dispatchEvent(new Event('mousedown')));
+        miniSlider.addEventListener('touchstart', () => mainSlider.dispatchEvent(new Event('touchstart')), { passive: true });
+        miniSlider.addEventListener('input', () => { mainSlider.value = miniSlider.value; mainSlider.dispatchEvent(new Event('input')); });
+        miniPlay.addEventListener('click', () => $('playPauseBtn').click());
+        $('miniMarkBtn').addEventListener('click', () => $('markBtn').click());
+        $('miniClearBtn').addEventListener('click', () => $('clearMarksBtn').click());
+        miniSI.addEventListener('change', () => { const t = $('toggleSI'); t.checked = miniSI.checked; t.dispatchEvent(new Event('change')); });
+        // main -> mini mirror; called each frame from updateVisualComponents and on collapse toggle.
+        window.syncMiniPlaybackBar = function () {
+            miniSlider.min = mainSlider.min;
+            if (miniSlider.max !== mainSlider.max) miniSlider.max = mainSlider.max;
+            if (!isScrubbing) miniSlider.value = mainSlider.value;
+            miniSlider.disabled = mainSlider.disabled;
+            if (miniTime && mainTime) miniTime.textContent = mainTime.innerText;
+            if (miniPlay) miniPlay.textContent = isPlaying ? 'Pause' : 'Play';
+            if (miniSI) miniSI.checked = $('toggleSI').checked;
+        };
+    })();
+
+    // Fullscreen any graph: inject a ⛶ button into each chart panel's title row that fills the viewport
+    // with just that graph and hides the top-right sticky cluster (like the media panel fullscreens).
+    // Toggle off with the button again or Esc.
+    (function wireChartFullscreen() {
+        const resizeChartIn = (panel) => setTimeout(() => {
+            const cv = panel.querySelector('canvas');
+            const ch = cv && typeof Chart !== 'undefined' && Chart.getChart(cv);
+            if (ch) ch.resize();
+        }, 60);
+        const topRight = () => document.getElementById('topRightControls');
+        function toggleChartFullscreen(panel) {
+            const tr = topRight();
+            if (panel.classList.contains('chart-fs')) {
+                panel.classList.remove('chart-fs');
+                if (tr && !document.querySelector('.fake-fs')) tr.style.display = '';
+                if (document.fullscreenElement && !document.querySelector('.fake-fs')) document.exitFullscreen().catch(() => {});
+                resizeChartIn(panel);
+                return;
+            }
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+            panel.classList.add('chart-fs');
+            if (tr) tr.style.display = 'none';
+            resizeChartIn(panel);
+        }
+        document.querySelectorAll('[id^="title-"]').forEach(titleRow => {
+            const group = titleRow.querySelector('.flex.items-center.gap-2');
+            const panel = titleRow.parentElement;
+            if (!group || !panel) return;
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'reset-scale-btn text-muted text-base hover:text-accent hover:scale-110 transition-all focus:outline-none';
+            btn.title = 'Fullscreen this graph';
+            btn.textContent = '⛶';
+            btn.addEventListener('click', (e) => { e.stopPropagation(); toggleChartFullscreen(panel); });
+            group.insertBefore(btn, group.firstChild);
+        });
+        // Esc / leaving real fullscreen drops any fullscreened graph too.
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) document.querySelectorAll('.chart-fs').forEach(p => { p.classList.remove('chart-fs'); resizeChartIn(p); });
+        });
+    })();
 
     playPauseBtn.addEventListener('click', function() {
         // Fold the old "Apply & Run" into Play: when starting playback in manual mode, if the start/end
@@ -429,7 +508,7 @@
             });
             top.appendChild(checks); top.appendChild(prev);
             const rm = document.createElement('button'); rm.type = 'button'; rm.textContent = '✕ Remove graph';
-            rm.className = 'text-faint hover:text-danger'; rm.style.cssText = 'align-self:flex-end;background:none;border:none;cursor:pointer;padding:6px 2px 0;font-size:11px;';
+            rm.className = 'clip-remove-graph'; rm.style.cssText = 'align-self:flex-end;background:none;border:none;cursor:pointer;padding:6px 2px 0;font-size:11px;';
             rm.addEventListener('click', () => { clipCustomDefs.splice(i, 1); renderClipCustomList(); });
             card.appendChild(top); card.appendChild(rm);
             box.appendChild(card);
@@ -1041,6 +1120,11 @@
             const next = root.dataset.theme === 'light' ? 'dark' : 'light';
             root.dataset.theme = next;
             syncAria();
+            // the 2D basemap palette is theme-aware now, so drop its cached render and repaint the tracker.
+            bgNeedsUpdate = true;
+            if (filteredData.length && trackerModeSelect.value === '2d' && typeof renderMapEngineFrame === 'function') {
+                renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            }
             // Legend label colors are theme-aware (js/17-charts.js generateLabels), baked at build
             // time, so rebuild the legends on toggle. update('none') re-runs generateLabels without
             // animation; the zoom plugin preserves any pan/zoom across it.

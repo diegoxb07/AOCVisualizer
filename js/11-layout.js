@@ -136,6 +136,10 @@
             const collapsed = bar.classList.toggle('collapsed');
             btn.setAttribute('aria-expanded', String(!collapsed));
             btn.innerHTML = collapsed ? '&#9660; Show media' : '&#9650; Collapse media';
+            // while the media is collapsed the full playback bar is hidden; the mini bar in the strip covers play/scrub/mark.
+            const bottom = document.getElementById('stickyBottomBar');
+            if (bottom) bottom.style.display = collapsed ? 'none' : '';
+            if (typeof syncMiniPlaybackBar === 'function') syncMiniPlaybackBar();
             if (!collapsed) {
                 resizeCanvasLayout();
                 if (filteredData.length > 0 && trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }

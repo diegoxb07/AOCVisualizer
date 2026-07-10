@@ -58,9 +58,9 @@ flowchart TD
 
 | Use case | What the tool gives you |
 | --- | --- |
-| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the[...]
-| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point anal[...]
-| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive[...]
+| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside. You can also record clips in advance for presentations. |
+| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and record annotated clips to video. |
+| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
 
 ---
 
@@ -70,17 +70,17 @@ flowchart TD
 
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's f[...]
+**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
 
-**Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded fligh[...]
+**Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
 
-> Archive controls greyed out with an **"API Offline"** banner mean the archive service is unreachable, and one should use manual upload. It re-checks every ~60 s and can re-enable itself. Details: **[...]
+> Archive controls greyed out with an **"API Offline"** banner mean the archive service is unreachable, and one should use manual upload. It re-checks every ~60 s and can re-enable itself. Details: **[API & Connectivity](docs/CONNECTIVITY.md)**.
 
 ---
 
 ## 2. Time window & replay controls
 
-Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment, and everything downstream (map, charts, PFD, timeline) renders only that window. Leave the detected range alone to replay [...]
+Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment, and everything downstream (map, charts, PFD, timeline) renders only that window. Leave the detected range alone to replay the whole flight. **After changing the window, just press Play, it applies the new window before starting playback.**
 
 With a synced MMR video loaded, the window auto-adjusts to the video's timeframe, so manual trimming mainly applies to data-only replay (or Manual sync mode).
 
@@ -94,7 +94,7 @@ All playback lives in the sticky bottom bar:
 | **Timeline slider** | Scrub anywhere; the UTC readout updates live. |
 | **8Hz Smoothing** (map header) | Catmull-Rom interpolation between the native 1-second samples for fluid motion instead of stepping. Recommended for training. |
 
-Keyboard: **Space** = play/pause, **← / →** = scrub (hold to accelerate), **Shift + ← / →** = jump 10 flight-minutes. Display preferences (units, tracker mode, track/barb colors, PFD, smoothin[...]
+Keyboard: **Space** = play/pause, **← / →** = scrub (hold to accelerate), **Shift + ← / →** = jump 10 flight-minutes. Display preferences (units, tracker mode, track/barb colors, PFD, smoothing) are remembered between sessions.
 
 If an MMR video is loaded, the **video clock drives playback** and the telemetry follows it; otherwise the engine advances on its own clock.
 
@@ -105,13 +105,13 @@ If an MMR video is loaded, the **video clock drives playback** and the telemetry
 Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header.
 
 - **2D**: whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom, drag to pan; zoom out for synoptic context.
-- **3D**: Three.js scene with terrain, a plane model, and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse.
+- **3D**: Three.js scene over an elevation-shaded **terrain basemap** (a bundled low-res global ETOPO relief grid, so land and sea floor sit at real height and a below-sea-level takeoff no longer starts under a flat plane), with a plane model and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse. **Real Scale (3D)** draws the aircraft at true size and adds faint flight-level reference planes so climbs and descents read against them.
 
-Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, inde[...]
+Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
 
-> **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, st[...]
+> **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, stepping through the Saffir-Simpson categories from there. A fully black track just means the aircraft never sampled hurricane-force winds.
 
-**Measure & mark:** **Measure** (map header) draws polygon/circle/rectangle for distance & area; **Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to o[...]
+**Measure & mark:** **Measure** (map header) draws polygon/circle/rectangle for distance & area; **Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to open **Point Data Analysis** and **download** its full report.
 
 ---
 
@@ -119,7 +119,7 @@ Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Ba
 
 Load a cockpit/radar **`.mp4`** in **Upload MMR to Sync**. Two sync modes:
 
-- **Auto-Sync (default)**: OCR reads the timestamp **burned into the video frame** and aligns automatically. A green pulse means OCR is active; a non-blocking "Syncing…" pill shows while it hunts. C[...]
+- **Auto-Sync (default)**: OCR reads the timestamp **burned into the video frame** and aligns automatically. A green pulse means OCR is active; a non-blocking "Syncing…" pill shows while it hunts. Click **Sync Now** to force a lock (a few clicks on a clear frame helps), and hide any *other* on-screen timestamps that could confuse it. Reads are sanity-checked against the flight's time range, so a misread can't jump playback wildly.
 - **Manual Time Input**: type the video's UTC start time in **MMR Start Time** (`HHMMSS`). Simple and reliable when you already know it.
 
 ---
@@ -134,6 +134,7 @@ Open the **Satellite** picker in the map header: choose a satellite, then its pr
 
 Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):
 
+- **Band 2**: Red Visible (0.64 µm), the highest-resolution visible channel, sharpest daytime cloud and convection detail (daylight only)
 - **Band 3**: Veggie (Vegetation/NIR, 0.86 µm), daytime land and low-cloud contrast
 - **Band 5**: Near-IR (Snow/Ice, 1.6 µm), separates ice cloud from water cloud
 - **Band 7**: Shortwave IR ("Fire Temperature", 3.9 µm), low cloud and fog at night
@@ -146,23 +147,23 @@ Current GOES archive products (the picker auto-discovers these from the API, so 
 
 ## 6. Storm best-track overlay
 
-Archive loads automatically draw the storm's **whole-life**, intensity-colored, dashed best-track on both trackers. Toggle it with the **Storm Track** checkbox; the **Last Storm Observation** car[...]
+Archive loads automatically draw the storm's **whole-life**, intensity-colored, dashed best-track on both trackers. Toggle it with the **Storm Track** checkbox; the **Last Storm Observation** card shows the nearest fix to the playback time, and hovering a track point pops its category, wind, pressure, and time.
 
 ---
 
 ## 7. Charts, PFD & HUD
 
-Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds/accel, pressure, thermodynamics) track the playback moment: **↺** resets zoom, **＋** adds/removes serie[...] 
+Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds/accel, pressure, thermodynamics) track the playback moment: **↺** resets zoom, **＋** adds/removes series, scroll/drag to zoom and pan. **Create Your Own Graph** (bottom) plots **any** variables the file contains against each other.
 
-Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a **slip/skid indicator**, wind box, ground-track [...]
+Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a **slip/skid indicator**, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **Imperial Units**, and **Press→GPS Alt** (altitude source, when available). The HUD box on the map shows live telemetry text.
 
-**8 Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds is turbulence-aware, scaled to the recorded vertical wind, so calm leg[...]
+**8 Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds is turbulence-aware, scaled to the recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air moves the airframe.
 
 ---
 
 ## 8. Exporting
 
-- **Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progre[...]
+- **Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progress pill + **■ Stop**). Great for briefing clips.
 
 ---
 
@@ -190,7 +191,7 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 ## Running & deploying
 
-- **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries, fonts,[...]
+- **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries, fonts, and basemap data ship inside the repo, so the tool loads and replays manual uploads **with no internet at all** (only the archive/satellite APIs and the OCR engine's runtime download need a connection).
 - **Deployment:** GitHub Pages via [.github/workflows/static.yml](.github/workflows/static.yml)
 - **No test suite.** Verify changes by opening the page and exercising the upload → play flow.
 
@@ -198,10 +199,26 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 ## Appendix: flight-level variables & sensors
 
-AOC flight-level files carry **hundreds** of columns, but this visualizer reads only the quality-controlled subset it needs to plot: position, GPS/pressure/radar altitude, D-value, pressures, temperat[...]
+AOC flight-level files carry **hundreds** of columns, but this visualizer reads only the quality-controlled subset it needs to plot: position, GPS/pressure/radar altitude, D-value, pressures, temperature and dew point, true/indicated airspeed, wind speed/direction/vertical wind, drift, heading, ground track, pitch/roll, angle of attack and sideslip, vertical acceleration, mixing ratio, and equivalent potential temperature. Those are the fields shown in the charts, PFD, HUD, and "Create Your Own Graph."
 
-Most raw columns come in **redundant sensors** (`.1`, `.2`, `.3` …), and after each flight a quality-assurance pass picks the best one as the **reference** (the `ref` suffix, e.g. `THDGref`, `LATref[...]
+Most raw columns come in **redundant sensors** (`.1`, `.2`, `.3` …), and after each flight a quality-assurance pass picks the best one as the **reference** (the `ref` suffix, e.g. `THDGref`, `LATref`). This tool reads those references (falling back to sensor `.1`) because it works with already-QC'd data. Column suffixes: `.d` derived, `.c` corrected, `.N` sensor index, `ref` chosen reference; families include INE (inertial), GPS, air-data unit (ADDU), dropsonde (`DS_`), and the SFMR surface-wind radiometer.
 
-Everything is **metric by default**; the **Imperial Units** filter converts (m→ft, m/s→mph, °C→°F), while knots and nautical miles are never converted. A variable that isn't present in the upl[...]
+Everything is **metric by default**; the **Imperial Units** filter converts (m→ft, m/s→mph, °C→°F), while knots and nautical miles are never converted. A variable that isn't present in the uploaded file is greyed out.
 
-> The app also carries an internal dictionary of the full raw-variable set (`js/00-var-catalog.js`) that it does **not** yet use for playback. It's groundwork for a future **Quality-Check mode** that [...]
+## Appendix: how values are computed
+
+Everything the app plots is taken from the file as loaded or derived from it in known, standard ways. The derivations:
+
+**Unit normalization.** Values are stored metric. Where a source channel is in m/s it is converted to knots (× 1.94384) for wind speed, true airspeed, and indicated airspeed; a radar altitude given in feet is converted to metres (× 0.3048). The **Imperial Units** filter converts for display only (see the appendix above).
+
+**Pressure altitude.** When a recorded pressure altitude is missing, it is computed from static pressure `P` (mb) with the standard-atmosphere formula `alt_m = (1 − (P / 1013.25)^0.190284) × 44307.69`.
+
+**Temperature baseline.** The warming/cooling track color compares each sample's ambient temperature to a rolling **±300-sample** (about ±5 min at 1 Hz) mean, kept as a sliding-window sum so a long flight does not recompute the window each step.
+
+**8 Hz smoothing (playback interpolation).** For fluid playback the map plane, PFD, and HUD are interpolated between the 1-second samples at 8 Hz with a uniform **Catmull-Rom** spline: position, heading and ground track, pitch and roll, and altitude, with longitude and headings unwrapped the short way so a dateline crossing or a 359°→1° turn interpolates correctly. A small **turbulence-aware micro-motion** is then added so the airframe is never perfectly still: its amplitude scales with the recorded vertical wind (`vtWnd`, the turbulence proxy) and its shape is smooth band-limited noise (a few sub-2 Hz sinusoids), so calm legs stay steady and only bumpy air rocks the plane. The drawn 2D and 3D flight tracks use the same Catmull-Rom curve (one cubic Bezier per 1-second segment in 2D), so the plane always rides on the line.
+
+**3D wind streaks (updraft/downdraft cue).** In the 3D view, a few small vertical streaks near the fuselage rise on an updraft and fall on a downdraft. They are driven by a signed "vertical bump": the recorded vertical wind (`vtWnd`) scaled down, or, if larger, the jerk (the change in the plane's vertical rate over a few seconds, where the vertical rate is the altitude change over a ±4-second window). Streaks appear only once that signal passes a threshold, so they mark clear updrafts and downdrafts rather than minor bumps, and their brightness and speed scale with its size.
+
+**Satellite day/night check.** The warning that a daylight-only product (reflective GOES bands 1 to 6) is being viewed after dark comes from a low-precision solar-position calculation (solar declination plus the equation of time) that gives the sun's elevation angle at the flight point and time; below −6° (past civil twilight) it counts as night.
+
+> The app also carries an internal dictionary of the full raw-variable set (`js/00-var-catalog.js`) that it does **not** yet use for playback. It's groundwork for a future **Quality-Check mode** that would list every variable in a file, overlay and cross-compare a measurement's redundant sensors, and flag data gaps, spikes, or sensor disagreement.

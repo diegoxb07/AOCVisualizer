@@ -280,7 +280,12 @@
         g.fillStyle = NOAA_LIV.black;
         (spec.windows || []).forEach(w => {
             const y = vOf(w.z) * H, du = w.drop ? 0.018 : 0;
-            [0.285 - du, 0.715 + du].forEach(u => {
+            // u 0.285 is the starboard (right) side, 0.715 the port (left); w.side paints one side only
+            // (e.g. the WP-3D's middle station is a regular window on the right, a bubble on the left).
+            let us = [0.285 - du, 0.715 + du];
+            if (w.side === 'right') us = [0.285 - du];
+            else if (w.side === 'left') us = [0.715 + du];
+            us.forEach(u => {
                 g.beginPath();
                 if (spec.windowStyle === 'circle') g.arc(W * u, y, spec.windowR || 4.5, 0, Math.PI * 2);
                 else g.ellipse(W * u, y, 4.5, 7, 0, 0, Math.PI * 2);
@@ -520,7 +525,7 @@
                 paintSweep(g, 512, 1024, vOf, -2.32, 1.765, top, bot, NOAA_LIV.navy);
                 strokeSweep(g, 512, 1024, vOf, -2.32, 1.765, z => top(z) + 0.0155, NOAA_LIV.sky, 6.5);
             },
-            windows: [{ z: -0.747 }, { z: -0.336, drop: true }, { z: 0.075 }, { z: 0.440 }],
+            windows: [{ z: -0.747 }, { z: -0.336, drop: true }, { z: 0.075 }, { z: 0.440 }, { z: -1.25, side: 'right' }],
             windowStyle: 'oval',
             tailWrap: { zTop: 1.372, slope: 1.37 },
             reg: { text: reg, z: 1.683, u: 0.235, color: '#ffffff', px: 14 },
@@ -651,9 +656,13 @@
         const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 8), new THREE.MeshBasicMaterial({ color: 0xd23b2f }));
         beacon.position.set(0, 0.255, -0.15); grp.add(beacon);
 
-        // bubble observation windows protruding from the hull sides: two forward, one aft
-        [-1.55, -1.25, 0.95].forEach(z => {
+        // bubble observation windows protruding from the hull sides. front (-1.55) and aft (0.95) are
+        // on both sides; the middle station (-1.25) is a bubble on the PORT (left, side -1) side only,
+        // and a regular cabin window on the STARBOARD (right, side 1) side (the real WP-3D asymmetry),
+        // painted right-only via the { z: -1.25, side: 'right' } entry in the windows spec above.
+        [[-1.55, false], [-1.25, true], [0.95, false]].forEach(([z, portOnly]) => {
             [1, -1].forEach(side => {
+                if (portOnly && side === 1) return;   // side 1 is starboard (right): its middle bubble is a window instead
                 const bubble = new THREE.Mesh(new THREE.SphereGeometry(0.032, 12, 10), mats.black);
                 bubble.scale.set(0.55, 1, 1);
                 bubble.position.set(side * 0.245, 0.055, z);
@@ -720,7 +729,7 @@
                 paintSweep(g, 512, 1024, vOf, -1.94, 1.98, top, bot, NOAA_LIV.navy, wrapShift);
                 strokeSweep(g, 512, 1024, vOf, -1.92, 1.698, (z, mi) => Math.min(top(z, mi) + 0.009, 0.492), NOAA_LIV.sky, 9, wrapShift);
             },
-            windows: [{ z: -1.266 }, { z: -1.050 }, { z: -0.833 }, { z: -0.617 }, { z: -0.400 }],
+            windows: [{ z: -1.266 }, { z: -1.050 }, { z: -0.833 }, { z: -0.617 }, { z: -0.400 }, { z: -0.184 }],
             windowStyle: 'circle', windowR: 6,
             emblem: { z: -1.407, side: 'right', r: 22, u: 0.325 }
         });

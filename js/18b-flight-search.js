@@ -43,13 +43,25 @@
             });
         }
         if (typeof allParsedData !== 'undefined' && allParsedData && allParsedData.length &&
-            typeof flightMetaData !== 'undefined' && flightMetaData && flightMetaData.id && !out.has(flightMetaData.id)) {
-            out.set(flightMetaData.id, {
-                id: flightMetaData.id,
-                label: fsLabel(flightMetaData.id, { mission: { mission_id: flightMetaData.id } }) + ' (open)',
-                preview: false,
-                rows: allParsedData
-            });
+            typeof flightMetaData !== 'undefined' && flightMetaData && flightMetaData.id) {
+            // canonical mission id of the open flight: archive metadata when present, else strip a
+            // trailing "(storm)" off flightMetaData.id so it matches the preloadedMissions key (which
+            // is the raw mission id). a flight already in the store is shown once, marked open.
+            const openId = (typeof reconArchiveMeta !== 'undefined' && reconArchiveMeta && reconArchiveMeta.missionId)
+                || flightMetaData.id.replace(/\s*\([^)]*\)\s*$/, '');
+            const existing = out.get(openId);
+            if (existing) {
+                existing.label = existing.label.replace(/\s*\(open\)\s*$/, '') + ' (open)';
+                existing.rows = allParsedData;
+                existing.preview = false;
+            } else {
+                out.set(openId, {
+                    id: openId,
+                    label: fsLabel(openId, { mission: { mission_id: openId } }) + ' (open)',
+                    preview: false,
+                    rows: allParsedData
+                });
+            }
         }
         return [...out.values()];
     }

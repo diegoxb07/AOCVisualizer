@@ -70,7 +70,7 @@ flowchart TD
 
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
+**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns works too: paste a full mission id to load it directly, or type a storm name alone (no year needed) to find that storm across every season, newest first; click a result to see its flights. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
 
 **Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
 
@@ -178,6 +178,7 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 | Charts/map not updating after a window change | Click **`Play`** (it applies the current time window). |
 | Nothing plays | Load a file, then click **`Play`**. |
 | Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
+| Found a bug, or have a question or idea | Click the **!** button (top right). It opens a report form addressed to **diegoxiaobarbero@gmail.com**; **Send** opens Gmail with the subject, details, and mission id prefilled. |
 
 ---
 

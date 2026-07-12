@@ -45,15 +45,17 @@
 
     let reconStormsForYear = [];      // last-fetched [{storm_name, storm_id, mission_count}] for the selected year
     let reconMissionsForStorm = [];   // last-fetched missions for the selected storm
-    let reconMissionListCache = {};   // storm_name -> chronologically-sorted missions, prefetched per year
+    let reconMissionListCache = {};   // storm_name -> missions sorted newest first, prefetched per year
     let stormListReqId = 0;           // guards against an older year's slower fetch overwriting a newer one
 
     const RECON_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    // "Aug 12-16" / "Sep 24, Oct 9" span of a storm's (sorted) missions, from flight_date YYYY-MM-DD.
+    // "Aug 12-16" / "Sep 24, Oct 9" span of a storm's missions, from flight_date YYYY-MM-DD.
+    // order-agnostic: iso dates compare lexicographically, so first/last are swapped if needed.
     function reconDateSpan(missions) {
         const fmt = d => { const p = d.split('-'); return RECON_MONTHS[+p[1] - 1] + ' ' + (+p[2]); };
-        const a = missions[0].flight_date, b = missions[missions.length - 1].flight_date;
+        let a = missions[0].flight_date, b = missions[missions.length - 1].flight_date;
         if (!a || !b) return '';
+        if (a > b) { const t = a; a = b; b = t; }
         if (a === b) return fmt(a);
         return a.slice(0, 7) === b.slice(0, 7) ? fmt(a) + ' to ' + (+b.split('-')[2]) : fmt(a) + ' to ' + fmt(b);
     }
@@ -218,7 +220,7 @@
             if (req !== stormListReqId) return;
             reconStormsForYear = (data && data.storms) || [];
             // The storms payload carries no dates, so prefetch every storm's mission list in parallel
-            // to date and sort the dropdown chronologically and make the storm pick instant. A failed
+            // to date and sort the dropdown newest first and make the storm pick instant. A failed
             // list (e.g. "Unknown / Training", whose slash breaks its routing) sorts to the end.
             const lists = await Promise.all(reconStormsForYear.map(s =>
                 reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
@@ -226,13 +228,13 @@
             reconStormsForYear.forEach((s, i) => {
                 const ms = (lists[i] && lists[i].missions) || null;
                 if (ms && ms.length) {
-                    ms.sort((a, b) => (a.start_unix || 0) - (b.start_unix || 0));
+                    ms.sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));   // newest flight first
                     reconMissionListCache[s.storm_name] = ms;
-                    s._firstUnix = ms[0].start_unix || Infinity;
+                    s._newestUnix = ms[0].start_unix || 0;
                     s._dateSpan = reconDateSpan(ms);
-                } else { s._firstUnix = Infinity; s._dateSpan = ''; }
+                } else { s._newestUnix = -Infinity; s._dateSpan = ''; }
             });
-            reconStormsForYear.sort((a, b) => a._firstUnix - b._firstUnix || a.storm_name.localeCompare(b.storm_name));
+            reconStormsForYear.sort((a, b) => (b._newestUnix - a._newestUnix) || a.storm_name.localeCompare(b.storm_name));
             reconStormsForYear.forEach(s => {
                 const opt = document.createElement('option'); opt.value = s.storm_name;
                 opt.textContent = `${boldUnicode(s.storm_name)} (${s.mission_count} flight${s.mission_count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
@@ -263,11 +265,11 @@
         reconMissionSelect.style.cursor = 'progress';
         setReconStatus('Loading flights for ' + stormName + '…');
         try {
-            // Usually already prefetched (and sorted) by the year handler above.
+            // Usually already prefetched (and sorted newest first) by the year handler above.
             let missions = reconMissionListCache[stormName];
             if (!missions) {
                 const data = await reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(stormName));
-                missions = ((data && data.missions) || []).slice().sort((a, b) => (a.start_unix || 0) - (b.start_unix || 0));
+                missions = ((data && data.missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
             }
             reconMissionsForStorm = missions;
             reconMissionsForStorm.forEach(m => {
@@ -301,15 +303,28 @@
     // --- Free-text mission search ------------------------------------------------------------
     // The Year -> Storm -> Flight cascade is exact but unforgiving: a flight filed under the wrong
     // storm, or one of the dozens in "Unknown / Training", is easy to lose. This searches a whole
-    // season's missions by any of id / storm / date / aircraft, and loads any full mission id
-    // directly (mission ids are unique across all years, so the storm need not be known).
+    // season's missions by any of id / storm / date / aircraft, loads any full mission id
+    // directly (mission ids are unique across all years, so the storm need not be known), and a
+    // bare storm name with no year finds that storm across every season, newest first.
     (function wireMissionSearch() {
         const input = document.getElementById('missionSearchInput');
         const results = document.getElementById('missionSearchResults');
         if (!input || !results) return;
         const MISSION_ID_RE = /^\d{8}[A-Za-z]\d+$/;
         const yearIndex = {};        // year -> flat [{...mission, storm_name}]; fetched once per year
+        const stormsByYear = {};     // year -> [{storm_name, mission_count, ...}]; one light request per season
         let searchSeq = 0;           // guards a slow index fetch against a newer keystroke
+
+        // Every season in the archive, newest first (the year select is populated newest first).
+        function allYears() {
+            return [...reconYearSelect.options].map(o => o.value).filter(Boolean);
+        }
+        async function fetchYearStorms(year) {
+            if (stormsByYear[year]) return stormsByYear[year];
+            const data = await reconApiJson('/v1/recon/' + year);
+            stormsByYear[year] = (data && data.storms) || [];
+            return stormsByYear[year];
+        }
 
         // Every mission for a season, flattened across its storms (Unknown / Training included).
         async function fetchYearIndex(year) {
@@ -346,6 +361,61 @@
             b.addEventListener('mousedown', (e) => { e.preventDefault(); hideResults(); input.blur(); loadReconMission(m.mission_id); });
             return b;
         }
+        // one row per storm season hit ("MILTON · 2024 · 7 flights"); clicking drills into its flights
+        function stormRow(year, s) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'block w-full text-left px-2.5 py-1.5 border-b border-hairline last:border-b-0 hover:bg-[color-mix(in_oklab,var(--accent)_50%,transparent)] hover:text-ink transition-colors text-ink bg-panel';
+            const n = s.mission_count;
+            b.innerHTML = `<span class="font-semibold">${escapeHtml(s.storm_name)}</span> <span class="text-muted font-normal">· ${escapeHtml(String(year))}${n ? ' · ' + n + ' flight' + (n === 1 ? '' : 's') : ''}</span>`;
+            b.addEventListener('mousedown', (e) => { e.preventDefault(); expandStorm(year, s.storm_name); });
+            return b;
+        }
+        // drill into one storm from a cross-year hit: list its flights newest first, right in the
+        // dropdown, each row loading directly
+        async function expandStorm(year, stormName) {
+            const seq = ++searchSeq;
+            const frag = rowFrag();
+            frag.appendChild(noteRow('Loading ' + stormName + ' · ' + year + '…'));
+            renderRows(frag);
+            let missions = [];
+            try {
+                const data = await reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(stormName));
+                missions = ((data && data.missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
+            } catch (e) { /* fall through to the empty list */ }
+            if (seq !== searchSeq) return;
+            const out = rowFrag();
+            out.appendChild(noteRow(stormName + ' · ' + year + (missions.length ? '' : ': no flights listed.')));
+            missions.forEach(m => out.appendChild(missionRow(Object.assign({ storm_name: stormName }, m), false)));
+            renderRows(out);
+        }
+        // all-years storm-name matching: one storms request per season (cached), tokens matched
+        // against the storm name, hits rendered newest season first. lead is prepended to the
+        // empty/found note when this runs as the season search's fallback.
+        async function renderStormHits(raw, seq, lead) {
+            const yrs = allYears();
+            const out = rowFrag();
+            if (!yrs.length) { out.appendChild(noteRow('The archive year list has not loaded yet.')); renderRows(out); return; }
+            const lists = await Promise.all(yrs.map(y => fetchYearStorms(y).catch(() => [])));
+            if (seq !== searchSeq) return;
+            const tokens = raw.toLowerCase().split(/\s+/).filter(Boolean);
+            const hits = [];
+            yrs.forEach((y, i) => lists[i].forEach(s => {
+                const name = (s.storm_name || '').toLowerCase();
+                if (tokens.every(t => name.includes(t))) hits.push({ year: y, storm: s });
+            }));
+            if (!hits.length) {
+                out.appendChild(noteRow((lead ? lead + ' No storms with that name in any other year either.'
+                    : 'No storms named "' + raw + '" in any year. Add a year or a mission id to search flights.')));
+                renderRows(out);
+                return;
+            }
+            if (lead) out.appendChild(noteRow(lead + ' Storms with that name in other years:'));
+            const CAP = 60;
+            hits.slice(0, CAP).forEach(h => out.appendChild(stormRow(h.year, h.storm)));
+            if (hits.length > CAP) out.appendChild(noteRow('Showing ' + CAP + ' of ' + hits.length + ' storms; type more of the name.'));
+            renderRows(out);
+        }
 
         // Which season(s) to search: any 4-digit year in the query (an 8-digit id/date leads with
         // one), else the year picked in the cascade.
@@ -365,8 +435,12 @@
             const frag = rowFrag();
             if (idHit) frag.appendChild(missionRow({ mission_id: idHit }, true));
             if (!years.length) {
-                if (!idHit) frag.appendChild(noteRow('Add a year (e.g. 2024), or paste a full mission id, to search.'));
+                // no year in the text and none picked in the cascade: treat the query as a storm
+                // name and search every season (the old behavior asked for a year and gave up)
+                if (idHit) { renderRows(frag); return; }
+                frag.appendChild(noteRow('Searching all years…'));
                 renderRows(frag);
+                await renderStormHits(raw, seq, '');
                 return;
             }
             frag.appendChild(noteRow('Searching ' + years.join(', ') + '…'));
@@ -386,7 +460,18 @@
             if (idHit) out.appendChild(missionRow({ mission_id: idHit }, true));
             const CAP = 60;
             matches.slice(0, CAP).forEach(m => { if (m.mission_id !== idHit) out.appendChild(missionRow(m, false)); });
-            if (!matches.length && !idHit) out.appendChild(noteRow('No missions match in ' + years.join(', ') + '.'));
+            if (!matches.length && !idHit) {
+                // the searched season came from the cascade pick, not the text, so a miss there
+                // may just be a stale year: look for the name across the other seasons before
+                // giving up (typing IAN with 2024 still selected should find IAN 2022)
+                if (!/(?:19|20)\d{2}/.test(raw)) {
+                    out.appendChild(noteRow('No missions match in ' + years.join(', ') + '. Checking other years…'));
+                    renderRows(out);
+                    await renderStormHits(raw, seq, 'No missions match in ' + years.join(', ') + '.');
+                    return;
+                }
+                out.appendChild(noteRow('No missions match in ' + years.join(', ') + '.'));
+            }
             else if (matches.length > CAP) out.appendChild(noteRow('Showing ' + CAP + ' of ' + matches.length + '; refine the search to narrow it.'));
             renderRows(out);
         }
@@ -751,7 +836,7 @@
     // download or parse on any later visit. The preloaded list is its own dropdown; the Preload
     // button opens a modal where any of the selected year's missions can be queued together. ---
     const preloadedMissions = new Map();   // missionId -> { mission, parsed { rows, stats }, isNc, storm }; stored-only stubs carry no parsed
-    const PRELOADED_STORE_MAX = 12;        // full-resolution missions are tens of MB each in IndexedDB
+    const PRELOADED_STORE_MAX = 24;        // full-resolution missions are tens of MB each in IndexedDB, so keep a cap; 24 stays well inside the origin quota
 
     let missionDB = null;
     const missionStoreReady = new Promise(resolve => {
@@ -806,13 +891,14 @@
             } catch (e) {}
         });
     }
-    // Startup: list what the store already holds as light stubs; rows stay on disk until opened.
+    // Startup: list what the store already holds as light stubs (newest flight first, matching
+    // the picker's order); rows stay on disk until opened.
     missionStoreReady.then(() => {
         if (!missionDB) return;
         try {
             const rq = missionDB.transaction('meta').objectStore('meta').getAll();
             rq.onsuccess = () => {
-                (rq.result || []).sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0)).forEach(m => {
+                (rq.result || []).sort((a, b) => (preloadedDateKey(b.missionId, null) - preloadedDateKey(a.missionId, null)) || ((b.savedAt || 0) - (a.savedAt || 0))).forEach(m => {
                     if (!preloadedMissions.has(m.missionId))
                         preloadedMissions.set(m.missionId, { mission: { mission_id: m.missionId, storm_name: m.stormName }, isNc: m.isNc, uploaded: !!m.uploaded });
                 });
@@ -830,17 +916,29 @@
         return `${id}${(rec.mission && rec.mission.storm_name) ? ' · ' + rec.mission.storm_name : ''}${tag}`;
     }
 
+    // flight-date sort key: start_unix when the record carries it, else the YYYYMMDD leading a
+    // mission id, else 0 (flights with no readable date keep their insertion order at the end)
+    function preloadedDateKey(id, rec) {
+        const su = rec && rec.mission && rec.mission.start_unix;
+        if (su) return su;
+        const m = /^(\d{4})(\d{2})(\d{2})/.exec(id || '');
+        return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 1000 : 0;
+    }
+
     function renderLoadedPickerPanel() {
         const listEl = document.getElementById('loadedPickerList'); if (!listEl) return;
         if (preloadedMissions.size === 0) { listEl.innerHTML = '<div class="loaded-pick-empty">No flights loaded yet.</div>'; return; }
         let html = '';
-        preloadedMissions.forEach((rec, id) => {
-            const active = id === loadedPickerSelectedId;
-            html += `<div class="loaded-pick-row${active ? ' active' : ''}">`
-                 +  `<button type="button" class="loaded-pick-open" data-open="${escapeHtml(id)}" title="Open ${escapeHtml(id)}">${escapeHtml(loadedPickerRowLabel(id, rec))}</button>`
-                 +  `<button type="button" class="loaded-pick-x" data-remove="${escapeHtml(id)}" title="Remove this flight from this device" aria-label="Remove ${escapeHtml(id)}">×</button>`
-                 +  `</div>`;
-        });
+        // newest flight first, by flight date rather than by when it was preloaded
+        [...preloadedMissions.entries()]
+            .sort((a, b) => preloadedDateKey(b[0], b[1]) - preloadedDateKey(a[0], a[1]))
+            .forEach(([id, rec]) => {
+                const active = id === loadedPickerSelectedId;
+                html += `<div class="loaded-pick-row${active ? ' active' : ''}">`
+                     +  `<button type="button" class="loaded-pick-open" data-open="${escapeHtml(id)}" title="Open ${escapeHtml(id)}">${escapeHtml(loadedPickerRowLabel(id, rec))}</button>`
+                     +  `<button type="button" class="loaded-pick-x" data-remove="${escapeHtml(id)}" title="Remove this flight from this device" aria-label="Remove ${escapeHtml(id)}">×</button>`
+                     +  `</div>`;
+            });
         listEl.innerHTML = html;
     }
 
@@ -985,12 +1083,13 @@
             checksBox.appendChild(note);
         };
 
-        // Season storm groups, ordered chronologically by each storm's first mission.
+        // Season storm groups, newest storm first (by each storm's latest mission), missions
+        // newest first within a group, matching the archive dropdowns.
         async function fetchSeasonGroups(year) {
             if (preloadListCache[year]) return preloadListCache[year];
             let groups;
             if (year === reconYearSelect.value && Object.keys(reconMissionListCache).length) {
-                // the archive dropdowns already prefetched this season's lists
+                // the archive dropdowns already prefetched this season's lists (newest first)
                 groups = Object.entries(reconMissionListCache).map(([name, missions]) => ({ name, missions }));
             } else {
                 const data = await reconApiJson('/v1/recon/' + year);
@@ -998,11 +1097,11 @@
                 const lists = await Promise.all(storms.map(s =>
                     reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
                 groups = storms.map((s, i) => {
-                    const ms = ((lists[i] && lists[i].missions) || []).slice().sort((a, b) => (a.start_unix || 0) - (b.start_unix || 0));
+                    const ms = ((lists[i] && lists[i].missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
                     return { name: s.storm_name, missions: ms };
                 }).filter(g => g.missions.length);
             }
-            groups.sort((a, b) => ((a.missions[0].start_unix || Infinity) - (b.missions[0].start_unix || Infinity)) || a.name.localeCompare(b.name));
+            groups.sort((a, b) => ((b.missions[0].start_unix || 0) - (a.missions[0].start_unix || 0)) || a.name.localeCompare(b.name));
             preloadListCache[year] = groups;
             return groups;
         }

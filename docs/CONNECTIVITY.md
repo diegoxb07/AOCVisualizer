@@ -20,7 +20,7 @@ in each state**, so during a training or replay session you always know your opt
 
 | Service | Used for | Required? |
 | --- | --- | --- |
-| **noaa-recon-api** (`https://joshmurdock.net/api`) | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
+| **noaa-recon-api** (currently `https://joshmurdock.net/api`, planned move to a NOAA-internal host, see [Changing the API host](#changing-the-api-host)) | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
 | **NASA GIBS** | MODIS / VIIRS polar satellite overlays | Only for MODIS/VIIRS overlays |
 | **GitHub-hosted GeoJSON** (Natural Earth plus US states) | The map's coastline and state geometry | Fetched once at startup; map still runs if it fails |
 | **CDNs** (Tailwind, Chart.js, Three.js, netcdfjs, Tesseract.js) | App libraries | Needed to load the page the first time, then browser-cached |
@@ -138,7 +138,7 @@ If you can't wait, reloading the page also re-checks immediately.
 
 ## Endpoint reference
 
-All under `RECON_API_BASE = https://joshmurdock.net/api` (defined in `js/02-satellite.js`).
+All under `RECON_API_BASE` (defined in `js/02-satellite.js`, currently `https://joshmurdock.net/api`).
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -152,6 +152,21 @@ All under `RECON_API_BASE = https://joshmurdock.net/api` (defined in `js/02-sate
 > The API is the source of truth for available satellite products. New bands and composites need
 > **no** client change; they appear in the picker on the next `products` fetch. Check the API repo
 > or `API.md` (github.com/jjmurdock19/noaa-recon-api) before assuming a product is missing.
+
+---
+
+## Changing the API host
+
+The recon API is planned to move from `joshmurdock.net` to a NOAA-internal host. Every fetch in
+the app goes through the single `RECON_API_BASE` constant, so the swap is two edits:
+
+1. **`RECON_API_BASE`** in `js/02-satellite.js`: point it at the new base URL (keep the `/api` path
+   segment if the new deployment uses one).
+2. **The CSP `<meta>` tag** in `index.html`: replace `https://joshmurdock.net` with the new origin
+   in **both** `connect-src` and `img-src` (the browser blocks the new host silently otherwise).
+
+Then update the host shown in this file and in the doc comments at the top of
+`js/12b-recon-archive.js`, `js/01-state.js`, and `js/02-satellite.js`.
 
 ---
 

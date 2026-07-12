@@ -20,6 +20,7 @@
     --accent-ink: oklch(97% 0.01 258);
     --accent-soft: oklch(30% 0.06 258);
     --danger: oklch(58% 0.17 25);
+    --warn: oklch(80% 0.13 82);
     --media-h: clamp(480px, 56vh, 620px); /* JS-resizable via the media drag handle */
 }
 :root[data-theme="light"] {
@@ -36,6 +37,7 @@
     --accent-ink: oklch(99% 0.001 90);
     --accent-soft: oklch(88% 0.045 258);
     --danger: oklch(48% 0.15 25);
+    --warn: oklch(56% 0.12 74);
 }
 
 /* Base */
@@ -180,8 +182,8 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .loaded-pick-open { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; text-align: left; background: transparent; border: none; color: var(--text); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loaded-pick-open:hover { background: var(--panel-strip); }
 .loaded-pick-row.active .loaded-pick-open { color: var(--accent); font-weight: 700; }
-.loaded-pick-x { flex: none; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 4px; color: var(--danger); font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.12s, color 0.12s; }
-.loaded-pick-x:hover { background: color-mix(in oklab, var(--danger) 16%, transparent); color: var(--danger); }
+.loaded-pick-x { flex: none; width: 20px; height: 20px; line-height: 1; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-radius: 4px; color: color-mix(in oklab, var(--danger) 55%, var(--text-muted)); font-size: 16px; font-weight: 700; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.loaded-pick-x:hover { background: color-mix(in oklab, var(--danger) 14%, transparent); color: color-mix(in oklab, var(--danger) 78%, var(--text-muted)); }
 .loaded-pick-empty { color: var(--text-faint); font-size: 11px; padding: 8px; }
 
 /* Fullscreen behavior (functional, do not simplify) */
@@ -559,3 +561,16 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
     transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, fill 0.35s ease, left 0.35s ease !important;
 }
+
+/* report a problem form (the ! button next to help): subject + details handed to a prefilled
+   gmail compose, same feature as in AOCQualityCheck */
+.report-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.report-form label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+.report-form input, .report-form textarea { background: var(--panel-strip); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; color: var(--text); outline: none; font-family: inherit; resize: vertical; transition: border-color .12s; }
+.report-form input:focus, .report-form textarea:focus { border-color: var(--accent); }
+.report-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.report-note { font-size: 10px; color: var(--text-faint); }
+.report-confirm-text { font-size: 12.5px; line-height: 1.5; color: var(--text); margin: 4px 0 6px; }
+.report-btn { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background .12s, border-color .12s; }
+.report-btn:hover { background: color-mix(in oklab, var(--accent) 16%, var(--panel-strip)); border-color: var(--accent); }
+.report-x { background: none; border: none; color: var(--text-muted); font-weight: 700; cursor: pointer; font-size: 13px; }

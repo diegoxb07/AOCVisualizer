@@ -20,33 +20,33 @@
         let statsHTML = `
             <div style="color:var(--accent); font-weight:bold; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:14px; font-family:monospace; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
             <div style="font-family:monospace; font-size:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; line-height: 1.5;">
-                <p>COORD LAT   : <span style="color:#fff; font-weight:bold;">${sf(dataRow.lat, 3)}° N</span></p>
-                <p>COORD LON   : <span style="color:#fff; font-weight:bold;">${sf(Math.abs(dataRow.lon), 3)}° W</span></p>`;
+                <p>COORD LAT   : <span style="color:var(--text); font-weight:bold;">${sf(dataRow.lat, 3)}° N</span></p>
+                <p>COORD LON   : <span style="color:var(--text); font-weight:bold;">${sf(Math.abs(dataRow.lon), 3)}° W</span></p>`;
                 
-        if (targetPr !== 850 || availableMetrics.has('pressure') || availableMetrics.has('sfcPr')) { statsHTML += `<p>BARO LEVEL  : <span style="color:#7dd3fc; font-weight:bold;">${sf(targetPr, 1)} mb</span></p>`; }
+        if (targetPr !== 850 || availableMetrics.has('pressure') || availableMetrics.has('sfcPr')) { statsHTML += `<p>BARO LEVEL  : <span style="color:var(--val-cool); font-weight:bold;">${sf(targetPr, 1)} mb</span></p>`; }
         
         let pAltDisp = dataRow.pAlt !== null ? sf(isImperial ? dataRow.pAlt * 3.28084 : dataRow.pAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
         let gAltDisp = dataRow.gpsAlt !== null ? sf(isImperial ? dataRow.gpsAlt * 3.28084 : dataRow.gpsAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
         let dValueDisp = dataRow.dValue !== null ? sf(isImperial ? dataRow.dValue * 3.28084 : dataRow.dValue, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
         
         if (useGps) { if (availableMetrics.has('gpsAlt')) statsHTML += `<p>GPS ALTITUDE: <span style="color:var(--accent); font-weight:bold;">${gAltDisp}</span></p>`; } 
-        else { if (availableMetrics.has('pAlt')) statsHTML += `<p>PRESS ALT   : <span style="color:#7c93ff; font-weight:bold;">${pAltDisp}</span></p>`; }
+        else { if (availableMetrics.has('pAlt')) statsHTML += `<p>PRESS ALT   : <span style="color:var(--val-alt); font-weight:bold;">${pAltDisp}</span></p>`; }
 
         if (availableMetrics.has('tempr') || availableMetrics.has('dewpt')) {
             let tDisp = dataRow.tempr !== null ? sf(isImperial ? (dataRow.tempr * 9/5 + 32) : dataRow.tempr, 1) + (isImperial ? '°F' : '°C') : 'NaN';
             let tdDisp = dataRow.dewpt !== null ? sf(isImperial ? (dataRow.dewpt * 9/5 + 32) : dataRow.dewpt, 1) + (isImperial ? '°F' : '°C') : 'NaN';
-            statsHTML += `<p>ENVIRONMENT : <span style="color:#ef4444; font-weight:bold;">${tDisp}</span> / <span style="color:#7dd3fc; font-weight:bold;">${tdDisp}</span></p>`;
+            statsHTML += `<p>ENVIRONMENT : <span style="color:#ef4444; font-weight:bold;">${tDisp}</span> / <span style="color:var(--val-cool); font-weight:bold;">${tdDisp}</span></p>`;
         }
         
-        if (rhCalc !== null) statsHTML += `<p>COMPUTED RH : <span style="color:#9aa1ad; font-weight:bold;">${sf(rhCalc, 1)}%</span></p>`;
-        if (availableMetrics.has('windDir') || availableMetrics.has('windSpd')) statsHTML += `<p>WIND VECTOR : <span style="color:#fbbf24; font-weight:bold;">${sf(dataRow.windDir, 0)}° @ ${sf(dataRow.windSpd, 1)} kt</span></p>`;
-        if (availableMetrics.has('accZ')) statsHTML += `<p>VERT ACCEL  : <span style="color:#aeb4bf; font-weight:bold;">${sf(dataRow.accZ, 2)} m/s²</span></p>`;
+        if (rhCalc !== null) statsHTML += `<p>COMPUTED RH : <span style="color:var(--text-muted); font-weight:bold;">${sf(rhCalc, 1)}%</span></p>`;
+        if (availableMetrics.has('windDir') || availableMetrics.has('windSpd')) statsHTML += `<p>WIND VECTOR : <span style="color:var(--val-warm); font-weight:bold;">${sf(dataRow.windDir, 0)}° @ ${sf(dataRow.windSpd, 1)} kt</span></p>`;
+        if (availableMetrics.has('accZ')) statsHTML += `<p>VERT ACCEL  : <span style="color:var(--text-muted); font-weight:bold;">${sf(dataRow.accZ, 2)} m/s²</span></p>`;
         if (availableMetrics.has('pitch') || availableMetrics.has('roll')) statsHTML += `<p>PITCH / ROLL: <span style="color:var(--accent); font-weight:bold;">${sf(dataRow.pitch, 1)}° / ${sf(dataRow.roll, 1)}°</span></p>`;
-        if (availableMetrics.has('driftAngle')) statsHTML += `<p>DRIFT ANGLE : <span style="color:#7ad9ff; font-weight:bold;">${sf(dataRow.driftAngle, 1)}°</span></p>`;
-        if (availableMetrics.has('tas')) statsHTML += `<p>TRUE AIRSPD : <span style="color:#fbbf24; font-weight:bold;">${sf(dataRow.tas, 1)} kt</span></p>`;
-        if (availableMetrics.has('ias')) statsHTML += `<p>IND AIRSPD  : <span style="color:#7dd3fc; font-weight:bold;">${sf(dataRow.ias, 1)} kt</span></p>`;
+        if (availableMetrics.has('driftAngle')) statsHTML += `<p>DRIFT ANGLE : <span style="color:var(--val-cool); font-weight:bold;">${sf(dataRow.driftAngle, 1)}°</span></p>`;
+        if (availableMetrics.has('tas')) statsHTML += `<p>TRUE AIRSPD : <span style="color:var(--val-warm); font-weight:bold;">${sf(dataRow.tas, 1)} kt</span></p>`;
+        if (availableMetrics.has('ias')) statsHTML += `<p>IND AIRSPD  : <span style="color:var(--val-cool); font-weight:bold;">${sf(dataRow.ias, 1)} kt</span></p>`;
         if (availableMetrics.has('vtWnd')) { let vtWndDisp = dataRow.vtWnd !== null ? sf(isImperial ? dataRow.vtWnd * 2.23694 : dataRow.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'NaN'; statsHTML += `<p>VERT WIND   : <span style="color:#ff3d71; font-weight:bold;">${vtWndDisp}</span></p>`; }
-        if (availableMetrics.has('dValue')) statsHTML += `<p>D-VALUE     : <span style="color:#7c93ff; font-weight:bold;">${dValueDisp}</span></p>`;
+        if (availableMetrics.has('dValue')) statsHTML += `<p>D-VALUE     : <span style="color:var(--val-alt); font-weight:bold;">${dValueDisp}</span></p>`;
         
         statsHTML += `</div>`; document.getElementById('pointAnalysisStats').innerHTML = statsHTML;
     }

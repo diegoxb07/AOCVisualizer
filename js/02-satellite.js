@@ -1476,12 +1476,25 @@
     // --- Background progress pill (2D map, top-center) ---------------------------------
     // Non-blocking indicator for the local satellite cache, so the user can close the modal and keep
     // working while it fills in the background. Driven by the batch cache via setBatchProgress().
+    // One pending hide at a time, owned here. A pass that ends leaves its bar up briefly to show the
+    // final count, so without this the outgoing pass's timer would pull the bar down on whatever pass
+    // started in the meantime (switching band cancels one pass and starts another immediately).
+    let _satPrefetchHideTimer = null;
+    function clearSatPrefetchHide() {
+        if (_satPrefetchHideTimer) { clearTimeout(_satPrefetchHideTimer); _satPrefetchHideTimer = null; }
+    }
+    function fadeSatPrefetchBar(ms) {
+        clearSatPrefetchHide();
+        _satPrefetchHideTimer = setTimeout(() => { _satPrefetchHideTimer = null; hideSatPrefetchBar(); }, ms);
+    }
     function showSatPrefetchBar() {
+        clearSatPrefetchHide();
         const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden');
         const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Preparing satellite cache…';
         setPrefetchIndeterminate(true);   // bounce until the first tile actually lands
     }
     function hideSatPrefetchBar() {
+        clearSatPrefetchHide();
         const b = document.getElementById('satPrefetchBar'); if (b) b.classList.add('hidden');
         setPrefetchIndeterminate(false);
     }
@@ -1626,7 +1639,7 @@
         const sb = document.getElementById('batchCacheStartBtn'); if (sb) sb.textContent = 'Start caching';
         const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = label || 'Stopped';
         const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Cache stopped.';
-        setTimeout(hideSatPrefetchBar, 800);
+        fadeSatPrefetchBar(800);
     }
 
     // Pre-caches the currently loaded flight's tiles for a satellite/bands, building the same
@@ -1659,7 +1672,7 @@
         setSatelliteControlsLocked(false);
         const doneMsg = `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
         setBatchProgress(done, total || 1, doneMsg);
-        setTimeout(hideSatPrefetchBar, 2500);
+        fadeSatPrefetchBar(2500);
         showToast(doneMsg, 6000);
         // Tiles are warm now: draw the current frame's imagery straight from cache.
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') fetchSatelliteImage(filteredData[currentIdx].absSeconds);
@@ -1754,7 +1767,7 @@
         if (startBtn) startBtn.textContent = 'Start caching';
         const msg = `Local cache done: ${fetched} new tile(s) from ${sources.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date / unreadable)` : ''}.`;
         setBatchProgress(done, total || 1, msg);
-        setTimeout(hideSatPrefetchBar, 2500);   // leave the pill up briefly with the final count
+        fadeSatPrefetchBar(2500);   // leave the pill up briefly with the final count
         showToast(msg, 7000);
     }
 

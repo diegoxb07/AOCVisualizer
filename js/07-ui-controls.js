@@ -256,6 +256,19 @@
             }
             // country labels: sit at the nearest coastline point to the plane, only while that coast is in
             // range, and scale with camera distance so they stay a constant readable size at any altitude.
+            // the state under the plane: one flat label, at the state's own centre rather than the
+            // plane's, so it names the ground without trailing the aircraft. Toggled only on a change
+            // of state, and stateIndexAt tests the current one first, so this stays a single hit test.
+            if (_stateLabels.length) {
+                const in3dS = !trackerModeSelect || trackerModeSelect.value === '3d';
+                const row = (in3dS && filteredData.length) ? filteredData[currentIdx] : null;
+                const sIdx = row ? stateIndexAt(row.lat, row.lon) : -1;
+                if (sIdx !== _stateLabelIdx) {
+                    if (_stateLabelIdx >= 0) _stateLabels[_stateLabelIdx].mesh.visible = false;
+                    if (sIdx >= 0) _stateLabels[sIdx].mesh.visible = true;
+                    _stateLabelIdx = sIdx;
+                }
+            }
             if (_countryLabels.length) {
                 const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
                 const show = in3d && camera3D && planeGroup3D && filteredData.length;
@@ -263,6 +276,8 @@
                 for (let i = 0; i < _countryLabels.length; i++) {
                     const cl = _countryLabels[i];
                     if (!show) { cl.sprite.visible = false; continue; }
+                    // a named state already says the country, so the US label stands down over one
+                    if (cl.isUSA && _stateLabelIdx >= 0) { cl.sprite.visible = false; continue; }
                     let best = Infinity, bx = 0, by = 0, bz = 0;
                     for (let k = 0; k < cl.pts.length; k++) { const p = cl.pts[k]; const dx = px - p.x, dz = pz - p.z, dd = dx * dx + dz * dz; if (dd < best) { best = dd; bx = p.x; by = p.y; bz = p.z; } }
                     const dist = Math.sqrt(best);
@@ -288,7 +303,9 @@
     let windStreaks3D = null;   // small vertical wind streaks on the plane for updrafts/downdrafts
     let _vertBump = 0;          // signed vertical bump at the current frame (updraft +, downdraft -)
     let _borderLines = [];      // { line, mat, box, base } coastline/border lines, faded by distance to the plane
-    let _countryLabels = [];    // { sprite, mat, aspect, pts } country name labels shown near visible coastlines
+    let _countryLabels = [];    // { sprite, mat, aspect, pts, isUSA } country name labels shown near visible coastlines
+    let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
+    let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -460,15 +477,55 @@
         return { sprite: spr, mat, aspect: w / 58, pts: [] };
     }
 
+    // A state name lying flat on the basemap, sized to the state's own width so it reads like a
+    // printed map label from straight above. A mesh, not a sprite: it holds its ground orientation
+    // and its map scale rather than turning to face the camera and holding a screen size.
+    function stateLabelMesh(name, worldWidth) {
+        const cv = document.createElement('canvas');
+        let c = cv.getContext('2d');
+        c.font = 'bold 44px sans-serif';
+        const w = Math.ceil(c.measureText(name).width) + 40;
+        cv.width = w; cv.height = 72;
+        c = cv.getContext('2d');
+        c.font = 'bold 44px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.lineWidth = 8; c.strokeStyle = 'rgba(5,12,20,0.92)'; c.strokeText(name, w / 2, 38);
+        c.fillStyle = '#eef4fb'; c.fillText(name, w / 2, 38);
+        const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        const geo = new THREE.PlaneGeometry(worldWidth, worldWidth * (72 / w));
+        geo.rotateX(-Math.PI / 2);   // lay it on the ground; the texture's top edge then points north
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 4; mesh.visible = false;
+        return { mesh, mat };
+    }
+
+    // mapFeatures index of the US state holding (lat, lon), or -1. The last match is tested first,
+    // since a flight sits inside one state for minutes at a time; the rest reject on bbox. Crossings
+    // are counted across every ring, so holes and each part of a multi-part state fall out even-odd.
+    function stateIndexAt(lat, lon) {
+        const hit = i => {
+            const s = _stateLabels[i], b = s.bbox;
+            if (lon < b[0] || lon > b[2] || lat < b[1] || lat > b[3]) return false;
+            let inside = false;
+            for (let k = 0; k < s.rings.length; k++) if (pointInPolygon(s.rings[k], lat, lon)) inside = !inside;
+            return inside;
+        };
+        if (_stateLabelIdx >= 0 && _stateLabelIdx < _stateLabels.length && hit(_stateLabelIdx)) return _stateLabelIdx;
+        for (let i = 0; i < _stateLabels.length; i++) if (i !== _stateLabelIdx && hit(i)) return i;
+        return -1;
+    }
+
     function build3DScene() {
         if (!threeDInitialized) init3D();
         // a newly loaded flight may be the other airframe; no-ops when the right model is up
         if (typeof setPlaneModel3D === 'function') setPlaneModel3D();
         while(threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]);
         _borderLines = [];
-        // country labels live on the scene (not threeMapGroup), so drop the previous set here.
+        // country and state labels live on the scene (not threeMapGroup), so drop the previous set here.
         _countryLabels.forEach(cl => { if (cl.sprite.parent) cl.sprite.parent.remove(cl.sprite); if (cl.mat.map) cl.mat.map.dispose(); cl.mat.dispose(); });
         _countryLabels = [];
+        _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
+        _stateLabels = []; _stateLabelIdx = -1;
         const landMat = new THREE.MeshBasicMaterial({ color: 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // bright coastlines and dimmer internal (state) borders, so countries read clearly against the
         // terrain shading. depthWrite off keeps them from occluding the streaks and each other.
@@ -507,8 +564,34 @@
                 if (all.length) {
                     const step = Math.max(1, Math.floor(all.length / 40));
                     const lbl = countryLabelSprite(feature.properties.NAME);
+                    lbl.isUSA = feature.properties.NAME === 'United States of America';
                     for (let k = 0; k < all.length; k += step) { const cc = all[k]; lbl.pts.push(get3DCoord(cc[0], cc[1], borderAlt(cc))); }
                     scene3D.add(lbl.sprite); _countryLabels.push(lbl);
+                }
+            }
+            // one flat name label per US state, laid on the basemap at the state's own centre and shown
+            // only for the state under the plane (animate3D), which is what names it on a look straight
+            // down. us-states.json carries the name lowercase, unlike the countries file's NAME.
+            if (isState && scene3D && feature.properties && feature.properties.name) {
+                const polys = geom.type === 'Polygon' ? [geom.coordinates] : (geom.type === 'MultiPolygon' ? geom.coordinates : []);
+                // pointInPolygon (js/04-geo-measure.js) reads {lat, lon}, so convert the rings once here
+                // rather than per test.
+                const rings = [];
+                polys.forEach(poly => poly.forEach(ring => rings.push(ring.map(cc => ({ lon: cc[0], lat: cc[1] })))));
+                const bbox = feature.properties.bbox;
+                if (rings.length && bbox) {
+                    // Anchor on the largest ring's average vertex, which sits inside the landmass for
+                    // shapes whose bbox centre does not (a bay, a lake, a second peninsula).
+                    let big = rings[0];
+                    rings.forEach(r => { if (r.length > big.length) big = r; });
+                    let sx = 0, sy = 0;
+                    big.forEach(p => { sx += p.lon; sy += p.lat; });
+                    const cLon = sx / big.length, cLat = sy / big.length;
+                    const lbl = stateLabelMesh(feature.properties.name, (bbox[2] - bbox[0]) * 20 * 0.55);
+                    const at = get3DCoord(cLon, cLat, borderAlt([cLon, cLat]) + 60);
+                    lbl.mesh.position.copy(at);
+                    lbl.rings = rings; lbl.bbox = bbox;
+                    scene3D.add(lbl.mesh); _stateLabels.push(lbl);
                 }
             }
         });

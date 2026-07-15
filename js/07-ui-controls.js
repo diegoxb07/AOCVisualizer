@@ -651,9 +651,11 @@
         const stateMat = new THREE.LineBasicMaterial({ color: light3D ? 0x94a3b0 : 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
-        // [lon, lat], so terrainElevationMeters takes (c[1], c[0]).
+        // [lon, lat], so terrainGroundMeters takes (c[1], c[0]). It reads the same pinned ground the
+        // surface is built from, refreshed here first, so a pinned field cannot rise through them.
         const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
-        const borderAlt = c => hasTerrain ? terrainElevationMeters(c[1], c[0]) + 90 : 5;
+        if (typeof refreshTerrainPins === 'function') refreshTerrainPins();
+        const borderAlt = c => hasTerrain ? terrainGroundMeters(c[1], c[0]) + 90 : 5;
         const processPolygon = (poly, isState) => {
             const shape = new THREE.Shape();
             poly.forEach((ring, ringIdx) => {

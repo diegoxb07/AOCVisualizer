@@ -1063,6 +1063,145 @@
         setReconStatus('Opened ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
     }
 
+    // ---- Shared archive season picker -------------------------------------------------------
+    // The Batch Load modal and the Pre-Cache Satellite Imagery modal both need the same
+    // Year -> Storm -> Flight tree over the archive, so it lives out here rather than inside
+    // either wire-up. They differ only in what an already-loaded mission means: Batch Load has
+    // nothing left to do for one (locks it), pre-cache still has its imagery to fetch (leaves it
+    // selectable, and it costs no download).
+    const reconSeasonCache = {};   // year -> [{ name, missions }] storm groups, fetched once per season
+
+    // Season storm groups, newest storm first (by each storm's latest mission), missions
+    // newest first within a group, matching the archive dropdowns.
+    async function reconFetchSeasonGroups(year) {
+        if (reconSeasonCache[year]) return reconSeasonCache[year];
+        let groups;
+        if (year === reconYearSelect.value && Object.keys(reconMissionListCache).length) {
+            // the archive dropdowns already prefetched this season's lists (newest first)
+            groups = Object.entries(reconMissionListCache).map(([name, missions]) => ({ name, missions }));
+        } else {
+            const data = await reconApiJson('/v1/recon/' + year);
+            const storms = (data && data.storms) || [];
+            const lists = await Promise.all(storms.map(s =>
+                reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
+            groups = storms.map((s, i) => {
+                const ms = ((lists[i] && lists[i].missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
+                return { name: s.storm_name, missions: ms };
+            }).filter(g => g.missions.length);
+        }
+        groups.sort((a, b) => ((b.missions[0].start_unix || 0) - (a.missions[0].start_unix || 0)) || a.name.localeCompare(b.name));
+        reconSeasonCache[year] = groups;
+        return groups;
+    }
+
+    function reconChecksNote(container, text) {
+        if (!container) return;
+        container.innerHTML = '';
+        const note = document.createElement('div');
+        note.className = 'text-faint';
+        note.textContent = text;
+        container.appendChild(note);
+    }
+
+    // One block per storm: a group checkbox toggling the whole storm, missions in a two-column
+    // grid beneath it. opts.lockLoaded checks + disables missions already on the device;
+    // opts.loadedTag is the suffix marking those; opts.checkId pre-checks one mission.
+    function reconRenderSeasonChecks(container, groups, opts) {
+        const o = opts || {};
+        if (!container) return;
+        container.innerHTML = '';
+        if (!groups.length) { reconChecksNote(container, 'No archived recon flights found for this season.'); return; }
+        groups.forEach(gr => {
+            const block = document.createElement('div');
+            const head = document.createElement('label');
+            head.className = 'flex items-center gap-2 cursor-pointer font-semibold text-muted';
+            const all = document.createElement('input');
+            // Marked so mission-collecting selectors can exclude it: it carries no mission id (a
+            // valueless checkbox reads as "on"), it only toggles the storm's mission boxes.
+            all.type = 'checkbox'; all.className = 'accent-accent recon-storm-all';
+            const title = document.createElement('span');
+            title.textContent = gr.name;
+            const meta = document.createElement('span');
+            meta.className = 'text-faint font-normal';
+            const dspan = reconDateSpan(gr.missions);
+            meta.textContent = `(${gr.missions.length} flight${gr.missions.length === 1 ? '' : 's'}${dspan ? ', ' + dspan : ''})`;
+            head.appendChild(all); head.appendChild(title); head.appendChild(meta);
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-2 gap-x-3 pl-5 mt-0.5';
+            gr.missions.forEach(m => {
+                const onDevice = preloadedMissions.has(m.mission_id);
+                const lock = !!o.lockLoaded && onDevice;
+                const lbl = document.createElement('label');
+                lbl.className = 'flex items-center gap-2 cursor-pointer min-w-0';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.value = m.mission_id; cb.className = 'accent-accent flex-none';
+                if (lock) { cb.checked = true; cb.disabled = true; }
+                else if (o.checkId && m.mission_id === o.checkId) cb.checked = true;
+                const span = document.createElement('span');
+                span.className = 'truncate';
+                const tag = onDevice ? (o.loadedTag || ' (loaded)') : '';
+                span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${tag}`;
+                span.title = `${m.flight_date} · ${m.aircraft || m.tail_num || ''} · ${m.obs_count} obs`;
+                lbl.appendChild(cb); lbl.appendChild(span);
+                grid.appendChild(lbl);
+            });
+            all.addEventListener('change', () => {
+                grid.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(cb => { cb.checked = all.checked; });
+            });
+            block.appendChild(head); block.appendChild(grid);
+            container.appendChild(block);
+        });
+    }
+
+    // Fill a modal's own season <select> from the archive's year list, so it works with nothing
+    // picked in the archive cascade. Idempotent, safe to call on every open.
+    async function reconFillSeasonYears(sel) {
+        if (!sel) return;
+        await reconYearsReady;
+        if (sel.options.length <= 1) {
+            sel.innerHTML = '<option value="">Year…</option>';
+            [...reconYearSelect.options].slice(1).forEach(o => {
+                const opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.value;
+                sel.appendChild(opt);
+            });
+        }
+        if (!sel.value && reconYearSelect.value) sel.value = reconYearSelect.value;
+    }
+
+    // Archive missions carry flight_date; every mission id also starts YYYYMMDD, so fall back to that.
+    function reconMissionDate(mission, missionId) {
+        if (mission && mission.flight_date) return mission.flight_date;
+        const m = String(missionId || '').match(/^(\d{4})(\d{2})(\d{2})/);
+        return m ? `${m[1]}-${m[2]}-${m[3]}` : 'Unknown';
+    }
+
+    // Track + flight date for an archived mission, for callers that only need the geometry (i.e.
+    // pre-caching its satellite imagery, which needs the box and time span, nothing else).
+    // Reuses the on-device copy when there is one, including the post-reload case where the record
+    // is a stub in memory but whole in IndexedDB, so a batch-loaded mission costs no download.
+    // Deliberately does NOT store what it downloads: caching imagery shouldn't silently evict
+    // someone's batch-loaded missions out of the PRELOADED_STORE_MAX slots.
+    async function reconRowsForMission(missionId, onProgress) {
+        const note = onProgress || (() => {});
+        let rec = preloadedMissions.get(missionId);
+        if (rec && !rec.parsed) rec = (await missionIdbGet(missionId)) || rec;
+        if (rec && rec.parsed && rec.parsed.rows && rec.parsed.rows.length) {
+            return { rows: rec.parsed.rows, date: reconMissionDate(rec.mission, missionId) };
+        }
+        const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
+        let parsed;
+        try {
+            const buf = await fetchArrayBufferWithProgress(
+                RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
+                (r, t) => note(`Reading ${missionId}… ${Math.round(r / t * 100)}%`));
+            parsed = await parseFlightSource(buf);
+            if (!parsed.rows.length) throw new Error('no usable rows');
+        } catch (e) {
+            parsed = await parseFlightSource(reconObsToTsv(mission));   // decimated preview fallback
+        }
+        return { rows: parsed.rows, date: reconMissionDate(mission, missionId) };
+    }
+
     (function wirePreload() {
         const modal = document.getElementById('preloadModal');
         const checksBox = document.getElementById('preloadMissionChecks');
@@ -1072,91 +1211,21 @@
         const yearSel = document.getElementById('preloadYearSelect');
         let preloadRunning = false;
         const setModalStatus = msg => { if (statusEl) statusEl.textContent = msg || ''; };
-        const preloadListCache = {};   // year -> [{ name, missions }] storm groups, fetched once per season
         let preloadListReq = 0;        // guards a slow season fetch against a newer pick
 
-        const checksNote = text => {
-            checksBox.innerHTML = '';
-            const note = document.createElement('div');
-            note.className = 'text-faint';
-            note.textContent = text;
-            checksBox.appendChild(note);
-        };
-
-        // Season storm groups, newest storm first (by each storm's latest mission), missions
-        // newest first within a group, matching the archive dropdowns.
-        async function fetchSeasonGroups(year) {
-            if (preloadListCache[year]) return preloadListCache[year];
-            let groups;
-            if (year === reconYearSelect.value && Object.keys(reconMissionListCache).length) {
-                // the archive dropdowns already prefetched this season's lists (newest first)
-                groups = Object.entries(reconMissionListCache).map(([name, missions]) => ({ name, missions }));
-            } else {
-                const data = await reconApiJson('/v1/recon/' + year);
-                const storms = (data && data.storms) || [];
-                const lists = await Promise.all(storms.map(s =>
-                    reconApiJson('/v1/recon/' + year + '/' + encodeURIComponent(s.storm_name)).catch(() => null)));
-                groups = storms.map((s, i) => {
-                    const ms = ((lists[i] && lists[i].missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
-                    return { name: s.storm_name, missions: ms };
-                }).filter(g => g.missions.length);
-            }
-            groups.sort((a, b) => ((b.missions[0].start_unix || 0) - (a.missions[0].start_unix || 0)) || a.name.localeCompare(b.name));
-            preloadListCache[year] = groups;
-            return groups;
-        }
-
-        // One block per storm: a group checkbox toggling the whole storm, missions in a
-        // two-column grid beneath it, already-preloaded ones checked and locked.
-        function renderSeason(groups) {
-            checksBox.innerHTML = '';
-            if (!groups.length) { checksNote('No archived recon flights found for this season.'); return; }
-            groups.forEach(gr => {
-                const block = document.createElement('div');
-                const head = document.createElement('label');
-                head.className = 'flex items-center gap-2 cursor-pointer font-semibold text-muted';
-                const all = document.createElement('input');
-                all.type = 'checkbox'; all.className = 'accent-accent';
-                const title = document.createElement('span');
-                title.textContent = gr.name;
-                const meta = document.createElement('span');
-                meta.className = 'text-faint font-normal';
-                const span = reconDateSpan(gr.missions);
-                meta.textContent = `(${gr.missions.length} flight${gr.missions.length === 1 ? '' : 's'}${span ? ', ' + span : ''})`;
-                head.appendChild(all); head.appendChild(title); head.appendChild(meta);
-                const grid = document.createElement('div');
-                grid.className = 'grid grid-cols-2 gap-x-3 pl-5 mt-0.5';
-                gr.missions.forEach(m => {
-                    const done = preloadedMissions.has(m.mission_id);
-                    const lbl = document.createElement('label');
-                    lbl.className = 'flex items-center gap-2 cursor-pointer min-w-0';
-                    const cb = document.createElement('input');
-                    cb.type = 'checkbox'; cb.value = m.mission_id; cb.className = 'accent-accent flex-none';
-                    if (done) { cb.checked = true; cb.disabled = true; }
-                    else if (m.mission_id === reconMissionSelect.value) cb.checked = true;
-                    const span = document.createElement('span');
-                    span.className = 'truncate';
-                    span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${done ? ' (loaded)' : ''}`;
-                    span.title = `${m.flight_date} · ${m.aircraft || m.tail_num || ''} · ${m.obs_count} obs`;
-                    lbl.appendChild(cb); lbl.appendChild(span);
-                    grid.appendChild(lbl);
-                });
-                all.addEventListener('change', () => {
-                    grid.querySelectorAll('input[type=checkbox]:not(:disabled)').forEach(cb => { cb.checked = all.checked; });
-                });
-                block.appendChild(head); block.appendChild(grid);
-                checksBox.appendChild(block);
-            });
-        }
+        const checksNote = text => reconChecksNote(checksBox, text);
 
         async function loadSeasonIntoModal(year) {
             const req = ++preloadListReq;
             if (!year) { checksNote('Pick a season above; its storms and missions appear here.'); return; }
             checksNote('Loading the ' + year + ' season…');
             try {
-                const groups = await fetchSeasonGroups(year);
+                const groups = await reconFetchSeasonGroups(year);
                 if (req !== preloadListReq) return;
-                renderSeason(groups);
+                // Already-loaded missions are locked here: batch loading one again is a no-op.
+                reconRenderSeasonChecks(checksBox, groups, {
+                    lockLoaded: true, loadedTag: ' (loaded)', checkId: reconMissionSelect.value
+                });
             } catch (e) {
                 if (req === preloadListReq) checksNote('Could not load ' + year + ' (' + e.message + ').');
             }
@@ -1169,15 +1238,7 @@
             if (fill) fill.style.width = '0%';
             setModalStatus(preloadRunning ? 'A batch load is running…' : 'Check the missions to load.');
             modal.style.display = 'flex';
-            await reconYearsReady;
-            if (yearSel && yearSel.options.length <= 1) {
-                yearSel.innerHTML = '<option value="">Year…</option>';
-                [...reconYearSelect.options].slice(1).forEach(o => {
-                    const opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.value;
-                    yearSel.appendChild(opt);
-                });
-            }
-            if (yearSel && !yearSel.value && reconYearSelect.value) yearSel.value = reconYearSelect.value;
+            await reconFillSeasonYears(yearSel);
             if (isReconApiDown()) {
                 if (yearSel) yearSel.disabled = true;
                 if (startBtn) startBtn.disabled = true;   // nothing to download offline; steer users to the file picker
@@ -1232,7 +1293,7 @@
         // running in the background (progress stays visible in the archive status line).
         async function runPreload() {
             if (preloadRunning) { setModalStatus('A batch load is already running.'); return; }
-            const ids = [...checksBox.querySelectorAll('input[type=checkbox]:checked:not(:disabled)')].map(cb => cb.value);
+            const ids = [...checksBox.querySelectorAll('input[type=checkbox]:checked:not(:disabled):not(.recon-storm-all)')].map(cb => cb.value);
             if (!ids.length) { setModalStatus('Nothing checked.'); return; }
             preloadRunning = true; if (startBtn) startBtn.disabled = true;
             let ok = 0;

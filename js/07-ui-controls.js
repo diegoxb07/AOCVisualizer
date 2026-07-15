@@ -203,8 +203,8 @@
     const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
     // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
     // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
-    const STORM_SYM_SCALE = 0.042;
-    const STORM_RIBBON_SCALE = 0.008;
+    const STORM_SYM_SCALE = 0.062;
+    const STORM_RIBBON_SCALE = 0.011;
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
         if (realScale3D && typeof realScaleCamDistance === 'function') {

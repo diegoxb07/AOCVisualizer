@@ -162,28 +162,39 @@
     // while the label stays dark and readable. Drawn flat on the sea, never billboarded or spun.
     let stormFixRing3D = null;   // current-fix marker on the 3D best track, positioned per frame
     let _stormSymTex = {};
+    // The symbols lie flat on the map and are read from a low camera, so they sample at a grazing
+    // angle, which is what smears them. Anisotropy is the setting that addresses that; trilinear
+    // alone still blurs along the viewing axis.
+    function stormTexFrom(cv) {
+        const tex = new THREE.CanvasTexture(cv);
+        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        return tex;
+    }
+    // The disc and its category letter. Kept apart from the arms so the current fix can turn its
+    // arms while the letter stays square to the map and readable.
     function stormSymbolTex(label) {
         if (_stormSymTex[label]) return _stormSymTex[label];
         const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
         const c = cv.getContext('2d');
-        c.strokeStyle = '#ffffff'; c.fillStyle = '#ffffff'; c.lineCap = 'round';
+        c.fillStyle = '#ffffff';
         c.beginPath(); c.arc(128, 128, 68, 0, Math.PI * 2); c.fill();
-        if (label !== 'TD') {
-            c.lineWidth = 26;
-            c.beginPath(); c.arc(128, 128, 88, -0.3, 1.5); c.stroke();
-            c.beginPath(); c.arc(128, 128, 88, Math.PI - 0.3, Math.PI + 1.5); c.stroke();
-        }
         c.fillStyle = '#0b1220'; c.font = '700 72px sans-serif';
         c.textAlign = 'center'; c.textBaseline = 'middle';
         c.fillText(label, 128, 132);
-        const tex = new THREE.CanvasTexture(cv);
-        // The symbols lie flat on the map and are read from a low camera, so they are sampled at a
-        // grazing angle, which is what smears the category label. Anisotropy is the setting that
-        // addresses that; trilinear alone still blurs along the viewing axis.
-        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
-        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
-        _stormSymTex[label] = tex;
-        return tex;
+        _stormSymTex[label] = stormTexFrom(cv);
+        return _stormSymTex[label];
+    }
+    // The two spiral arms on their own quad, on the same 256 grid as the disc so they line up.
+    function stormArmsTex() {
+        if (_stormSymTex.__arms) return _stormSymTex.__arms;
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
+        const c = cv.getContext('2d');
+        c.strokeStyle = '#ffffff'; c.lineCap = 'round'; c.lineWidth = 26;
+        c.beginPath(); c.arc(128, 128, 88, -0.3, 1.5); c.stroke();
+        c.beginPath(); c.arc(128, 128, 88, Math.PI - 0.3, Math.PI + 1.5); c.stroke();
+        _stormSymTex.__arms = stormTexFrom(cv);
+        return _stormSymTex.__arms;
     }
 
     // Home camera offset from the aircraft (the orbit target): close enough that the airframe
@@ -274,6 +285,33 @@
                     if (sIdx >= 0) _stateLabels[sIdx].mesh.visible = true;
                     _stateLabelIdx = sIdx;
                 }
+                // Sized off camera distance, so the name holds one readable size whether the camera
+                // is on the aircraft or out far enough to frame the state. The anchor stays the
+                // state's own centre, so it is the scale that tracks the camera, never the position.
+                if (sIdx >= 0 && camera3D) {
+                    const sl = _stateLabels[sIdx];
+                    const k = (camera3D.position.distanceTo(sl.mesh.position) || 1) * 0.045;
+                    sl.mesh.scale.set(k, 1, k);
+                }
+            }
+            // Airfield codes hold a readable size the same way, and sit off their dot by their own
+            // scaled width, so the gap stays constant on screen instead of closing up as you zoom.
+            if (_airportLabels.length && camera3D) {
+                for (let i = 0; i < _airportLabels.length; i++) {
+                    const al = _airportLabels[i];
+                    const k = (camera3D.position.distanceTo(al.at) || 1) * 0.022;
+                    al.mesh.scale.set(k, 1, k);
+                    al.mesh.position.set(al.at.x + k * 1.4, al.at.y, al.at.z);
+                }
+            }
+            // The current storm fix's arms turn cyclonically, the same as the 2D layer's.
+            if (_stormArmMeshes.length) {
+                const spin = (performance.now() / 12000) * 2 * Math.PI;
+                for (let i = 0; i < _stormArmMeshes.length; i++) {
+                    const am = _stormArmMeshes[i];
+                    // +y turns counterclockwise seen from above, the northern-hemisphere sense
+                    am.mesh.rotation.y = (am.idx === currentStormFixIdx) ? (am.lat < 0 ? -spin : spin) : 0;
+                }
             }
             if (_countryLabels.length) {
                 const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
@@ -312,6 +350,8 @@
     let _countryLabels = [];    // { sprite, mat, aspect, pts, isUSA } country name labels shown near visible coastlines
     let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
     let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
+    let _airportLabels = [];    // { mesh, at } flat airfield codes, scaled and offset per frame
+    let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -496,10 +536,12 @@
         if (threeDInitialized && filteredData.length > 0) build3DScene();
     }
 
-    // A state name lying flat on the basemap, sized to the state's own width so it reads like a
-    // printed map label from straight above. A mesh, not a sprite: it holds its ground orientation
-    // and its map scale rather than turning to face the camera and holding a screen size.
-    function stateLabelMesh(name, worldWidth) {
+    // A state name lying flat on the basemap. A mesh, not a sprite, so it keeps its ground
+    // orientation and reads as printed on the map rather than turning to face the camera. Built one
+    // world unit tall, whatever the name's length, and scaled by camera distance each frame
+    // (animate3D): the camera works from 0.7 units off the aircraft out to hundreds across a state,
+    // so any fixed world size is either unreadable at one end or larger than the screen at the other.
+    function stateLabelMesh(name) {
         const cv = document.createElement('canvas');
         let c = cv.getContext('2d');
         c.font = 'bold 44px sans-serif';
@@ -509,9 +551,11 @@
         c.font = 'bold 44px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
         c.lineWidth = 8; c.strokeStyle = 'rgba(5,12,20,0.92)'; c.strokeText(name, w / 2, 38);
         c.fillStyle = '#eef4fb'; c.fillText(name, w / 2, 38);
-        const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+        const tex = new THREE.CanvasTexture(cv);
+        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-        const geo = new THREE.PlaneGeometry(worldWidth, worldWidth * (72 / w));
+        const geo = new THREE.PlaneGeometry(w / 72, 1);   // unit height, so scale is length-independent
         geo.rotateX(-Math.PI / 2);   // lay it on the ground; the texture's top edge then points north
         const mesh = new THREE.Mesh(geo, mat);
         mesh.renderOrder = 4; mesh.visible = false;
@@ -521,7 +565,9 @@
     // An airfield's code lying flat on the basemap beside its dot, in the same idiom as the state
     // labels. Military takes the sky-blue accent, civil a neutral ink, both keylined dark so they
     // read over terrain, water and imagery alike.
-    function airportLabelMesh(code, mil, worldWidth) {
+    // Built one world unit tall and scaled by camera distance each frame, for the same reason the
+    // state names are (see stateLabelMesh).
+    function airportLabelMesh(code, mil) {
         const cv = document.createElement('canvas');
         let c = cv.getContext('2d');
         c.font = 'bold 40px sans-serif';
@@ -535,7 +581,7 @@
         tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
         tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-        const geo = new THREE.PlaneGeometry(worldWidth, worldWidth * (56 / w));
+        const geo = new THREE.PlaneGeometry(w / 56, 1);   // unit height, so scale is code-length-independent
         geo.rotateX(-Math.PI / 2);
         const mesh = new THREE.Mesh(geo, mat);
         mesh.renderOrder = 4;
@@ -569,6 +615,8 @@
         _countryLabels = [];
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
+        // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
+        _airportLabels = []; _stormArmMeshes = [];
         const light3D = document.documentElement.dataset.theme === 'light';
         const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // coastlines carry, internal (state) borders sit back, so countries read against the terrain
@@ -625,15 +673,14 @@
                 polys.forEach(poly => poly.forEach(ring => rings.push(ring.map(cc => ({ lon: cc[0], lat: cc[1] })))));
                 const bbox = feature.properties.bbox;
                 if (rings.length && bbox) {
-                    // Anchor on the largest ring, and take the width from that ring's own span rather
-                    // than the feature bbox: Alaska's Aleutians cross the dateline, so its bbox spans
-                    // ~360 degrees and would size the label to the whole world.
+                    // Anchor on the largest ring's average vertex, which sits inside the landmass for
+                    // shapes whose bbox centre does not (a bay, a lake, a second peninsula).
                     let big = rings[0];
                     rings.forEach(r => { if (r.length > big.length) big = r; });
-                    let sx = 0, sy = 0, rMinLon = 180, rMaxLon = -180;
-                    big.forEach(p => { sx += p.lon; sy += p.lat; if (p.lon < rMinLon) rMinLon = p.lon; if (p.lon > rMaxLon) rMaxLon = p.lon; });
+                    let sx = 0, sy = 0;
+                    big.forEach(p => { sx += p.lon; sy += p.lat; });
                     const cLon = sx / big.length, cLat = sy / big.length;
-                    const lbl = stateLabelMesh(feature.properties.name, (rMaxLon - rMinLon) * 20 * 0.55);
+                    const lbl = stateLabelMesh(feature.properties.name);
                     const at = get3DCoord(cLon, cLat, borderAlt([cLon, cLat]) + 60);
                     lbl.mesh.position.copy(at);
                     lbl.rings = rings; lbl.bbox = bbox;
@@ -652,9 +699,10 @@
                 const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: a.mil ? 0x38bdf8 : 0xe8eef6, depthWrite: false }));
                 dot.position.copy(at); dot.renderOrder = 3;
                 threeMapGroup.add(dot);
-                const lbl = airportLabelMesh(a.code, a.mil, 1.6);
-                lbl.mesh.position.set(at.x + 1.1, at.y, at.z);
+                const lbl = airportLabelMesh(a.code, a.mil);
+                lbl.mesh.position.copy(at);
                 threeMapGroup.add(lbl.mesh);
+                _airportLabels.push({ mesh: lbl.mesh, at });
             });
         }
         // elevation-shaded terrain surface from the bundled ETOPO grid, so land and sea floor sit at
@@ -715,12 +763,25 @@
             // clear of its neighbours while being large enough to read the category.
             const symSize = Math.max(1.7, ribbonW * 8);
             stormTrackPoints.forEach((p, i) => {
+                const col3 = new THREE.Color(stormWindColor(p.windKt));
+                // Arms on their own quad under the disc, so the current fix can turn them (animate3D)
+                // without tumbling its category letter. Below tropical-storm strength there are none.
+                if (p.windKt >= 34) {
+                    const armGeo = new THREE.PlaneGeometry(symSize, symSize);
+                    armGeo.rotateX(-Math.PI / 2);
+                    const arms = new THREE.Mesh(armGeo,
+                        new THREE.MeshBasicMaterial({ map: stormArmsTex(), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+                    arms.position.copy(stormPts[i]); arms.position.y = 0.05;
+                    arms.renderOrder = 2;
+                    threeMapGroup.add(arms);
+                    _stormArmMeshes.push({ mesh: arms, lat: p.lat, idx: i });
+                }
                 const geo = new THREE.PlaneGeometry(symSize, symSize);
                 geo.rotateX(-Math.PI / 2);
                 const sym = new THREE.Mesh(geo,
-                    new THREE.MeshBasicMaterial({ map: stormSymbolTex(stormCatLabel(p.windKt)), color: new THREE.Color(stormWindColor(p.windKt)), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+                    new THREE.MeshBasicMaterial({ map: stormSymbolTex(stormCatLabel(p.windKt)), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
                 sym.position.copy(stormPts[i]); sym.position.y = 0.06;
-                sym.renderOrder = 2;
+                sym.renderOrder = 3;
                 threeMapGroup.add(sym);
             });
             // marker for the best-track fix the status card refers to: a flat ring around that fix's
@@ -729,7 +790,7 @@
             const ringGeo = new THREE.RingGeometry(symSize * 0.60, symSize * 0.76, 48);
             ringGeo.rotateX(-Math.PI / 2);
             stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
-            stormFixRing3D.renderOrder = 3;
+            stormFixRing3D.renderOrder = 5;
             stormFixRing3D.position.y = 0.09;
             stormFixRing3D.visible = false;
             threeMapGroup.add(stormFixRing3D);

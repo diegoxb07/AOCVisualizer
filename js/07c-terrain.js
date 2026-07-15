@@ -34,7 +34,7 @@
         if (e < 0) {
             const t = Math.max(0, Math.min(1, -e / 5000));
             return (document.documentElement.dataset.theme === 'light')
-                ? [0.83 - 0.17 * t, 0.89 - 0.17 * t, 0.94 - 0.13 * t]
+                ? [0.58 - 0.20 * t, 0.72 - 0.22 * t, 0.85 - 0.19 * t]
                 : [0.04 + 0.03 * (1 - t), 0.20 - 0.11 * t, 0.32 - 0.15 * t];
         }
         const t = Math.max(0, Math.min(1, e / 4000));
@@ -85,7 +85,7 @@
         grp.add(terrain);
         // faint sea-level surface at y=0 (get3DCoord centers the flight on the origin).
         const seaGeom = new THREE.PlaneGeometry((lon1 - lon0) * 20, (lat1 - lat0) * 20); seaGeom.rotateX(-Math.PI / 2);
-        const seaCol = (document.documentElement.dataset.theme === 'light') ? 0x8fb8d8 : 0x2f6fa6;
+        const seaCol = (document.documentElement.dataset.theme === 'light') ? 0x5f93c4 : 0x2f6fa6;
         const sea = new THREE.Mesh(seaGeom, new THREE.MeshBasicMaterial({ color: seaCol, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }));
         sea.position.set(0, 0, 0); sea.renderOrder = -1;
         grp.add(sea);

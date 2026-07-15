@@ -600,10 +600,40 @@
         const liveSat = document.getElementById('satelliteSelect');
         const clipSat = document.getElementById('clipSatSelect');
         if (liveSat) { clipSat.innerHTML = liveSat.innerHTML; clipSat.value = liveSat.value; }
+        syncClipSatEnabled();
 
         renderClipCustomList();
         populateClipGraphList();
         initClipFramePreviews();
+    });
+
+    // The satellite overlay draws on the 2D tracker only, so a 3D clip has nothing to lay it over.
+    // Hold the picker at Off there, rather than letting a choice imply imagery that never arrives.
+    function syncClipSatEnabled() {
+        const is3d = document.getElementById('clipTrackerMode').value === '3d';
+        const sat = document.getElementById('clipSatSelect');
+        const btn = document.getElementById('clipSatCacheBtn');
+        const note = document.getElementById('clipSatNote');
+        if (sat) { if (is3d) sat.value = 'none'; sat.disabled = is3d; }
+        if (btn) btn.disabled = is3d || !sat || sat.value === 'none';
+        if (note) note.classList.toggle('hidden', !is3d);
+    }
+    document.getElementById('clipTrackerMode').addEventListener('change', syncClipSatEnabled);
+    document.getElementById('clipSatSelect').addEventListener('change', syncClipSatEnabled);
+
+    // Build the chosen satellite's whole-flight imagery up front, so a recording plays from cache
+    // instead of stalling on the API each time the clock crosses a scan. Applying the layer to the
+    // live picker is what gives maybeAutoPrecacheSatellite a product to build from.
+    document.getElementById('clipSatCacheBtn').addEventListener('click', async () => {
+        const liveSat = document.getElementById('satelliteSelect');
+        const wantSat = document.getElementById('clipSatSelect').value;
+        if (!liveSat || wantSat === 'none') return;
+        if (liveSat.value !== wantSat) { liveSat.value = wantSat; liveSat.dispatchEvent(new Event('change')); }
+        if (typeof maybeAutoPrecacheSatellite !== 'function') return;
+        await maybeAutoPrecacheSatellite();
+        // It stays silent when there is no work: a polar layer is one image per day, and a flight
+        // whose tiles are all local needs none. Say so rather than leave the button looking inert.
+        if (!batchCaching) showToast('Nothing to cache: this imagery is already on this device, or the layer streams one image per day.', 5000);
     });
 
     // Total graphs to record = checked page graphs + custom graphs that have metrics picked.
@@ -977,6 +1007,15 @@
         const graphs = fixedGraphs.concat(customGraphs).slice(0, 4);
         const videoStack = document.getElementById('clipVideoStack').value;
 
+        // The recorder captures the live tracker, so a collapsed media bar leaves nothing to frame or
+        // to capture. Expand through the collapse button, which owns the label, the aria state, the
+        // bottom bar, and the resize plus redraw the hidden canvas needs.
+        const mediaBar = document.getElementById('stickyMediaBar');
+        if (mediaBar && mediaBar.classList.contains('collapsed')) {
+            const collapseBtn = document.getElementById('mediaCollapseBtn');
+            if (collapseBtn) collapseBtn.click();
+        }
+
         // Apply the chosen tracker mode + satellite to the live view (the recorder captures it live).
         const wantMode = document.getElementById('clipTrackerMode').value;
         if (trackerModeSelect.value !== wantMode) { trackerModeSelect.value = wantMode; trackerModeSelect.dispatchEvent(new Event('change')); }
@@ -997,7 +1036,14 @@
             if (satOn && fetching && performance.now() < deadline) { setTimeout(waitSat, 150); return; }
             runRecordCountdown(3, cb);
         }
-        setTimeout(waitSat, 250);   // let the 2D/3D switch + satellite fetch kick off first
+        // A whole-flight cache pass (the Cache imagery first button) runs far past the per-tile
+        // deadline below, and recording through it would capture the tiles arriving. Hold for it
+        // with no deadline: it shows its own progress pill and carries its own Cancel.
+        function waitCache() {
+            if (batchCaching) { setTimeout(waitCache, 250); return; }
+            setTimeout(waitSat, 250);   // let the 2D/3D switch + satellite fetch kick off first
+        }
+        waitCache();
     }
 
     function runRecordCountdown(n, cb) {

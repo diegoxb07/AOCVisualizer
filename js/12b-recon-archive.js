@@ -613,7 +613,7 @@
         try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
         if (mission.source_url) {
             reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden');
-            reconSourceLink.title = 'Open the original NetCDF from NOAA directly (same file this loaded automatically)';
+            reconSourceLink.title = 'Open the original NetCDF directly (same file this loaded automatically)';
         } else { reconSourceLink.classList.add('hidden'); }
 
         if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track…`);

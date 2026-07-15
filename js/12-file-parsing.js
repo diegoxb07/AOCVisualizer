@@ -24,9 +24,9 @@
         if (!e.target.files[0]) return;
         markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true;
-        // First video of the session: start pulling the ~12 MB OCR engine now (it is no longer
-        // fetched at page load). Not awaited, the video is usable meanwhile; evaluateAutoSyncDefault
-        // below flips on Auto and shows the warmup badge, and the locks await it themselves.
+        // First video of the session: start pulling the ~12 MB OCR engine, which loads on demand. Not
+        // awaited, the video is usable meanwhile; evaluateAutoSyncDefault below flips on Auto and
+        // shows the warmup badge, and the locks await it themselves.
         ensureOCR();
         syncMediaGridLayout();
         speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
@@ -35,9 +35,9 @@
         video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); }, { once: true });
         video.addEventListener('seeking', syncTelemetryToVideoClock);
         evaluateAutoSyncDefault();
-        // No ocrAvailable precondition here any more: it is still false while the engine warms up,
-        // so testing it would drop the very first auto-lock. performImmediateOcrLock awaits the
-        // warmup itself and returns quietly (silent) if OCR ends up unavailable.
+        // No ocrAvailable precondition: it reads false until the engine finishes warming up, so
+        // gating on it here would drop the first auto-lock. performImmediateOcrLock awaits the
+        // warmup itself and returns quietly (silent) if OCR is unavailable.
         video.addEventListener('loadeddata', () => { if (videoSyncMode.value === 'auto') performImmediateOcrLock({ silent: true }); }, { once: true });
         setTimeout(() => { if (videoSyncMode.value === 'auto' && !isPlaying) performImmediateOcrLock({ silent: true }); }, 1000);
     });
@@ -129,7 +129,7 @@
         const report = onProgress || updateParseProgress;
         const onMainThread = () => {
             if (source && typeof source !== 'string' && source.byteLength === 0)
-                throw new Error('parse worker failed and the file buffer was already handed off — please re-select the file');
+                throw new Error('parse worker failed and the file buffer was already handed off. Please re-select the file.');
             const tsv = typeof source === 'string' ? source : ncArrayBufferToTsv(source, report);
             return parseFlightTextToRows(tsv);
         };

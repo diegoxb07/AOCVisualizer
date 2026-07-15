@@ -23,11 +23,10 @@
         } catch(e) { ocrAvailable = false; ocrWorker = null; console.warn("Auto-sync OCR unavailable."); }
     }
 
-    // The vendored engine (wasm core + eng training data) is ~12 MB, and only Auto-Sync ever needs
-    // it, so the warmup is deferred until an MMR video actually arrives instead of being paid on
-    // every page load. Idempotent: concurrent callers share the one in-flight promise, and it never
-    // rejects (initOCR swallows its own errors and leaves ocrAvailable false), so callers can await
-    // it unguarded. Callers must still check ocrAvailable afterwards.
+    // The vendored engine (wasm core + eng training data) is ~12 MB and only Auto-Sync needs it, so
+    // the warmup waits until an MMR video arrives. Idempotent: concurrent callers share the one
+    // in-flight promise, and it never rejects (initOCR swallows its own errors and leaves
+    // ocrAvailable false), so callers can await it unguarded and check ocrAvailable afterwards.
     function ensureOCR() {
         if (ocrInitPromise) return ocrInitPromise;
         ocrWarmingUp = true;

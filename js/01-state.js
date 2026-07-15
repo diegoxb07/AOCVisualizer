@@ -29,6 +29,10 @@
     let satBlobMaxBytes = 600 * 1024 * 1024; // 600 MB on-disk ceiling for the cold tile store
     let satBlobBytes = 0;                    // running total of satBlobStore blob sizes
     let batchCaching = false;                // a multi-flight local sat-cache pass is running
+    // True while the running pass is the automatic one for the displayed satellite, false while it is
+    // the Pre-Cache modal's. Switching the display abandons the first (its satellite is gone) and
+    // leaves the second alone (it caches its own chosen satellite, whatever the map shows).
+    let batchCacheIsAuto = false;
     let batchCacheCancel = false;            // user asked to stop the current pass
     let batchCacheAbortController = null;    // aborts the in-flight recon-api request/poll on Cancel
     let batchCachePass = 0;                  // bumped per pass; a Cancel invalidates the running pass so its teardown no-ops
@@ -50,7 +54,7 @@
     let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null
     let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
-    let showStormTrack = false;       // "Storm Track" toggle; off until the user turns it on
+    let showStormTrack = true;        // "Storm Track" toggle; the track draws only once a best-track loads
     let hoveredStormIdx = -1;         // index into stormTrackPoints currently under the mouse (2D map hover), -1 = none
     let currentPointAnalysisData = null; 
     let tempBaseline = [];

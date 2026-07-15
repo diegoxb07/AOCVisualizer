@@ -175,12 +175,16 @@
         // slightly translucent so the basemap/satellite stays readable underneath.
         stormTrackPoints.forEach((p, i) => {
             const hovered = i === hoveredStormIdx;
+            // The fix the status card refers to carries a sky-blue keyline, the accent the rest of
+            // the UI uses for "this is the live one". Hover keeps white, so the two never collide.
+            const isCurrent = typeof currentStormFixIdx !== 'undefined' && i === currentStormFixIdx;
+            const ringCol = hovered ? '#ffffff' : (isCurrent ? '#38bdf8' : 'rgba(0,0,0,0.85)');
             const col = stormWindColor(p.windKt), lbl = stormCatLabel(p.windKt);
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
             ctx.globalAlpha = hovered ? 1.0 : 0.9;
             if (!lbl) {   // unknown intensity: keep a plain small fix marker
                 ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-                ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = 1.2; ctx.stroke();
+                ctx.strokeStyle = ringCol; ctx.lineWidth = isCurrent ? 2 : 1.2; ctx.stroke();
                 ctx.restore(); return;
             }
             const r = hovered ? 8 : 6;
@@ -190,22 +194,11 @@
                 ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
             }
             ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-            ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
-            // the fix the status card currently refers to carries a white label; every other fix dark
-            const isCurrent = typeof currentStormFixIdx !== 'undefined' && i === currentStormFixIdx;
+            ctx.strokeStyle = ringCol; ctx.lineWidth = (hovered || isCurrent) ? 2 : 1.2; ctx.stroke();
+            // Every category color carries this dark label legibly, the lighter ones included.
             ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            // The white highlight label disappears against the lighter category colours (yellow TS,
-            // orange cat-1/2), so outline it: stroke black first, then fill white over the stroke's
-            // inner half, leaving a thin dark keyline. Round joins keep the thin strokes from
-            // spiking off tight corners on glyphs like 4 and 5.
-            if (isCurrent) {
-                ctx.strokeStyle = '#000000';
-                ctx.lineWidth = Math.max(1.4, r * 0.28);
-                ctx.lineJoin = 'round'; ctx.miterLimit = 2;
-                ctx.strokeText(lbl, 0, 0.5);
-            }
-            ctx.fillStyle = isCurrent ? '#ffffff' : '#111827';
+            ctx.fillStyle = '#111827';
             ctx.fillText(lbl, 0, 0.5);
             ctx.restore();
         });
@@ -280,11 +273,10 @@
         const xOf = lon => ((lon - plotMinLon) / deltaLon) * cssW;   // lon already in the plot domain
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
         const hasSatImage = satImageLoaded && isSatOn && satImage.width > 0;
-        // At 100% the imagery is meant to be the only thing in its footprint, so the basemap goes
-        // *under* it instead of over it and the opaque draw hides it for free — no per-pixel clip, and
-        // it works for every drawImage branch below. Land outside the footprint still draws normally,
-        // since there is no imagery there to replace it. Below 100% the old order stands: imagery
-        // first, then a translucent basemap over it so coastlines stay readable against the tiles.
+        // At 100% the imagery is the only thing inside its footprint, so the basemap draws under it
+        // and the opaque tiles cover it, for every drawImage branch below. Land outside the footprint
+        // still draws, there being no imagery there to replace it. Below 100% the imagery draws first
+        // and a translucent basemap over it, keeping coastlines readable against the tiles.
         const satHidesBasemap = hasSatImage && satTileOpacity >= 1;
         const drawSatImage = () => {
             bgCtx.globalAlpha = satTileOpacity;
@@ -390,11 +382,11 @@
         };
 
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
-        // `anchor` is the last sample actually drawn, and a skip must NOT move it, so skipped
-        // distance accumulates and the next draw spans from the last drawn point. Measuring i-1 -> i
-        // instead, with no anchor, skips EVERY segment at 1 Hz (samples sit far under a pixel apart)
-        // and erases the whole past track. Threshold is in on-screen px, so the drawn segment count
-        // is bounded by the track's pixel length, not by the sample count.
+        // `anchor` is the last sample actually drawn, and a skip must leave it put, so skipped
+        // distance accumulates and the next draw spans from the last drawn point. At 1 Hz consecutive
+        // samples sit far under a pixel apart, so the anchor is what lets any segment clear the
+        // threshold. The threshold is in on-screen px, bounding the drawn segment count by the
+        // track's pixel length rather than the sample count.
         let anchor = 0;
         for (let i = 1; i <= idx; i++) {
             setSeg(anchor, i);

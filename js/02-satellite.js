@@ -82,7 +82,7 @@
                             keys.map((k, i) => [k, vals[i]])
                                 .sort((a, b) => ((a[1] && a[1].t) || 0) - ((b[1] && b[1].t) || 0))
                                 .forEach(([k, v]) => { if (v && v.blob && !satBlobStore.has(k)) { satBlobStore.set(k, v); satBlobBytes += satEntryBytes(v); } });
-                            // Trims a store written before the byte cap existed, which may be far over it.
+                            // A store restored from disk can exceed either cap, so trim it to both.
                             satBlobEvict();
                             resolve();
                         };
@@ -92,12 +92,11 @@
             } catch (e) { resolve(); }
         });
     })();
-    // IndexedDB surfaces quota/abort failures ASYNCHRONOUSLY, on the transaction, so the try/catch
-    // around a put only ever catches synchronous throws and a full quota sails straight past it.
-    // Untracked, every tile write silently no-ops while satBlobStore still reports the tile cached,
-    // and "pre-cached" flights come back empty on the next visit. On the first such failure, pull
-    // the byte ceiling down to below what is currently resident and evict to it, so a full disk
-    // degrades to a smaller on-disk cache instead of failing every write from then on.
+    // IndexedDB reports quota/abort failures asynchronously on the transaction, so a try/catch around
+    // the put catches only synchronous throws and a full quota needs tx.onabort to be seen at all.
+    // Without that, writes no-op while satBlobStore still reports the tile cached. On the first
+    // failure, pull the byte ceiling down toward what is currently resident (floored at 64 MB) and
+    // evict to it, so a full disk degrades to a smaller on-disk cache rather than failing every write.
     let satIdbWriteFailed = false;
     function onSatIdbWriteFail(err) {
         if (satIdbWriteFailed) return;
@@ -235,7 +234,7 @@
               {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9: Water Vapor',          bboxSupported:true}
           ]
         },
-        // GOES-West (GOES-17/18, sub-point ~137°W), added once the recon-api gained `goes-west`.
+        // GOES-West (GOES-17/18, sub-point ~137°W), served by the recon-api's `goes-west` satellite.
         // Covers east/central-Pacific recon (greyed out for Atlantic flights via the coverage test).
         { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
           satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
@@ -747,12 +746,9 @@
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
-        // The stepper hangs below the header and over the map's top-right, where the "Fetching
-        // satellite" pill also sits. #mapContainer sets no z-index, so it never opens a stacking
-        // context, and that pill's z-50 escapes to out-paint the header's z-20 and cover the
-        // stepper. Flag the container so the pill can move aside while the stepper is up. Safe by
-        // construction: the stepper is polar-orbiter-only and #satColorLegend, which owns the
-        // top-left, is recon-GOES-only, so the two can never be on screen at the same time.
+        // The stepper overhangs the map's top-right, where the "Fetching satellite" pill also sits,
+        // so flag the container and let the pill move to the top-left while the stepper is up.
+        // css/app.css #mapContainer.sat-daystepper-open carries the stacking-context reasoning.
         const mapContainerEl = document.getElementById('mapContainer');
         if (mapContainerEl) mapContainerEl.classList.toggle('sat-daystepper-open', active);
         // The 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
@@ -1576,12 +1572,11 @@
                 }
             }
         } else {
-            // Polar (MODIS/VIIRS GIBS): one tile per band per calendar day. A polar orbiter only gives
-            // one pass a day, so the day-stepper exists to browse +/-SAT_DAY_RANGE days around the
-            // flight for a pass with less cloud or a better swath position. Cache that whole window,
-            // not just the flight day: caching day 0 alone meant stepping off it on a later offline
-            // visit found nothing cached, which is the one case pre-caching is meant to cover. Cheap,
-            // since polar is one tile per band per day (unlike GOES, which is one per 10 min).
+            // Polar (MODIS/VIIRS GIBS): one tile per band per calendar day. A polar orbiter gives one
+            // pass a day, so the day-stepper browses +/-SAT_DAY_RANGE days around the flight for a
+            // pass with less cloud or a better swath position. Cache that whole window, since
+            // stepping off day 0 offline needs those days on device too. Cheap at one tile per band
+            // per day (GOES is one per 10 min).
             const box = computeSatFetchBox(extent);
             if (!box) return [];
             const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
@@ -1617,6 +1612,23 @@
         if (bandSelect) bandSelect.disabled = locked;
     }
 
+    // Tears down whichever cache pass is running. Synchronous through batchCaching = false, so a
+    // caller can start a fresh pass on the next line and clear precacheCurrentFlight's own guard.
+    // Bumping the pass invalidates the running loop, which stops at its next check and skips its
+    // teardown, and the abort kills the tile fetch or poll in flight.
+    function cancelSatCachePass(label) {
+        if (!batchCaching) return;
+        batchCacheCancel = true;
+        batchCachePass++;
+        if (batchCacheAbortController) { try { batchCacheAbortController.abort(); } catch (e) {} }
+        batchCaching = false; batchCacheIsAuto = false; batchCacheAbortController = null;
+        setSatelliteControlsLocked(false);
+        const sb = document.getElementById('batchCacheStartBtn'); if (sb) sb.textContent = 'Start caching';
+        const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = label || 'Stopped';
+        const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Cache stopped.';
+        setTimeout(hideSatPrefetchBar, 800);
+    }
+
     // Pre-caches the currently loaded flight's tiles for a satellite/bands, building the same
     // deterministic tile list live playback will request, so playback never pauses on the API.
     // Triggered by maybeAutoPrecacheSatellite() or the "Pre-Cache Satellite Imagery" modal.
@@ -1630,7 +1642,7 @@
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
         const myPass = ++batchCachePass;
-        batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
+        batchCaching = true; batchCacheIsAuto = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         showSatPrefetchBar();   // background pill (has its own Cancel) so playback stays usable
         const total = targets.length;
@@ -1643,7 +1655,7 @@
             setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
         }
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
-        batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
+        batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         const doneMsg = `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
         setBatchProgress(done, total || 1, doneMsg);
@@ -1698,7 +1710,7 @@
             showToast('Archive GOES caching is unavailable while the API is offline.', 5000); return;
         }
         const myPass = ++batchCachePass;
-        batchCaching = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
+        batchCaching = true; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         const startBtn = document.getElementById('batchCacheStartBtn');
         if (startBtn) { startBtn.textContent = 'Stop'; }
@@ -1737,7 +1749,7 @@
         }
 
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
-        batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
+        batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';
         const msg = `Local cache done: ${fetched} new tile(s) from ${sources.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date / unreadable)` : ''}.`;

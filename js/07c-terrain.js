@@ -42,6 +42,54 @@
         const s = (t - 0.5) / 0.5; return [0.53 + 0.30 * s, 0.37 + 0.34 * s, 0.18 + 0.55 * s];             // tan -> snow
     }
 
+    // How far from an end the ground is pulled toward the aircraft, and how far off the grid may be
+    // before that end is taken as airborne rather than on a field.
+    const TERRAIN_PIN_DEG = 1.5;
+    const TERRAIN_PIN_MAX_M = 300;
+
+    // The ends of the track, each with the gap between the aircraft there and the grid's idea of the
+    // ground under it. The grid samples ETOPO every 0.5 degrees, about 55 km, so a field's own
+    // elevation is averaged into its surroundings and the aircraft can sit tens of metres under or
+    // over the rendered ground at exactly the two moments it should be touching it.
+    // An end whose gap is larger than TERRAIN_PIN_MAX_M is left alone: the aircraft is genuinely
+    // airborne there (the parser drops rows under 20 kt, so a track can open already climbing), and
+    // it should read that way rather than drag a plateau up under itself.
+    function terrainPins() {
+        if (typeof filteredData === 'undefined' || filteredData.length < 2) return [];
+        if (typeof track3DAltMeters !== 'function') return [];
+        const out = [];
+        [filteredData[0], filteredData[filteredData.length - 1]].forEach(d => {
+            if (!d || d.lat == null || d.lon == null) return;
+            const delta = track3DAltMeters(d) - terrainElevationMeters(d.lat, d.lon);
+            if (Math.abs(delta) > TERRAIN_PIN_MAX_M) return;
+            out.push({ lat: d.lat, lon: d.lon, delta });
+        });
+        return out;
+    }
+
+    // The pins in force for the current scene. Refreshed by refreshTerrainPins() at each build, so
+    // the surface and everything draped on it read one ground.
+    let _terrainPins = [];
+    function refreshTerrainPins() { _terrainPins = terrainPins(); }
+
+    // Ground elevation with the ends pinned to the aircraft, fading out over TERRAIN_PIN_DEG. Only
+    // the nearest pin applies, so a there-and-back mission that starts and ends on the same field
+    // corrects once rather than twice. This is the ground for anything laid on the terrain: the
+    // coastlines drape through it too, or a pinned field would rise through them.
+    function terrainGroundMeters(lat, lon) {
+        const e = terrainElevationMeters(lat, lon);
+        if (!_terrainPins.length) return e;
+        let best = null, bestD = Infinity;
+        for (let i = 0; i < _terrainPins.length; i++) {
+            const p = _terrainPins[i], dLon = (lon - p.lon) * Math.cos(lat * Math.PI / 180), dLat = lat - p.lat;
+            const d = Math.hypot(dLon, dLat);
+            if (d < bestD) { bestD = d; best = p; }
+        }
+        if (!best || bestD >= TERRAIN_PIN_DEG) return e;
+        const t = bestD / TERRAIN_PIN_DEG;
+        return e + best.delta * (1 - t * t * (3 - 2 * t));   // smoothstep out to the radius
+    }
+
     // A terrain surface over the flight's horizontal extent (plus margin), sampled from the grid and
     // placed with the SAME mapping as the track (get3DCoord), plus a faint sea-level plane so ocean
     // reads as a surface with the bathymetry faintly beneath. Returns a THREE.Group, or null if the
@@ -50,20 +98,21 @@
         if (!_terrain || typeof THREE === 'undefined' || typeof get3DCoord !== 'function') return null;
         if (typeof plotMinLon === 'undefined' || plotMinLon == null) return null;
         // This mesh is the colored surface in 3D (the flat land fills only build when the grid is
-        // absent), so the pad is what decides how far the map reads as ground rather than nothing.
-        // It stays a proportional pad and one draw call at any size; the grid stays finer than the
-        // source's own 0.5 degree spacing at a typical storm's span, so the width costs no detail.
-        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1, pad = 1.5;
+        // absent), so the pad is what decides how much ground the map shows. Kept close to the
+        // flight: relief far from it carries no information about the mission and competes with the
+        // track for the eye. The grid stays finer than the source's own 0.5 degree spacing at a
+        // typical storm's span, so the sampling costs no detail.
+        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1, pad = 0.4;
         const lon0 = plotMinLon - spanLon * pad, lon1 = plotMaxLon + spanLon * pad;
         const lat0 = plotMinLat - spanLat * pad, lat1 = plotMaxLat + spanLat * pad;
-        const NX = 160, NY = 160;
+        const NX = 120, NY = 120;
         const grp = new THREE.Group();
         const verts = [], colors = [], idx = [];
         for (let iy = 0; iy < NY; iy++) {
             for (let ix = 0; ix < NX; ix++) {
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
-                const m = terrainElevationMeters(lat, lon);
+                const m = terrainGroundMeters(lat, lon);
                 const p = get3DCoord(lon, lat, m);
                 verts.push(p.x, p.y, p.z);
                 const c = terrainColorRGB(m);

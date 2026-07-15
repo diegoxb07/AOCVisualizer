@@ -157,6 +157,33 @@
         return Math.min(16, Math.max(8, 30 / zoom));
     }
 
+    // Paused, nothing else repaints the 2D map, so the current fix's arms need their own frames to
+    // turn on (js/18-engine.js only redraws as the playhead advances, and it owns the frames while
+    // playing, where it also supplies the interpolated row this cannot reproduce). The loop parks
+    // itself the moment there are no arms to turn, so an idle page, the 3D tracker, a flight with no
+    // storm, and a fix too weak to draw arms all cost nothing.
+    let _stormSpinRaf = null;
+    function stormSpinWanted() {
+        return !isPlaying && showStormTrack && stormTrackPoints.length > 1
+            && filteredData.length > 0
+            && trackerModeSelect && trackerModeSelect.value === '2d'
+            && typeof currentStormFixIdx !== 'undefined' && currentStormFixIdx >= 0
+            && stormTrackPoints[currentStormFixIdx] && stormTrackPoints[currentStormFixIdx].windKt >= 34;
+    }
+    function stormSpinTick() {
+        _stormSpinRaf = null;
+        if (!stormSpinWanted()) return;
+        // Through updateVisualComponents, not renderMapEngineFrame, so the plane keeps whichever row
+        // the engine picked: under 8Hz smoothing that is an interpolated sub-sample position, and
+        // repainting from filteredData[currentIdx] would snap it back to the raw sample. Passing
+        // skipCharts with an unchanged idx leaves the HUD, storm badge and charts alone, so this is
+        // the map and PFD only. It reschedules through renderMapEngineFrame's ensureStormSpin.
+        updateVisualComponents(currentIdx, true);
+    }
+    function ensureStormSpin() {
+        if (_stormSpinRaf === null && stormSpinWanted()) _stormSpinRaf = requestAnimationFrame(stormSpinTick);
+    }
+
     // Best-track overlay for the storm the loaded mission belongs to (js/12b-recon-archive.js), spanning
     // its whole life, not just the flight's window. Drawn UNDER the flight track/plane so the flight
     // stays the visually dominant element; getX/getY project it exactly like everything else on this
@@ -189,9 +216,16 @@
             }
             const r = hovered ? 8 : 6;
             if (p.windKt >= 34) {
+                ctx.save();
+                // The current fix's arms turn cyclonically, one revolution per 12s. Canvas +y points
+                // down, so a negative angle reads counterclockwise, the northern-hemisphere sense.
+                // Only the arms turn: the category letter would tumble, and the disc is symmetric.
+                // Rotation is orthonormal, so the symbol holds its size.
+                if (isCurrent) ctx.rotate((p.lat < 0 ? 1 : -1) * (performance.now() / 12000) * 2 * Math.PI);
                 ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
                 ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
+                ctx.restore();
             }
             ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
             ctx.strokeStyle = ringCol; ctx.lineWidth = (hovered || isCurrent) ? 2 : 1.2; ctx.stroke();
@@ -624,5 +658,8 @@
         if (measurePointsGeo.length > 0) drawShapeGeometry(measureShape, measurePointsGeo, true, -1, false);
 
         ctx.restore();
+        // Every repaint re-arms the spin, so pausing, loading a storm, or switching back to 2D picks
+        // it up without any of them knowing about it, and the loop feeds itself from here.
+        ensureStormSpin();
     }
 

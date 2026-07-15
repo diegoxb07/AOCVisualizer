@@ -381,8 +381,8 @@
         const _gx = j => getX(filteredData[j < 0 ? 0 : (j > _n - 1 ? _n - 1 : j)].lon);
         const _gy = j => getY(filteredData[j < 0 ? 0 : (j > _n - 1 ? _n - 1 : j)].lat);
         const cp = { x1: 0, y1: 0, c1x: 0, c1y: 0, c2x: 0, c2y: 0, x2: 0, y2: 0 };
-        const setSeg = (i) => {   // fills cp for the curve filteredData[i-1] -> filteredData[i]
-            const p0x = _gx(i - 2), p0y = _gy(i - 2), p1x = _gx(i - 1), p1y = _gy(i - 1);
+        const setSeg = (j, i) => {   // fills cp for the curve filteredData[j] -> filteredData[i]
+            const p0x = _gx(j - 1), p0y = _gy(j - 1), p1x = _gx(j), p1y = _gy(j);
             const p2x = _gx(i), p2y = _gy(i), p3x = _gx(i + 1), p3y = _gy(i + 1);
             cp.x1 = p1x; cp.y1 = p1y; cp.x2 = p2x; cp.y2 = p2y;
             cp.c1x = p1x + (p2x - p0x) / 6; cp.c1y = p1y + (p2y - p0y) / 6;
@@ -390,11 +390,18 @@
         };
 
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
+        // `anchor` is the last sample actually drawn, and a skip must NOT move it, so skipped
+        // distance accumulates and the next draw spans from the last drawn point. Measuring i-1 -> i
+        // instead, with no anchor, skips EVERY segment at 1 Hz (samples sit far under a pixel apart)
+        // and erases the whole past track. Threshold is in on-screen px, so the drawn segment count
+        // is bounded by the track's pixel length, not by the sample count.
+        let anchor = 0;
         for (let i = 1; i <= idx; i++) {
-            setSeg(i);
-            if (Math.abs(cp.x2 - cp.x1) < 1 && Math.abs(cp.y2 - cp.y1) < 1 && i !== idx) continue;
+            setSeg(anchor, i);
+            if (i !== idx && Math.abs(cp.x2 - cp.x1) * mapScale < 1 && Math.abs(cp.y2 - cp.y1) * mapScale < 1) continue;
             ctx.beginPath(); ctx.strokeStyle = getPathColorHex(filteredData[i], i);
             ctx.moveTo(cp.x1, cp.y1); ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2); ctx.stroke();
+            anchor = i;
         }
 
         // Future (not-yet-flown) track, faint grey, same smooth curve. Normally one continuous path, but
@@ -405,13 +412,13 @@
         const onScreen = (x, y) => { const sx = mapOffsetX + mapScale * x, sy = mapOffsetY + mapScale * y; return sx > -cssW && sx < 2 * cssW && sy > -cssH && sy < 2 * cssH; };
         if (clipHi) {
             for (let i = idx + 1; i < filteredData.length; i++) {
-                setSeg(i);
+                setSeg(i - 1, i);
                 if (onScreen(cp.x2, cp.y2) || onScreen(cp.x1, cp.y1)) { ctx.beginPath(); ctx.moveTo(cp.x1, cp.y1); ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2); ctx.stroke(); }
             }
         } else {
             ctx.beginPath(); let started = false;
             for (let i = idx + 1; i < filteredData.length; i++) {
-                setSeg(i);
+                setSeg(i - 1, i);
                 if (!started) { ctx.moveTo(cp.x1, cp.y1); started = true; }
                 ctx.bezierCurveTo(cp.c1x, cp.c1y, cp.c2x, cp.c2y, cp.x2, cp.y2);
             }

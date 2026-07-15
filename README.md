@@ -105,7 +105,7 @@ If an MMR video is loaded, the **video clock drives playback** and the telemetry
 Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header.
 
 - **2D**: whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom, drag to pan; zoom out for synoptic context.
-- **3D**: Three.js scene over an elevation-shaded **terrain basemap** (a bundled low-res global ETOPO relief grid, so land and sea floor sit at real height and a below-sea-level takeoff no longer starts under a flat plane), with a plane model and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse. **Real Scale (3D)** draws the aircraft at true size and adds faint flight-level reference planes so climbs and descents read against them.
+- **3D**: Three.js scene over an elevation-shaded **terrain basemap** (a bundled low-res global ETOPO relief grid, so land sits at real height over a flat sea, and the ground meets the aircraft at takeoff and landing), with a plane model and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse. **Real Scale (3D)** draws the aircraft at true size and adds faint flight-level reference planes so climbs and descents read against them.
 
 Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
 

@@ -5,7 +5,7 @@
    data/etopo-heightmap.png is a 721x361 (0.5 deg) global ETOPO elevation grid, source NOAA NCEI via
    the CoastWatch ERDDAP (etopo180). Elevation in metres is packed into the R and G channels:
    elev = (R*256 + G) - 11000. Row 0 is the north edge (+90 lat), columns run west (-180) to east.
-   It gives the 3D basemap real land and sea-floor height, so a flight over below-sea-level ground sits
+   It gives the 3D basemap real land height and tells land from sea, so a flight over high ground sits
    at the correct height relative to the terrain. */
 
     const TERRAIN_OFFSET = 11000;   // packed value = elev + this; see data/etopo-heightmap.png
@@ -27,15 +27,16 @@
         return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
     }
 
-    // Elevation-shaded color (0..1 rgb): bathymetry below sea level, green->tan->snow above. The sea
-    // ramp follows the theme and starts from the 2D basemap's ocean (#d4e3f0 light, #0e1a29 dark),
-    // deepening with depth either way. Land keeps one ramp: its mid-tones hold against both themes.
+    // Color (0..1 rgb): one flat ocean below sea level, green->tan->snow above it. Depth is not
+    // shaded, the sea floor's shape being no part of what this map is read for, so water carries a
+    // single tone per theme, pitched to hold against the 3D scene background (scene3DBgColor in
+    // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which the water here
+    // would sink into. Land keeps one ramp across themes: its mid-tones hold against both.
     function terrainColorRGB(e) {
         if (e < 0) {
-            const t = Math.max(0, Math.min(1, -e / 5000));
             return (document.documentElement.dataset.theme === 'light')
-                ? [0.58 - 0.20 * t, 0.72 - 0.22 * t, 0.85 - 0.19 * t]
-                : [0.04 + 0.03 * (1 - t), 0.20 - 0.11 * t, 0.32 - 0.15 * t];
+                ? [0.58, 0.72, 0.85]
+                : [0.07, 0.20, 0.32];
         }
         const t = Math.max(0, Math.min(1, e / 4000));
         if (t < 0.5) { const s = t / 0.5; return [0.17 + 0.36 * s, 0.42 - 0.05 * s, 0.20 - 0.01 * s]; }   // green -> tan
@@ -74,8 +75,8 @@
 
     // Ground elevation with the ends pinned to the aircraft, fading out over TERRAIN_PIN_DEG. Only
     // the nearest pin applies, so a there-and-back mission that starts and ends on the same field
-    // corrects once rather than twice. This is the ground for anything laid on the terrain: the
-    // coastlines drape through it too, or a pinned field would rise through them.
+    // corrects once rather than twice. This is the raw ground, which runs below sea level over
+    // water; terrainSurfaceMeters below is what the map is drawn at.
     function terrainGroundMeters(lat, lon) {
         const e = terrainElevationMeters(lat, lon);
         if (!_terrainPins.length) return e;
@@ -90,9 +91,14 @@
         return e + best.delta * (1 - t * t * (3 - 2 * t));   // smoothstep out to the radius
     }
 
+    // The height the map is drawn at: land carries relief and water lies flat at sea level, but for
+    // a pin's reach of a field, where the ground rides up to meet the aircraft. Anything laid on the
+    // surface reads this rather than the raw ground, or it would sink under the sea wherever the
+    // grid puts the ground below it.
+    function terrainSurfaceMeters(lat, lon) { return Math.max(0, terrainGroundMeters(lat, lon)); }
+
     // A terrain surface over the flight's horizontal extent (plus margin), sampled from the grid and
-    // placed with the SAME mapping as the track (get3DCoord), plus a faint sea-level plane so ocean
-    // reads as a surface with the bathymetry faintly beneath. Returns a THREE.Group, or null if the
+    // placed with the SAME mapping as the track (get3DCoord). Returns a THREE.Group, or null if the
     // grid has not loaded or three.js / plot bounds are not ready.
     function buildTerrainMesh3D() {
         if (!_terrain || typeof THREE === 'undefined' || typeof get3DCoord !== 'function') return null;
@@ -112,10 +118,12 @@
             for (let ix = 0; ix < NX; ix++) {
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
-                const m = terrainGroundMeters(lat, lon);
-                const p = get3DCoord(lon, lat, m);
+                // Height reads the drawn surface, colour the raw ground. A pin reaches 300 m, enough
+                // to carry a shallow coastal cell over sea level, and colouring off it would paint
+                // the pin's whole radius as land out into the water.
+                const p = get3DCoord(lon, lat, terrainSurfaceMeters(lat, lon));
                 verts.push(p.x, p.y, p.z);
-                const c = terrainColorRGB(m);
+                const c = terrainColorRGB(terrainElevationMeters(lat, lon));
                 colors.push(c[0], c[1], c[2]);
             }
         }
@@ -132,12 +140,6 @@
         const terrain = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
         terrain.renderOrder = -2;   // draw under the track, storm ribbon and plane
         grp.add(terrain);
-        // faint sea-level surface at y=0 (get3DCoord centers the flight on the origin).
-        const seaGeom = new THREE.PlaneGeometry((lon1 - lon0) * 20, (lat1 - lat0) * 20); seaGeom.rotateX(-Math.PI / 2);
-        const seaCol = (document.documentElement.dataset.theme === 'light') ? 0x5f93c4 : 0x2f6fa6;
-        const sea = new THREE.Mesh(seaGeom, new THREE.MeshBasicMaterial({ color: seaCol, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }));
-        sea.position.set(0, 0, 0); sea.renderOrder = -1;
-        grp.add(sea);
         return grp;
     }
 

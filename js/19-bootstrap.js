@@ -361,6 +361,23 @@
         return [minX, minY, maxX, maxY];
     }
 
+    // Airfields the aircraft can operate from, as [ident, iata, lat, lon, name, isLarge, isMil].
+    // Local-only: unlike the basemap this has no upstream URL to fall back to, so a failed fetch
+    // just leaves the layer off. Loads after the basemap, being the smaller and less critical of
+    // the two, and marks the map dirty so the codes appear as soon as they land.
+    function loadAirports() {
+        fetch('data/airports.json' + (typeof assetVer === 'function' ? assetVer() : ''))
+            .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(rows => {
+                if (!Array.isArray(rows)) return;
+                airports = rows.map(a => ({ code: a[1] || a[0], name: a[4], lat: a[2], lon: a[3], big: a[5] === 1, mil: a[6] === 1 }));
+                bgNeedsUpdate = true;
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                if (typeof threeDInitialized !== 'undefined' && threeDInitialized && filteredData.length > 0) build3DScene();
+            })
+            .catch(() => {});
+    }
+
     // Local copies first (data/ ships with the app, so the basemap works offline);
     // fall back to the original remote sources if the local fetch fails (e.g. file://).
     const fetchGeo = (localPath, remoteUrl) =>
@@ -383,6 +400,7 @@
             });
         }
         bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+        loadAirports();
     }).catch(e => {});
 
     // --- MP4 Video Zoom & Pan Logic ---

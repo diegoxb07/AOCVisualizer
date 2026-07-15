@@ -518,6 +518,30 @@
         return { mesh, mat };
     }
 
+    // An airfield's code lying flat on the basemap beside its dot, in the same idiom as the state
+    // labels. Military takes the sky-blue accent, civil a neutral ink, both keylined dark so they
+    // read over terrain, water and imagery alike.
+    function airportLabelMesh(code, mil, worldWidth) {
+        const cv = document.createElement('canvas');
+        let c = cv.getContext('2d');
+        c.font = 'bold 40px sans-serif';
+        const w = Math.ceil(c.measureText(code).width) + 28;
+        cv.width = w; cv.height = 56;
+        c = cv.getContext('2d');
+        c.font = 'bold 40px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.lineWidth = 7; c.strokeStyle = 'rgba(5,12,20,0.92)'; c.strokeText(code, w / 2, 30);
+        c.fillStyle = mil ? '#38bdf8' : '#e8eef6'; c.fillText(code, w / 2, 30);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        const geo = new THREE.PlaneGeometry(worldWidth, worldWidth * (56 / w));
+        geo.rotateX(-Math.PI / 2);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 4;
+        return { mesh, mat };
+    }
+
     // mapFeatures index of the US state holding (lat, lon), or -1. The last match is tested first,
     // since a flight sits inside one state for minutes at a time; the rest reject on bbox. Crossings
     // are counted across every ring, so holes and each part of a multi-part state fall out even-odd.
@@ -617,6 +641,22 @@
                 }
             }
         });
+        // Airfields near the flight: a dot and its code flat on the basemap, so a landing reads as a
+        // place. Bounded by the same box as the basemap features, since a code the flight can never
+        // reach is only clutter, and dropped into threeMapGroup so a rebuild clears them with it.
+        if (airports.length) {
+            const dotGeo = new THREE.SphereGeometry(0.10, 10, 8);
+            airports.forEach(a => {
+                if (!isBoxInFlightBounds([a.lon, a.lat, a.lon, a.lat])) return;
+                const at = get3DCoord(a.lon, a.lat, borderAlt([a.lon, a.lat]) + 40);
+                const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: a.mil ? 0x38bdf8 : 0xe8eef6, depthWrite: false }));
+                dot.position.copy(at); dot.renderOrder = 3;
+                threeMapGroup.add(dot);
+                const lbl = airportLabelMesh(a.code, a.mil, 1.6);
+                lbl.mesh.position.set(at.x + 1.1, at.y, at.z);
+                threeMapGroup.add(lbl.mesh);
+            });
+        }
         // elevation-shaded terrain surface from the bundled ETOPO grid, so land and sea floor sit at
         // real height. null until the grid loads, while the flat coastline map above renders.
         if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }
@@ -801,7 +841,11 @@
 
             setTimeout(() => {
                 resizeCanvasLayout();
-                if (filteredData.length > 0) { if (!threeDInitialized) build3DScene(); updateVisualComponents(currentIdx); }
+                // Rebuild on every entry, not only the first. The scene bakes its layers in, while 2D
+                // reads them live on each repaint, so anything that arrived while 3D was away (a storm
+                // best-track, a new flight, a theme change) is only in the scene once it is rebuilt.
+                // build3DScene calls init3D itself when the scene does not exist yet.
+                if (filteredData.length > 0) { build3DScene(); updateVisualComponents(currentIdx); }
                 // real-scale was likely toggled while in 2D, where the camera couldn't dolly; frame the
                 // now-tiny plane on entering 3D so it isn't a distant speck.
                 if (realScale3D) dollyCameraForScale();

@@ -601,12 +601,20 @@
     <div class="modal-card">
         <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
         <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Pre-Cache Satellite Imagery</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a satellite and band(s), then select one or more flight files (.txt or .nc). Every tile those flights need is downloaded into the local cache. Cached imagery is saved on this device, so these flights play back with no fetching on any later visit. For MODIS/VIIRS, the two days either side of the flight are cached as well, so the day-stepper still has imagery offline. (Flights outside the chosen satellite's view / before its data starts are skipped.)</p>
+        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a satellite and band(s), then choose flights from the archive below, upload your own files, or both. Every tile those flights need is downloaded into the local cache. Cached imagery is saved on this device, so these flights play back with no fetching on any later visit. Archive flights only need their track read, so ones already on this device (marked <b>on device</b>) cost no extra download. For MODIS/VIIRS, the two days either side of the flight are cached as well, so the day-stepper still has imagery offline. (Flights outside the chosen satellite's view / before its data starts are skipped.)</p>
         <div class="mt-3 text-xs text-muted font-semibold">Satellite:</div>
         <select id="batchSatSelect" class="mt-1 bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer"></select>
         <div class="mt-3 text-xs text-muted font-semibold">Bands to cache:</div>
         <div id="batchBandChecks" class="flex flex-wrap gap-4 mt-1 text-[11px] text-ink select-none"></div>
-        <label class="block mt-3 text-xs text-muted font-semibold">Flight files:</label>
+        <div class="mt-3 flex items-center gap-2 relative">
+            <span class="text-xs text-muted font-semibold">From the archive:</span>
+            <select id="batchYearSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
+                <option value="">Year&hellip;</option>
+            </select>
+            <span id="batchApiOfflineToast" class="hidden absolute inset-0 z-10 flex items-center justify-center rounded border border-[color-mix(in_oklab,var(--danger)_70%,transparent)] bg-danger-soft text-[10px] font-semibold text-danger whitespace-nowrap pointer-events-none">API Offline</span>
+        </div>
+        <div id="batchMissionChecks" class="mt-2 max-h-[32vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-ink select-none"></div>
+        <label class="block mt-3 text-xs text-muted font-semibold">Or flight files:</label>
         <input type="file" id="batchFileInput" multiple accept=".txt,.nc" class="mt-1 block w-full text-[11px] text-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[var(--border)] file:text-[var(--text)] file:cursor-pointer" />
         <div class="mt-3 h-2 bg-panel-strip rounded overflow-hidden"><div id="batchCacheFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
         <div id="batchCacheStatus" class="text-[11px] text-muted mt-1">No files selected.</div>

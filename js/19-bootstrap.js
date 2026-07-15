@@ -22,11 +22,44 @@
         const startBtn = document.getElementById('batchCacheStartBtn');
         if (!btn || !modal || !fileInput || !startBtn) return;
         let picked = [];
+        const yearSel = document.getElementById('batchYearSelect');
+        const checksBox = document.getElementById('batchMissionChecks');
+        let seasonReq = 0;   // guards a slow season fetch against a newer pick
         // Closing the modal only HIDES it, caching keeps running in the background (progress shows on
         // the on-map pill), so the user can close it and keep working. Stopping is explicit (Stop button
         // or the pill's Cancel).
         const closeModal = () => { modal.style.display = 'none'; };
-        btn.addEventListener('click', () => { populateBatchSatSelect(); populateBatchBandChecks(); modal.style.display = 'flex'; });
+
+        // Same Year -> Storm -> Flight tree the Batch Load modal uses (js/12b-recon-archive.js).
+        // Unlike there, an already-loaded mission is NOT locked: its imagery still needs caching.
+        // It is only tagged, since having the track on device means no download to read it.
+        async function loadSeason(year) {
+            const req = ++seasonReq;
+            if (!checksBox) return;
+            if (!year) { reconChecksNote(checksBox, 'Pick a season to list its flights, or upload files below.'); return; }
+            reconChecksNote(checksBox, 'Loading the ' + year + ' season…');
+            try {
+                const groups = await reconFetchSeasonGroups(year);
+                if (req !== seasonReq) return;
+                reconRenderSeasonChecks(checksBox, groups, { lockLoaded: false, loadedTag: ' (on device)' });
+            } catch (e) {
+                if (req === seasonReq) reconChecksNote(checksBox, 'Could not load ' + year + ' (' + e.message + ').');
+            }
+        }
+        async function openModal() {
+            populateBatchSatSelect(); populateBatchBandChecks();
+            modal.style.display = 'flex';
+            const offline = typeof isReconApiDown === 'function' && isReconApiDown();
+            const toast = document.getElementById('batchApiOfflineToast');
+            if (toast) toast.classList.toggle('hidden', !offline);
+            if (yearSel) yearSel.disabled = offline;
+            // Uploaded files still cache fine with the archive down, so only the tree is dropped.
+            if (offline) { reconChecksNote(checksBox, 'The recon archive is unreachable, so flights cannot be listed. Uploading files below still works.'); return; }
+            await reconFillSeasonYears(yearSel);
+            loadSeason(yearSel ? yearSel.value : '');
+        }
+        btn.addEventListener('click', openModal);
+        if (yearSel) yearSel.addEventListener('change', () => loadSeason(yearSel.value));
         document.getElementById('batchCacheCloseBtn').addEventListener('click', closeModal);
         document.getElementById('batchCacheCloseX').addEventListener('click', closeModal);
         const satSelect = document.getElementById('batchSatSelect');
@@ -57,7 +90,22 @@
         startBtn.addEventListener('click', () => {
             if (batchCaching) { requestCacheCancel(); return; }
             const bands = Array.from(document.querySelectorAll('#batchBandChecks input:checked')).map(c => c.value);
-            batchCacheFlights(picked, bands, satSelect ? satSelect.value : '');
+            // Unify the two inputs into one source list: checked archive missions (read via the recon
+            // API / on-device store) and uploaded files. Order is archive first, then files.
+            const sources = [];
+            if (checksBox) {
+                // :not(.recon-storm-all) drops the per-storm toggle rows, which carry no mission id.
+                checksBox.querySelectorAll('input[type=checkbox]:checked:not(:disabled):not(.recon-storm-all)').forEach(cb => {
+                    const id = cb.value;
+                    sources.push({ label: id, load: (onProgress) => reconRowsForMission(id, onProgress) });
+                });
+            }
+            picked.forEach(file => sources.push({
+                label: file.name,
+                load: async () => readFlightFileForBatch(file)   // { name, date, rows }
+            }));
+            if (!sources.length) { document.getElementById('batchCacheStatus').textContent = 'Pick archive flights or upload files first.'; return; }
+            batchCacheFlights(sources, bands, satSelect ? satSelect.value : '');
         });
     })();
 

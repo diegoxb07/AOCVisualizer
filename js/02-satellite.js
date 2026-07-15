@@ -1685,9 +1685,12 @@
         precacheCurrentFlight(layerDef.value, [bandId]);
     }
 
-    async function batchCacheFlights(files, bandIds, layerValue) {
+    // `sources` is a list of { label, load: async onProgress => ({ date, rows }) }, so a flight can
+    // come from an uploaded file or from the archive; all this needs is the track's box and time
+    // span. See wireBatchCache in js/19-bootstrap.js for the two builders.
+    async function batchCacheFlights(sources, bandIds, layerValue) {
         if (batchCaching) return;
-        if (!files || !files.length) { showToast('Pick one or more flight files first.', 5000); return; }
+        if (!sources || !sources.length) { showToast('Pick one or more flights first.', 5000); return; }
         if (!layerValue) { showToast('Pick a satellite to cache.', 5000); return; }
         if (!bandIds || !bandIds.length) { showToast('Pick at least one band to cache.', 5000); return; }
         const layerDefForCheck = GIBS_LAYERS.find(d => d.value === layerValue);
@@ -1701,14 +1704,19 @@
         if (startBtn) { startBtn.textContent = 'Stop'; }
         showSatPrefetchBar();   // background pill so progress is visible even if the modal is closed
 
-        // Pass 1: parse every file (sequentially) and build the tile list.
+        // Pass 1: read every flight (sequentially) and build the tile list.
         let allTargets = [], skipped = 0;
-        for (let i = 0; i < files.length; i++) {
+        for (let i = 0; i < sources.length; i++) {
             if (batchCacheCancel || myPass !== batchCachePass) break;
-            setBatchProgress(0, 1, `Reading ${i + 1}/${files.length}: ${files[i].name}…`);
-            const f = await readFlightFileForBatch(files[i]);
+            const src = sources[i];
+            setBatchProgress(0, 1, `Reading ${i + 1}/${sources.length}: ${src.label}…`);
+            let f;
+            // An archive source downloads, so it can fail (offline mid-pass, bad mission); skip that
+            // flight rather than tearing down a pass that may already have queued others.
+            try { f = await src.load(msg => setBatchProgress(0, 1, `(${i + 1}/${sources.length}) ${msg}`)); }
+            catch (e) { skipped++; continue; }
             if (myPass !== batchCachePass) break;
-            if (f.date === 'Unknown' || f.rows.length === 0) { skipped++; continue; }
+            if (!f || f.date === 'Unknown' || !f.rows || f.rows.length === 0) { skipped++; continue; }
             const t = batchTargetsForFlight(f.rows, f.date, bandIds, layerValue);
             if (t.length === 0) { skipped++; continue; }   // out of view / before this satellite's data
             allTargets = allTargets.concat(t);
@@ -1732,7 +1740,7 @@
         batchCaching = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';
-        const msg = `Local cache done: ${fetched} new tile(s) from ${files.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date)` : ''}.`;
+        const msg = `Local cache done: ${fetched} new tile(s) from ${sources.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date / unreadable)` : ''}.`;
         setBatchProgress(done, total || 1, msg);
         setTimeout(hideSatPrefetchBar, 2500);   // leave the pill up briefly with the final count
         showToast(msg, 7000);

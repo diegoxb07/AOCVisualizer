@@ -92,11 +92,10 @@
             } catch (e) { resolve(); }
         });
     })();
-    // IndexedDB reports quota/abort failures asynchronously on the transaction, so a try/catch around
-    // the put catches only synchronous throws and a full quota needs tx.onabort to be seen at all.
-    // Without that, writes no-op while satBlobStore still reports the tile cached. On the first
-    // failure, pull the byte ceiling down toward what is currently resident (floored at 64 MB) and
-    // evict to it, so a full disk degrades to a smaller on-disk cache rather than failing every write.
+    // IndexedDB reports quota failures asynchronously, so tx.onabort is the only place a put's
+    // failure surfaces; a try/catch around it sees synchronous throws alone. On the first, drop the
+    // byte ceiling toward what is resident (floored at 64 MB) and evict, so a full disk shrinks the
+    // cache rather than silently stopping every write.
     let satIdbWriteFailed = false;
     function onSatIdbWriteFail(err) {
         if (satIdbWriteFailed) return;
@@ -1476,9 +1475,8 @@
     // --- Background progress pill (2D map, top-center) ---------------------------------
     // Non-blocking indicator for the local satellite cache, so the user can close the modal and keep
     // working while it fills in the background. Driven by the batch cache via setBatchProgress().
-    // One pending hide at a time, owned here. A pass that ends leaves its bar up briefly to show the
-    // final count, so without this the outgoing pass's timer would pull the bar down on whatever pass
-    // started in the meantime (switching band cancels one pass and starts another immediately).
+    // One pending hide at a time. A pass leaves its bar up briefly to show the final count, and
+    // switching band starts the next pass inside that window, so the timer is cleared on show.
     let _satPrefetchHideTimer = null;
     function clearSatPrefetchHide() {
         if (_satPrefetchHideTimer) { clearTimeout(_satPrefetchHideTimer); _satPrefetchHideTimer = null; }

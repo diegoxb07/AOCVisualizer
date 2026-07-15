@@ -112,12 +112,10 @@
         });
     }
 
-    // The surface's colour, as a texture rather than per-vertex. The mesh carries a vertex every
-    // ~23 km, so colouring at its vertices smears every coastline into a gradient that wide, which
-    // is the whole width of a barrier island. Painting instead lets the coastline come from the same
-    // vector outlines the 2D basemap fills, so it lands where the border is at any mesh density.
-    // Land shading is rasterised coarse and scaled up: the elevation source is half-degree, so
-    // shading it finer invents nothing, while the coastline itself is cut at full resolution.
+    // The surface's colour, painted rather than taken per-vertex, so the coastline comes from the
+    // vector outlines at texture resolution instead of the mesh's ~23 km vertex spacing. Shading is
+    // rasterised at TERRAIN_SHADE and scaled up, the elevation source being half-degree; only the
+    // coastline needs TERRAIN_TEX.
     const TERRAIN_TEX = 2048, TERRAIN_SHADE = 256;
 
     // Held across rebuilds and keyed on everything it draws from. build3DScene runs on a dozen
@@ -177,13 +175,10 @@
     const TERRAIN_PIN_DEG = 1.5;
     const TERRAIN_PIN_MAX_M = 300;
 
-    // The ends of the track, each with the gap between the aircraft there and the grid's idea of the
-    // ground under it. The grid samples ETOPO every 0.5 degrees, about 55 km, so a field's own
-    // elevation is averaged into its surroundings and the aircraft can sit tens of metres under or
-    // over the rendered ground at exactly the two moments it should be touching it.
-    // An end whose gap is larger than TERRAIN_PIN_MAX_M is left alone: the aircraft is genuinely
-    // airborne there (the parser drops rows under 20 kt, so a track can open already climbing), and
-    // it should read that way rather than drag a plateau up under itself.
+    // The track's ends, each with the gap between the aircraft and the ground under it. The grid
+    // averages a field's elevation into its half-degree cell, so the two touch by tens of metres.
+    // A gap over TERRAIN_PIN_MAX_M means the aircraft is airborne there, not on a field, and is left
+    // alone (the parser drops rows under 20 kt, so a track can open already climbing).
     function terrainPins() {
         if (typeof filteredData === 'undefined' || filteredData.length < 2) return [];
         if (typeof track3DAltMeters !== 'function') return [];

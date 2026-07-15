@@ -275,12 +275,8 @@
                     }
                 }
             }
-            // country labels: sit at the nearest coastline point to the plane, only while that coast is in
-            // range, and scale with camera distance so they stay a constant readable size at any altitude.
-            // the state the plane is over: one flat label, at the state's own centre rather than the
-            // plane's, so it names the ground without trailing the aircraft. Toggled only on a change
-            // of state, and stateIndexAt tests the current one first, so this stays a single hit test.
-            // Runs ahead of the country labels, which read _stateLabelIdx to stand down under it.
+            // the state the plane is over: one label at that state's own centre. Runs before the
+            // country labels, which read _stateLabelIdx to stand down under it.
             if (_stateLabels.length) {
                 const in3dS = !trackerModeSelect || trackerModeSelect.value === '3d';
                 const row = (in3dS && filteredData.length) ? filteredData[currentIdx] : null;
@@ -290,13 +286,9 @@
                     if (sIdx >= 0) _stateLabels[sIdx].mesh.visible = true;
                     _stateLabelIdx = sIdx;
                 }
-                // Sized off camera distance, so the name holds one readable size whether the camera
-                // is on the aircraft or out far enough to frame the state, and turned to face it, so
-                // a low camera does not read the name edge-on. Yaw puts the text across the view;
-                // pitching by the camera's own elevation lands the name flat on the map from straight
-                // above and stands it up toward the eye as the camera drops to the horizon. Both are
-                // orientation and size only: the anchor stays the state's own centre, so what tracks
-                // the camera is how the name faces, never where it sits.
+                // Size and facing follow the camera, the anchor never does. Yaw puts the text across
+                // the view; pitching by the camera's elevation lays the name flat from straight above
+                // and stands it up as the camera drops to the horizon.
                 if (sIdx >= 0 && camera3D) {
                     const sl = _stateLabels[sIdx], a = sl.at;
                     const dx = camera3D.position.x - a.x, dy = camera3D.position.y - a.y, dz = camera3D.position.z - a.z;
@@ -306,10 +298,8 @@
                     sl.mesh.rotation.set(0, 0, 0);
                     sl.mesh.rotateY(Math.atan2(dx, dz));
                     sl.mesh.rotateX(-elev);
-                    // The name turns about its middle, so standing it up drops its lower half below
-                    // the anchor and into the terrain. Ride up by that half, which is the label's
-                    // half-height laid against the vertical: nothing at all lying flat, all of it
-                    // standing upright.
+                    // it turns about its middle, so ride up by its half-height against the vertical,
+                    // or standing it up puts its lower half through the terrain
                     sl.mesh.position.set(a.x, a.y + (k / 2) * Math.cos(elev), a.z);
                 }
             }
@@ -340,6 +330,8 @@
                     am.mesh.rotation.y = (am.idx === currentStormFixIdx) ? (am.lat < 0 ? -spin : spin) : 0;
                 }
             }
+            // country labels: sit at the nearest coastline point to the plane, only while that coast is in
+            // range, and scale with camera distance so they stay a constant readable size at any altitude.
             if (_countryLabels.length) {
                 const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
                 const show = in3d && camera3D && planeGroup3D && filteredData.length;
@@ -498,7 +490,8 @@
     // fall on a downdraft/dip, so vertical air motion reads on the model. Kept off the rolling plane
     // group so they stay vertical; positioned and scaled onto the plane each frame (update3DFrame), and
     // streamed and faded by the signed vertical bump (vertBump) in animate3D.
-    const WIND_STREAK_H = 1.35;   // half-range the streaks stream over, in local space
+    const WIND_STREAK_H = 0.40;     // half-range each streak streams over, in local space
+    const WIND_STREAK_SPREAD = 0.3; // how far off the fuselage they sit, roughly the wing
     function ensureWindStreaks() {
         if (windStreaks3D || typeof scene3D === 'undefined' || !scene3D) return;
         windStreaks3D = new THREE.Group();
@@ -506,10 +499,10 @@
             const mat = new THREE.LineBasicMaterial({ color: 0xdfeaf7, transparent: true, opacity: 0, depthWrite: false });
             const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.5, 0)]);
             const line = new THREE.Line(geo, mat);
-            const ox = (Math.random() * 2 - 1) * 0.5, oz = (Math.random() * 2 - 1) * 0.5;   // tight cluster near the fuselage
-            const wingShrink = 1 - 0.55 * Math.min(1, Math.abs(ox) / 0.5);   // shorter toward the wingtips
+            const ox = (Math.random() * 2 - 1) * WIND_STREAK_SPREAD, oz = (Math.random() * 2 - 1) * WIND_STREAK_SPREAD;
+            const wingShrink = 1 - 0.55 * Math.min(1, Math.abs(ox) / WIND_STREAK_SPREAD);   // shorter toward the tips
             line.userData = { ox, oz, baseY: (Math.random() * 2 - 1) * WIND_STREAK_H };
-            line.scale.y = (0.26 + Math.random() * 0.22) * wingShrink;
+            line.scale.y = (0.11 + Math.random() * 0.10) * wingShrink;
             line.position.set(ox, line.userData.baseY, oz);
             windStreaks3D.add(line);
         }
@@ -564,13 +557,10 @@
         if (threeDInitialized && filteredData.length > 0) build3DScene();
     }
 
-    // A state name on the basemap, held square to the camera by animate3D: it lies flat on the map
-    // from straight above and tips up toward the eye as the camera drops, so it reads at any angle
-    // without ever leaving the state it names. A mesh, not a sprite, since a sprite would face the
-    // camera flat-on always and never lie down onto the map.
-    // Built one world unit tall, whatever the name's length, and scaled by camera distance each
-    // frame: the camera works from 0.7 units off the aircraft out to hundreds across a state, so any
-    // fixed world size is either unreadable at one end or larger than the screen at the other.
+    // A state name on the basemap. A mesh, not a sprite, so animate3D can lay it onto the map from
+    // straight above and stand it up as the camera drops. Built one world unit tall whatever the
+    // name's length, and scaled there by camera distance, the camera ranging from 0.7 units off the
+    // aircraft to hundreds across a state.
     function stateLabelMesh(name) {
         const cv = document.createElement('canvas');
         let c = cv.getContext('2d');
@@ -651,12 +641,10 @@
         const stateMat = new THREE.LineBasicMaterial({ color: light3D ? 0x94a3b0 : 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
-        // [lon, lat], so terrainSurfaceMeters takes (c[1], c[0]). It reads the same drawn surface the
-        // mesh is built from, pins refreshed here first, so neither a pinned field nor the flat sea
-        // can rise through them: a vector coastline routinely samples to a grid cell the water owns,
-        // and 90 m over a trench would sit far under the sea.
+        // [lon, lat], so terrainSurfaceMeters takes (c[1], c[0]). It reads the drawn surface, not the
+        // raw ground, or a coastline sampling to a water cell would sit under the sea.
         const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
-        // Both prime what terrainSurfaceMeters reads, and the drape below is the first to read it.
+        // both prime terrainSurfaceMeters, and the drape below is its first reader
         if (typeof refreshTerrainPins === 'function') refreshTerrainPins();
         if (typeof refreshTerrainMask === 'function') refreshTerrainMask();
         const borderAlt = c => hasTerrain ? terrainSurfaceMeters(c[1], c[0]) + 90 : 5;

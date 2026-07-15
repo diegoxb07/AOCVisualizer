@@ -555,7 +555,7 @@
     function scene3DBgColor() {
         return (document.documentElement.dataset.theme === 'light') ? 0xdfe6ec : 0x171122;
     }
-    // Re-colors the 3D basemap for the current theme. The terrain's sea ramp and the border line
+    // Re-colors the 3D basemap for the current theme. The terrain's water and land colours and the border line
     // colours are baked at build time, so a theme change needs a rebuild; the scene background is
     // live and set here either way, since it also applies with no flight loaded.
     function applyTheme3D() {
@@ -651,11 +651,13 @@
         const stateMat = new THREE.LineBasicMaterial({ color: light3D ? 0x94a3b0 : 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
-        // [lon, lat], so terrainGroundMeters takes (c[1], c[0]). It reads the same pinned ground the
-        // surface is built from, refreshed here first, so a pinned field cannot rise through them.
+        // [lon, lat], so terrainSurfaceMeters takes (c[1], c[0]). It reads the same drawn surface the
+        // mesh is built from, pins refreshed here first, so neither a pinned field nor the flat sea
+        // can rise through them: a vector coastline routinely samples to a grid cell the water owns,
+        // and 90 m over a trench would sit far under the sea.
         const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
         if (typeof refreshTerrainPins === 'function') refreshTerrainPins();
-        const borderAlt = c => hasTerrain ? terrainGroundMeters(c[1], c[0]) + 90 : 5;
+        const borderAlt = c => hasTerrain ? terrainSurfaceMeters(c[1], c[0]) + 90 : 5;
         const processPolygon = (poly, isState) => {
             const shape = new THREE.Shape();
             poly.forEach((ring, ringIdx) => {
@@ -718,8 +720,8 @@
                 }
             }
         });
-        // elevation-shaded terrain surface from the bundled ETOPO grid, so land and sea floor sit at
-        // real height. null until the grid loads, while the flat coastline map above renders.
+        // elevation-shaded terrain surface from the bundled ETOPO grid, so land sits at real height
+        // over a flat sea. null until the grid loads, while the flat coastline map above renders.
         if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }
         if(filteredData.length > 0) {
             // densify each 1 Hz segment with the same uniform catmull-rom the plane center rides

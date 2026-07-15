@@ -532,13 +532,16 @@
         return false;
     }
 
-    function satDateForOffset(offset) {
-        if (flightMetaData.date === 'Unknown') return null;
-        const d = new Date(flightMetaData.date + 'T00:00:00Z');
+    // Shift a YYYY-MM-DD by whole UTC days. Kept free of flightMetaData so batch caching can call it
+    // per flight file, where the loaded-flight date is not the date being cached.
+    function dateStrWithOffset(dateStr, offset) {
+        if (!dateStr || dateStr === 'Unknown') return null;
+        const d = new Date(dateStr + 'T00:00:00Z');
         d.setUTCDate(d.getUTCDate() + offset);
         const Y=d.getUTCFullYear(), M=String(d.getUTCMonth()+1).padStart(2,'0'), D=String(d.getUTCDate()).padStart(2,'0');
         return Y+'-'+M+'-'+D;
     }
+    function satDateForOffset(offset) { return dateStrWithOffset(flightMetaData.date, offset); }
 
     function updateSatelliteDropdownTimes() {
         const satSelect = document.getElementById('satelliteSelect');
@@ -1573,7 +1576,12 @@
                 }
             }
         } else {
-            // Polar (MODIS/VIIRS GIBS): one daily tile per band for the flight's date.
+            // Polar (MODIS/VIIRS GIBS): one tile per band per calendar day. A polar orbiter only gives
+            // one pass a day, so the day-stepper exists to browse +/-SAT_DAY_RANGE days around the
+            // flight for a pass with less cloud or a better swath position. Cache that whole window,
+            // not just the flight day: caching day 0 alone meant stepping off it on a later offline
+            // visit found nothing cached, which is the one case pre-caching is meant to cover. Cheap,
+            // since polar is one tile per band per day (unlike GOES, which is one per 10 min).
             const box = computeSatFetchBox(extent);
             if (!box) return [];
             const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
@@ -1582,13 +1590,19 @@
             let pxW = Math.min(SAT_PX_CAP, Math.round(boxLonSpan * NATIVE_PX_PER_DEG));
             let pxH = Math.round(pxW / aspect);
             if (pxH > SAT_PX_CAP) { pxH = SAT_PX_CAP; pxW = Math.round(pxH * aspect); }
-            for (const bandId of bandIds) {
-                if (!layerDef.bands.find(b => b.id === bandId)) continue;
-                const fetchId = layerDef.value + '||' + bandId + '||' + dateStr + '||' +
-                    box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
-                if (seen.has(fetchId)) continue; seen.add(fetchId);
-                const params = { wmsLayer: layerDef.wmsPrefix + bandId, dateStr, box, pxW, pxH };
-                out.push({ fetchId, run: () => getOrFetchPolarTile(fetchId, params) });
+            for (let off = -SAT_DAY_RANGE; off <= SAT_DAY_RANGE; off++) {
+                const dayStr = dateStrWithOffset(dateStr, off);
+                // Re-checked per day, not just for the flight date: a -N offset can fall before this
+                // satellite's record starts even when the flight itself does not.
+                if (!dayStr || (layerDef.minDate && dayStr < layerDef.minDate)) continue;
+                for (const bandId of bandIds) {
+                    if (!layerDef.bands.find(b => b.id === bandId)) continue;
+                    const fetchId = layerDef.value + '||' + bandId + '||' + dayStr + '||' +
+                        box.minLon.toFixed(2)+','+box.minLat.toFixed(2)+','+box.maxLon.toFixed(2)+','+box.maxLat.toFixed(2);
+                    if (seen.has(fetchId)) continue; seen.add(fetchId);
+                    const params = { wmsLayer: layerDef.wmsPrefix + bandId, dateStr: dayStr, box, pxW, pxH };
+                    out.push({ fetchId, run: () => getOrFetchPolarTile(fetchId, params) });
+                }
             }
         }
         return out;

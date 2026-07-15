@@ -203,8 +203,8 @@
     const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
     // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
     // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
-    const STORM_SYM_SCALE = 0.020;
-    const STORM_RIBBON_SCALE = 0.004;
+    const STORM_SYM_SCALE = 0.042;
+    const STORM_RIBBON_SCALE = 0.008;
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
         if (realScale3D && typeof realScaleCamDistance === 'function') {
@@ -656,7 +656,9 @@
         // can rise through them: a vector coastline routinely samples to a grid cell the water owns,
         // and 90 m over a trench would sit far under the sea.
         const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
+        // Both prime what terrainSurfaceMeters reads, and the drape below is the first to read it.
         if (typeof refreshTerrainPins === 'function') refreshTerrainPins();
+        if (typeof refreshTerrainMask === 'function') refreshTerrainMask();
         const borderAlt = c => hasTerrain ? terrainSurfaceMeters(c[1], c[0]) + 90 : 5;
         const processPolygon = (poly, isState) => {
             const shape = new THREE.Shape();

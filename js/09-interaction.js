@@ -186,14 +186,23 @@
         else resetMapView();
     });
 
-    // The recenter button only surfaces in 2D once the user has panned/zoomed off the aircraft.
+    // The recenter button surfaces once the user has moved off the aircraft: in 2D on a pan or zoom,
+    // in 3D on a pan away from the orbit target (js/07-ui-controls.js owns that test, since only it
+    // can see the camera). animate3D calls this as the target drifts.
     function updateFollowButton() {
         const btn = document.getElementById('recenterPlaneBtn');
         if (!btn) return;
-        btn.style.display = (!followAircraft2D && filteredData.length > 0 && trackerModeSelect.value === '2d') ? '' : 'none';
+        if (filteredData.length === 0) { btn.style.display = 'none'; return; }
+        const show = trackerModeSelect.value === '3d'
+            ? (typeof cam3DOffPlane === 'function' && cam3DOffPlane())
+            : !followAircraft2D;
+        btn.style.display = show ? '' : 'none';
     }
     const recenterBtn = document.getElementById('recenterPlaneBtn');
-    if (recenterBtn) recenterBtn.addEventListener('click', () => engageFollowAircraft());
+    if (recenterBtn) recenterBtn.addEventListener('click', () => {
+        if (trackerModeSelect.value === '3d') { if (typeof recenter3DOnPlane === 'function') recenter3DOnPlane(); }
+        else engageFollowAircraft();
+    });
 
     canvas.addEventListener('mousedown', (e) => { 
         if (trackerModeSelect.value === '3d') return; 

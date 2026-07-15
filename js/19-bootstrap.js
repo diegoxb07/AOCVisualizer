@@ -617,6 +617,7 @@
         const liveSat = document.getElementById('satelliteSelect');
         const clipSat = document.getElementById('clipSatSelect');
         if (liveSat) { clipSat.innerHTML = liveSat.innerHTML; clipSat.value = liveSat.value; }
+        populateClipBands(document.getElementById('satBandSelect').value);
         syncClipSatEnabled();
 
         renderClipCustomList();
@@ -624,34 +625,82 @@
         initClipFramePreviews();
     });
 
+    // The products for whatever satellite the clip picked, read from GIBS_LAYERS rather than the live
+    // band picker, so choosing a satellite here lists its products without touching the live view.
+    // Archive-GOES keeps the placeholder the live picker uses: nothing caches or records until a
+    // product is chosen, and neither fetching nor caching does anything without one.
+    function populateClipBands(preferId) {
+        const sat = document.getElementById('clipSatSelect');
+        const band = document.getElementById('clipSatBandSelect');
+        if (!sat || !band || typeof GIBS_LAYERS === 'undefined') return;
+        const def = GIBS_LAYERS.find(d => d.value === sat.value);
+        band.innerHTML = '';
+        if (!def || !def.bands || !def.bands.length) { band.style.display = 'none'; return; }
+        if (def.isReconApi) {
+            const ph = document.createElement('option');
+            ph.value = ''; ph.textContent = 'Choose a product…';
+            band.appendChild(ph);
+        }
+        def.bands.forEach(b => {
+            if (b.available === false) return;
+            const o = document.createElement('option');
+            o.value = b.id; o.textContent = b.name;
+            band.appendChild(o);
+        });
+        if (preferId && [...band.options].some(o => o.value === preferId)) band.value = preferId;
+        band.style.display = '';
+    }
+
     // The satellite overlay draws on the 2D tracker only, so a 3D clip has nothing to lay it over.
     // Hold the picker at Off there, rather than letting a choice imply imagery that never arrives.
+    // The cache button also needs a product: without one there is nothing to build.
     function syncClipSatEnabled() {
         const is3d = document.getElementById('clipTrackerMode').value === '3d';
         const sat = document.getElementById('clipSatSelect');
+        const band = document.getElementById('clipSatBandSelect');
         const btn = document.getElementById('clipSatCacheBtn');
         const note = document.getElementById('clipSatNote');
+        const off = !sat || sat.value === 'none';
         if (sat) { if (is3d) sat.value = 'none'; sat.disabled = is3d; }
-        if (btn) btn.disabled = is3d || !sat || sat.value === 'none';
+        if (band) band.style.display = (is3d || off || !band.options.length) ? 'none' : '';
+        if (btn) btn.disabled = is3d || off || !band || !band.value;
         if (note) note.classList.toggle('hidden', !is3d);
     }
     document.getElementById('clipTrackerMode').addEventListener('change', syncClipSatEnabled);
-    document.getElementById('clipSatSelect').addEventListener('change', syncClipSatEnabled);
+    document.getElementById('clipSatSelect').addEventListener('change', () => { populateClipBands(); syncClipSatEnabled(); });
+    document.getElementById('clipSatBandSelect').addEventListener('change', syncClipSatEnabled);
 
     // Build the chosen satellite's whole-flight imagery up front, so a recording plays from cache
     // instead of stalling on the API each time the clock crosses a scan. Applying the layer to the
     // live picker is what gives maybeAutoPrecacheSatellite a product to build from.
     document.getElementById('clipSatCacheBtn').addEventListener('click', async () => {
-        const liveSat = document.getElementById('satelliteSelect');
         const wantSat = document.getElementById('clipSatSelect').value;
-        if (!liveSat || wantSat === 'none') return;
-        if (liveSat.value !== wantSat) { liveSat.value = wantSat; liveSat.dispatchEvent(new Event('change')); }
+        const wantBand = document.getElementById('clipSatBandSelect').value;
+        if (wantSat === 'none') return;
+        if (!wantBand) { showToast('Pick a product for this satellite first.', 4000); return; }
+        applyClipSatToLive(wantSat, wantBand);
         if (typeof maybeAutoPrecacheSatellite !== 'function') return;
         await maybeAutoPrecacheSatellite();
-        // It stays silent when there is no work: a polar layer is one image per day, and a flight
-        // whose tiles are all local needs none. Say so rather than leave the button looking inert.
-        if (!batchCaching) showToast('Nothing to cache: this imagery is already on this device, or the layer streams one image per day.', 5000);
+        // It stays silent when there is no work to do, so name the cases rather than leave the
+        // button looking inert. A polar layer is one image a day and builds nothing ahead.
+        if (!batchCaching) {
+            const def = GIBS_LAYERS.find(d => d.value === wantSat);
+            showToast(def && def.isReconApi
+                ? 'This product is already cached for the flight.'
+                : 'This layer streams a single image per day, so there is nothing to build ahead.', 5000);
+        }
     });
+
+    // Push the clip's satellite and product onto the live pickers, which are what the fetch, the
+    // cache and the recorder all read. The band goes on after the satellite, whose change handler
+    // rebuilds the band list underneath it.
+    function applyClipSatToLive(satValue, bandId) {
+        const liveSat = document.getElementById('satelliteSelect');
+        const liveBand = document.getElementById('satBandSelect');
+        if (!liveSat) return;
+        if (liveSat.value !== satValue) { liveSat.value = satValue; liveSat.dispatchEvent(new Event('change')); }
+        if (liveBand && bandId && liveBand.value !== bandId) { liveBand.value = bandId; liveBand.dispatchEvent(new Event('change')); }
+    }
 
     // Total graphs to record = checked page graphs + custom graphs that have metrics picked.
     function clipTotalGraphs() {
@@ -1034,11 +1083,10 @@
         }
 
         // Apply the chosen tracker mode + satellite to the live view (the recorder captures it live).
+        // The product goes with the satellite: an archive-GOES layer draws nothing until one is set.
         const wantMode = document.getElementById('clipTrackerMode').value;
         if (trackerModeSelect.value !== wantMode) { trackerModeSelect.value = wantMode; trackerModeSelect.dispatchEvent(new Event('change')); }
-        const liveSat = document.getElementById('satelliteSelect');
-        const wantSat = document.getElementById('clipSatSelect').value;
-        if (liveSat && liveSat.value !== wantSat) { liveSat.value = wantSat; liveSat.dispatchEvent(new Event('change')); }
+        applyClipSatToLive(document.getElementById('clipSatSelect').value, document.getElementById('clipSatBandSelect').value);
 
         // Wait for any satellite fetch to finish, then run a 3-second countdown so the user can frame the tracker.
         waitForSatThenCountdown(() => startClipCapture(startIdx, endIdx, graphs, videoStack));

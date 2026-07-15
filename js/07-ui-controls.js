@@ -200,7 +200,9 @@
     // Home camera offset from the aircraft (the orbit target): close enough that the airframe
     // fills the view on open. The per-frame follow keeps whatever offset the user orbits to;
     // reset3DView() snaps back to this one.
-    const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
+    // Offset to one side rather than square behind, so the airframe reads with some depth to it.
+    // Its length is the home orbit distance (dollyCameraForScale reads it as one).
+    const CAM3D_HOME = { x: 0.30, y: 0.28, z: 0.60 };
     // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
     // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
     const STORM_SYM_SCALE = 0.062;
@@ -275,6 +277,10 @@
                     }
                 }
             }
+            // the recenter button, toggled only as the answer changes so the DOM is left alone frame
+            // to frame (js/09-interaction.js owns the button, and 2D drives it the same way)
+            const off3d = cam3DOffPlane();
+            if (off3d !== _cam3DWasOff) { _cam3DWasOff = off3d; if (typeof updateFollowButton === 'function') updateFollowButton(); }
             // the state the plane is over: one label at that state's own centre. Runs before the
             // country labels, which read _stateLabelIdx to stand down under it.
             if (_stateLabels.length) {
@@ -372,6 +378,7 @@
     let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
     let _stormSyms = [];        // { mesh, at } storm fix symbols, held to one screen size by camera distance
     let _stormStrips = [];      // { mesh, at } storm ribbon legs, width held the same way
+    let _cam3DWasOff = false;   // last cam3DOffPlane answer, so the recenter button only writes on a change
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -412,6 +419,29 @@
         const fovR = (camera3D.fov || 45) * Math.PI / 180;
         return halfLen / Math.tan(fovR * 0.32);
     }
+    // How far the orbit target may sit off the plane before the recenter button surfaces, as a
+    // fraction of the camera's distance, so it reads the same close in and far out.
+    const CAM3D_OFF_FRAC = 0.12;
+
+    // True once a pan has taken the orbit target off the aircraft. update3DFrame re-centers on every
+    // index change, so this only holds while paused, which is the only time a pan survives.
+    function cam3DOffPlane() {
+        if (typeof controls3D === 'undefined' || !controls3D || !camera3D || !planeGroup3D) return false;
+        if (!filteredData.length || trackerModeSelect.value !== '3d') return false;
+        const d = camera3D.position.distanceTo(controls3D.target) || 1;
+        return controls3D.target.distanceTo(planeGroup3D.position) > d * CAM3D_OFF_FRAC;
+    }
+
+    // Put the aircraft back under the orbit target, carrying the camera with it so the angle and
+    // distance the user set are kept.
+    function recenter3DOnPlane() {
+        if (typeof controls3D === 'undefined' || !controls3D || !camera3D || !planeGroup3D) return;
+        const p = planeGroup3D.position;
+        camera3D.position.add(p.clone().sub(controls3D.target));
+        controls3D.target.copy(p); controls3D.update();
+        if (typeof updateFollowButton === 'function') updateFollowButton();
+    }
+
     function dollyCameraForScale() {
         if (typeof controls3D === 'undefined' || !controls3D || typeof camera3D === 'undefined' || !camera3D) return;
         const dist = realScale3D ? realScaleCamDistance() : Math.hypot(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);

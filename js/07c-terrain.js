@@ -27,13 +27,82 @@
         return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
     }
 
-    // Color (0..1 rgb): one flat ocean below sea level, green->tan->snow above it. Depth is not
-    // shaded, the sea floor's shape being no part of what this map is read for, so water carries a
-    // single tone per theme, pitched to hold against the 3D scene background (scene3DBgColor in
+    // The padded box the terrain covers. Kept close to the flight: relief far from it carries no
+    // information about the mission and competes with the track for the eye. Shared, so build3DScene
+    // can prime the land mask from it before it drapes anything on the surface.
+    const TERRAIN_PAD = 0.4;
+    function terrainExtent() {
+        if (typeof plotMinLon === 'undefined' || plotMinLon == null) return null;
+        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1;
+        return {
+            lon0: plotMinLon - spanLon * TERRAIN_PAD, lon1: plotMaxLon + spanLon * TERRAIN_PAD,
+            lat0: plotMinLat - spanLat * TERRAIN_PAD, lat1: plotMaxLat + spanLat * TERRAIN_PAD
+        };
+    }
+    function refreshTerrainMask() {
+        const e = terrainExtent();
+        if (e) buildLandMask(e.lon0, e.lon1, e.lat0, e.lat1);
+    }
+
+    // Land is what the country borders enclose, not what sits above sea level, so ground inside a
+    // coastline reads as land at any height. The borders are rasterised once per extent into a mask
+    // and sampled per vertex: testing 14,400 vertices against 242 country outlines of ~100k points
+    // between them runs to tens of millions of crossings, while a fill is one native raster and the
+    // lookups are then flat.
+    let _landMask = null;
+    function buildLandMask(lon0, lon1, lat0, lat1) {
+        if (typeof mapFeatures === 'undefined' || !mapFeatures.length) { _landMask = null; return null; }
+        // The feature count is part of the key, so a mask raised before the basemap finished loading
+        // is rebuilt once it has.
+        if (_landMask && _landMask.lon0 === lon0 && _landMask.lon1 === lon1
+            && _landMask.lat0 === lat0 && _landMask.lat1 === lat1 && _landMask.n === mapFeatures.length) return _landMask;
+        const W = 512, H = 512;
+        const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const c = cv.getContext('2d', { willReadFrequently: true });
+        c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+        c.fillStyle = '#fff';
+        const X = lon => (lon - lon0) / (lon1 - lon0) * W;
+        const Y = lat => (lat1 - lat) / (lat1 - lat0) * H;
+        mapFeatures.forEach(f => {
+            // states sit inside their country's outline, so filling countries alone covers them
+            if (f.properties && f.properties.isState) return;
+            const g = f.geometry; if (!g) return;
+            const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+            polys.forEach(poly => {
+                c.beginPath();
+                poly.forEach(ring => ring.forEach((p, i) => {
+                    const x = X(p[0]), y = Y(p[1]);
+                    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+                }));
+                c.fill('evenodd');   // later rings are holes, the same rule the 2D basemap fills by
+            });
+        });
+        const px = c.getImageData(0, 0, W, H).data;
+        const data = new Uint8Array(W * H);
+        for (let i = 0; i < W * H; i++) data[i] = px[i * 4] > 127 ? 1 : 0;
+        _landMask = { w: W, h: H, lon0, lon1, lat0, lat1, n: mapFeatures.length, data };
+        return _landMask;
+    }
+
+    // True inside a country outline. Falls back to sea level while the basemap has not loaded, so a
+    // terrain built before the borders arrive still tells land from water.
+    function isLandAt(lat, lon) {
+        const m = _landMask;
+        if (!m) return terrainElevationMeters(lat, lon) >= 0;
+        const x = Math.round((lon - m.lon0) / (m.lon1 - m.lon0) * (m.w - 1));
+        const y = Math.round((m.lat1 - lat) / (m.lat1 - m.lat0) * (m.h - 1));
+        if (x < 0 || x >= m.w || y < 0 || y >= m.h) return false;
+        return m.data[y * m.w + x] === 1;
+    }
+
+    // Color (0..1 rgb): one flat tone for water, green->tan->snow for land. Depth is not shaded, the
+    // sea floor's shape being no part of what this map is read for, so water carries a single tone
+    // per theme, pitched to hold against the 3D scene background (scene3DBgColor in
     // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which the water here
-    // would sink into. Land keeps one ramp across themes: its mid-tones hold against both.
-    function terrainColorRGB(e) {
-        if (e < 0) {
+    // would sink into. Land keeps one ramp across themes: its mid-tones hold against both, and it
+    // starts at green, so ground below sea level inside a coastline still reads as land.
+    function terrainColorRGB(e, land) {
+        if (!land) {
             return (document.documentElement.dataset.theme === 'light')
                 ? [0.58, 0.72, 0.85]
                 : [0.07, 0.20, 0.32];
@@ -91,39 +160,42 @@
         return e + best.delta * (1 - t * t * (3 - 2 * t));   // smoothstep out to the radius
     }
 
-    // The height the map is drawn at: land carries relief and water lies flat at sea level, but for
-    // a pin's reach of a field, where the ground rides up to meet the aircraft. Anything laid on the
-    // surface reads this rather than the raw ground, or it would sink under the sea wherever the
-    // grid puts the ground below it.
-    function terrainSurfaceMeters(lat, lon) { return Math.max(0, terrainGroundMeters(lat, lon)); }
+    // The height the map is drawn at. Land keeps its ground whatever it reads, so a coastline that
+    // encloses ground below sea level dips rather than flooding and the aircraft stays over it.
+    // Water lies flat at sea level, but for a pin's reach of a field, where the ground rides up to
+    // meet the aircraft: an island small enough for the borders to miss still gets its ground.
+    // Anything laid on the surface reads this rather than the raw ground.
+    function terrainSurfaceMeters(lat, lon) {
+        const g = terrainGroundMeters(lat, lon);
+        return isLandAt(lat, lon) ? g : Math.max(0, g);
+    }
 
     // A terrain surface over the flight's horizontal extent (plus margin), sampled from the grid and
     // placed with the SAME mapping as the track (get3DCoord). Returns a THREE.Group, or null if the
     // grid has not loaded or three.js / plot bounds are not ready.
     function buildTerrainMesh3D() {
         if (!_terrain || typeof THREE === 'undefined' || typeof get3DCoord !== 'function') return null;
-        if (typeof plotMinLon === 'undefined' || plotMinLon == null) return null;
+        const ext = terrainExtent(); if (!ext) return null;
+        const lon0 = ext.lon0, lon1 = ext.lon1, lat0 = ext.lat0, lat1 = ext.lat1;
         // This mesh is the colored surface in 3D (the flat land fills only build when the grid is
-        // absent), so the pad is what decides how much ground the map shows. Kept close to the
-        // flight: relief far from it carries no information about the mission and competes with the
-        // track for the eye. The grid stays finer than the source's own 0.5 degree spacing at a
-        // typical storm's span, so the sampling costs no detail.
-        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1, pad = 0.4;
-        const lon0 = plotMinLon - spanLon * pad, lon1 = plotMaxLon + spanLon * pad;
-        const lat0 = plotMinLat - spanLat * pad, lat1 = plotMaxLat + spanLat * pad;
+        // absent). The grid stays finer than the source's own 0.5 degree spacing at a typical
+        // storm's span, so the sampling costs no detail.
         const NX = 120, NY = 120;
         const grp = new THREE.Group();
+        buildLandMask(lon0, lon1, lat0, lat1);   // no-op when build3DScene already primed this extent
         const verts = [], colors = [], idx = [];
         for (let iy = 0; iy < NY; iy++) {
             for (let ix = 0; ix < NX; ix++) {
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
-                // Height reads the drawn surface, colour the raw ground. A pin reaches 300 m, enough
-                // to carry a shallow coastal cell over sea level, and colouring off it would paint
-                // the pin's whole radius as land out into the water.
-                const p = get3DCoord(lon, lat, terrainSurfaceMeters(lat, lon));
+                // The mask decides land from water, the ground decides how high. Taken here rather
+                // than through terrainSurfaceMeters so one ground lookup and one mask lookup serve
+                // both the height and the colour.
+                const g = terrainGroundMeters(lat, lon);
+                const land = isLandAt(lat, lon);
+                const p = get3DCoord(lon, lat, land ? g : Math.max(0, g));
                 verts.push(p.x, p.y, p.z);
-                const c = terrainColorRGB(terrainElevationMeters(lat, lon));
+                const c = terrainColorRGB(g, land);
                 colors.push(c[0], c[1], c[2]);
             }
         }

@@ -193,9 +193,19 @@
             ctx.strokeStyle = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)'; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
             // the fix the status card currently refers to carries a white label; every other fix dark
             const isCurrent = typeof currentStormFixIdx !== 'undefined' && i === currentStormFixIdx;
-            ctx.fillStyle = isCurrent ? '#ffffff' : '#111827';
             ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            // The white highlight label disappears against the lighter category colours (yellow TS,
+            // orange cat-1/2), so outline it: stroke black first, then fill white over the stroke's
+            // inner half, leaving a thin dark keyline. Round joins keep the thin strokes from
+            // spiking off tight corners on glyphs like 4 and 5.
+            if (isCurrent) {
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = Math.max(1.4, r * 0.28);
+                ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+                ctx.strokeText(lbl, 0, 0.5);
+            }
+            ctx.fillStyle = isCurrent ? '#ffffff' : '#111827';
             ctx.fillText(lbl, 0, 0.5);
             ctx.restore();
         });

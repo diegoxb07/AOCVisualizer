@@ -201,6 +201,10 @@
     // fills the view on open. The per-frame follow keeps whatever offset the user orbits to;
     // reset3DView() snaps back to this one.
     const CAM3D_HOME = { x: 0, y: 0.28, z: 0.66 };
+    // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
+    // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
+    const STORM_SYM_SCALE = 0.020;
+    const STORM_RIBBON_SCALE = 0.004;
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
         if (realScale3D && typeof realScaleCamDistance === 'function') {
@@ -294,13 +298,37 @@
                 // orientation and size only: the anchor stays the state's own centre, so what tracks
                 // the camera is how the name faces, never where it sits.
                 if (sIdx >= 0 && camera3D) {
-                    const sl = _stateLabels[sIdx], p = sl.mesh.position;
-                    const dx = camera3D.position.x - p.x, dy = camera3D.position.y - p.y, dz = camera3D.position.z - p.z;
+                    const sl = _stateLabels[sIdx], a = sl.at;
+                    const dx = camera3D.position.x - a.x, dy = camera3D.position.y - a.y, dz = camera3D.position.z - a.z;
                     const k = (Math.sqrt(dx * dx + dy * dy + dz * dz) || 1) * 0.045;
+                    const elev = Math.atan2(dy, Math.hypot(dx, dz));
                     sl.mesh.scale.set(k, k, 1);
                     sl.mesh.rotation.set(0, 0, 0);
                     sl.mesh.rotateY(Math.atan2(dx, dz));
-                    sl.mesh.rotateX(-Math.atan2(dy, Math.hypot(dx, dz)));
+                    sl.mesh.rotateX(-elev);
+                    // The name turns about its middle, so standing it up drops its lower half below
+                    // the anchor and into the terrain. Ride up by that half, which is the label's
+                    // half-height laid against the vertical: nothing at all lying flat, all of it
+                    // standing upright.
+                    sl.mesh.position.set(a.x, a.y + (k / 2) * Math.cos(elev), a.z);
+                }
+            }
+            // Storm symbols and ribbon hold one screen size off camera distance, so a storm reads the
+            // same at any zoom and whatever distance its track covered. Each takes its own distance,
+            // so a fix near the camera does not swell against one further down the track.
+            if (camera3D && (_stormSyms.length || _stormStrips.length)) {
+                const cp = camera3D.position;
+                for (let i = 0; i < _stormSyms.length; i++) {
+                    const s = _stormSyms[i], k = (cp.distanceTo(s.at) || 1) * STORM_SYM_SCALE;
+                    s.mesh.scale.set(k, 1, k);
+                }
+                for (let i = 0; i < _stormStrips.length; i++) {
+                    const s = _stormStrips[i], k = (cp.distanceTo(s.at) || 1) * STORM_RIBBON_SCALE;
+                    s.mesh.scale.set(k, 1, 1);   // width only; the leg keeps the length it was built at
+                }
+                if (stormFixRing3D && stormFixRing3D.visible) {
+                    const k = (cp.distanceTo(stormFixRing3D.position) || 1) * STORM_SYM_SCALE;
+                    stormFixRing3D.scale.set(k, 1, k);
                 }
             }
             // The current storm fix's arms turn cyclonically, the same as the 2D layer's.
@@ -350,6 +378,8 @@
     let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
     let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
     let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
+    let _stormSyms = [];        // { mesh, at } storm fix symbols, held to one screen size by camera distance
+    let _stormStrips = [];      // { mesh, at } storm ribbon legs, width held the same way
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -610,8 +640,8 @@
         _countryLabels = [];
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
-        // These live in threeMapGroup, drained above, so only the tracking array needs clearing.
-        _stormArmMeshes = [];
+        // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
+        _stormArmMeshes = []; _stormSyms = []; _stormStrips = [];
         const light3D = document.documentElement.dataset.theme === 'light';
         const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // coastlines carry, internal (state) borders sit back, so countries read against the terrain
@@ -676,9 +706,12 @@
                     big.forEach(p => { sx += p.lon; sy += p.lat; });
                     const cLon = sx / big.length, cLat = sy / big.length;
                     const lbl = stateLabelMesh(feature.properties.name);
-                    const at = get3DCoord(cLon, cLat, borderAlt([cLon, cLat]) + 60);
+                    // Elevation is sampled at the centroid alone while the name spans much further,
+                    // so it clears the ground by more than the borders do, which the standing-up lift
+                    // in animate3D then builds on.
+                    const at = get3DCoord(cLon, cLat, borderAlt([cLon, cLat]) + 220);
                     lbl.mesh.position.copy(at);
-                    lbl.rings = rings; lbl.bbox = bbox;
+                    lbl.at = at; lbl.rings = rings; lbl.bbox = bbox;
                     scene3D.add(lbl.mesh); _stateLabels.push(lbl);
                 }
             }
@@ -715,18 +748,16 @@
         if (showStormTrack && stormTrackPoints.length > 1) {
             const stormPts = [];
             stormTrackPoints.forEach(p => stormPts.push(get3DCoord(p.lon, p.lat, 0)));
-            // flat dashed ribbon laid on the sea surface, one strip per fix-to-fix leg
-            // (shortened to leave the gap), intensity-colored like the 2D layer; the width
-            // scales with the track's own extent so it stays readable at the zoom that frames it
-            const bb = new THREE.Box3().setFromPoints(stormPts);
-            const span = bb.getSize(new THREE.Vector3()).length();
-            const ribbonW = Math.max(0.16, span * 0.0017);
+            // flat dashed ribbon laid on the sea surface, one strip per fix-to-fix leg (shortened to
+            // leave the gap), intensity-colored like the 2D layer. Ribbon and symbols are built at
+            // unit width and scaled by camera distance each frame (animate3D), so a storm reads the
+            // same whether its track runs 3 degrees or 40, and at any zoom.
             for (let i = 0; i < stormPts.length - 1; i++) {
                 const a = stormPts[i], b = stormPts[i + 1];
                 const dx = b.x - a.x, dz = b.z - a.z;
                 const legLen = Math.hypot(dx, dz) * 0.72;
                 if (legLen < 0.01) continue;
-                const geo = new THREE.PlaneGeometry(ribbonW, legLen);
+                const geo = new THREE.PlaneGeometry(1, legLen);
                 geo.rotateX(-Math.PI / 2);   // lay the strip flat; its length axis runs along z
                 const strip = new THREE.Mesh(geo,
                     new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(stormTrackPoints[i].windKt)), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
@@ -734,18 +765,15 @@
                 strip.rotation.y = Math.atan2(dx, dz);
                 strip.renderOrder = 1;   // symbols draw after the ribbon, whatever the camera angle
                 threeMapGroup.add(strip);
+                _stormStrips.push({ mesh: strip, at: strip.position.clone() });
             }
-            // flat, static cyclone symbol at each fix with its category printed on it. Sized off the
-            // track's own extent, like the ribbon, so it holds the same share of the frame at any
-            // storm size. Best-track fixes sit roughly 2.5% of the track span apart, so this stays
-            // clear of its neighbours while being large enough to read the category.
-            const symSize = Math.max(1.7, ribbonW * 8);
+            // flat cyclone symbol at each fix with its category printed on it
             stormTrackPoints.forEach((p, i) => {
                 const col3 = new THREE.Color(stormWindColor(p.windKt));
                 // Arms on their own quad under the disc, so the current fix can turn them (animate3D)
                 // without tumbling its category letter. Below tropical-storm strength there are none.
                 if (p.windKt >= 34) {
-                    const armGeo = new THREE.PlaneGeometry(symSize, symSize);
+                    const armGeo = new THREE.PlaneGeometry(1, 1);
                     armGeo.rotateX(-Math.PI / 2);
                     const arms = new THREE.Mesh(armGeo,
                         new THREE.MeshBasicMaterial({ map: stormArmsTex(), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
@@ -753,19 +781,21 @@
                     arms.renderOrder = 2;
                     threeMapGroup.add(arms);
                     _stormArmMeshes.push({ mesh: arms, lat: p.lat, idx: i });
+                    _stormSyms.push({ mesh: arms, at: arms.position.clone() });
                 }
-                const geo = new THREE.PlaneGeometry(symSize, symSize);
+                const geo = new THREE.PlaneGeometry(1, 1);
                 geo.rotateX(-Math.PI / 2);
                 const sym = new THREE.Mesh(geo,
                     new THREE.MeshBasicMaterial({ map: stormSymbolTex(stormCatLabel(p.windKt)), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
                 sym.position.copy(stormPts[i]); sym.position.y = 0.06;
                 sym.renderOrder = 3;
                 threeMapGroup.add(sym);
+                _stormSyms.push({ mesh: sym, at: sym.position.clone() });
             });
             // marker for the best-track fix the status card refers to: a flat ring around that fix's
             // symbol in the sky-blue accent, the same one the 2D layer keylines it with, moved by
-            // updateStormTrackBadge() as playback advances
-            const ringGeo = new THREE.RingGeometry(symSize * 0.60, symSize * 0.76, 48);
+            // updateStormTrackBadge() as playback advances, and scaled with the symbols in animate3D
+            const ringGeo = new THREE.RingGeometry(0.60, 0.76, 48);
             ringGeo.rotateX(-Math.PI / 2);
             stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
             stormFixRing3D.renderOrder = 5;

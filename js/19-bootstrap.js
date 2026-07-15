@@ -299,10 +299,12 @@
         }
         if (filteredData.length === 0) return;
         if (isPlaying) {
-            isPlaying = false; playPauseBtn.innerText = "Play"; 
-            if (videoLoaded) video.pause(); 
-            if (animationFrameId) cancelAnimationFrame(animationFrameId); 
-        } else { 
+            isPlaying = false; playPauseBtn.innerText = "Play";
+            if (videoLoaded) video.pause();
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            // the engine's frames stop here, so hand the storm-fix spin its own (js/15-map-render.js)
+            if (typeof ensureStormSpin === 'function') ensureStormSpin();
+        } else {
             isPlaying = true; playPauseBtn.innerText = "Pause"; 
             playbackAccumulator = 0; lastTickTime = performance.now(); 
             

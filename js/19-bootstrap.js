@@ -361,7 +361,7 @@
         return [minX, minY, maxX, maxY];
     }
 
-    // Airfields the aircraft can operate from, as [ident, iata, lat, lon, name, isLarge, isMil].
+    // Airfields for the 2D basemap, as [ident, iata, lat, lon, name, isLarge, isMil].
     // Local-only: unlike the basemap this has no upstream URL to fall back to, so a failed fetch
     // just leaves the layer off. Loads after the basemap, being the smaller and less critical of
     // the two, and marks the map dirty so the codes appear as soon as they land.
@@ -373,7 +373,6 @@
                 airports = rows.map(a => ({ code: a[1] || a[0], name: a[4], lat: a[2], lon: a[3], big: a[5] === 1, mil: a[6] === 1 }));
                 bgNeedsUpdate = true;
                 if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-                if (typeof threeDInitialized !== 'undefined' && threeDInitialized && filteredData.length > 0) build3DScene();
             })
             .catch(() => {});
     }

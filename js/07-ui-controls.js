@@ -294,16 +294,6 @@
                     sl.mesh.scale.set(k, 1, k);
                 }
             }
-            // Airfield codes hold a readable size the same way, and sit off their dot by their own
-            // scaled width, so the gap stays constant on screen instead of closing up as you zoom.
-            if (_airportLabels.length && camera3D) {
-                for (let i = 0; i < _airportLabels.length; i++) {
-                    const al = _airportLabels[i];
-                    const k = (camera3D.position.distanceTo(al.at) || 1) * 0.022;
-                    al.mesh.scale.set(k, 1, k);
-                    al.mesh.position.set(al.at.x + k * 1.4, al.at.y, al.at.z);
-                }
-            }
             // The current storm fix's arms turn cyclonically, the same as the 2D layer's.
             if (_stormArmMeshes.length) {
                 const spin = (performance.now() / 12000) * 2 * Math.PI;
@@ -350,7 +340,6 @@
     let _countryLabels = [];    // { sprite, mat, aspect, pts, isUSA } country name labels shown near visible coastlines
     let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
     let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
-    let _airportLabels = [];    // { mesh, at } flat airfield codes, scaled and offset per frame
     let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
@@ -565,29 +554,6 @@
     // An airfield's code lying flat on the basemap beside its dot, in the same idiom as the state
     // labels. Military takes the sky-blue accent, civil a neutral ink, both keylined dark so they
     // read over terrain, water and imagery alike.
-    // Built one world unit tall and scaled by camera distance each frame, for the same reason the
-    // state names are (see stateLabelMesh).
-    function airportLabelMesh(code, mil) {
-        const cv = document.createElement('canvas');
-        let c = cv.getContext('2d');
-        c.font = 'bold 40px sans-serif';
-        const w = Math.ceil(c.measureText(code).width) + 28;
-        cv.width = w; cv.height = 56;
-        c = cv.getContext('2d');
-        c.font = 'bold 40px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.lineWidth = 7; c.strokeStyle = 'rgba(5,12,20,0.92)'; c.strokeText(code, w / 2, 30);
-        c.fillStyle = mil ? '#38bdf8' : '#e8eef6'; c.fillText(code, w / 2, 30);
-        const tex = new THREE.CanvasTexture(cv);
-        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
-        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
-        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
-        const geo = new THREE.PlaneGeometry(w / 56, 1);   // unit height, so scale is code-length-independent
-        geo.rotateX(-Math.PI / 2);
-        const mesh = new THREE.Mesh(geo, mat);
-        mesh.renderOrder = 4;
-        return { mesh, mat };
-    }
-
     // mapFeatures index of the US state holding (lat, lon), or -1. The last match is tested first,
     // since a flight sits inside one state for minutes at a time; the rest reject on bbox. Crossings
     // are counted across every ring, so holes and each part of a multi-part state fall out even-odd.
@@ -615,8 +581,8 @@
         _countryLabels = [];
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
-        // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
-        _airportLabels = []; _stormArmMeshes = [];
+        // These live in threeMapGroup, drained above, so only the tracking array needs clearing.
+        _stormArmMeshes = [];
         const light3D = document.documentElement.dataset.theme === 'light';
         const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // coastlines carry, internal (state) borders sit back, so countries read against the terrain
@@ -688,23 +654,6 @@
                 }
             }
         });
-        // Airfields near the flight: a dot and its code flat on the basemap, so a landing reads as a
-        // place. Bounded by the same box as the basemap features, since a code the flight can never
-        // reach is only clutter, and dropped into threeMapGroup so a rebuild clears them with it.
-        if (airports.length) {
-            const dotGeo = new THREE.SphereGeometry(0.10, 10, 8);
-            airports.forEach(a => {
-                if (!isBoxInFlightBounds([a.lon, a.lat, a.lon, a.lat])) return;
-                const at = get3DCoord(a.lon, a.lat, borderAlt([a.lon, a.lat]) + 40);
-                const dot = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({ color: a.mil ? 0x38bdf8 : 0xe8eef6, depthWrite: false }));
-                dot.position.copy(at); dot.renderOrder = 3;
-                threeMapGroup.add(dot);
-                const lbl = airportLabelMesh(a.code, a.mil);
-                lbl.mesh.position.copy(at);
-                threeMapGroup.add(lbl.mesh);
-                _airportLabels.push({ mesh: lbl.mesh, at });
-            });
-        }
         // elevation-shaded terrain surface from the bundled ETOPO grid, so land and sea floor sit at
         // real height. null until the grid loads, while the flat coastline map above renders.
         if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }

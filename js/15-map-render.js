@@ -286,10 +286,12 @@
         return out;
     }
 
-    // Airfield codes start at the zoom where they have room to sit beside their dot, majors and
-    // military first, every field once the view is tight enough to tell them apart.
-    const AIRPORT_MIN_SCALE = 2.5;
-    const AIRPORT_ALL_SCALE = 9;
+    // Airfield codes come in by tier as the view tightens: majors and military from AIRPORT_MIN_SCALE,
+    // every field from AIRPORT_ALL_SCALE. The home field ignores both and draws at any zoom, being
+    // the reference every mission starts and ends at, and a medium field that no tier would show early.
+    const AIRPORT_MIN_SCALE = 1;
+    const AIRPORT_ALL_SCALE = 4;
+    const AIRPORT_HOME_CODE = 'LAL';   // Lakeland Linder, the AOC's home field
 
     // Geometry clipping kicks in past this zoom; below it the raw paths are small enough for the
     // rasterizer and the draw stays byte-identical to the unclipped output.
@@ -386,27 +388,29 @@
                 });
             }
         };
-        // Airfields, over whatever the basemap ended up being. Zoom-gated: 1,486 codes at synoptic
-        // zoom is noise, so the majors appear first and the rest join once the view is tight enough
-        // to place them. Drawn at a fixed screen size, and only inside the view.
+        // Airfields, over whatever the basemap ended up being. Zoom-gated, since 1,486 codes at
+        // synoptic zoom is noise: home draws at any zoom, majors and military join early, and the
+        // rest once the view is tight enough to place them. Drawn at a fixed screen size, in view only.
         const drawAirports = () => {
-            if (!airports.length || mapScale < AIRPORT_MIN_SCALE) return;
-            const all = mapScale >= AIRPORT_ALL_SCALE;
+            if (!airports.length) return;
+            const all = mapScale >= AIRPORT_ALL_SCALE, majors = mapScale >= AIRPORT_MIN_SCALE;
             const v = getVisibleGeoBounds(); if (!v) return;
             bgCtx.save();
             bgCtx.textAlign = 'left'; bgCtx.textBaseline = 'middle';
-            bgCtx.font = '600 ' + (10 / mapScale) + 'px Inter, ui-sans-serif, sans-serif';
             bgCtx.lineWidth = 2.5 / mapScale; bgCtx.lineJoin = 'round';
             const r = 2.2 / mapScale, pad = 4 / mapScale;
             for (let i = 0; i < airports.length; i++) {
                 const a = airports[i];
-                if (!all && !a.big && !a.mil) continue;   // majors and military carry the low zooms
+                const home = a.code === AIRPORT_HOME_CODE;
+                if (!home && !all && (!majors || (!a.big && !a.mil))) continue;
                 if (a.lon < v.minLon || a.lon > v.maxLon || a.lat < v.minLat || a.lat > v.maxLat) continue;
                 const x = getX(a.lon), y = getY(a.lat);
-                // military in the accent, civil in a neutral ink, both keylined so they read over
-                // land, water and satellite imagery alike
-                const col = a.mil ? '#38bdf8' : (lightMap ? '#1f2937' : '#e2e8f0');
-                bgCtx.beginPath(); bgCtx.arc(x, y, r, 0, 2 * Math.PI);
+                // home in the accent and a size up, since it is the reference every mission starts
+                // and ends at; military in the accent too, civil in a neutral ink. All keylined so
+                // they read over land, water and satellite imagery alike.
+                const col = (home || a.mil) ? '#38bdf8' : (lightMap ? '#1f2937' : '#e2e8f0');
+                bgCtx.font = '600 ' + ((home ? 12 : 10) / mapScale) + 'px Inter, ui-sans-serif, sans-serif';
+                bgCtx.beginPath(); bgCtx.arc(x, y, home ? r * 1.5 : r, 0, 2 * Math.PI);
                 bgCtx.fillStyle = col; bgCtx.fill();
                 bgCtx.strokeStyle = lightMap ? 'rgba(255,255,255,0.9)' : 'rgba(5,12,20,0.85)';
                 bgCtx.stroke();

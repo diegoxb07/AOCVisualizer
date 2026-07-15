@@ -157,11 +157,9 @@
         return Math.min(16, Math.max(8, 30 / zoom));
     }
 
-    // Paused, nothing else repaints the 2D map, so the current fix's arms need their own frames to
-    // turn on (js/18-engine.js only redraws as the playhead advances, and it owns the frames while
-    // playing, where it also supplies the interpolated row this cannot reproduce). The loop parks
-    // itself the moment there are no arms to turn, so an idle page, the 3D tracker, a flight with no
-    // storm, and a fix too weak to draw arms all cost nothing.
+    // Frames for the current fix's arms while paused, when nothing else repaints the map.
+    // js/18-engine.js owns them while playing, where it also supplies the interpolated row. Parks
+    // itself whenever there are no arms to turn.
     let _stormSpinRaf = null;
     function stormSpinWanted() {
         return !isPlaying && showStormTrack && stormTrackPoints.length > 1

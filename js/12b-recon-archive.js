@@ -1175,12 +1175,10 @@
         return m ? `${m[1]}-${m[2]}-${m[3]}` : 'Unknown';
     }
 
-    // Track + flight date for an archived mission, for callers that only need the geometry (i.e.
-    // pre-caching its satellite imagery, which needs the box and time span, nothing else).
-    // Reuses the on-device copy when there is one, including the post-reload case where the record
-    // is a stub in memory but whole in IndexedDB, so a batch-loaded mission costs no download.
-    // Deliberately does NOT store what it downloads: caching imagery shouldn't silently evict
-    // someone's batch-loaded missions out of the PRELOADED_STORE_MAX slots.
+    // Track + flight date for an archived mission, for callers that need only its geometry. Reuses
+    // the on-device copy when there is one, including a post-reload stub whose record is still whole
+    // in IndexedDB. Does not store what it downloads, so caching imagery cannot evict a batch-loaded
+    // mission out of the PRELOADED_STORE_MAX slots.
     async function reconRowsForMission(missionId, onProgress) {
         const note = onProgress || (() => {});
         let rec = preloadedMissions.get(missionId);

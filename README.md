@@ -111,14 +111,7 @@ Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Ba
 
 > **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, stepping through the Saffir-Simpson categories from there. A fully black track just means the aircraft never sampled hurricane-force winds.
 
-> **Note on the 3D wind streaks:** the short vertical streaks around the aircraft mark genuine vertical air motion, so they are **off far more often than on**. They need **all** of:
-> - the **3D** tracker (never drawn in 2D), and
-> - **playback running** (pausing hides them outright, so a paused frame never has them), and
-> - a vertical bump above the threshold, from **either**:
->   - **vertical wind (`vtWnd`) above ~2 m/s**, the direct updraft/downdraft signal, or
->   - the aircraft's own **vertical rate changing by more than ~2.8 m/s within 3 seconds**, which catches a sudden dip or lift even in a file with no vertical-wind channel.
->
-> Whichever of the two is larger drives it. Streaks **rise** in an updraft or upward bump and **fall** in a downdraft or dip, and both their brightness and their speed scale with the size of it: brightness tops out around **4.5 m/s** of vertical wind, and the scale itself is capped at **6.5 m/s**, past which only the speed still reads. Below the threshold nothing draws at all, so smooth air looks smooth and a minor bump does not light up and say nothing. The vertical-rate path reads whichever altitude **3D Track Altitude** is set to, so GPS and pressure can differ slightly on the same flight.
+> **Note on the 3D wind streaks:** the short streaks at the wings show vertical air motion, and need **all three**: the **3D** tracker, **playback running** (pausing hides them), and a vertical bump past the threshold. The bump is whichever is larger of **vertical wind (`vtWnd`) over ~2 m/s** or the **vertical rate changing over ~2.8 m/s within 3 seconds**, so a file with no vertical-wind channel still shows them. They rise in an updraft, fall in a downdraft, and brighten and speed up with it. Smooth air shows nothing.
 
 **Measure & mark:** **Measure** (map header) draws polygon/circle/rectangle for distance & area; **Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to open **Point Data Analysis** and **download** its full report.
 

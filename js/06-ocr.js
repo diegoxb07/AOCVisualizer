@@ -37,11 +37,9 @@
 
     // --- Non-blocking "Syncing…" badge, shown while Auto-Sync is hunting for the MMR timestamp ---
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
-    // Visible whenever Auto-Sync has a video and is either warming the OCR engine up (first video
-    // of the session, see ensureOCR), actively scanning (isOcrRunning), or still has a pending
-    // (re)lock queued (forceOcrSyncNextTick). Hidden once a lock settles.
-    // The badge, not a skeleton over the video: the MMR plays fine during the warmup, it is only
-    // the tracker alignment that is pending, so covering the frame would hide usable footage.
+    // Visible whenever Auto-Sync has a video and is either warming the engine up (ensureOCR),
+    // scanning (isOcrRunning), or holding a queued (re)lock (forceOcrSyncNextTick). A badge rather
+    // than a cover, since the MMR plays through the warmup and only the alignment is pending.
     function refreshSyncingIndicator() {
         const el = document.getElementById('syncingIndicator');
         if (!el) return;

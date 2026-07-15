@@ -601,7 +601,7 @@
     <div class="modal-card">
         <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
         <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Pre-Cache Satellite Imagery</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a satellite and band(s), then select one or more flight files (.txt or .nc). Every tile those flights need is downloaded into the local cache. Cached imagery is saved on this device, so these flights play back with no fetching on any later visit. (Flights outside the chosen satellite's view / before its data starts are skipped.)</p>
+        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a satellite and band(s), then select one or more flight files (.txt or .nc). Every tile those flights need is downloaded into the local cache. Cached imagery is saved on this device, so these flights play back with no fetching on any later visit. For MODIS/VIIRS, the two days either side of the flight are cached as well, so the day-stepper still has imagery offline. (Flights outside the chosen satellite's view / before its data starts are skipped.)</p>
         <div class="mt-3 text-xs text-muted font-semibold">Satellite:</div>
         <select id="batchSatSelect" class="mt-1 bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer"></select>
         <div class="mt-3 text-xs text-muted font-semibold">Bands to cache:</div>

@@ -61,22 +61,9 @@
         const c = cv.getContext('2d', { willReadFrequently: true });
         c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
         c.fillStyle = '#fff';
-        const X = lon => (lon - lon0) / (lon1 - lon0) * W;
-        const Y = lat => (lat1 - lat) / (lat1 - lat0) * H;
-        mapFeatures.forEach(f => {
-            // states sit inside their country's outline, so filling countries alone covers them
-            if (f.properties && f.properties.isState) return;
-            const g = f.geometry; if (!g) return;
-            const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
-            polys.forEach(poly => {
-                c.beginPath();
-                poly.forEach(ring => ring.forEach((p, i) => {
-                    const x = X(p[0]), y = Y(p[1]);
-                    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
-                }));
-                c.fill('evenodd');   // later rings are holes, the same rule the 2D basemap fills by
-            });
-        });
+        c.beginPath();
+        traceLandPath(c, lon => (lon - lon0) / (lon1 - lon0) * W, lat => (lat1 - lat) / (lat1 - lat0) * H);
+        c.fill('evenodd');   // later rings are holes, the same rule the 2D basemap fills by
         const px = c.getImageData(0, 0, W, H).data;
         const data = new Uint8Array(W * H);
         for (let i = 0; i < W * H; i++) data[i] = px[i * 4] > 127 ? 1 : 0;
@@ -95,21 +82,94 @@
         return m.data[y * m.w + x] === 1;
     }
 
-    // Color (0..1 rgb): one flat tone for water, green->tan->snow for land. Depth is not shaded, the
-    // sea floor's shape being no part of what this map is read for, so water carries a single tone
-    // per theme, pitched to hold against the 3D scene background (scene3DBgColor in
-    // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which the water here
-    // would sink into. Land keeps one ramp across themes: its mid-tones hold against both, and it
-    // starts at green, so ground below sea level inside a coastline still reads as land.
-    function terrainColorRGB(e, land) {
-        if (!land) {
-            return (document.documentElement.dataset.theme === 'light')
-                ? [0.58, 0.72, 0.85]
-                : [0.07, 0.20, 0.32];
-        }
+    // One flat tone per theme for water. Depth is not shaded, the sea floor's shape being no part of
+    // what this map is read for. Pitched to hold against the 3D scene background (scene3DBgColor in
+    // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which it would sink into.
+    function waterColorCss() {
+        return (document.documentElement.dataset.theme === 'light') ? 'rgb(148,184,217)' : 'rgb(18,51,82)';
+    }
+
+    // Land color (0..1 rgb) by height: green->tan->snow. One ramp across themes, its mid-tones
+    // holding against both, and it starts at green, so ground below sea level inside a coastline
+    // still reads as land.
+    function landColorRGB(e) {
         const t = Math.max(0, Math.min(1, e / 4000));
         if (t < 0.5) { const s = t / 0.5; return [0.17 + 0.36 * s, 0.42 - 0.05 * s, 0.20 - 0.01 * s]; }   // green -> tan
         const s = (t - 0.5) / 0.5; return [0.53 + 0.30 * s, 0.37 + 0.34 * s, 0.18 + 0.55 * s];             // tan -> snow
+    }
+
+    // Trace the country outlines into the current path, in the given lon/lat to pixel frame. States
+    // are skipped: their country's outline already encloses them.
+    function traceLandPath(c, X, Y) {
+        mapFeatures.forEach(f => {
+            if (f.properties && f.properties.isState) return;
+            const g = f.geometry; if (!g) return;
+            const polys = g.type === 'Polygon' ? [g.coordinates] : (g.type === 'MultiPolygon' ? g.coordinates : []);
+            polys.forEach(poly => poly.forEach(ring => ring.forEach((p, i) => {
+                const x = X(p[0]), y = Y(p[1]);
+                if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+            })));
+        });
+    }
+
+    // The surface's colour, as a texture rather than per-vertex. The mesh carries a vertex every
+    // ~23 km, so colouring at its vertices smears every coastline into a gradient that wide, which
+    // is the whole width of a barrier island. Painting instead lets the coastline come from the same
+    // vector outlines the 2D basemap fills, so it lands where the border is at any mesh density.
+    // Land shading is rasterised coarse and scaled up: the elevation source is half-degree, so
+    // shading it finer invents nothing, while the coastline itself is cut at full resolution.
+    const TERRAIN_TEX = 2048, TERRAIN_SHADE = 256;
+
+    // Held across rebuilds and keyed on everything it draws from. build3DScene runs on a dozen
+    // events and drops the old mesh without disposing it, so raising a fresh 2048 texture each time
+    // would hand the GPU a new one per rebuild and never give the last back.
+    let _terrainTex = null;
+    function terrainTexture(lon0, lon1, lat0, lat1) {
+        const key = [lon0, lon1, lat0, lat1, document.documentElement.dataset.theme,
+                     (typeof mapFeatures !== 'undefined' ? mapFeatures.length : 0)].join('|');
+        if (_terrainTex && _terrainTex.key === key) return _terrainTex.tex;
+        if (_terrainTex) _terrainTex.tex.dispose();
+        _terrainTex = { key, tex: buildTerrainTexture(lon0, lon1, lat0, lat1) };
+        return _terrainTex.tex;
+    }
+
+    function buildTerrainTexture(lon0, lon1, lat0, lat1) {
+        const shadeCv = document.createElement('canvas');
+        shadeCv.width = TERRAIN_SHADE; shadeCv.height = TERRAIN_SHADE;
+        const sctx = shadeCv.getContext('2d');
+        const img = sctx.createImageData(TERRAIN_SHADE, TERRAIN_SHADE);
+        for (let y = 0; y < TERRAIN_SHADE; y++) {
+            for (let x = 0; x < TERRAIN_SHADE; x++) {
+                const lon = lon0 + (lon1 - lon0) * x / (TERRAIN_SHADE - 1);
+                const lat = lat1 - (lat1 - lat0) * y / (TERRAIN_SHADE - 1);
+                const c = landColorRGB(terrainGroundMeters(lat, lon));
+                const i = (y * TERRAIN_SHADE + x) * 4;
+                img.data[i] = c[0] * 255; img.data[i + 1] = c[1] * 255; img.data[i + 2] = c[2] * 255; img.data[i + 3] = 255;
+            }
+        }
+        sctx.putImageData(img, 0, 0);
+
+        const cv = document.createElement('canvas');
+        cv.width = TERRAIN_TEX; cv.height = TERRAIN_TEX;
+        const c = cv.getContext('2d');
+        c.fillStyle = waterColorCss();
+        c.fillRect(0, 0, TERRAIN_TEX, TERRAIN_TEX);
+        if (typeof mapFeatures !== 'undefined' && mapFeatures.length) {
+            const X = lon => (lon - lon0) / (lon1 - lon0) * TERRAIN_TEX;
+            const Y = lat => (lat1 - lat) / (lat1 - lat0) * TERRAIN_TEX;
+            c.save();
+            c.beginPath();
+            traceLandPath(c, X, Y);
+            c.clip('evenodd');   // later rings are holes, the same rule the 2D basemap fills by
+            c.drawImage(shadeCv, 0, 0, TERRAIN_TEX, TERRAIN_TEX);
+            c.restore();
+        }
+        const tex = new THREE.CanvasTexture(cv);
+        // The surface is read at a grazing angle from a low camera, which is what smears a texture
+        tex.anisotropy = (typeof renderer3D !== 'undefined' && renderer3D && renderer3D.capabilities)
+            ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        return tex;
     }
 
     // How far from an end the ground is pulled toward the aircraft, and how far off the grid may be
@@ -183,20 +243,18 @@
         const NX = 120, NY = 120;
         const grp = new THREE.Group();
         buildLandMask(lon0, lon1, lat0, lat1);   // no-op when build3DScene already primed this extent
-        const verts = [], colors = [], idx = [];
+        const verts = [], uvs = [], idx = [];
         for (let iy = 0; iy < NY; iy++) {
             for (let ix = 0; ix < NX; ix++) {
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
-                // The mask decides land from water, the ground decides how high. Taken here rather
-                // than through terrainSurfaceMeters so one ground lookup and one mask lookup serve
-                // both the height and the colour.
-                const g = terrainGroundMeters(lat, lon);
-                const land = isLandAt(lat, lon);
-                const p = get3DCoord(lon, lat, land ? g : Math.max(0, g));
+                // The mesh carries height only; the texture carries land, water and shading. The mask
+                // still decides here whether the ground may dip below sea level.
+                const p = get3DCoord(lon, lat, terrainSurfaceMeters(lat, lon));
                 verts.push(p.x, p.y, p.z);
-                const c = terrainColorRGB(g, land);
-                colors.push(c[0], c[1], c[2]);
+                // CanvasTexture flips Y by default, so the canvas's top row (lat1) reads at v=1,
+                // which is the north edge, where iy runs out.
+                uvs.push(ix / (NX - 1), iy / (NY - 1));
             }
         }
         for (let iy = 0; iy < NY - 1; iy++) {
@@ -207,9 +265,10 @@
         }
         const geom = new THREE.BufferGeometry();
         geom.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-        geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         geom.setIndex(idx);
-        const terrain = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+        const terrain = new THREE.Mesh(geom,
+            new THREE.MeshBasicMaterial({ map: terrainTexture(lon0, lon1, lat0, lat1), side: THREE.DoubleSide }));
         terrain.renderOrder = -2;   // draw under the track, storm ribbon and plane
         grp.add(terrain);
         return grp;

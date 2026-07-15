@@ -205,8 +205,14 @@
     const CAM3D_HOME = { x: 0.30, y: 0.28, z: 0.60 };
     // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
     // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
-    const STORM_SYM_SCALE = 0.062;
-    const STORM_RIBBON_SCALE = 0.011;
+    const STORM_SYM_SCALE = 0.080;
+    const STORM_RIBBON_SCALE = 0.013;
+    const STORM_RIBBON_OPACITY = 0.55;   // the ribbon reads through; the symbols stay solid
+    // One height for the whole layer. renderOrder stacks it and none of it writes depth, so a
+    // vertical gap buys nothing and costs alignment: the symbols scale with camera distance, so
+    // close in a fixed gap is large against them and reads as parallax between the ring and the
+    // symbol it marks.
+    const STORM_LAYER_Y = 0.05;
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
         if (realScale3D && typeof realScaleCamDistance === 'function') {
@@ -772,24 +778,33 @@
         if (showStormTrack && stormTrackPoints.length > 1) {
             const stormPts = [];
             stormTrackPoints.forEach(p => stormPts.push(get3DCoord(p.lon, p.lat, 0)));
-            // flat dashed ribbon laid on the sea surface, one strip per fix-to-fix leg (shortened to
-            // leave the gap), intensity-colored like the 2D layer. Ribbon and symbols are built at
-            // unit width and scaled by camera distance each frame (animate3D), so a storm reads the
-            // same whether its track runs 3 degrees or 40, and at any zoom.
+            // flat dashed ribbon laid on the sea surface, intensity-colored like the 2D layer. Each
+            // fix-to-fix leg (shortened to leave the gap) is two strips, one per end fix, so a leg
+            // that crosses a category boundary carries both colors and changes at its midpoint.
+            // Ribbon and symbols are built at unit width and scaled by camera distance each frame
+            // (animate3D), so a storm reads the same whether its track runs 3 degrees or 40, and at
+            // any zoom.
             for (let i = 0; i < stormPts.length - 1; i++) {
                 const a = stormPts[i], b = stormPts[i + 1];
                 const dx = b.x - a.x, dz = b.z - a.z;
-                const legLen = Math.hypot(dx, dz) * 0.72;
+                const full = Math.hypot(dx, dz);
+                const legLen = full * 0.72;
                 if (legLen < 0.01) continue;
-                const geo = new THREE.PlaneGeometry(1, legLen);
-                geo.rotateX(-Math.PI / 2);   // lay the strip flat; its length axis runs along z
-                const strip = new THREE.Mesh(geo,
-                    new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(stormTrackPoints[i].windKt)), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
-                strip.position.copy(a).lerp(b, 0.5); strip.position.y = 0.03;
-                strip.rotation.y = Math.atan2(dx, dz);
-                strip.renderOrder = 1;   // symbols draw after the ribbon, whatever the camera angle
-                threeMapGroup.add(strip);
-                _stormStrips.push({ mesh: strip, at: strip.position.clone() });
+                const yaw = Math.atan2(dx, dz);
+                const ux = dx / full, uz = dz / full;   // unit along the leg, matching the strip's +z
+                const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+                for (let h = 0; h < 2; h++) {
+                    const geo = new THREE.PlaneGeometry(1, legLen / 2);
+                    geo.rotateX(-Math.PI / 2);   // lay the strip flat; its length axis runs along z
+                    const strip = new THREE.Mesh(geo,
+                        new THREE.MeshBasicMaterial({ color: new THREE.Color(stormWindColor(stormTrackPoints[i + h].windKt)), transparent: true, opacity: STORM_RIBBON_OPACITY, side: THREE.DoubleSide, depthWrite: false }));
+                    const off = (h ? 0.25 : -0.25) * legLen;   // the half nearer the fix it is colored by
+                    strip.position.set(mx + ux * off, STORM_LAYER_Y, mz + uz * off);
+                    strip.rotation.y = yaw;
+                    strip.renderOrder = 1;   // symbols draw after the ribbon, whatever the camera angle
+                    threeMapGroup.add(strip);
+                    _stormStrips.push({ mesh: strip, at: strip.position.clone() });
+                }
             }
             // flat cyclone symbol at each fix with its category printed on it
             stormTrackPoints.forEach((p, i) => {
@@ -801,7 +816,7 @@
                     armGeo.rotateX(-Math.PI / 2);
                     const arms = new THREE.Mesh(armGeo,
                         new THREE.MeshBasicMaterial({ map: stormArmsTex(), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
-                    arms.position.copy(stormPts[i]); arms.position.y = 0.05;
+                    arms.position.copy(stormPts[i]); arms.position.y = STORM_LAYER_Y;
                     arms.renderOrder = 2;
                     threeMapGroup.add(arms);
                     _stormArmMeshes.push({ mesh: arms, lat: p.lat, idx: i });
@@ -811,7 +826,7 @@
                 geo.rotateX(-Math.PI / 2);
                 const sym = new THREE.Mesh(geo,
                     new THREE.MeshBasicMaterial({ map: stormSymbolTex(stormCatLabel(p.windKt)), color: col3, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
-                sym.position.copy(stormPts[i]); sym.position.y = 0.06;
+                sym.position.copy(stormPts[i]); sym.position.y = STORM_LAYER_Y;
                 sym.renderOrder = 3;
                 threeMapGroup.add(sym);
                 _stormSyms.push({ mesh: sym, at: sym.position.clone() });
@@ -823,7 +838,7 @@
             ringGeo.rotateX(-Math.PI / 2);
             stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
             stormFixRing3D.renderOrder = 5;
-            stormFixRing3D.position.y = 0.09;
+            stormFixRing3D.position.y = STORM_LAYER_Y;
             stormFixRing3D.visible = false;
             threeMapGroup.add(stormFixRing3D);
         }

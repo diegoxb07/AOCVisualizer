@@ -5,8 +5,8 @@
     async function performImmediateOcrLock({ silent = false, gateGapSeconds = null } = {}) {
         if (!videoLoaded) return;
         if (isOcrRunning) return;
-        // The engine is fetched on the first video rather than at page load, so the first lock of a
-        // session waits on that warmup instead of wrongly reporting OCR missing. No-op once warm.
+        // The engine is fetched on the first video, so the first lock of a session must wait on that
+        // warmup before it can judge ocrAvailable. No-op once warm.
         await ensureOCR();
         if (!ocrWorker || !ocrAvailable) { if (!silent) showToast("Auto-sync (OCR) isn't available. Use Manual time inputs.", 6000); return; }
         if (isOcrRunning) return;   // a lock may have started while the warmup above was awaited

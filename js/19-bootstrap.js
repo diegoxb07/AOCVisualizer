@@ -66,21 +66,10 @@
         if (satSelect) satSelect.addEventListener('change', populateBatchBandChecks);   // bands differ per satellite
         // Set the cancel flag AND abort whatever request/poll is currently in flight, so the pass
         // actually stops within a tick instead of finishing out its current (up to 30s) poll wait.
-        const requestCacheCancel = () => {
-            if (!batchCaching) return;
-            // full, immediate teardown so the user can use the satellite controls right away instead of
-            // waiting for the loop to unwind. bumping the pass invalidates the running loop (it stops on
-            // its next check and skips its own teardown), and the abort kills the in-flight tile fetch.
-            batchCacheCancel = true;
-            batchCachePass++;
-            if (batchCacheAbortController) { try { batchCacheAbortController.abort(); } catch (e) {} }
-            batchCaching = false; batchCacheAbortController = null;
-            if (typeof setSatelliteControlsLocked === 'function') setSatelliteControlsLocked(false);
-            const sb = document.getElementById('batchCacheStartBtn'); if (sb) sb.textContent = 'Start caching';
-            const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Stopped';
-            const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Cache stopped.';
-            if (typeof hideSatPrefetchBar === 'function') setTimeout(hideSatPrefetchBar, 800);
-        };
+        // Full, immediate teardown so the user can use the satellite controls right away instead of
+        // waiting for the loop to unwind. cancelSatCachePass (js/02-satellite.js) is shared with the
+        // satellite/product change handlers, which abandon the auto pass the same way.
+        const requestCacheCancel = () => cancelSatCachePass('Stopped');
         const pillCancel = document.getElementById('satPrefetchCancel');
         if (pillCancel) pillCancel.addEventListener('click', () => { if (batchCaching) requestCacheCancel(); });
         fileInput.addEventListener('change', (e) => {
@@ -147,15 +136,10 @@
         scrubSyncTimeout = null; scrubDebounceTimer = null; slideSyncTimer = null; satDebounceTimer = null;
         playbackAccumulator = 0; lastTickTime = 0; videoPlaybackAccumulator = 0; videoStartSeconds = 0;
 
-        // stop any running multi-flight satellite cache pass (requestCacheCancel is trapped in the batch
-        // IIFE, so replicate its teardown here) and clear the tile preloader queue.
-        if (batchCaching) {
-            batchCacheCancel = true; batchCachePass++;
-            if (batchCacheAbortController) { try { batchCacheAbortController.abort(); } catch (e) {} }
-            batchCaching = false; batchCacheAbortController = null;
-            if (typeof setSatelliteControlsLocked === 'function') setSatelliteControlsLocked(false);
-            if (typeof hideSatPrefetchBar === 'function') hideSatPrefetchBar();
-        }
+        // stop any running satellite cache pass and clear the tile preloader queue. The bar hides at
+        // once here rather than on cancelSatCachePass's fade delay, since a reset clears the screen.
+        cancelSatCachePass('Stopped');
+        if (typeof hideSatPrefetchBar === 'function') hideSatPrefetchBar();
         if (typeof resetSatPreload === 'function') resetSatPreload();
 
         // unload the MMR video (revokes its object URL, resets both drop zones + speeds) and drop its zoom/pan.
@@ -174,7 +158,7 @@
         customMarkers = []; tempBaseline = []; lastParseStats = null;
         flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
         reconArchiveMeta = null; stormTrackPoints = []; stormTrackMeta = null;
-        showStormTrack = false; hoveredStormIdx = -1; currentPointAnalysisData = null;
+        showStormTrack = true; hoveredStormIdx = -1; currentPointAnalysisData = null;
         window._appliedWindow = undefined;
         isMeasuring = false; measurePointsGeo = []; drawnShapes = []; liveMouseGeo = null;
         isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1;
@@ -207,7 +191,7 @@
         hud.style.display = 'none';
         const pfdOv = document.getElementById('pfdOverlay'); if (pfdOv) pfdOv.style.display = 'none';
         const stormLbl = document.getElementById('stormTrackToggleLabel'); if (stormLbl) stormLbl.style.display = 'none';
-        const stormCb = document.getElementById('toggleStormTrack'); if (stormCb) stormCb.checked = false;
+        const stormCb = document.getElementById('toggleStormTrack'); if (stormCb) stormCb.checked = true;
         const dataLine = document.getElementById('dataReportLine'); if (dataLine) dataLine.classList.add('hidden');
         const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
         const badge = document.getElementById('satTimeBadge'); if (badge) badge.classList.add('hidden');
@@ -1135,9 +1119,9 @@
                 }
             });
             const save = () => {
-                // Merge, don't replace: 'theme' shares this blob but is deliberately not a PREF_ID
-                // (see the theme toggle below), so rebuilding the object from PREF_IDS alone used to
-                // drop it, silently reverting the theme on the next reload.
+                // Merge, don't replace: 'theme' shares this blob but is not a PREF_ID (see the theme
+                // toggle below), so a rebuild from PREF_IDS alone would drop it and revert the theme
+                // on reload.
                 let out = {};
                 try { out = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { out = {}; }
                 PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) out[id] = el.type === 'checkbox' ? el.checked : el.value; });

@@ -723,6 +723,12 @@
         buildSatDayStepper();
         updateSatTimeBadge();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            // Drop the auto pass for the satellite being left: its tiles are for imagery that is off
+            // screen, and maybeAutoPrecacheSatellite below returns early while any pass holds
+            // batchCaching, so the satellite now displayed would never build. This runs first to
+            // clear that guard. The Pre-Cache modal's pass survives, since it caches the satellite it
+            // was told to, independently of what the map shows.
+            if (batchCacheIsAuto) cancelSatCachePass('Stopped');
             // Archive-GOES layers reset satBandSelect to a blank placeholder, so fetchSatelliteImage/
             // maybeAutoPrecacheSatellite no-op until a product is picked. Polar (MODIS/VIIRS) layers
             // have no placeholder and fetch their daily image immediately.
@@ -737,6 +743,9 @@
     document.getElementById('satBandSelect').addEventListener('change', () => {
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
+            // Same handoff as the satellite change above: the auto pass for the product being left is
+            // abandoned so the newly picked one can build.
+            if (batchCacheIsAuto) cancelSatCachePass('Stopped');
             // Archived (recon-api) satellites stream a tile per 10-min scan from the API, which can
             // pause playback, so picking a bbox-capable product auto-builds its whole timeframe up
             // front (maybeAutoPrecacheSatellite) instead of trickling in during playback. A full-disk-

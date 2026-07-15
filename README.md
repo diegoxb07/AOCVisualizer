@@ -3,7 +3,7 @@
 This video telemetry tool replays flight-level instrument data together with optional synced radar
 (**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, video recording, and much, much, more!
 
-Built for the **NOAA Aircraft Operations Center**. Runs entirely in the browser, API-backend optional.
+Built for the **Aircraft Operations Center**. Runs entirely in the browser, API-backend optional.
 
 - **Tool Link:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages)
 - **Repository:** https://github.com/diegoxb07/AOCVisualizer
@@ -60,7 +60,7 @@ flowchart TD
 | --- | --- |
 | **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside. You can also record clips in advance for presentations. |
 | **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and record annotated clips to video. |
-| **API-backed workflow** | A built-in **NOAA Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
+| **API-backed workflow** | A built-in **Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
 
 ---
 
@@ -70,7 +70,7 @@ flowchart TD
 
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns works too: paste a full mission id to load it directly, or type a storm name alone (no year needed) to find that storm across every season, newest first; click a result to see its flights. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original NOAA file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
+**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns works too: paste a full mission id to load it directly, or type a storm name alone (no year needed) to find that storm across every season, newest first; click a result to see its flights. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original source file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
 
 **Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
 
@@ -129,7 +129,7 @@ Load a cockpit/radar **`.mp4`** in **Upload MMR to Sync**. Two sync modes:
 Open the **Satellite** picker in the map header: choose a satellite, then its product appears right below to pick. A **tile-opacity slider** at the top of the picker fades the imagery up or down against a clashing basemap, and for GOES products a small **color-scale legend** (brightness temperature or reflectance, with units) sits in the top-left of the 2D player. Options auto-populate from the flight's date and location.
 
 - **MODIS / VIIRS (polar, NASA GIBS)**: any date back to each mission's start. Keyed to a calendar day; a **day-stepper** moves between days and overpass times are looked up automatically.
-- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from NOAA's S3 archive for the flight's **historical** date, refreshed on a 10-minute interval. Choose a **product** in the picker (spectral bands plus Sandwich / GeoColor composites); a product the API can't currently serve shows as **unavailable** rather than vanishing, and only that product greys out.
+- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from the GOES S3 archive for the flight's **historical** date, refreshed on a 10-minute interval. Choose a **product** in the picker (spectral bands plus Sandwich / GeoColor composites); a product the API can't currently serve shows as **unavailable** rather than vanishing, and only that product greys out.
 - **⤓ Pre-Cache Satellite Imagery** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
 
 Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):

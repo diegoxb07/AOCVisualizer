@@ -157,7 +157,7 @@
         box.innerHTML = '';
         fsFlights = fsSearchableFlights();
         if (!fsFlights.length) {
-            box.innerHTML = '<div style="color:var(--text-faint);padding:4px 0;">No flights loaded yet. Load a mission or use Pre-load Flight Data, then search across them.</div>';
+            box.innerHTML = '<div style="color:var(--text-faint);padding:4px 0;">No flights loaded yet. Load a mission or use Batch Load Flight Data, then search across them.</div>';
         } else {
             fsFlights.forEach((f) => {
                 const label = document.createElement('label');

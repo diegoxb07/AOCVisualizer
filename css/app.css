@@ -205,8 +205,12 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #mapPanel:is(:fullscreen, .fake-fs) .media-container, #videoPanel:is(:fullscreen, .fake-fs) .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
 #mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
 #mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: 170px; width: 210px; height: 210px; }
-/* In fullscreen, put the storm card on the left under the satellite badge. */
-#mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
+/* Only in 3D fullscreen does the info stack move left, because #attitudeHud takes the top-right
+   there (see below) and the sat legend is 2D-only, so the left is free. In 2D fullscreen it keeps
+   its default top-right: #satColorLegend owns the top-left, and an unscoped left move here put the
+   stack straight on top of it. Both live in #mapContainer, so no fullscreen offset is needed.
+   #mapInfoStack is itself a flex column, so the sat badge and storm card stack, never overlap. */
+html.pref-tracker-3d #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
 /* Pre-hide the 2D-only controls on a 3D-preference refresh (class set by the inline head script
    in index.html) so they don't flash before persistDisplayPrefs restores the 3D tracker mode. */
@@ -489,7 +493,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satTimeBadge, #stormStatusCard { font-size: 9px; padding: 3px 7px; }
 /* In 3D fullscreen the pitch/roll HUD moves to the top-right and the info stack to the top-left. */
 #mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; transform-origin: top right; }
-#mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { transform-origin: top left; }
+html.pref-tracker-3d #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { transform-origin: top left; }
 /* Hide the pitch/roll box until it actually has telemetry, otherwise it's an odd empty bordered
    square floating in the 3D view before a flight is loaded. */
 #attitudeHud:empty { display: none !important; }

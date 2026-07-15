@@ -66,7 +66,7 @@ flowchart TD
 
 ## 1. Loading a flight
 
-> **Tip: preload flight data first.** Click **⤓ Preload Flight Data** after picking a year and check every mission you plan to look at. They download and parse once in the background, stay saved on this device, and then open instantly from the **Preloaded missions** list, so you can hop between multiple flights without waiting on processing (even after a page reload).
+> **Tip: batch load flight data first.** Click **⤓ Batch Load Flight Data** after picking a year and check every mission you plan to look at. They download and parse once in the background, stay saved on this device, and then open instantly from the **Previously Loaded Missions** list, so you can hop between multiple flights without waiting on processing (even after a page reload).
 
 Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
 

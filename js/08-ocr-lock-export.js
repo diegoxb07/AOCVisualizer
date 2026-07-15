@@ -4,9 +4,13 @@
 
     async function performImmediateOcrLock({ silent = false, gateGapSeconds = null } = {}) {
         if (!videoLoaded) return;
+        if (isOcrRunning) return;
+        // The engine is fetched on the first video rather than at page load, so the first lock of a
+        // session waits on that warmup instead of wrongly reporting OCR missing. No-op once warm.
+        await ensureOCR();
         if (!ocrWorker || !ocrAvailable) { if (!silent) showToast("Auto-sync (OCR) isn't available. Use Manual time inputs.", 6000); return; }
-        if (isOcrRunning) return; 
-        
+        if (isOcrRunning) return;   // a lock may have started while the warmup above was awaited
+
         isOcrRunning = true;
         refreshSyncingIndicator();  // hunting for the timestamp frame
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();

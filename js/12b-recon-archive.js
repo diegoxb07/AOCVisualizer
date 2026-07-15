@@ -987,8 +987,8 @@
 
     async function preloadReconMission(missionId, statusFn) {
         const status = statusFn || setReconStatus;
-        if (preloadedMissions.has(missionId)) { status(missionId + ' is already preloaded.'); return true; }
-        status('Preloading ' + missionId + ' in the background…');
+        if (preloadedMissions.has(missionId)) { status(missionId + ' is already loaded.'); return true; }
+        status('Batch loading ' + missionId + ' in the background…');
         try {
             const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
@@ -996,7 +996,7 @@
             try {
                 const buf = await fetchArrayBufferWithProgress(
                     RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
-                    (r, t) => status('Preloading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
+                    (r, t) => status('Batch loading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
                 parsed = await parseFlightSource(buf);
                 if (!parsed.rows.length) throw new Error('no usable rows');
                 isNc = true;
@@ -1008,10 +1008,10 @@
             try { storm = await fetchStormTrackData(mission); } catch (e) { }
             savePreloadedMission(missionId, { mission, parsed, isNc, storm });
             updatePreloadedSelect();
-            status('Preloaded ' + missionId + '. Pick it from the preloaded list to open it instantly.');
+            status('Loaded ' + missionId + '. Pick it from the Previously Loaded Missions list to open it instantly.');
             return true;
         } catch (e) {
-            status('Could not preload ' + missionId + ' (' + e.message + ').');
+            status('Could not load ' + missionId + ' (' + e.message + ').');
             return false;
         }
     }
@@ -1050,7 +1050,7 @@
             reconArchiveMeta = null;
             updateMissionHeader();
             refreshStormTrackDisplay();
-            setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
+            setReconStatus('Opened ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
             return;
         }
         reconArchiveMeta = { missionId: mission.mission_id, stormName: mission.storm_name, stormId: mission.storm_id, aircraft: mission.aircraft, tailNum: mission.tail_num, sourceUrl: mission.source_url };
@@ -1060,7 +1060,7 @@
         stormTrackPoints = rec.storm ? rec.storm.points : [];
         stormTrackMeta = rec.storm ? rec.storm.meta : null;
         refreshStormTrackDisplay();
-        setReconStatus('Opened preloaded ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
+        setReconStatus('Opened ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
     }
 
     (function wirePreload() {
@@ -1136,7 +1136,7 @@
                     else if (m.mission_id === reconMissionSelect.value) cb.checked = true;
                     const span = document.createElement('span');
                     span.className = 'truncate';
-                    span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${done ? ' (preloaded)' : ''}`;
+                    span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${done ? ' (loaded)' : ''}`;
                     span.title = `${m.flight_date} · ${m.aircraft || m.tail_num || ''} · ${m.obs_count} obs`;
                     lbl.appendChild(cb); lbl.appendChild(span);
                     grid.appendChild(lbl);
@@ -1167,7 +1167,7 @@
         async function openPreloadModal() {
             if (!modal || !checksBox) return;
             if (fill) fill.style.width = '0%';
-            setModalStatus(preloadRunning ? 'A preload pass is running…' : 'Check the missions to preload.');
+            setModalStatus(preloadRunning ? 'A batch load is running…' : 'Check the missions to load.');
             modal.style.display = 'flex';
             await reconYearsReady;
             if (yearSel && yearSel.options.length <= 1) {
@@ -1181,7 +1181,7 @@
             if (isReconApiDown()) {
                 if (yearSel) yearSel.disabled = true;
                 if (startBtn) startBtn.disabled = true;   // nothing to download offline; steer users to the file picker
-                checksNote('The recon archive is unreachable, so seasons cannot be listed. Uploaded files still preload normally.');
+                checksNote('The recon archive is unreachable, so seasons cannot be listed. Uploaded files still load normally.');
                 return;
             }
             if (yearSel) yearSel.disabled = false;
@@ -1231,7 +1231,7 @@
         // Sequential download + parse of everything checked; closing the modal lets it keep
         // running in the background (progress stays visible in the archive status line).
         async function runPreload() {
-            if (preloadRunning) { setModalStatus('A preload pass is already running.'); return; }
+            if (preloadRunning) { setModalStatus('A batch load is already running.'); return; }
             const ids = [...checksBox.querySelectorAll('input[type=checkbox]:checked:not(:disabled)')].map(cb => cb.value);
             if (!ids.length) { setModalStatus('Nothing checked.'); return; }
             preloadRunning = true; if (startBtn) startBtn.disabled = true;

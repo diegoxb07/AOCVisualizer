@@ -32,17 +32,31 @@
         if (e) { satBlobStore.delete(id); satBlobStore.set(id, e); }
         return e || null;
     }
-    function satBlobPut(id, entry) {
-        if (satBlobStore.has(id)) satBlobStore.delete(id);
-        entry.t = Date.now();
-        satBlobStore.set(id, entry);
-        satIdbPut(id, entry);
-        while (satBlobStore.size > SAT_BLOB_MAX) {
+    const satEntryBytes = e => (e && e.blob && e.blob.size) || 0;
+    // Single removal point for the cold store, so satBlobBytes can never drift out of sync with it.
+    function satBlobDrop(id) {
+        const e = satBlobStore.get(id);
+        if (e === undefined) return;
+        satBlobBytes -= satEntryBytes(e);
+        satBlobStore.delete(id); satIdbDelete(id);
+    }
+    // LRU-evict until BOTH the count and the byte cap are satisfied (Map iteration order = LRU).
+    function satBlobEvict() {
+        while (satBlobStore.size > SAT_BLOB_MAX || satBlobBytes > satBlobMaxBytes) {
             const oldest = satBlobStore.keys().next().value;
-            satBlobStore.delete(oldest); satIdbDelete(oldest);
+            if (oldest === undefined) break;
+            satBlobDrop(oldest);
         }
     }
-    function clearSatTileCache() { satTileCache.clear(); satBlobStore.clear(); satFetchInFlight.clear(); satIdbClear(); }
+    function satBlobPut(id, entry) {
+        if (satBlobStore.has(id)) { satBlobBytes -= satEntryBytes(satBlobStore.get(id)); satBlobStore.delete(id); }
+        entry.t = Date.now();
+        satBlobStore.set(id, entry);
+        satBlobBytes += satEntryBytes(entry);
+        satIdbPut(id, entry);
+        satBlobEvict();
+    }
+    function clearSatTileCache() { satTileCache.clear(); satBlobStore.clear(); satBlobBytes = 0; satFetchInFlight.clear(); satIdbClear(); }
 
     // --- Persistent cold store -----------------------------------------------------------
     // The blob store is mirrored into IndexedDB so cached tiles survive reloads and browser
@@ -67,11 +81,9 @@
                             // Oldest-first insertion keeps Map iteration order = LRU order.
                             keys.map((k, i) => [k, vals[i]])
                                 .sort((a, b) => ((a[1] && a[1].t) || 0) - ((b[1] && b[1].t) || 0))
-                                .forEach(([k, v]) => { if (v && v.blob && !satBlobStore.has(k)) satBlobStore.set(k, v); });
-                            while (satBlobStore.size > SAT_BLOB_MAX) {
-                                const oldest = satBlobStore.keys().next().value;
-                                satBlobStore.delete(oldest); satIdbDelete(oldest);
-                            }
+                                .forEach(([k, v]) => { if (v && v.blob && !satBlobStore.has(k)) { satBlobStore.set(k, v); satBlobBytes += satEntryBytes(v); } });
+                            // Trims a store written before the byte cap existed, which may be far over it.
+                            satBlobEvict();
                             resolve();
                         };
                         valsRq.onerror = () => resolve();
@@ -80,7 +92,29 @@
             } catch (e) { resolve(); }
         });
     })();
-    function satIdbPut(id, entry) { if (!satDB) return; try { satDB.transaction('tiles', 'readwrite').objectStore('tiles').put(entry, id); } catch (e) {} }
+    // IndexedDB surfaces quota/abort failures ASYNCHRONOUSLY, on the transaction, so the try/catch
+    // around a put only ever catches synchronous throws and a full quota sails straight past it.
+    // Untracked, every tile write silently no-ops while satBlobStore still reports the tile cached,
+    // and "pre-cached" flights come back empty on the next visit. On the first such failure, pull
+    // the byte ceiling down to below what is currently resident and evict to it, so a full disk
+    // degrades to a smaller on-disk cache instead of failing every write from then on.
+    let satIdbWriteFailed = false;
+    function onSatIdbWriteFail(err) {
+        if (satIdbWriteFailed) return;
+        satIdbWriteFailed = true;
+        satBlobMaxBytes = Math.max(64 * 1024 * 1024, Math.floor(satBlobBytes * 0.75));
+        console.warn('Satellite tile cache: IndexedDB write failed (' + ((err && err.name) || 'unknown')
+            + '). Shrinking the on-disk cache to ' + Math.round(satBlobMaxBytes / 1048576) + ' MB.', err);
+        satBlobEvict();
+    }
+    function satIdbPut(id, entry) {
+        if (!satDB) return;
+        try {
+            const tx = satDB.transaction('tiles', 'readwrite');
+            tx.objectStore('tiles').put(entry, id);
+            tx.onabort = () => onSatIdbWriteFail(tx.error);
+        } catch (e) { onSatIdbWriteFail(e); }
+    }
     function satIdbDelete(id) { if (!satDB) return; try { satDB.transaction('tiles', 'readwrite').objectStore('tiles').delete(id); } catch (e) {} }
     function satIdbClear() { if (!satDB) return; try { satDB.transaction('tiles', 'readwrite').objectStore('tiles').clear(); } catch (e) {} }
 
@@ -369,7 +403,7 @@
         // "API Offline" cover over the season dropdown in the pre-load flight data modal
         const preloadApiOfflineToast = document.getElementById('preloadApiOfflineToast');
         if (preloadApiOfflineToast) preloadApiOfflineToast.classList.toggle('hidden', !apiDown);
-        // "Preload selected" only downloads the checked ARCHIVE missions, so it's dead while the API is
+        // "Batch load selected" only downloads the checked ARCHIVE missions, so it's dead while the API is
         // offline. Disable it then, so users don't click it expecting it to preload their own uploaded
         // files (those go through the modal's file picker, a separate path). Same apiDownForced dance as
         // the selects above, so recovery doesn't stomp a disable runPreload set for its own run.
@@ -379,7 +413,7 @@
                 if (preloadStartBtn.dataset.apiDownForced === undefined) preloadStartBtn.dataset.apiDownForced = preloadStartBtn.disabled ? '0' : '1';
                 if (!preloadStartBtn.dataset.defaultTitle) preloadStartBtn.dataset.defaultTitle = preloadStartBtn.title || '';
                 preloadStartBtn.disabled = true;
-                preloadStartBtn.title = 'Archive preloading is unavailable while the API is offline. Uploaded files still preload from the file picker.';
+                preloadStartBtn.title = 'Archive batch loading is unavailable while the API is offline. Uploaded files still load from the file picker.';
             } else {
                 if (preloadStartBtn.dataset.apiDownForced === '1') preloadStartBtn.disabled = false;
                 delete preloadStartBtn.dataset.apiDownForced;

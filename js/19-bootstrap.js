@@ -1087,7 +1087,11 @@
                 }
             });
             const save = () => {
-                const out = {};
+                // Merge, don't replace: 'theme' shares this blob but is deliberately not a PREF_ID
+                // (see the theme toggle below), so rebuilding the object from PREF_IDS alone used to
+                // drop it, silently reverting the theme on the next reload.
+                let out = {};
+                try { out = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { out = {}; }
                 PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) out[id] = el.type === 'checkbox' ? el.checked : el.value; });
                 localStorage.setItem(KEY, JSON.stringify(out));
             };

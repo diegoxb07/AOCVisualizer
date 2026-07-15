@@ -3,6 +3,7 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     let ocrWorker = null, isOcrRunning = false, lastOcrTime = 0, lastOcrVideoTime = 0, ocrHistory = [], ocrAvailable = false;
+    let ocrInitPromise = null, ocrWarmingUp = false;
     async function initOCR() {
         if (ocrWorker) return;
         if (typeof Tesseract === 'undefined') { ocrAvailable = false; return; }
@@ -21,19 +22,37 @@
             ocrAvailable = true;
         } catch(e) { ocrAvailable = false; ocrWorker = null; console.warn("Auto-sync OCR unavailable."); }
     }
-    window.addEventListener('load', initOCR);
+
+    // The vendored engine (wasm core + eng training data) is ~12 MB, and only Auto-Sync ever needs
+    // it, so the warmup is deferred until an MMR video actually arrives instead of being paid on
+    // every page load. Idempotent: concurrent callers share the one in-flight promise, and it never
+    // rejects (initOCR swallows its own errors and leaves ocrAvailable false), so callers can await
+    // it unguarded. Callers must still check ocrAvailable afterwards.
+    function ensureOCR() {
+        if (ocrInitPromise) return ocrInitPromise;
+        ocrWarmingUp = true;
+        refreshSyncingIndicator();
+        ocrInitPromise = initOCR().finally(() => { ocrWarmingUp = false; refreshSyncingIndicator(); });
+        return ocrInitPromise;
+    }
 
     // --- Non-blocking "Syncing…" badge, shown while Auto-Sync is hunting for the MMR timestamp ---
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
-    // Visible whenever Auto-Sync has a video and is either actively scanning (isOcrRunning) or
-    // still has a pending (re)lock queued (forceOcrSyncNextTick). Hidden once a lock settles.
+    // Visible whenever Auto-Sync has a video and is either warming the OCR engine up (first video
+    // of the session, see ensureOCR), actively scanning (isOcrRunning), or still has a pending
+    // (re)lock queued (forceOcrSyncNextTick). Hidden once a lock settles.
+    // The badge, not a skeleton over the video: the MMR plays fine during the warmup, it is only
+    // the tracker alignment that is pending, so covering the frame would hide usable footage.
     function refreshSyncingIndicator() {
         const el = document.getElementById('syncingIndicator');
         if (!el) return;
-        const hunting = videoLoaded
-            && videoSyncMode && videoSyncMode.value === 'auto'
-            && ocrAvailable && (isOcrRunning || forceOcrSyncNextTick);
-        el.classList.toggle('show', !!hunting);
+        const onAuto = videoLoaded && videoSyncMode && videoSyncMode.value === 'auto';
+        const warming = onAuto && ocrWarmingUp;
+        const hunting = onAuto && ocrAvailable && (isOcrRunning || forceOcrSyncNextTick);
+        const label = el.querySelector('.sync-label'), sub = el.querySelector('.sync-sub');
+        if (label) label.textContent = warming ? 'Preparing Auto-Sync…' : 'Syncing…';
+        if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : 'aligning tracker';
+        el.classList.toggle('show', !!(warming || hunting));
     }
 
     // Inverse of markDropZoneLoaded: returns a drop zone to its dashed waiting state.

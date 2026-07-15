@@ -269,7 +269,14 @@
         const clipBox = mapClipBox();
         const xOf = lon => ((lon - plotMinLon) / deltaLon) * cssW;   // lon already in the plot domain
         const satSel2 = document.getElementById('satelliteSelect'); const isSatOn = satSel2 && satSel2.value !== 'none';
-        if (satImageLoaded && isSatOn && satImage.width > 0) {
+        const hasSatImage = satImageLoaded && isSatOn && satImage.width > 0;
+        // At 100% the imagery is meant to be the only thing in its footprint, so the basemap goes
+        // *under* it instead of over it and the opaque draw hides it for free — no per-pixel clip, and
+        // it works for every drawImage branch below. Land outside the footprint still draws normally,
+        // since there is no imagery there to replace it. Below 100% the old order stands: imagery
+        // first, then a translucent basemap over it so coastlines stay readable against the tiles.
+        const satHidesBasemap = hasSatImage && satTileOpacity >= 1;
+        const drawSatImage = () => {
             bgCtx.globalAlpha = satTileOpacity;
             if (satImageBox) {
                 const sMinLon = wrapLon(satImageBox.minLon), sMaxLon = wrapLon(satImageBox.maxLon);
@@ -292,15 +299,18 @@
                 }
             } else { bgCtx.drawImage(satImage, 0, 0, cssW, cssH); }
             bgCtx.globalAlpha = 1.0;
-        }
-        if (mapFeatures.length > 0) {
+        };
+        const drawLandFeatures = () => {
+            if (mapFeatures.length === 0) return;
             // muted land over the ocean base, soft coastlines, and fainter internal (state) borders.
-            // over satellite imagery the land goes translucent so the tiles still show through.
-            const landFill = isSatOn ? (lightMap ? 'rgba(70,110,80,0.20)' : 'rgba(40,74,62,0.26)')
+            // over satellite imagery the land goes translucent so the tiles still show through, unless
+            // it is drawing underneath fully-opaque imagery, where the normal solid palette applies.
+            const overSat = isSatOn && !satHidesBasemap;
+            const landFill = overSat ? (lightMap ? 'rgba(70,110,80,0.20)' : 'rgba(40,74,62,0.26)')
                                      : (lightMap ? '#e4ebdd' : '#22463a');
-            const coastCol = isSatOn ? (lightMap ? 'rgba(45,60,72,0.60)' : 'rgba(214,228,238,0.65)')
+            const coastCol = overSat ? (lightMap ? 'rgba(45,60,72,0.60)' : 'rgba(214,228,238,0.65)')
                                      : (lightMap ? '#5e6f7c' : '#7ea8bf');
-            const borderCol = isSatOn ? (lightMap ? 'rgba(45,60,72,0.32)' : 'rgba(214,228,238,0.34)')
+            const borderCol = overSat ? (lightMap ? 'rgba(45,60,72,0.32)' : 'rgba(214,228,238,0.34)')
                                       : (lightMap ? 'rgba(94,111,124,0.50)' : 'rgba(126,168,191,0.40)');
             bgCtx.fillStyle = landFill;
             const strokeFor = isState => { bgCtx.strokeStyle = isState ? borderCol : coastCol; bgCtx.lineWidth = (isState ? 1.0 : 1.5) / mapScale; };
@@ -334,7 +344,9 @@
                     }
                 });
             }
-        }
+        };
+        if (satHidesBasemap) { drawLandFeatures(); drawSatImage(); }
+        else { if (hasSatImage) drawSatImage(); drawLandFeatures(); }
         bgCtx.restore(); bgNeedsUpdate = false;
     }
 

@@ -23,6 +23,11 @@
     const SAT_CACHE_MAX = 24;                // just the playback neighborhood (decoded = RAM-heavy)
     const satBlobStore = new Map();          // COLD: fetchId -> { blob, box, scanStartMs }
     const SAT_BLOB_MAX = 1500;               // ≈ 30 storm-bands of 10-min tiles (LRU-evicted)
+    // Second, independent cap. A tile is a full-res PNG (hundreds of KB up to several MB), so the
+    // count cap above alone allows multiple GB and lets the browser's quota kill writes instead.
+    // Whichever cap trips first evicts. Lowered at runtime if the quota is hit anyway (see 02).
+    let satBlobMaxBytes = 600 * 1024 * 1024; // 600 MB on-disk ceiling for the cold tile store
+    let satBlobBytes = 0;                    // running total of satBlobStore blob sizes
     let batchCaching = false;                // a multi-flight local sat-cache pass is running
     let batchCacheCancel = false;            // user asked to stop the current pass
     let batchCacheAbortController = null;    // aborts the in-flight recon-api request/poll on Cancel

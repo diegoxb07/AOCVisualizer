@@ -24,6 +24,10 @@
         if (!e.target.files[0]) return;
         markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true;
+        // First video of the session: start pulling the ~12 MB OCR engine now (it is no longer
+        // fetched at page load). Not awaited, the video is usable meanwhile; evaluateAutoSyncDefault
+        // below flips on Auto and shows the warmup badge, and the locks await it themselves.
+        ensureOCR();
         syncMediaGridLayout();
         speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
@@ -31,8 +35,11 @@
         video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); }, { once: true });
         video.addEventListener('seeking', syncTelemetryToVideoClock);
         evaluateAutoSyncDefault();
-        video.addEventListener('loadeddata', () => { if (videoSyncMode.value === 'auto' && ocrAvailable) performImmediateOcrLock({ silent: true }); }, { once: true });
-        setTimeout(() => { if (videoSyncMode.value === 'auto' && ocrAvailable && !isPlaying) performImmediateOcrLock({ silent: true }); }, 1000);
+        // No ocrAvailable precondition here any more: it is still false while the engine warms up,
+        // so testing it would drop the very first auto-lock. performImmediateOcrLock awaits the
+        // warmup itself and returns quietly (silent) if OCR ends up unavailable.
+        video.addEventListener('loadeddata', () => { if (videoSyncMode.value === 'auto') performImmediateOcrLock({ silent: true }); }, { once: true });
+        setTimeout(() => { if (videoSyncMode.value === 'auto' && !isPlaying) performImmediateOcrLock({ silent: true }); }, 1000);
     });
 
     document.getElementById('fileInput').addEventListener('change', function(e) {

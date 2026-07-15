@@ -287,12 +287,20 @@
                     _stateLabelIdx = sIdx;
                 }
                 // Sized off camera distance, so the name holds one readable size whether the camera
-                // is on the aircraft or out far enough to frame the state. The anchor stays the
-                // state's own centre, so it is the scale that tracks the camera, never the position.
+                // is on the aircraft or out far enough to frame the state, and turned to face it, so
+                // a low camera does not read the name edge-on. Yaw puts the text across the view;
+                // pitching by the camera's own elevation lands the name flat on the map from straight
+                // above and stands it up toward the eye as the camera drops to the horizon. Both are
+                // orientation and size only: the anchor stays the state's own centre, so what tracks
+                // the camera is how the name faces, never where it sits.
                 if (sIdx >= 0 && camera3D) {
-                    const sl = _stateLabels[sIdx];
-                    const k = (camera3D.position.distanceTo(sl.mesh.position) || 1) * 0.045;
-                    sl.mesh.scale.set(k, 1, k);
+                    const sl = _stateLabels[sIdx], p = sl.mesh.position;
+                    const dx = camera3D.position.x - p.x, dy = camera3D.position.y - p.y, dz = camera3D.position.z - p.z;
+                    const k = (Math.sqrt(dx * dx + dy * dy + dz * dz) || 1) * 0.045;
+                    sl.mesh.scale.set(k, k, 1);
+                    sl.mesh.rotation.set(0, 0, 0);
+                    sl.mesh.rotateY(Math.atan2(dx, dz));
+                    sl.mesh.rotateX(-Math.atan2(dy, Math.hypot(dx, dz)));
                 }
             }
             // The current storm fix's arms turn cyclonically, the same as the 2D layer's.
@@ -526,11 +534,13 @@
         if (threeDInitialized && filteredData.length > 0) build3DScene();
     }
 
-    // A state name lying flat on the basemap. A mesh, not a sprite, so it keeps its ground
-    // orientation and reads as printed on the map rather than turning to face the camera. Built one
-    // world unit tall, whatever the name's length, and scaled by camera distance each frame
-    // (animate3D): the camera works from 0.7 units off the aircraft out to hundreds across a state,
-    // so any fixed world size is either unreadable at one end or larger than the screen at the other.
+    // A state name on the basemap, held square to the camera by animate3D: it lies flat on the map
+    // from straight above and tips up toward the eye as the camera drops, so it reads at any angle
+    // without ever leaving the state it names. A mesh, not a sprite, since a sprite would face the
+    // camera flat-on always and never lie down onto the map.
+    // Built one world unit tall, whatever the name's length, and scaled by camera distance each
+    // frame: the camera works from 0.7 units off the aircraft out to hundreds across a state, so any
+    // fixed world size is either unreadable at one end or larger than the screen at the other.
     function stateLabelMesh(name) {
         const cv = document.createElement('canvas');
         let c = cv.getContext('2d');
@@ -545,8 +555,9 @@
         tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
         tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
         const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+        // Left standing in its own XY plane, facing +Z. animate3D lays it down or stands it up each
+        // frame against the camera, so baking a ground rotation in here would fight that.
         const geo = new THREE.PlaneGeometry(w / 72, 1);   // unit height, so scale is length-independent
-        geo.rotateX(-Math.PI / 2);   // lay it on the ground; the texture's top edge then points north
         const mesh = new THREE.Mesh(geo, mat);
         // Draws after the country labels (renderOrder 5), so where a neighbouring country's name
         // reaches across a border the state name still reads.

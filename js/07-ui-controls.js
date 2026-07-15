@@ -779,9 +779,21 @@
         if (!list || !sat) return;
         const activeSat = sat.value, activeBand = band ? band.value : '';
         let html = `<button type="button" class="sat-pick-off${activeSat === 'none' ? ' active' : ''}" data-off="1">Off (no overlay)</button>`;
+        // Heading wherever the list crosses between the two kinds of satellite (GIBS_LAYERS is
+        // ordered geostationary-first). They behave very differently, so the split is worth calling
+        // out: GOES scans continuously, a polar orbiter gives one usable pass per day.
+        let lastKind = null;
         for (const opt of sat.options) {
             if (opt.value === 'none') continue;
             const def = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === opt.value) : null;
+            const kind = (def && (def.isGoes || def.isReconApi)) ? 'geo' : 'polar';
+            if (kind !== lastKind) {
+                html += `<div class="sat-pick-group sat-pick-group-top">`
+                     +  (kind === 'geo' ? 'Geostationary &middot; continuous 10-min scans'
+                                        : 'Polar orbiters &middot; one pass per day')
+                     +  `</div>`;
+                lastKind = kind;
+            }
             const expanded = satPickerExpanded === opt.value && !opt.disabled;
             const isActive = activeSat === opt.value;
             html += `<div class="sat-pick-sat${opt.disabled ? ' disabled' : ''}${isActive ? ' active' : ''}">`;

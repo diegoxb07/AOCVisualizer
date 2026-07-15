@@ -213,7 +213,38 @@
         badge.classList.remove('hidden');
     }
 
+    // Order is the order the satellite picker lists them in (updateSatelliteOptions fills the native
+    // select from this array, and the picker panel walks that select). Geostationary GOES first: it
+    // is the everyday choice, with continuous 10-min scans through a whole mission. The polar
+    // orbiters below it only give one usable daytime pass per day, so they are the exception, and
+    // renderSatPickerPanel draws a group heading wherever this list crosses from one kind to the other.
     const GIBS_LAYERS = [
+        // GOES geostationary imagery, ARCHIVE, via the noaa-recon-api. Renders GOES ABI tiles from
+        // NOAA's S3 archive for any historical date. `isReconApi:true` routes it through
+        // fetchReconApiSat; each "band" carries `band`+`cmap` (or `product` for a composite).
+        // `cadenceMin` buckets fetches to the playback clock; `subLon` drives the Earth-disk coverage
+        // test that greys the layer out when the flight is outside that satellite's disk. The API
+        // auto-resolves the spacecraft from the date, so only `satellite` needs to be passed. The
+        // `bands` list is a fallback until loadSatelliteProducts() replaces it with the live list from
+        // GET /v1/satellite/products, don't hardcode new bands/products here, use that endpoint.
+        { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
+          satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
+          bands: [
+              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13: Clean IR',            bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13: IR Enhanced (ir4)',   bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9: Water Vapor',          bboxSupported:true}
+          ]
+        },
+        // GOES-West (GOES-17/18, sub-point ~137°W), added once the recon-api gained `goes-west`.
+        // Covers east/central-Pacific recon (greyed out for Atlantic flights via the coverage test).
+        { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
+          satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
+          bands: [
+              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13: Clean IR',            bboxSupported:true},
+              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13: IR Enhanced (ir4)',   bboxSupported:true},
+              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9: Water Vapor',          bboxSupported:true}
+          ]
+        },
         { value:'MODIS-TERRA',  baseLabel:'Terra Pass', wmsPrefix:'MODIS_Terra_', shortName:'MOD09', swath:true,
           bands: [
               {id:'CorrectedReflectance_TrueColor', name:'True Color'},
@@ -246,32 +277,6 @@
               {id:'CorrectedReflectance_Bands721', name:'False Color (Bands 7-2-1)'},
               {id:'Brightness_Temp_Band31_Day', name:'Infrared (Band 31, Day)'},
               {id:'Brightness_Temp_Band31_Night', name:'Infrared (Band 31, Night)'}
-          ]
-        },
-        // GOES geostationary imagery, ARCHIVE, via the noaa-recon-api. Renders GOES ABI tiles from
-        // NOAA's S3 archive for any historical date. `isReconApi:true` routes it through
-        // fetchReconApiSat; each "band" carries `band`+`cmap` (or `product` for a composite).
-        // `cadenceMin` buckets fetches to the playback clock; `subLon` drives the Earth-disk coverage
-        // test that greys the layer out when the flight is outside that satellite's disk. The API
-        // auto-resolves the spacecraft from the date, so only `satellite` needs to be passed. The
-        // `bands` list is a fallback until loadSatelliteProducts() replaces it with the live list from
-        // GET /v1/satellite/products, don't hardcode new bands/products here, use that endpoint.
-        { value:'GOES-RECON', baseLabel:'GOES-East (Archive)', isReconApi:true, cadenceMin:10,
-          satellite:'goes-east', subLon:-75.0, minDate:'2017-07-10',
-          bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13: Clean IR',            bboxSupported:true},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13: IR Enhanced (ir4)',   bboxSupported:true},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9: Water Vapor',          bboxSupported:true}
-          ]
-        },
-        // GOES-West (GOES-17/18, sub-point ~137°W), added once the recon-api gained `goes-west`.
-        // Covers east/central-Pacific recon (greyed out for Atlantic flights via the coverage test).
-        { value:'GOES-RECON-WEST', baseLabel:'GOES-West (Archive)', isReconApi:true, cadenceMin:10,
-          satellite:'goes-west', subLon:-137.0, minDate:'2018-08-28',
-          bands: [
-              {id:'ir13',     band:13, cmap:'abi13', name:'Band 13: Clean IR',            bboxSupported:true},
-              {id:'ir13_ir4', band:13, cmap:'ir4',   name:'Band 13: IR Enhanced (ir4)',   bboxSupported:true},
-              {id:'wv9',      band:9,  cmap:'abi9',  name:'Band 9: Water Vapor',          bboxSupported:true}
           ]
         }
     ];
@@ -564,7 +569,10 @@
                     const fmtDate = new Date(midMs);
                     const hh = String(fmtDate.getUTCHours()).padStart(2, '0');
                     const mm = String(fmtDate.getUTCMinutes()).padStart(2, '0');
-                    opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z]`;
+                    // "(Daily)" so the time does not read like a GOES-style scan you can scrub
+                    // through: a polar orbiter gives this one overpass for the whole day.
+                    // The no-granule branch below already says "Daily" on its own.
+                    opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z] (Daily)`;
 
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
                         satLoadedInfo.imageTimeMs = midMs;
@@ -736,6 +744,14 @@
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
+        // The stepper hangs below the header and over the map's top-right, where the "Fetching
+        // satellite" pill also sits. #mapContainer sets no z-index, so it never opens a stacking
+        // context, and that pill's z-50 escapes to out-paint the header's z-20 and cover the
+        // stepper. Flag the container so the pill can move aside while the stepper is up. Safe by
+        // construction: the stepper is polar-orbiter-only and #satColorLegend, which owns the
+        // top-left, is recon-GOES-only, so the two can never be on screen at the same time.
+        const mapContainerEl = document.getElementById('mapContainer');
+        if (mapContainerEl) mapContainerEl.classList.toggle('sat-daystepper-open', active);
         // The 10-min stepper only makes sense for GOES (10-min scan cadence); hide it otherwise.
         const stepCluster = document.getElementById('satStepCluster');
         if (stepCluster) stepCluster.style.display = (in2d && satOn && isGoesLike) ? '' : 'none';

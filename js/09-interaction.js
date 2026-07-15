@@ -187,15 +187,13 @@
     });
 
     // The recenter button surfaces once the user has moved off the aircraft: in 2D on a pan or zoom,
-    // in 3D on a pan away from the orbit target (js/07-ui-controls.js owns that test, since only it
-    // can see the camera). animate3D calls this as the target drifts.
+    // in 3D on a pan away from the orbit target. Each mode keeps a follow flag that its own handlers
+    // clear, and calls this when one flips.
     function updateFollowButton() {
         const btn = document.getElementById('recenterPlaneBtn');
         if (!btn) return;
         if (filteredData.length === 0) { btn.style.display = 'none'; return; }
-        const show = trackerModeSelect.value === '3d'
-            ? (typeof cam3DOffPlane === 'function' && cam3DOffPlane())
-            : !followAircraft2D;
+        const show = trackerModeSelect.value === '3d' ? !followAircraft3D : !followAircraft2D;
         btn.style.display = show ? '' : 'none';
     }
     const recenterBtn = document.getElementById('recenterPlaneBtn');

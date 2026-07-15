@@ -215,6 +215,7 @@
     const STORM_LAYER_Y = 0.05;
     function reset3DView() {
         if (!threeDInitialized || !controls3D) return;
+        if (planeGroup3D) { settleControls3D(); followAircraft3D = true; controls3D.target.copy(planeGroup3D.position); }
         if (realScale3D && typeof realScaleCamDistance === 'function') {
             // real-scale: keep the home viewing angle but pull in to frame the tiny plane, not the far preset
             const dir = new THREE.Vector3(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z).normalize().multiplyScalar(realScaleCamDistance());
@@ -241,6 +242,16 @@
         renderer3D.setSize(w, h); threeDContainer.insertBefore(renderer3D.domElement, threeDContainer.firstChild);
         controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement); controls3D.enableDamping = true;
         controls3D.minDistance = 0.02;   // let the user get right in on the aircraft without dollying through the target
+        // Stop following once the user pans the aircraft out from under the orbit target, which
+        // surfaces the recenter button. Of the OrbitControls gestures only pan (right-drag, or a
+        // two-finger drag) moves the target; orbit and dolly keep the aircraft centered, so they
+        // leave following on.
+        controls3D.addEventListener('change', () => {
+            if (!followAircraft3D || !planeGroup3D) return;
+            if (controls3D.target.distanceTo(planeGroup3D.position) < 1e-6) return;
+            followAircraft3D = false;
+            if (typeof updateFollowButton === 'function') updateFollowButton();
+        });
         scene3D.add(new THREE.AmbientLight(0xffffff, 0.6)); const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(10, 20, 10); scene3D.add(dirLight);
         planeGroup3D = new THREE.Group(); planeGroup3D.scale.set(0.06, 0.06, 0.06); scene3D.add(planeGroup3D);
         // the airframe itself (WP-3D or G-IV per the loaded flight) is built by js/07b-plane-models.js
@@ -283,10 +294,6 @@
                     }
                 }
             }
-            // the recenter button, toggled only as the answer changes so the DOM is left alone frame
-            // to frame (js/09-interaction.js owns the button, and 2D drives it the same way)
-            const off3d = cam3DOffPlane();
-            if (off3d !== _cam3DWasOff) { _cam3DWasOff = off3d; if (typeof updateFollowButton === 'function') updateFollowButton(); }
             // the state the plane is over: one label at that state's own centre. Runs before the
             // country labels, which read _stateLabelIdx to stand down under it.
             if (_stateLabels.length) {
@@ -384,7 +391,7 @@
     let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
     let _stormSyms = [];        // { mesh, at } storm fix symbols, held to one screen size by camera distance
     let _stormStrips = [];      // { mesh, at } storm ribbon legs, width held the same way
-    let _cam3DWasOff = false;   // last cam3DOffPlane answer, so the recenter button only writes on a change
+    let followAircraft3D = true;   // the 3D twin of followAircraft2D: update3DFrame only re-centers while it is set
     let _reframeRealScale = false;   // set when the plane is (re)built with real-scale on; consumed once the plane is positioned (update3DFrame)
     const PLANE_REAL_LEN_M = { p3: 35.61, giv: 26.90 };
     function planeModelLocalLength() {
@@ -425,25 +432,21 @@
         const fovR = (camera3D.fov || 45) * Math.PI / 180;
         return halfLen / Math.tan(fovR * 0.32);
     }
-    // How far the orbit target may sit off the plane before the recenter button surfaces, as a
-    // fraction of the camera's distance, so it reads the same close in and far out.
-    const CAM3D_OFF_FRAC = 0.12;
-
-    // True once a pan has taken the orbit target off the aircraft. update3DFrame re-centers on every
-    // index change, so this only holds while paused, which is the only time a pan survives.
-    function cam3DOffPlane() {
-        if (typeof controls3D === 'undefined' || !controls3D || !camera3D || !planeGroup3D) return false;
-        if (!filteredData.length || trackerModeSelect.value !== '3d') return false;
-        const d = camera3D.position.distanceTo(controls3D.target) || 1;
-        return controls3D.target.distanceTo(planeGroup3D.position) > d * CAM3D_OFF_FRAC;
+    // Apply and clear the pan/orbit momentum damping is still carrying, so a snap that follows is not
+    // dragged back off the aircraft over the next few seconds by the tail of the gesture that left it.
+    function settleControls3D() {
+        const damp = controls3D.enableDamping;
+        controls3D.enableDamping = false; controls3D.update(); controls3D.enableDamping = damp;
     }
 
     // Put the aircraft back under the orbit target, carrying the camera with it so the angle and
-    // distance the user set are kept.
+    // distance the user set are kept, and resume following.
     function recenter3DOnPlane() {
         if (typeof controls3D === 'undefined' || !controls3D || !camera3D || !planeGroup3D) return;
+        settleControls3D();
         const p = planeGroup3D.position;
         camera3D.position.add(p.clone().sub(controls3D.target));
+        followAircraft3D = true;
         controls3D.target.copy(p); controls3D.update();
         if (typeof updateFollowButton === 'function') updateFollowButton();
     }
@@ -885,8 +888,14 @@
             const hmat = headingArrow3D.children[0].material;
             hmat.transparent = true; hmat.opacity = op;
         }
-        camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
-        controls3D.target.copy(pos); controls3D.update();
+        // Carry the camera along by the same delta as the target, so following holds the user's
+        // viewing angle and distance. A pan clears followAircraft3D, which parks the view and leaves
+        // the plane free to fly out of it until the recenter button puts it back.
+        if (followAircraft3D) {
+            camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
+            controls3D.target.copy(pos);
+        }
+        controls3D.update();
         if (_reframeRealScale) { _reframeRealScale = false; dollyCameraForScale(); }   // frame the plane after a real-scale build/refresh
         attitudeHud.innerHTML = `PITCH: ${t_pitch.toFixed(1)}°<br>ROLL: ${t_roll.toFixed(1)}°<br>HDG: ${t_th.toFixed(1)}°<br>TRK: ${t_track.toFixed(1)}°`;
     }

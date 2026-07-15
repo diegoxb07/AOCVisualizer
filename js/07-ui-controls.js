@@ -164,20 +164,26 @@
     let _stormSymTex = {};
     function stormSymbolTex(label) {
         if (_stormSymTex[label]) return _stormSymTex[label];
-        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 128;
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256;
         const c = cv.getContext('2d');
         c.strokeStyle = '#ffffff'; c.fillStyle = '#ffffff'; c.lineCap = 'round';
-        c.beginPath(); c.arc(64, 64, 34, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(128, 128, 68, 0, Math.PI * 2); c.fill();
         if (label !== 'TD') {
-            c.lineWidth = 13;
-            c.beginPath(); c.arc(64, 64, 44, -0.3, 1.5); c.stroke();
-            c.beginPath(); c.arc(64, 64, 44, Math.PI - 0.3, Math.PI + 1.5); c.stroke();
+            c.lineWidth = 26;
+            c.beginPath(); c.arc(128, 128, 88, -0.3, 1.5); c.stroke();
+            c.beginPath(); c.arc(128, 128, 88, Math.PI - 0.3, Math.PI + 1.5); c.stroke();
         }
-        c.fillStyle = '#0b1220'; c.font = '700 36px sans-serif';
+        c.fillStyle = '#0b1220'; c.font = '700 72px sans-serif';
         c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillText(label, 64, 66);
-        _stormSymTex[label] = new THREE.CanvasTexture(cv);
-        return _stormSymTex[label];
+        c.fillText(label, 128, 132);
+        const tex = new THREE.CanvasTexture(cv);
+        // The symbols lie flat on the map and are read from a low camera, so they are sampled at a
+        // grazing angle, which is what smears the category label. Anisotropy is the setting that
+        // addresses that; trilinear alone still blurs along the viewing axis.
+        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        _stormSymTex[label] = tex;
+        return tex;
     }
 
     // Home camera offset from the aircraft (the orbit target): close enough that the airframe
@@ -199,7 +205,7 @@
     function init3D() {
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
-        scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(0x171122);
+        scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(scene3DBgColor());
         // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so it is
         // small in world units and used to near-clip before you could get close); the huge near/far
         // span rides a logarithmic depth buffer to stay z-fight-free.
@@ -477,6 +483,19 @@
         return { sprite: spr, mat, aspect: w / 58, pts: [] };
     }
 
+    // The 3D scene's void behind the map, tracking the theme like the rest of the basemap.
+    function scene3DBgColor() {
+        return (document.documentElement.dataset.theme === 'light') ? 0xdfe6ec : 0x171122;
+    }
+    // Re-colors the 3D basemap for the current theme. The terrain's sea ramp and the border line
+    // colours are baked at build time, so a theme change needs a rebuild; the scene background is
+    // live and set here either way, since it also applies with no flight loaded.
+    function applyTheme3D() {
+        if (typeof scene3D === 'undefined' || !scene3D) return;
+        scene3D.background = new THREE.Color(scene3DBgColor());
+        if (threeDInitialized && filteredData.length > 0) build3DScene();
+    }
+
     // A state name lying flat on the basemap, sized to the state's own width so it reads like a
     // printed map label from straight above. A mesh, not a sprite: it holds its ground orientation
     // and its map scale rather than turning to face the camera and holding a screen size.
@@ -526,11 +545,13 @@
         _countryLabels = [];
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
-        const landMat = new THREE.MeshBasicMaterial({ color: 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-        // bright coastlines and dimmer internal (state) borders, so countries read clearly against the
-        // terrain shading. depthWrite off keeps them from occluding the streaks and each other.
-        const coastMat = new THREE.LineBasicMaterial({ color: 0xf0f6fc, transparent: true, opacity: 0.9, depthWrite: false });
-        const stateMat = new THREE.LineBasicMaterial({ color: 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
+        const light3D = document.documentElement.dataset.theme === 'light';
+        const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        // coastlines carry, internal (state) borders sit back, so countries read against the terrain
+        // shading. Both take the 2D basemap's per-theme line colours, since light water needs dark
+        // lines to show at all. depthWrite off keeps them from occluding the streaks and each other.
+        const coastMat = new THREE.LineBasicMaterial({ color: light3D ? 0x5e6f7c : 0xf0f6fc, transparent: true, opacity: 0.9, depthWrite: false });
+        const stateMat = new THREE.LineBasicMaterial({ color: light3D ? 0x94a3b0 : 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
         // [lon, lat], so terrainElevationMeters takes (c[1], c[0]).
@@ -580,14 +601,15 @@
                 polys.forEach(poly => poly.forEach(ring => rings.push(ring.map(cc => ({ lon: cc[0], lat: cc[1] })))));
                 const bbox = feature.properties.bbox;
                 if (rings.length && bbox) {
-                    // Anchor on the largest ring's average vertex, which sits inside the landmass for
-                    // shapes whose bbox centre does not (a bay, a lake, a second peninsula).
+                    // Anchor on the largest ring, and take the width from that ring's own span rather
+                    // than the feature bbox: Alaska's Aleutians cross the dateline, so its bbox spans
+                    // ~360 degrees and would size the label to the whole world.
                     let big = rings[0];
                     rings.forEach(r => { if (r.length > big.length) big = r; });
-                    let sx = 0, sy = 0;
-                    big.forEach(p => { sx += p.lon; sy += p.lat; });
+                    let sx = 0, sy = 0, rMinLon = 180, rMaxLon = -180;
+                    big.forEach(p => { sx += p.lon; sy += p.lat; if (p.lon < rMinLon) rMinLon = p.lon; if (p.lon > rMaxLon) rMaxLon = p.lon; });
                     const cLon = sx / big.length, cLat = sy / big.length;
-                    const lbl = stateLabelMesh(feature.properties.name, (bbox[2] - bbox[0]) * 20 * 0.55);
+                    const lbl = stateLabelMesh(feature.properties.name, (rMaxLon - rMinLon) * 20 * 0.55);
                     const at = get3DCoord(cLon, cLat, borderAlt([cLon, cLat]) + 60);
                     lbl.mesh.position.copy(at);
                     lbl.rings = rings; lbl.bbox = bbox;
@@ -647,8 +669,11 @@
                 strip.renderOrder = 1;   // symbols draw after the ribbon, whatever the camera angle
                 threeMapGroup.add(strip);
             }
-            // flat, static cyclone symbol at each fix with its category printed on it
-            const symSize = Math.max(0.42, ribbonW * 1.9);
+            // flat, static cyclone symbol at each fix with its category printed on it. Sized off the
+            // track's own extent, like the ribbon, so it holds the same share of the frame at any
+            // storm size. Best-track fixes sit roughly 2.5% of the track span apart, so this stays
+            // clear of its neighbours while being large enough to read the category.
+            const symSize = Math.max(1.7, ribbonW * 8);
             stormTrackPoints.forEach((p, i) => {
                 const geo = new THREE.PlaneGeometry(symSize, symSize);
                 geo.rotateX(-Math.PI / 2);
@@ -658,12 +683,12 @@
                 sym.renderOrder = 2;
                 threeMapGroup.add(sym);
             });
-            // discreet marker for the best-track fix the status card currently refers to:
-            // a thin flat ring around that fix's symbol, moved by updateStormTrackBadge()
-            // as playback advances
-            const ringGeo = new THREE.RingGeometry(symSize * 0.62, symSize * 0.72, 40);
+            // marker for the best-track fix the status card refers to: a flat ring around that fix's
+            // symbol in the sky-blue accent, the same one the 2D layer keylines it with, moved by
+            // updateStormTrackBadge() as playback advances
+            const ringGeo = new THREE.RingGeometry(symSize * 0.60, symSize * 0.76, 48);
             ringGeo.rotateX(-Math.PI / 2);
-            stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+            stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
             stormFixRing3D.renderOrder = 3;
             stormFixRing3D.position.y = 0.09;
             stormFixRing3D.visible = false;

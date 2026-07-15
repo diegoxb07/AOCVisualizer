@@ -1158,11 +1158,14 @@
             const next = root.dataset.theme === 'light' ? 'dark' : 'light';
             root.dataset.theme = next;
             syncAria();
-            // the 2D basemap palette is theme-aware now, so drop its cached render and repaint the tracker.
+            // the 2D basemap palette is theme-aware, so drop its cached render and repaint the tracker.
             bgNeedsUpdate = true;
             if (filteredData.length && trackerModeSelect.value === '2d' && typeof renderMapEngineFrame === 'function') {
                 renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             }
+            // the 3D basemap's sea ramp and line colours bake in at build time, so it re-colours by
+            // rebuilding; applyTheme3D also sets the scene background, which applies with no flight.
+            if (typeof applyTheme3D === 'function') applyTheme3D();
             // Legend label colors are theme-aware (js/17-charts.js generateLabels), baked at build
             // time, so rebuild the legends on toggle. update('none') re-runs generateLabels without
             // animation; the zoom plugin preserves any pan/zoom across it.

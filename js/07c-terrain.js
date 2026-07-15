@@ -27,9 +27,16 @@
         return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
     }
 
-    // Elevation-shaded color (0..1 rgb): bathymetry blues below sea level, green->tan->snow above.
+    // Elevation-shaded color (0..1 rgb): bathymetry below sea level, green->tan->snow above. The sea
+    // ramp follows the theme and starts from the 2D basemap's ocean (#d4e3f0 light, #0e1a29 dark),
+    // deepening with depth either way. Land keeps one ramp: its mid-tones hold against both themes.
     function terrainColorRGB(e) {
-        if (e < 0) { const t = Math.max(0, Math.min(1, -e / 5000)); return [0.04 + 0.03 * (1 - t), 0.20 - 0.11 * t, 0.32 - 0.15 * t]; }
+        if (e < 0) {
+            const t = Math.max(0, Math.min(1, -e / 5000));
+            return (document.documentElement.dataset.theme === 'light')
+                ? [0.83 - 0.17 * t, 0.89 - 0.17 * t, 0.94 - 0.13 * t]
+                : [0.04 + 0.03 * (1 - t), 0.20 - 0.11 * t, 0.32 - 0.15 * t];
+        }
         const t = Math.max(0, Math.min(1, e / 4000));
         if (t < 0.5) { const s = t / 0.5; return [0.17 + 0.36 * s, 0.42 - 0.05 * s, 0.20 - 0.01 * s]; }   // green -> tan
         const s = (t - 0.5) / 0.5; return [0.53 + 0.30 * s, 0.37 + 0.34 * s, 0.18 + 0.55 * s];             // tan -> snow
@@ -42,19 +49,24 @@
     function buildTerrainMesh3D() {
         if (!_terrain || typeof THREE === 'undefined' || typeof get3DCoord !== 'function') return null;
         if (typeof plotMinLon === 'undefined' || plotMinLon == null) return null;
-        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1, pad = 0.25;
+        // This mesh is the colored surface in 3D (the flat land fills only build when the grid is
+        // absent), so the pad is what decides how far the map reads as ground rather than nothing.
+        // It stays a proportional pad and one draw call at any size; the grid stays finer than the
+        // source's own 0.5 degree spacing at a typical storm's span, so the width costs no detail.
+        const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1, pad = 1.5;
         const lon0 = plotMinLon - spanLon * pad, lon1 = plotMaxLon + spanLon * pad;
         const lat0 = plotMinLat - spanLat * pad, lat1 = plotMaxLat + spanLat * pad;
-        const NX = 96, NY = 96;
+        const NX = 160, NY = 160;
         const grp = new THREE.Group();
         const verts = [], colors = [], idx = [];
         for (let iy = 0; iy < NY; iy++) {
             for (let ix = 0; ix < NX; ix++) {
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
-                const p = get3DCoord(lon, lat, terrainElevationMeters(lat, lon));
+                const m = terrainElevationMeters(lat, lon);
+                const p = get3DCoord(lon, lat, m);
                 verts.push(p.x, p.y, p.z);
-                const c = terrainColorRGB(terrainElevationMeters(lat, lon));
+                const c = terrainColorRGB(m);
                 colors.push(c[0], c[1], c[2]);
             }
         }
@@ -73,7 +85,8 @@
         grp.add(terrain);
         // faint sea-level surface at y=0 (get3DCoord centers the flight on the origin).
         const seaGeom = new THREE.PlaneGeometry((lon1 - lon0) * 20, (lat1 - lat0) * 20); seaGeom.rotateX(-Math.PI / 2);
-        const sea = new THREE.Mesh(seaGeom, new THREE.MeshBasicMaterial({ color: 0x2f6fa6, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }));
+        const seaCol = (document.documentElement.dataset.theme === 'light') ? 0x8fb8d8 : 0x2f6fa6;
+        const sea = new THREE.Mesh(seaGeom, new THREE.MeshBasicMaterial({ color: seaCol, transparent: true, opacity: 0.20, side: THREE.DoubleSide, depthWrite: false }));
         sea.position.set(0, 0, 0); sea.renderOrder = -1;
         grp.add(sea);
         return grp;

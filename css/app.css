@@ -21,6 +21,11 @@
     --accent-soft: oklch(30% 0.06 258);
     --danger: oklch(58% 0.17 25);
     --warn: oklch(80% 0.13 82);
+    /* Readout value hues (point analysis). The panel sits on --panel, so each hue carries a light
+       variant below dark enough to hold against it while keeping the same identity. */
+    --val-cool: #7dd3fc;
+    --val-alt: #7c93ff;
+    --val-warm: #fbbf24;
     --media-h: clamp(480px, 56vh, 620px); /* JS-resizable via the media drag handle */
 }
 :root[data-theme="light"] {
@@ -38,6 +43,9 @@
     --accent-soft: oklch(88% 0.045 258);
     --danger: oklch(48% 0.15 25);
     --warn: oklch(56% 0.12 74);
+    --val-cool: #0369a1;
+    --val-alt: #4338ca;
+    --val-warm: #b45309;
 }
 
 /* Base */

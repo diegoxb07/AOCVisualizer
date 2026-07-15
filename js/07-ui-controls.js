@@ -273,9 +273,10 @@
             }
             // country labels: sit at the nearest coastline point to the plane, only while that coast is in
             // range, and scale with camera distance so they stay a constant readable size at any altitude.
-            // the state under the plane: one flat label, at the state's own centre rather than the
+            // the state the plane is over: one flat label, at the state's own centre rather than the
             // plane's, so it names the ground without trailing the aircraft. Toggled only on a change
             // of state, and stateIndexAt tests the current one first, so this stays a single hit test.
+            // Runs ahead of the country labels, which read _stateLabelIdx to stand down under it.
             if (_stateLabels.length) {
                 const in3dS = !trackerModeSelect || trackerModeSelect.value === '3d';
                 const row = (in3dS && filteredData.length) ? filteredData[currentIdx] : null;
@@ -547,16 +548,28 @@
         const geo = new THREE.PlaneGeometry(w / 72, 1);   // unit height, so scale is length-independent
         geo.rotateX(-Math.PI / 2);   // lay it on the ground; the texture's top edge then points north
         const mesh = new THREE.Mesh(geo, mat);
-        mesh.renderOrder = 4; mesh.visible = false;
+        // Draws after the country labels (renderOrder 5), so where a neighbouring country's name
+        // reaches across a border the state name still reads.
+        mesh.renderOrder = 6; mesh.visible = false;
         return { mesh, mat };
     }
 
-    // An airfield's code lying flat on the basemap beside its dot, in the same idiom as the state
-    // labels. Military takes the sky-blue accent, civil a neutral ink, both keylined dark so they
-    // read over terrain, water and imagery alike.
-    // mapFeatures index of the US state holding (lat, lon), or -1. The last match is tested first,
-    // since a flight sits inside one state for minutes at a time; the rest reject on bbox. Crossings
-    // are counted across every ring, so holes and each part of a multi-part state fall out even-odd.
+    // Degrees from (lat, lon) to a [minLon, minLat, maxLon, maxLat] box, 0 anywhere inside it.
+    function bboxDistDeg(b, lat, lon) {
+        const dx = Math.max(b[0] - lon, 0, lon - b[2]);
+        const dy = Math.max(b[1] - lat, 0, lat - b[3]);
+        return Math.hypot(dx, dy);
+    }
+
+    // How far offshore a state still names the ground beneath. These flights sit over water for most
+    // of a mission, so an inside-only test would leave the state nameless exactly when the question
+    // is being asked, and hand the frame to the country label instead.
+    const STATE_NEAR_DEG = 2.5;
+
+    // _stateLabels index for the US state at (lat, lon): the one holding it, else the nearest within
+    // STATE_NEAR_DEG, else -1. The last match is tested first, since a flight sits with one state for
+    // minutes at a time; the rest reject on bbox. Crossings count across every ring, so holes and each
+    // part of a multi-part state fall out even-odd.
     function stateIndexAt(lat, lon) {
         const hit = i => {
             const s = _stateLabels[i], b = s.bbox;
@@ -567,7 +580,12 @@
         };
         if (_stateLabelIdx >= 0 && _stateLabelIdx < _stateLabels.length && hit(_stateLabelIdx)) return _stateLabelIdx;
         for (let i = 0; i < _stateLabels.length; i++) if (i !== _stateLabelIdx && hit(i)) return i;
-        return -1;
+        let near = -1, best = STATE_NEAR_DEG;
+        for (let i = 0; i < _stateLabels.length; i++) {
+            const d = bboxDistDeg(_stateLabels[i].bbox, lat, lon);
+            if (d < best) { best = d; near = i; }
+        }
+        return near;
     }
 
     function build3DScene() {

@@ -53,6 +53,9 @@
     // archive instead of a manual file upload. See js/12b-recon-archive.js.
     let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null
     let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
+    // Airfields for the basemaps: { code, name, lat, lon, big, mil }, filled by loadAirports()
+    // (js/19-bootstrap.js) from data/airports.json. Empty until it lands, and stays empty if it fails.
+    let airports = [];
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
     let showStormTrack = true;        // "Storm Track" toggle; the track draws only once a best-track loads
     let hoveredStormIdx = -1;         // index into stormTrackPoints currently under the mouse (2D map hover), -1 = none

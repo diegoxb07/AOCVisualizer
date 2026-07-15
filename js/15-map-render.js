@@ -286,6 +286,11 @@
         return out;
     }
 
+    // Airfield codes start at the zoom where they have room to sit beside their dot, majors and
+    // military first, every field once the view is tight enough to tell them apart.
+    const AIRPORT_MIN_SCALE = 2.5;
+    const AIRPORT_ALL_SCALE = 9;
+
     // Geometry clipping kicks in past this zoom; below it the raw paths are small enough for the
     // rasterizer and the draw stays byte-identical to the unclipped output.
     const MAP_CLIP_MIN_SCALE = 6;
@@ -381,8 +386,38 @@
                 });
             }
         };
+        // Airfields, over whatever the basemap ended up being. Zoom-gated: 1,486 codes at synoptic
+        // zoom is noise, so the majors appear first and the rest join once the view is tight enough
+        // to place them. Drawn at a fixed screen size, and only inside the view.
+        const drawAirports = () => {
+            if (!airports.length || mapScale < AIRPORT_MIN_SCALE) return;
+            const all = mapScale >= AIRPORT_ALL_SCALE;
+            const v = getVisibleGeoBounds(); if (!v) return;
+            bgCtx.save();
+            bgCtx.textAlign = 'left'; bgCtx.textBaseline = 'middle';
+            bgCtx.font = '600 ' + (10 / mapScale) + 'px Inter, ui-sans-serif, sans-serif';
+            bgCtx.lineWidth = 2.5 / mapScale; bgCtx.lineJoin = 'round';
+            const r = 2.2 / mapScale, pad = 4 / mapScale;
+            for (let i = 0; i < airports.length; i++) {
+                const a = airports[i];
+                if (!all && !a.big && !a.mil) continue;   // majors and military carry the low zooms
+                if (a.lon < v.minLon || a.lon > v.maxLon || a.lat < v.minLat || a.lat > v.maxLat) continue;
+                const x = getX(a.lon), y = getY(a.lat);
+                // military in the accent, civil in a neutral ink, both keylined so they read over
+                // land, water and satellite imagery alike
+                const col = a.mil ? '#38bdf8' : (lightMap ? '#1f2937' : '#e2e8f0');
+                bgCtx.beginPath(); bgCtx.arc(x, y, r, 0, 2 * Math.PI);
+                bgCtx.fillStyle = col; bgCtx.fill();
+                bgCtx.strokeStyle = lightMap ? 'rgba(255,255,255,0.9)' : 'rgba(5,12,20,0.85)';
+                bgCtx.stroke();
+                bgCtx.strokeText(a.code, x + pad, y);
+                bgCtx.fillStyle = col; bgCtx.fillText(a.code, x + pad, y);
+            }
+            bgCtx.restore();
+        };
         if (satHidesBasemap) { drawLandFeatures(); drawSatImage(); }
         else { if (hasSatImage) drawSatImage(); drawLandFeatures(); }
+        drawAirports();
         bgCtx.restore(); bgNeedsUpdate = false;
     }
 

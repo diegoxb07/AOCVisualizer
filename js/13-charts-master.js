@@ -15,10 +15,15 @@
     }
 
     function mutedMetricColor(hex) {
-        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || ''); if (!m) return '#aab4be';
+        const light = document.documentElement.dataset.theme === 'light';
+        const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || ''); if (!m) return light ? '#5b6472' : '#aab4be';
         const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16), mix = 0.42;
         const t = (c, target) => Math.round(c * (1 - mix) + target * mix);
-        return `rgb(${t(r, 0xc9)}, ${t(g, 0xd2)}, ${t(b, 0xdc)})`;
+        // Blend each metric hue toward the menu background's tone: a pale slate for the dark menu,
+        // a dark slate for the near-white light menu, so the label keeps contrast either way.
+        return light
+            ? `rgb(${t(r, 0x33)}, ${t(g, 0x3a)}, ${t(b, 0x45)})`
+            : `rgb(${t(r, 0xc9)}, ${t(g, 0xd2)}, ${t(b, 0xdc)})`;
     }
 
     function buildMasterMenu() {

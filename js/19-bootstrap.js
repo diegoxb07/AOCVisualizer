@@ -255,7 +255,11 @@
         const resizeChartIn = (panel) => setTimeout(() => {
             const cv = panel.querySelector('canvas');
             const ch = cv && typeof Chart !== 'undefined' && Chart.getChart(cv);
-            if (ch) ch.resize();
+            if (!ch) return;
+            // Collapse the canvas first: its flex-grow wrapper sizes to content (flex-basis:auto), so the
+            // stale fullscreen height would otherwise feed back into resize() and pin the graph tall.
+            cv.style.height = '0';
+            ch.resize();
         }, 60);
         const topRight = () => document.getElementById('topRightControls');
         function toggleChartFullscreen(panel) {
@@ -282,7 +286,7 @@
             btn.title = 'Fullscreen this graph';
             btn.textContent = '⛶';
             btn.addEventListener('click', (e) => { e.stopPropagation(); toggleChartFullscreen(panel); });
-            group.insertBefore(btn, group.firstChild);
+            group.appendChild(btn);
         });
         // Esc / leaving real fullscreen drops any fullscreened graph too.
         document.addEventListener('fullscreenchange', () => {
@@ -1283,6 +1287,12 @@
             try {
                 if (typeof customCharts !== 'undefined') Object.values(customCharts).forEach(c => c && c.update('none'));
             } catch (e) { /* charts not built yet */ }
+            // Variable-menu label colors are theme-aware (mutedMetricColor), baked in at build time, so
+            // rebuild the dropdowns on toggle.
+            try {
+                if (typeof buildDropdownMenus === 'function') buildDropdownMenus();
+                if (typeof buildMasterMenu === 'function') buildMasterMenu();
+            } catch (e) { /* menus not built yet */ }
             try {
                 const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
                 saved.theme = next;

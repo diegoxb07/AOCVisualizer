@@ -26,7 +26,7 @@
     --val-cool: #7dd3fc;
     --val-alt: #7c93ff;
     --val-warm: #fbbf24;
-    --media-h: clamp(480px, 56vh, 620px); /* JS-resizable via the media drag handle */
+    --media-h: clamp(420px, 50vh, 560px); /* JS-resizable via the media drag handle */
 }
 :root[data-theme="light"] {
     color-scheme: light;
@@ -209,6 +209,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* Fullscreen a single graph, like the media panels: fill the viewport (the JS also hides the top-right
    sticky cluster). Toggle off with the ⛶ button again or Esc. */
 .chart-fs { position: fixed; inset: 0; z-index: 4000; margin: 0; border: none; border-radius: 0; background: var(--bg); padding: 18px 18px 24px; }
+/* Opening the ＋ menu adds .elevated-card (z-index:100 !important); keep a fullscreened graph over the
+   sticky media and bottom bars so they never surface on top of it. */
+.chart-fs.elevated-card { z-index: 4000 !important; }
 .chart-fs #masterGraphWrapper { max-height: none; }
 .chart-fs #masterCreatePrompt { min-height: 40vh; }
 #mapPanel:is(:fullscreen, .fake-fs), #videoPanel:is(:fullscreen, .fake-fs) { padding: 0; border: none; border-radius: 0; background-color: var(--bg); display: flex; flex-direction: column; }

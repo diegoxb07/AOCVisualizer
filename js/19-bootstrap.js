@@ -167,6 +167,8 @@
 
         // reset the map view + satellite draw state, and put the satellite picker back to Off.
         mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; followAircraft2D = true; bgNeedsUpdate = true;
+        followAircraft3D = true;
+        if (typeof updateFollowButton === 'function') updateFollowButton();   // hides the recenter overlay
         satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; lastSatFetchTime = '';
         satTileOpacity = 0.92;
         const opSlider = document.getElementById('satOpacitySlider'); if (opSlider) opSlider.value = 92;

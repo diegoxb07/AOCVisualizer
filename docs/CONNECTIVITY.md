@@ -22,19 +22,25 @@ in each state**, so during a training or replay session you always know your opt
 | --- | --- | --- |
 | **noaa-recon-api** (currently `https://joshmurdock.net/api`, planned move to a NOAA-internal host, see [Changing the API host](#changing-the-api-host)) | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
 | **NASA GIBS** | MODIS / VIIRS polar satellite overlays | Only for MODIS/VIIRS overlays |
-| **GitHub-hosted GeoJSON** (Natural Earth plus US states) | The map's coastline and state geometry | Fetched once at startup; map still runs if it fails |
-| **CDNs** (Tailwind, Chart.js, Three.js, netcdfjs, Tesseract.js) | App libraries | Needed to load the page the first time, then browser-cached |
+| **GitHub-hosted GeoJSON** (Natural Earth plus US states) | Fallback for the map's coastline and state geometry if the repo's local copies fail | Fetched once at startup; map still runs if it fails |
+
+There are **no CDNs**: all libraries, fonts, basemap data, and the Auto-Sync OCR engine ship in
+the repo and are served same-origin. A **service worker** (`sw.js`) precaches the entire app on
+the first visit, so the page itself, its scripts, fonts, coastlines, terrain, and OCR all load
+with **no network at all** afterwards.
 
 **None of your uploaded data is ever sent anywhere.** Files are read and parsed in the browser.
-The requests above are for imagery, geometry, libraries, and the archive catalog only.
+The requests above are for imagery, geometry, and the archive catalog only.
 
 ---
 
 ## The noaa-recon-api
 
-The **noaa-recon-api** is a public, CORS-open, no-key service
+The **noaa-recon-api** is a public, CORS-open service
 ([github.com/jjmurdock19/noaa-recon-api](https://github.com/jjmurdock19/noaa-recon-api)) that
-does two jobs for this tool.
+does two jobs for this tool. Its requests carry a bearer token that ships embedded in the page
+(`js/02-satellite.js`); like a publishable key it is meant to be visible, so nothing needs a
+sign-in. A user with their own token can override it by setting `reconApiToken` in localStorage.
 
 1. **Archive catalog plus flight data.** The Year/Storm/Flight browser is backed by its
    `/v1/recon/*` and `/v1/storms/*` endpoints. Loading a mission streams the original
@@ -75,7 +81,7 @@ in `js/02-satellite.js`.)
 - The **manual upload zone** is highlighted (blue ring) to draw your eye to it.
 - In the satellite dropdown, **GOES-East/West** options are disabled and relabelled
   **"…API Offline."**
-- The **Locally Cache Satellites** modal disables GOES options the same way.
+- The **Pre-Cache Satellite Imagery** modal disables GOES options the same way.
 
 ---
 
@@ -91,7 +97,6 @@ in `js/02-satellite.js`.)
 | PFD / HUD, units toggle | Yes | Yes |
 | Measure / Mark / point analysis export | Yes | Yes |
 | MMR video load plus sync (Auto-Sync/OCR and Manual) | Yes | Yes (all local) |
-| **KML export** | Yes | Yes |
 | **Record Clip** | Yes | Yes |
 | **MODIS / VIIRS** satellite overlays (NASA GIBS) | Yes | Needs GIBS, independent of the recon-api |
 | **GOES-East / GOES-West** archive imagery | Yes | No (disabled, "API Offline") |
@@ -112,14 +117,14 @@ You can run a complete training or replay session with no API.
 1. **Load the flight manually.** Drop a `.nc` file on the upload zone (the tool highlights it for
    you). This is the same parser the archive uses, so nothing downstream changes.
 2. **Load the MMR video** and sync it (Auto-Sync or Manual). All local.
-3. **Replay** with full controls, charts, PFD, measure, mark, KML, and Record Clip.
+3. **Replay** with full controls, charts, PFD, measure, mark, and Record Clip.
 4. **Satellite:** use **MODIS/VIIRS** if you have general internet (NASA GIBS), or rely on any
-   imagery you **pre-cached** earlier via **⤓ Locally Cache Satellites**. GOES-archive is
+   imagery you cached earlier via **⤓ Pre-Cache Satellite Imagery**. GOES-archive is
    unavailable until the recon-api is back.
 
-> Tip for field or limited-connectivity use: while you *do* have the API, use **⤓ Locally Cache
-> Satellites** to pre-download the GOES imagery for the flights you'll present. Cached tiles play
-> back with no network. The cache lasts until the browser tab closes.
+> Tip for field or limited-connectivity use: while you *do* have the API, use **⤓ Pre-Cache
+> Satellite Imagery** to download the GOES imagery for the flights you'll present. Cached
+> imagery plays back with no network, is saved on this device, and survives reloads.
 
 ---
 
@@ -189,6 +194,10 @@ The flight is outside that satellite's Earth-disk view (more than about 65° fro
 An Atlantic flight greys out GOES-West; an east-Pacific flight greys out GOES-East.
 
 **Can I use this completely offline (no internet at all)?**
-The page must be loaded once (to fetch CDN libraries, which are then browser-cached). After that,
-manual upload, local replay, video sync, charts, and export all work with no network. Map
-coastlines and any satellite imagery need connectivity, or a warm cache.
+Yes, after one online visit. A service worker (`sw.js`) precaches the whole app on first load,
+so the page opens with no network and manual upload, local replay, video sync (including
+Auto-Sync OCR), charts, map coastlines/terrain, and every export all work. The only things that
+still need connectivity are the network features themselves: archive loading, GOES imagery, and
+storm tracks (recon-api) plus MODIS/VIIRS (NASA GIBS), unless you pre-cached imagery while
+online. After a new version is deployed, the first page load still shows the previous build
+while the update installs in the background; the following reload shows the new one.

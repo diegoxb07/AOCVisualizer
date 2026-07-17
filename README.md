@@ -1,9 +1,12 @@
 # Mission Visualizer
 
-This video telemetry tool replays flight-level instrument data together with optional synced radar
-(**MMR**) video, and adds a live map tracker, fully customizable graphs with tons of variables, a Primary Flight Display, satellite imagery overlays, storm best-track overlays, video recording, and much, much, more!
+This tool replays AOC flight-level instrument data together with optional synced radar
+(**MMR**) video. It adds a live 2D/3D map tracker, synced charts for any recorded variable, a
+cockpit Primary Flight Display, satellite imagery overlays, storm best-track overlays,
+cross-flight comparison, and clip recording.
 
-Built for the **Aircraft Operations Center**. Runs entirely in the browser, API-backend optional.
+Built for the **Aircraft Operations Center**. Runs entirely in the browser; the archive API adds
+more automation (loads flight from archive) but is optional.
 
 - **Tool Link:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages)
 - **Repository:** https://github.com/diegoxb07/AOCVisualizer
@@ -22,12 +25,12 @@ flowchart TD
     LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
-    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
+    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
     MMR -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Is the API<br>online?"}
-    FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> dropdown → GOES East/West (archive) AND MODIS/VIIRS<br>pick a GOES sat to pre-cache them"]
-    FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> dropdown → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
+    FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> picker → GOES East/West (archive)<br>pick a product; imagery pre-caches<br>for the whole flight"]
+    FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> picker → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
     SAT -- "No" --> PLAY["<b>Play</b>, scroll through timeline, filters: change speed,<br>toggle 8Hz Smoothing / PFD / S.I Units"]
     SATGOES --> PLAY
     SATPOLAR --> PLAY
@@ -58,45 +61,45 @@ flowchart TD
 
 | Use case | What the tool gives you |
 | --- | --- |
-| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs all together with the MMR video synced alongside. You can also record clips in advance for presentations. |
-| **Replay / analysis** | Load flight-level data (or pull a whole mission from the archive), trim to a time window, color the track by wind speed or temperature, drop measurement shapes, do point analyses, overlay GOES/MODIS/VIIRS satellite imagery for the flight's date, and record annotated clips to video. |
-| **API-backed workflow** | A built-in **Recon Archive** browser (Year → Storm → Mission) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** satellite imagery is rendered on demand for the historical dates these flights fall on. |
+| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs, with the MMR video synced alongside. Clips can be recorded ahead of time for presentations. |
+| **Replay / analysis** | Load flight-level data or pull a whole mission from the archive, trim to a time window, color the track by wind speed or temperature, drop measurement shapes, run point analyses, overlay satellite imagery for the flight's date, and record annotated clips. |
+| **API-backed workflow** | The built-in **Recon Archive** browser (Year → Storm → Flight) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** imagery is rendered on demand for the historical dates these flights fall on. |
 
 ---
 
 ## 1. Loading a flight
 
-> **Tip: batch load flight data first.** Click **⤓ Batch Load Flight Data** after picking a year and check every mission you plan to look at. They download and parse once in the background, stay saved on this device, and then open instantly from the **Previously Loaded Missions** list, so you can hop between multiple flights without waiting on processing (even after a page reload).
+> **Tip: batch load flight data first.** Click **⤓ Batch Load Flight Data** after picking a year and check every mission you plan to look at. They download and parse once in the background and are saved on this device, so they open instantly from **Previously Loaded Missions**, even after a page reload.
 
-Both paths feed the **same** parser, so the map, charts, PFD, and export behave identically either way.
+Both loading paths feed the same parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (one-stop shop, needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns works too: paste a full mission id to load it directly, or type a storm name alone (no year needed) to find that storm across every season, newest first; click a result to see its flights. This streams the mission's full-resolution NetCDF (with a byte-progress readout), parses every recorded variable, **and** loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original source file for use in other tools. If the download ever fails it automatically falls back to a decimated (0.2 Hz) track; the status text tells you which path ran. The address bar also updates to a **shareable link** (`?mission=20241007N1`): send it to a colleague and the same mission loads automatically when they open it. A shared link only auto-loads on first open: **refreshing the page (or clicking ↺ Reset in the top-right) clears everything back to a fresh session.**
+**Option 1: Archive browser (needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns also works: paste a full mission id to load it directly, or type a storm name (no year needed) to find that storm across every season; clicking a result shows its flights. This streams the mission's full-resolution NetCDF with a byte-progress readout, parses every recorded variable, and loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original source file for use in other tools. If the download fails, the tool falls back to a decimated (0.2 Hz) track, and the status text says which path ran. The address bar also updates to a shareable link (`?mission=20241007N1`); a colleague who opens that link gets the same mission loaded automatically. A shared link only auto-loads on first open. Refreshing the page, or clicking **↺ Reset** in the top right, clears everything back to a fresh session.
 
-**Option 2: Manual upload (always works, no internet needed).** Drop a **`.nc`** file (e.g. `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
+**Option 2: Manual upload (works offline).** Drop a **`.txt`** or **`.nc`** file (for example `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load.
 
-> Archive controls greyed out with an **"API Offline"** banner mean the archive service is unreachable, and one should use manual upload. It re-checks every ~60 s and can re-enable itself. Details: **[API & Connectivity](docs/CONNECTIVITY.md)**.
+> When the archive dropdowns are greyed out with an **"API Offline"** banner, this means the archive service is unreachable. Use manual upload instead. The tool re-checks the service every 60 seconds and re-enables the archive when it recovers. Details: **[API & Connectivity](docs/CONNECTIVITY.md)**.
 
 ---
 
 ## 2. Time window & replay controls
 
-Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment, and everything downstream (map, charts, PFD, timeline) renders only that window. Leave the detected range alone to replay the whole flight. **After changing the window, just press Play, it applies the new window before starting playback.**
+Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment; the map, charts, PFD, and timeline then render only that window. Leave the detected range alone to replay the whole flight. **After changing the window, press Play. It applies the new window before starting playback.**
 
-With a synced MMR video loaded, the window auto-adjusts to the video's timeframe, so manual trimming mainly applies to data-only replay (or Manual sync mode).
+With a synced MMR video loaded, the window follows the video's timeframe, so manual trimming mainly applies to data-only replay and Manual sync mode.
 
 All playback lives in the sticky bottom bar:
 
 | Control | What it does |
 | --- | --- |
-| **`Play` / `Pause`** | Start / stop. |
+| **`Play` / `Pause`** | Start and stop. |
 | **`« / 1x / »`** | Playback speed. |
 | **`↻ Reset`** | Jump back to the start of the window. |
 | **Timeline slider** | Scrub anywhere; the UTC readout updates live. |
-| **8Hz Smoothing** (map header) | Catmull-Rom interpolation between the native 1-second samples for fluid motion instead of stepping. Recommended for training. |
+| **8Hz Smoothing** (map header) | Interpolates between the native 1-second samples so motion is fluid instead of stepping. |
 
-Keyboard: **Space** = play/pause, **← / →** = scrub (hold to accelerate), **Shift + ← / →** = jump 10 flight-minutes. Display preferences (units, tracker mode, track/barb colors, PFD, smoothing) are remembered between sessions.
+Keyboard: **Space** plays and pauses, **← / →** scrub (hold to accelerate), and **Shift + ← / →** jump 10 flight-minutes. Display preferences (units, tracker mode, track and barb colors, PFD, smoothing) are remembered between sessions.
 
-If an MMR video is loaded, the **video clock drives playback** and the telemetry follows it; otherwise the engine advances on its own clock.
+If an MMR video is loaded, the video clock drives playback and the telemetry follows it. Otherwise the engine advances on its own clock.
 
 ---
 
@@ -104,83 +107,87 @@ If an MMR video is loaded, the **video clock drives playback** and the telemetry
 
 Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header.
 
-- **2D**: whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom, drag to pan; zoom out for synoptic context.
-- **3D**: Three.js scene over an elevation-shaded **terrain basemap** (a bundled low-res global ETOPO relief grid, so land sits at real height over a flat sea, and the ground meets the aircraft at takeoff and landing), with a plane model and the track drawn by altitude (GPS or pressure, selectable; defaults to GPS). Orbit/zoom with the mouse. **Real Scale (3D)** draws the aircraft at true size and adds faint flight-level reference planes so climbs and descents read against them.
+- **2D**: a whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom and drag to pan; zooming out shows the surrounding synoptic picture. Airfield codes appear as you zoom in, and the AOC's home field (LAL) is always marked.
+- **3D**: a Three.js scene over an elevation-shaded terrain basemap, with US state names laid on the ground, a detailed aircraft model, and the track drawn at altitude (GPS or pressure, selectable; defaults to GPS). Orbit and zoom with the mouse. **Real Scale (3D)** draws the aircraft at its true size and adds faint flight-level reference planes so climbs and descents read against them.
 
-Options (bottom bar): **Track Color** (wind speed or warming/cooling), **Wind Barb Color** (wind speed or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
+Options (bottom bar): **Track Color** (wind speed, or warming/cooling), **Barb Color** (wind speed, or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), and **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
 
-> **Note on Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay **black** until the flight-level data records hurricane-force winds; color only appears at **64 kt and above**, stepping through the Saffir-Simpson categories from there. A fully black track just means the aircraft never sampled hurricane-force winds.
+> **Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay black until the flight-level data records hurricane-force winds. Color starts at **64 kt** and steps through the Saffir-Simpson categories from there. A fully black track means the aircraft never sampled hurricane-force winds.
 
-> **Note on the 3D wind streaks:** the short streaks at the wings show vertical air motion, and need **all three**: the **3D** tracker, **playback running** (pausing hides them), and a vertical bump past the threshold. The bump is whichever is larger of **vertical wind (`vtWnd`) over ~2 m/s** or the **vertical rate changing over ~2.8 m/s within 3 seconds**, so a file with no vertical-wind channel still shows them. They rise in an updraft, fall in a downdraft, and brighten and speed up with it. Smooth air shows nothing.
+> **3D wind streaks:** the short streaks at the wings show vertical air motion. They need the **3D** tracker, **playback running**, and a vertical bump past the threshold: either vertical wind (`vtWnd`) above about 2 m/s, or the vertical rate changing by more than about 2.8 m/s within 3 seconds, so a file with no vertical-wind channel still shows them. They rise in an updraft, fall in a downdraft, and brighten and speed up with stronger motion. Smooth air shows nothing.
 
-**Measure & mark:** **Measure** (map header) draws polygon/circle/rectangle for distance & area; **Mark Point** (bottom bar) drops a marker at the current position. Click a marked point to open **Point Data Analysis** and **download** its full report.
+**Measure & mark:** **Measure** (map header) draws a polygon, circle, or rectangle for distance and area. **Mark Point** (bottom bar) drops a marker at the current position. Clicking a marked point opens **Point Data Analysis**, where its full report can be downloaded.
 
 ---
 
 ## 4. MMR video sync
 
-Load a cockpit/radar **`.mp4`** in **Upload MMR to Sync**. Two sync modes:
+Load a cockpit or radar **`.mp4`** in the **Upload MMR** zone. Two sync modes:
 
-- **Auto-Sync (default)**: OCR reads the timestamp **burned into the video frame** and aligns automatically. A green pulse means OCR is active; a non-blocking "Syncing…" pill shows while it hunts. Click **Sync Now** to force a lock (a few clicks on a clear frame helps), and hide any *other* on-screen timestamps that could confuse it. Reads are sanity-checked against the flight's time range, so a misread can't jump playback wildly.
-- **Manual Time Input**: type the video's UTC start time in **MMR Start Time** (`HHMMSS`). Simple and reliable when you already know it.
+- **Auto-Sync (default)**: OCR reads the timestamp burned into the video frame and aligns the data to it. A green pulse means OCR is active, and a "Syncing" pill shows while it hunts. Click **Sync Now** to force a lock (a few clicks on a clear frame helps), and hide any other on-screen timestamps that could confuse it. Reads are sanity-checked against the flight's time range, so a misread cannot jump playback wildly.
+- **Manual Time Input**: type the video's UTC start time in **MMR Start Time** (`HHMMSS`).
 
 ---
 
 ## 5. Satellite overlays
 
-Open the **Satellite** picker in the map header: choose a satellite, then its product appears right below to pick. A **tile-opacity slider** at the top of the picker fades the imagery up or down against a clashing basemap, and for GOES products a small **color-scale legend** (brightness temperature or reflectance, with units) sits in the top-left of the 2D player. Options auto-populate from the flight's date and location.
+Open the **Sat:** picker in the map header and choose a satellite; its products then appear right below. A slider at the top of the picker adjusts the imagery's opacity over the basemap, and for GOES products a color-scale legend (brightness temperature or reflectance, with units) sits in the top left of the 2D player. The options fill in from the flight's date and location.
 
-- **MODIS / VIIRS (polar, NASA GIBS)**: any date back to each mission's start. Keyed to a calendar day; a **day-stepper** moves between days and overpass times are looked up automatically.
-- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from the GOES S3 archive for the flight's **historical** date, refreshed on a 10-minute interval. Choose a **product** in the picker (spectral bands plus Sandwich / GeoColor composites); a product the API can't currently serve shows as **unavailable** rather than vanishing, and only that product greys out.
-- **⤓ Pre-Cache Satellite Imagery** (top card) pre-downloads imagery for **multiple flights** at once; the cache lasts until the tab closes.
+- **MODIS / VIIRS (polar orbiters, NASA GIBS)**: available for any date back to each mission's start. Imagery is organized by calendar day; the day-stepper moves between days, and overpass times are looked up automatically.
+- **GOES-East / GOES-West (archive, needs the API)**: rendered server-side from the GOES archive for the flight's date, advancing on the 10-minute scan interval as playback runs. Nothing shows until a product is chosen, and choosing one also pre-caches imagery for the whole flight so playback never waits on a download. A product the API cannot currently serve is shown as unavailable on its own; the rest stay usable.
+- **⤓ Pre-Cache Satellite Imagery** (top card) downloads imagery for several flights at once. Cached imagery is saved on this device and survives reloads.
 
-Current GOES archive products (the picker auto-discovers these from the API, so new ones appear without an app update):
+The picker discovers the product list from the API at startup, so new products appear without an app update. The full 16-band GOES ABI set is available for both GOES satellites, plus two composites:
 
-- **Band 2**: Red Visible (0.64 µm), the highest-resolution visible channel, sharpest daytime cloud and convection detail (daylight only)
-- **Band 3**: Veggie (Vegetation/NIR, 0.86 µm), daytime land and low-cloud contrast
-- **Band 5**: Near-IR (Snow/Ice, 1.6 µm), separates ice cloud from water cloud
-- **Band 7**: Shortwave IR ("Fire Temperature", 3.9 µm), low cloud and fog at night
-- **Band 9**: Mid-Level Water Vapor (6.9 µm), moisture, dry slots, shear
-- **Band 13**: Clean IR Window (10.3 µm), cloud-top temperature day or night; also offered as **IR Enhanced (ir4)** and **BD Curve (Dvorak)** variants
-- **Sandwich** (composite): Band 13 IR color over visible texture, best for daytime convection
-- **GeoColor** (composite): true color by day, IR by night
+- **Bands 1-6** (visible and near-IR, daylight only; a warning shows if the flight point is in darkness): Band 2 (Red Visible, 0.64 µm) has the sharpest daytime cloud and convection detail, Band 3 (Veggie, 0.86 µm) shows land and vegetation, and Band 5 (Snow/Ice, 1.6 µm) separates ice cloud from water cloud.
+- **Band 7** (Shortwave IR, 3.9 µm): low cloud and fog at night.
+- **Bands 8-10** (Water Vapor, 6.2 / 6.9 / 7.3 µm): upper, mid, and low-level moisture, dry slots, and shear.
+- **Bands 11-16** (IR windows and trace-gas channels): cloud-top temperature, day or night. Band 13 (Clean IR, 10.3 µm) is the usual pick, and is also offered as **IR Enhanced (ir4)** and **BD Curve (Dvorak)** variants.
+- **Sandwich** (composite): Band 13 IR color over visible texture, for daytime convection.
+- **GeoColor** (composite): true color by day, IR at night.
 
 ---
 
 ## 6. Storm best-track overlay
 
-Archive loads automatically draw the storm's **whole-life**, intensity-colored, dashed best-track on both trackers. Toggle it with the **Storm Track** checkbox; the **Last Storm Observation** card shows the nearest fix to the playback time, and hovering a track point pops its category, wind, pressure, and time.
+Archive loads draw the storm's whole-life, intensity-colored, dashed best-track on both trackers. It starts on; the **Storm Track** checkbox (map controls) hides it. The **Last Storm Observation** card shows the best-track fix nearest to the playback time, and hovering a track point on the 2D map shows its category, wind, pressure, and time.
 
 ---
 
 ## 7. Charts, PFD & HUD
 
-Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds/accel, pressure, thermodynamics) track the playback moment: **↺** resets zoom, **＋** adds/removes series, scroll/drag to zoom and pan. **Create Your Own Graph** (bottom) plots **any** variables the file contains against each other.
+Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accelerations, pressure, thermodynamics) follow the playback moment. **↺** resets zoom, **＋** adds or removes series, and scroll or drag zooms and pans. **Create Your Own Graph** (bottom) plots any variables the file contains against each other.
 
-Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a **slip/skid indicator**, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **Imperial Units**, and **Press→GPS Alt** (altitude source, when available). The HUD box on the map shows live telemetry text.
+Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display with an attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a slip/skid indicator, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **S.I Units** (readouts are imperial by default; checking it switches them to metric), and **GPS→Press Alt** (switches the PFD altitude tape from GPS to pressure altitude, when both exist). The HUD box on the map shows live telemetry text.
 
-**8 Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds is turbulence-aware, scaled to the recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air moves the airframe.
+**8Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds scales with the recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air moves the airframe.
 
 ---
 
-## 8. Exporting
+## 8. Comparing flights
 
-- **Record Clip**: pick a start/end range, tracker mode, satellite overlay, optional MMR video, and up to four graphs; the tool auto-plays the range and screen-records it to a **`.webm`** (progress pill + **■ Stop**). Great for briefing clips.
+**Metrics Across Flights** (top card) scans every loaded flight, or a subset you pick, for the highest or lowest value of a chosen metric. It ranks the flights, reports each one's peak with its time, altitude, and position, and draws them together on one comparison graph. It works offline on whatever is already loaded, and the currently open flight is not touched.
+
+---
+
+## 9. Exporting
+
+**Record Clip**: pick a start and end time (both endpoints preview live, so the exact frames are visible before recording), a tracker mode, a satellite overlay, the MMR video if one is loaded, and up to four graphs. Custom graphs can also be built from any variables just for the clip. The tool plays the range and records it to a 1080p **`.webm`**, with a progress pill and a **■ Stop** button. Recorded graphs get value and bound annotations drawn over them.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Likely cause / fix |
+| Symptom | What it means and what to do |
 | --- | --- |
-| Archive dropdowns greyed out, **"API Offline"** | The noaa-recon-api is unreachable, so use **manual upload**. Auto-recovers when the API returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
-| A GOES option is greyed out | API offline, **or** the flight is outside that satellite's Earth-disk view (e.g. GOES-West for an Atlantic flight). Try the other GOES or MODIS/VIIRS. |
-| Picked GOES but nothing shows | Products don't auto-select; pick a product in the **Satellite** picker first. |
-| Auto-Sync lands on the wrong time | Click **Sync Now** again on a clear frame, hide other on-screen timestamps, or switch to **Manual**. |
-| Charts/map not updating after a window change | Click **`Play`** (it applies the current time window). |
-| Nothing plays | Load a file, then click **`Play`**. |
-| Sluggish with satellite on | Let the pre-cache finish, or pre-cache ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
-| Found a bug, or have a question or idea | Click the **!** button (top right). It opens a report form addressed to **diegoxiaobarbero@gmail.com**; **Send** opens Gmail with the subject, details, and mission id prefilled. |
+| The archive dropdowns are greyed out with an **"API Offline"** banner. | The archive service is unreachable. Load flights by manual upload; the tool re-checks every 60 seconds and re-enables the archive when the service returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
+| A GOES option is greyed out. | Either the API is offline, or the flight is outside that satellite's view of the Earth. An Atlantic flight greys out GOES-West, and an east-Pacific flight greys out GOES-East. Use the other GOES or MODIS/VIIRS. |
+| A GOES satellite is picked but nothing shows. | Products are not auto-selected. Pick a product in the **Sat:** picker first. |
+| Auto-Sync lands on the wrong time. | Click **Sync Now** on a frame where the burned-in timestamp is clear, hide any other on-screen timestamps, or switch to **Manual** mode. |
+| The charts and map do not update after changing the time window. | Press **`Play`**. It applies the current window before starting. |
+| Nothing plays. | Load a flight file first, then press **`Play`**. |
+| Playback is sluggish with satellite imagery on. | Let the pre-cache finish, or cache the imagery ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
+| You found a bug, or have a question or idea. | Click the **!** button in the top right. It opens a report form addressed to **diegoxiaobarbero@gmail.com**, and **Send** opens Gmail with the subject, details, and mission id prefilled. |
 
 ---
 
@@ -192,11 +199,13 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display: att
 
 ---
 
-## Running & deploying
+## Running, architecture & deploying
 
-- **No build step, no dependencies to install.** Open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the directory statically (`python3 -m http.server`, etc.). All libraries, fonts, and basemap data ship inside the repo, so the tool loads and replays manual uploads **with no internet at all** (only the archive/satellite APIs and the OCR engine's runtime download need a connection).
-- **Deployment:** GitHub Pages via [.github/workflows/static.yml](.github/workflows/static.yml)
-- **No test suite.** Verify changes by opening the page and exercising the upload → play flow.
+- **Running:** open https://diegoxb07.github.io/AOCVisualizer/ in a browser, or serve the repo directory with any static file server (`python3 -m http.server`, for example). Everything the page needs (libraries, fonts, basemap data, the Auto-Sync OCR engine) ships in the repo and is served same-origin, so nothing loads from a CDN and manual uploads replay with no internet.
+- **Architecture:** plain HTML, CSS, and classic scripts, with no build step. [index.html](index.html) carries the markup, and the numbered files in `js/` (split by subsystem) share one global scope and load in order. File parsing runs in a **web worker** (`js/parse-worker.js`), so a large flight file never freezes the page; the worker, the page, and the tests all share the one parser core in `js/11b-parser-core.js`, so every path produces identical rows. Batch-loaded missions and satellite imagery persist in **IndexedDB**, which is what lets them survive reloads.
+- **Offline (`sw.js`).** A service worker precaches every same-origin asset (page, css/js, libs, fonts, basemap data, OCR engine) on the first visit to the Pages URL and serves it cache-first from then on, so after one online load the page opens and replays flights with no network; [API & Connectivity](docs/CONNECTIVITY.md) has the full online/offline matrix. Cross-origin requests (recon-api, NASA GIBS, the GeoJSON fallback) pass straight through uncached, so the API health check still sees real failures and the "API Offline" banner keeps working. The deploy workflow stamps `CACHE_VERSION` in `sw.js` with the commit SHA (the same `sed` that stamps the `?v=` tokens), so every deploy installs a fresh cache (each file revalidated against the server, never trusted to the HTTP cache) and drops the previous one on activate; cached files are matched ignoring the query string. The first load after a deploy still renders the old build while the new cache installs in the background; the reload after that shows it, so a live replay session is never interrupted. Two rules keep it honest: **every added or renamed css/js/font/data file must also be added to `PRECACHE` in `sw.js`** (`cache.addAll` rejects wholesale on a single 404 and the app silently stays online-only), and cache names keep the **`aoc-viz-`** prefix because the `github.io` origin is shared with sibling project pages, so cleanup only ever deletes this app's own caches. The worker registers only on `github.io`; localhost previews stay service-worker-free and always serve the working tree.
+- **Deployment:** GitHub Pages via [.github/workflows/static.yml](.github/workflows/static.yml). The workflow rewrites every `?v=` cache-buster to the deploy's commit SHA, so a push always reaches browsers fresh.
+- **Checks:** `node tests/run-tests.js` runs the parser checks (synthetic fixtures; a FLAG means a parser judgment call no longer matches its independently computed expectation). Verify UI changes by opening the page and exercising the load and playback flow.
 
 ---
 
@@ -206,13 +215,13 @@ AOC flight-level files carry **hundreds** of columns, but this visualizer reads 
 
 Most raw columns come in **redundant sensors** (`.1`, `.2`, `.3` …), and after each flight a quality-assurance pass picks the best one as the **reference** (the `ref` suffix, e.g. `THDGref`, `LATref`). This tool reads those references (falling back to sensor `.1`) because it works with already-QC'd data. Column suffixes: `.d` derived, `.c` corrected, `.N` sensor index, `ref` chosen reference; families include INE (inertial), GPS, air-data unit (ADDU), dropsonde (`DS_`), and the SFMR surface-wind radiometer.
 
-Everything is **metric by default**; the **Imperial Units** filter converts (m→ft, m/s→mph, °C→°F), while knots and nautical miles are never converted. A variable that isn't present in the uploaded file is greyed out.
+Values are stored metric internally, and readouts display **imperial by default** (feet, mph, °F); the **S.I Units** checkbox switches the display to metric. Knots and nautical miles are never converted. A variable that isn't present in the uploaded file is greyed out.
 
 ## Appendix: how values are computed
 
 Everything the app plots is taken from the file as loaded or derived from it in known, standard ways. The derivations:
 
-**Unit normalization.** Values are stored metric. Where a source channel is in m/s it is converted to knots (× 1.94384) for wind speed, true airspeed, and indicated airspeed; a radar altitude given in feet is converted to metres (× 0.3048). The **Imperial Units** filter converts for display only (see the appendix above).
+**Unit normalization.** Values are stored metric. Where a source channel is in m/s it is converted to knots (× 1.94384) for wind speed, true airspeed, and indicated airspeed; a radar altitude given in feet is converted to metres (× 0.3048). The **S.I Units** checkbox changes the display only (see the appendix above).
 
 **Pressure altitude.** When a recorded pressure altitude is missing, it is computed from static pressure `P` (mb) with the standard-atmosphere formula `alt_m = (1 − (P / 1013.25)^0.190284) × 44307.69`.
 

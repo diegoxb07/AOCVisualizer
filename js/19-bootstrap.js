@@ -159,6 +159,7 @@
         flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
         reconArchiveMeta = null; stormTrackPoints = []; stormTrackMeta = null;
         showStormTrack = true; hoveredStormIdx = -1; currentPointAnalysisData = null;
+        if (typeof resetTdrOverlay === 'function') resetTdrOverlay();
         window._appliedWindow = undefined;
         isMeasuring = false; measurePointsGeo = []; drawnShapes = []; liveMouseGeo = null;
         isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1;

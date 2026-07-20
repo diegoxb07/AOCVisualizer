@@ -216,6 +216,9 @@
             updateMeasureUI(); if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
         }
 
+        // TDR cross-section picking consumes the click while armed (js/07d-tdr.js).
+        if (typeof tdrSliceMapClick === 'function' && tdrSliceMapClick(geo)) { measureClickHandled = true; return; }
+
         if (isMeasuring) {
             if (measureShape === 'polygon') {
                 measurePointsGeo.push(geo);

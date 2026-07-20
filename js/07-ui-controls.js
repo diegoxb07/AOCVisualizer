@@ -206,7 +206,12 @@
     // Storm layer sizes, as a fraction of the camera's distance to each piece, so the layer reads the
     // same at any zoom and for any storm. The ribbon stays a thin line against the symbols.
     const STORM_SYM_SCALE = 0.080;
+    const STORM_SYM_MAX_K = 2.2;    // world-size ceiling: beyond it far fixes stop growing and recede normally
+    const STORM_SYM_TILT = 0.35;    // slight pitch toward the camera so category labels read at low angles
     const STORM_RIBBON_SCALE = 0.013;
+    // scratch axes/quaternions for the per-frame symbol orientation, allocated once
+    const _stormAxisX = new THREE.Vector3(1, 0, 0), _stormAxisY = new THREE.Vector3(0, 1, 0);
+    const _stormQYaw = new THREE.Quaternion(), _stormQTilt = new THREE.Quaternion(), _stormQSpin = new THREE.Quaternion();
     const STORM_RIBBON_OPACITY = 0.55;   // the ribbon reads through; the symbols stay solid
     // One height for the whole layer. renderOrder stacks it and none of it writes depth, so a
     // vertical gap buys nothing and costs alignment: the symbols scale with camera distance, so
@@ -322,31 +327,43 @@
                     sl.mesh.position.set(a.x, a.y + (k / 2) * Math.cos(elev), a.z);
                 }
             }
-            // Storm symbols and ribbon hold one screen size off camera distance, so a storm reads the
-            // same at any zoom and whatever distance its track covered. Each takes its own distance,
-            // so a fix near the camera does not swell against one further down the track.
+            // Storm symbols and ribbon hold one screen size off camera distance, capped at
+            // STORM_SYM_MAX_K so far fixes stop growing in world size and recede normally. Each
+            // symbol also yaws toward the camera and pitches up slightly (STORM_SYM_TILT) so the
+            // category labels read at low viewing angles; the current fix's arms compose their
+            // cyclonic spin on top of that orientation.
             if (camera3D && (_stormSyms.length || _stormStrips.length)) {
                 const cp = camera3D.position;
+                _stormQTilt.setFromAxisAngle(_stormAxisX, STORM_SYM_TILT);
                 for (let i = 0; i < _stormSyms.length; i++) {
-                    const s = _stormSyms[i], k = (cp.distanceTo(s.at) || 1) * STORM_SYM_SCALE;
+                    const s = _stormSyms[i], k = Math.min(STORM_SYM_MAX_K, (cp.distanceTo(s.at) || 1) * STORM_SYM_SCALE);
                     s.mesh.scale.set(k, 1, k);
+                    // lift with size and tilt so the tipped lower edge stays above the sea surface
+                    s.mesh.position.y = STORM_LAYER_Y + (k / 2) * Math.sin(STORM_SYM_TILT);
+                    _stormQYaw.setFromAxisAngle(_stormAxisY, Math.atan2(cp.x - s.at.x, cp.z - s.at.z));
+                    s.mesh.quaternion.copy(_stormQYaw).multiply(_stormQTilt);
+                }
+                // +y turns counterclockwise seen from above, the northern-hemisphere sense
+                if (_stormArmMeshes.length) {
+                    const spin = (performance.now() / 12000) * 2 * Math.PI;
+                    for (let i = 0; i < _stormArmMeshes.length; i++) {
+                        const am = _stormArmMeshes[i];
+                        if (am.idx !== currentStormFixIdx) continue;
+                        _stormQSpin.setFromAxisAngle(_stormAxisY, am.lat < 0 ? -spin : spin);
+                        am.mesh.quaternion.multiply(_stormQSpin);
+                    }
                 }
                 for (let i = 0; i < _stormStrips.length; i++) {
                     const s = _stormStrips[i], k = (cp.distanceTo(s.at) || 1) * STORM_RIBBON_SCALE;
                     s.mesh.scale.set(k, 1, 1);   // width only; the leg keeps the length it was built at
                 }
                 if (stormFixRing3D && stormFixRing3D.visible) {
-                    const k = (cp.distanceTo(stormFixRing3D.position) || 1) * STORM_SYM_SCALE;
+                    const k = Math.min(STORM_SYM_MAX_K, (cp.distanceTo(stormFixRing3D.position) || 1) * STORM_SYM_SCALE);
                     stormFixRing3D.scale.set(k, 1, k);
-                }
-            }
-            // The current storm fix's arms turn cyclonically, the same as the 2D layer's.
-            if (_stormArmMeshes.length) {
-                const spin = (performance.now() / 12000) * 2 * Math.PI;
-                for (let i = 0; i < _stormArmMeshes.length; i++) {
-                    const am = _stormArmMeshes[i];
-                    // +y turns counterclockwise seen from above, the northern-hemisphere sense
-                    am.mesh.rotation.y = (am.idx === currentStormFixIdx) ? (am.lat < 0 ? -spin : spin) : 0;
+                    // outer radius 0.76, so the ring needs a proportionally larger lift than the glyphs
+                    stormFixRing3D.position.y = STORM_LAYER_Y + 0.76 * k * Math.sin(STORM_SYM_TILT);
+                    _stormQYaw.setFromAxisAngle(_stormAxisY, Math.atan2(cp.x - stormFixRing3D.position.x, cp.z - stormFixRing3D.position.z));
+                    stormFixRing3D.quaternion.copy(_stormQYaw).multiply(_stormQTilt);
                 }
             }
             // country labels: sit at the nearest coastline point to the plane, only while that coast is in

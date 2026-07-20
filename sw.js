@@ -5,7 +5,7 @@
 // CACHE_VERSION keeps the '?v=' shape so the same sed in .github/workflows/static.yml that
 // stamps index.html's cache-busters rewrites it to the deploy's commit SHA: every deploy
 // installs a fresh cache, and activate() deletes the previous one.
-const CACHE_VERSION = '?v=20260717b';
+const CACHE_VERSION = '?v=20260720h';
 const CACHE_NAME = 'aoc-viz-' + CACHE_VERSION.replace(/[^0-9A-Za-z._-]/g, '');
 
 // Every same-origin file the app needs at runtime. Fetches are matched with ignoreSearch, so the
@@ -43,6 +43,7 @@ const PRECACHE = [
     'js/07-ui-controls.js',
     'js/07b-plane-models.js',
     'js/07c-terrain.js',
+    'js/07d-tdr.js',
     'js/08-ocr-lock-export.js',
     'js/09-interaction.js',
     'js/10-point-analysis.js',

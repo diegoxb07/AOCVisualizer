@@ -100,6 +100,7 @@ in `js/02-satellite.js`.)
 | **Record Clip** | Yes | Yes |
 | **MODIS / VIIRS** satellite overlays (NASA GIBS) | Yes | Needs GIBS, independent of the recon-api |
 | **GOES-East / GOES-West** archive imagery | Yes | No (disabled, "API Offline") |
+| **TDR radar overlays** (2D layers and 3D columns) | Yes | No for new analyses and cross-sections; already-fetched ones keep showing |
 | **Storm best-track** overlay | Yes (comes with archive load) | No for new loads; an already-loaded track stays until reset |
 | **Batch satellite pre-cache** (GOES) | Yes | No (GOES disabled) |
 | Imagery already in the **local cache** | Yes | Yes (served from cache, no fetch) |
@@ -153,6 +154,7 @@ All under `RECON_API_BASE` (defined in `js/02-satellite.js`, currently `https://
 | `GET /v1/recon/*`, `GET /v1/storms/*` | Archive catalog: years, storms, missions, and best-tracks. |
 | `GET /v1/recon/mission/{id}` | Mission metadata plus a 0.2 Hz-decimated track (the fallback path). |
 | `GET /v1/recon/mission/{id}/download` | Streams the **full-resolution** mission NetCDF (CORS-open; the primary archive load path). |
+| `GET /v1/tdr/mission/{id}`, `/v1/tdr/volume`, `/v1/tdr/plane_slice` | Tail Doppler Radar coverage, full reflectivity volumes for the radar overlays, and vertical cross-sections. |
 
 > The API is the source of truth for available satellite products. New bands and composites need
 > **no** client change; they appear in the picker on the next `products` fetch. Check the API repo

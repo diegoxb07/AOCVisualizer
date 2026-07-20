@@ -198,6 +198,8 @@
         allParsedData.forEach(row => { Object.keys(METRIC_DEFS).forEach(k => { if (row[k] !== null && row[k] !== undefined && !isNaN(row[k])) availableMetrics.add(k); }); });
 
         updateMissionHeader();
+        // TDR coverage probe for the new flight (js/07d-tdr.js); resets the previous overlay itself.
+        if (typeof initTdrForFlight === 'function') initTdrForFlight();
 
         ['startTimeInput', 'endTimeInput', 'playPauseBtn', 'exportClipBtn'].forEach(id => document.getElementById(id).disabled = false);
         document.getElementById('startTimeInput').value = allParsedData[0].time;

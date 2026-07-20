@@ -195,6 +195,7 @@
         const skipStatic = skipCharts && idx === _lastStaticIdx;
 
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(idx, visualRow); else update3DFrame(idx, visualRow);
+        if (typeof updateTdr3D === 'function') updateTdr3D(currentRow.absSeconds);
         if (!skipStatic) renderHUD(currentRow);
 
         if (document.getElementById('togglePfd').checked) renderPFD(visualRow);

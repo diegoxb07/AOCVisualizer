@@ -417,8 +417,31 @@
             }
             bgCtx.restore();
         };
+        // TDR 2D overlay: the picker's composited altitude layers for the current analysis,
+        // above imagery and basemap, below the airfield codes. Same source-crop guard as the
+        // satellite path, since a deep zoom otherwise overflows the rasterizer.
+        const drawTdr2D = () => {
+            if (typeof tdr2DImage === 'undefined' || !tdr2DImage || !tdr2DBox) return;
+            bgCtx.globalAlpha = (typeof tdr2DOpacity !== 'undefined') ? tdr2DOpacity : 0.85;
+            const tMinLon = wrapLon(tdr2DBox.minLon), tMaxLon = wrapLon(tdr2DBox.maxLon);
+            if (clipBox && tMinLon < tMaxLon) {
+                const iMinLon = Math.max(tMinLon, clipBox.minLon), iMaxLon = Math.min(tMaxLon, clipBox.maxLon);
+                const iMinLat = Math.max(tdr2DBox.minLat, clipBox.minLat), iMaxLat = Math.min(tdr2DBox.maxLat, clipBox.maxLat);
+                if (iMinLon < iMaxLon && iMinLat < iMaxLat) {
+                    const fw = tdr2DImage.width / (tMaxLon - tMinLon), fh = tdr2DImage.height / (tdr2DBox.maxLat - tdr2DBox.minLat);
+                    bgCtx.drawImage(tdr2DImage,
+                        (iMinLon - tMinLon) * fw, (tdr2DBox.maxLat - iMaxLat) * fh, (iMaxLon - iMinLon) * fw, (iMaxLat - iMinLat) * fh,
+                        xOf(iMinLon), getY(iMaxLat), xOf(iMaxLon) - xOf(iMinLon), getY(iMinLat) - getY(iMaxLat));
+                }
+            } else {
+                const dx = getX(tdr2DBox.minLon), dy = getY(tdr2DBox.maxLat), dw = getX(tdr2DBox.maxLon) - getX(tdr2DBox.minLon), dh = getY(tdr2DBox.minLat) - getY(tdr2DBox.maxLat);
+                bgCtx.drawImage(tdr2DImage, dx, dy, dw, dh);
+            }
+            bgCtx.globalAlpha = 1.0;
+        };
         if (satHidesBasemap) { drawLandFeatures(); drawSatImage(); }
         else { if (hasSatImage) drawSatImage(); drawLandFeatures(); }
+        drawTdr2D();
         drawAirports();
         bgCtx.restore(); bgNeedsUpdate = false;
     }
@@ -674,9 +697,10 @@
             ctx.restore();
 
             // On-canvas button: ✓ to finish the active shape (any type, once 2+ points exist). Deletion is via the Clear button.
+            // Anchored just above the LAST dropped point, so finishing never needs a long mouse trip.
             if (isActiveShape && isMeasuring && pts.length >= 2) {
-                const bb = shapeScreenBBox(type, pts);
-                const fx = (bb.minX + bb.maxX) / 2; const fy = bb.minY - 16;
+                const lp = toScreenPt(pts[pts.length - 1].lon, pts[pts.length - 1].lat);
+                const fx = lp.x; const fy = lp.y - 26;
                 drawCanvasButton('finish', -1, fx, fy, '✓', '#0284c7');
                 // "Click ... to finish" caption around the checkmark.
                 ctx.save(); ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = 'bold 11px sans-serif'; ctx.textBaseline = 'middle';

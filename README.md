@@ -61,7 +61,7 @@ flowchart TD
 
 | Use case | What the tool gives you |
 | --- | --- |
-| **Training** | Replay a real mission at any speed, scrub to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs, with the MMR video synced alongside. Clips can be recorded ahead of time for presentations. |
+| **Training** | Replay a real mission at any speed, slide to any moment, and watch the aircraft state (attitude, winds, altitude, speeds) change live on the map, PFD, and graphs, with the MMR video synced alongside. Clips can be recorded ahead of time for presentations. |
 | **Replay / analysis** | Load flight-level data or pull a whole mission from the archive, trim to a time window, color the track by wind speed or temperature, drop measurement shapes, run point analyses, overlay satellite imagery for the flight's date, and record annotated clips. |
 | **API-backed workflow** | The built-in **Recon Archive** browser (Year → Storm → Flight) loads full-resolution mission NetCDF and the storm's whole-life best-track automatically, and archive **GOES** imagery is rendered on demand for the historical dates these flights fall on. |
 
@@ -94,10 +94,10 @@ All playback lives in the sticky bottom bar:
 | **`Play` / `Pause`** | Start and stop. |
 | **`« / 1x / »`** | Playback speed. |
 | **`↻ Reset`** | Jump back to the start of the window. |
-| **Timeline slider** | Scrub anywhere; the UTC readout updates live. |
+| **Timeline slider** | Slide to any moment; the UTC readout updates live. |
 | **8Hz Smoothing** (map header) | Interpolates between the native 1-second samples so motion is fluid instead of stepping. |
 
-Keyboard: **Space** plays and pauses, **← / →** scrub (hold to accelerate), and **Shift + ← / →** jump 10 flight-minutes. Display preferences (units, tracker mode, track and barb colors, PFD, smoothing) are remembered between sessions.
+Keyboard: **Space** plays and pauses, **← / →** slide through the timeline (hold to accelerate), and **Shift + ← / →** jump 10 flight-minutes. Display preferences (units, tracker mode, track and barb colors, PFD, smoothing) are remembered between sessions.
 
 If an MMR video is loaded, the video clock drives playback and the telemetry follows it. Otherwise the engine advances on its own clock.
 

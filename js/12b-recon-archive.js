@@ -352,6 +352,16 @@
             d.textContent = text;
             return d;
         }
+        // SEB-archive reminder appended to empty search results: a missing mission usually means
+        // the flight hasn't been filed to the SEB Archive yet (can lag a day), not a bad query.
+        function sebHintRow() {
+            const d = document.createElement('div');
+            d.className = 'px-2.5 py-1.5 bg-panel';
+            d.style.cssText = 'color:var(--warn);display:flex;align-items:center;gap:6px;font-size:10.5px;line-height:1.35;';
+            d.innerHTML = '<span aria-hidden="true" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border:1.5px solid var(--warn);border-radius:50%;font-size:9px;font-weight:700;">?</span>' +
+                '<span>Can\'t find the mission you\'re looking for? Check if the flight has been put onto the SEB Archive (may take up to a day to populate; remember you can always manually upload it above).</span>';
+            return d;
+        }
         function missionRow(m, primary) {
             const b = document.createElement('button');
             b.type = 'button';
@@ -407,6 +417,7 @@
             if (!hits.length) {
                 out.appendChild(noteRow((lead ? lead + ' No storms with that name in any other year either.'
                     : 'No storms named "' + raw + '" in any year. Add a year or a mission id to search flights.')));
+                out.appendChild(sebHintRow());
                 renderRows(out);
                 return;
             }
@@ -471,6 +482,7 @@
                     return;
                 }
                 out.appendChild(noteRow('No missions match in ' + years.join(', ') + '.'));
+                out.appendChild(sebHintRow());
             }
             else if (matches.length > CAP) out.appendChild(noteRow('Showing ' + CAP + ' of ' + matches.length + '; refine the search to narrow it.'));
             renderRows(out);
@@ -894,6 +906,9 @@
     // Startup: list what the store already holds as light stubs (newest flight first, matching
     // the picker's order); rows stay on disk until opened.
     missionStoreReady.then(() => {
+        // Seed the picker's label/disabled state up front: with nothing to rehydrate the callbacks
+        // below never fire, and the empty store must still read "(no already loaded missions)".
+        updatePreloadedSelect();
         if (!missionDB) return;
         try {
             const rq = missionDB.transaction('meta').objectStore('meta').getAll();
@@ -951,7 +966,8 @@
         if (btn) btn.disabled = preloadedMissions.size === 0;
         if (lbl) {
             const rec = loadedPickerSelectedId ? preloadedMissions.get(loadedPickerSelectedId) : null;
-            lbl.textContent = rec ? loadedPickerRowLabel(loadedPickerSelectedId, rec) : 'Previously Loaded Missions…';
+            lbl.textContent = rec ? loadedPickerRowLabel(loadedPickerSelectedId, rec)
+                : (preloadedMissions.size === 0 ? '(no already loaded missions)' : 'Previously Loaded Missions…');
         }
         renderLoadedPickerPanel();
     }

@@ -320,8 +320,6 @@
         const reconMissionSelect = document.getElementById('reconMissionSelect');
         const reconStormSelect = document.getElementById('reconStormSelect');
         const reconYearSelect = document.getElementById('reconYearSelect');
-        const loadFlightDataGroup = document.getElementById('loadFlightDataGroup');
-        const loadFlightDataLabel = document.getElementById('loadFlightDataLabel');
         const uploadZone = document.getElementById('dataDropZone');
         const uploadLabel = document.getElementById('dataDropLabel');
         const uploadApiOfflineToastWrapper = document.getElementById('uploadApiOfflineToastWrapper');
@@ -336,12 +334,16 @@
             reconBtn.disabled = apiDown || (reconMissionSelect ? !reconMissionSelect.value : false);
             reconBtn.title = apiDown ? 'Archive flight loading is unavailable while the API is offline' : reconBtn.dataset.defaultTitle;
         }
-        if (loadFlightDataGroup) {
-            loadFlightDataGroup.classList.toggle('opacity-70', apiDown);
-        }
-        if (loadFlightDataLabel) {
-            loadFlightDataLabel.classList.toggle('text-accent', !apiDown);
-            loadFlightDataLabel.classList.toggle('text-faint', apiDown);
+        // The "Load a Mission" header deliberately keeps its accent color and full opacity while
+        // the API is down: loading a mission still works fine offline (manual upload and the
+        // previously-loaded list), so the header must not read as disabled.
+        // The static SEB-archive hint invites a search, which is disabled while the API is down;
+        // grey its yellow (text and circled ? alike, via the filter) with the rest of the block.
+        const sebHint = document.getElementById('sebArchiveHint');
+        if (sebHint) {
+            sebHint.classList.toggle('grayscale', apiDown);
+            sebHint.classList.toggle('saturate-0', apiDown);
+            sebHint.classList.toggle('opacity-60', apiDown);
         }
         [reconYearSelect, reconStormSelect, reconMissionSelect].forEach(sel => {
             if (!sel) return;
@@ -570,7 +572,7 @@
                     const fmtDate = new Date(midMs);
                     const hh = String(fmtDate.getUTCHours()).padStart(2, '0');
                     const mm = String(fmtDate.getUTCMinutes()).padStart(2, '0');
-                    // "(Daily)" so the time does not read like a GOES-style scan you can scrub
+                    // "(Daily)" so the time does not read like a GOES-style scan you can slide through
                     // through: a polar orbiter gives this one overpass for the whole day.
                     // The no-granule branch below already says "Daily" on its own.
                     opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z] (Daily)`;
@@ -1339,7 +1341,7 @@
         }
         satUnavailableNote = null;
 
-        // Warm the buckets around the playhead in the background so scrubbing stays smooth.
+        // Warm the buckets around the playhead in the background so sliding stays smooth.
         // bboxSupported is read from the /products discovery endpoint (bands and composites both
         // report it); a false there means a genuinely full-disk-only product, none current.
         const bboxSupported = bandObj.bboxSupported !== false;
@@ -1361,7 +1363,7 @@
             center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite };
 
         // Already decoded in the HOT cache? Re-show it INSTANTLY, no network, no decode, no debounce.
-        // This is what makes scrubbing across preloaded buckets smooth.
+        // This is what makes sliding across preloaded buckets smooth.
         const cached = satCacheGet(fetchId);
         if (cached) { applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
 
@@ -1373,7 +1375,7 @@
             return;
         }
 
-        // True cold miss: fetch from the API (deduped, then cached). Debounced so rapid scrubbing doesn't
+        // True cold miss: fetch from the API (deduped, then cached). Debounced so rapid sliding doesn't
         // fire a display fetch for every bucket it flies past, only the one it settles on.
         clearTimeout(satDebounceTimer);
         satDebounceTimer = setTimeout(async () => {

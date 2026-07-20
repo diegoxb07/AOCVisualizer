@@ -191,7 +191,7 @@
 
         // The HUD, storm badge, and chart playheads depend only on idx, so the 8Hz sub-sample
         // ticks (skipCharts=true, same idx) skip rebuilding them; any idx change or full update
-        // (unit toggle, marker add, scrub) still redraws everything.
+        // (unit toggle, marker add, slide) still redraws everything.
         const skipStatic = skipCharts && idx === _lastStaticIdx;
 
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(idx, visualRow); else update3DFrame(idx, visualRow);

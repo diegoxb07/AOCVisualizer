@@ -91,7 +91,7 @@ in `js/02-satellite.js`.)
 | --- | --- | --- |
 | **Archive browser** (Year, Storm, Flight load) | Yes | No (disabled, "API Offline") |
 | **Manual upload** (`.nc`, also `.txt`) | Yes | Yes |
-| Replay: play/pause, speed, scrub, 8 Hz smoothing | Yes | Yes |
+| Replay: play/pause, speed, timeline sliding, 8 Hz smoothing | Yes | Yes |
 | Map tracker (2D & 3D), track/barb colouring, markers | Yes | Yes |
 | Charts plus "Create Your Own Graph" | Yes | Yes |
 | PFD / HUD, units toggle | Yes | Yes |

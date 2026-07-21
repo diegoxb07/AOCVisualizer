@@ -456,12 +456,36 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .help-body b, .help-body strong { color: var(--text); font-weight: 600; }
 .help-body a { color: var(--accent); text-decoration: underline; }
 .help-body kbd { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text); white-space: nowrap; }
-/* TDR picker: the level column plus its action row; the panel shell and opacity row reuse the
-   sat-picker classes so the two dropdowns read as siblings. */
+/* TDR workspace sidebar: docked over the pinned tracker's left edge while TDR mode is up.
+   Below the sticky bottom bar (z-2000) and above the canvas overlays. */
+.tdr-mode-bar { position: absolute; left: 14px; top: 64px; width: 244px; max-height: calc(100vh - 200px); z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: color-mix(in oklab, var(--panel) 96%, transparent); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
+.tdr-mode-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.tdr-mode-head button { background: transparent; border: none; color: var(--text-faint); font-size: 16px; cursor: pointer; line-height: 1; }
+.tdr-mode-head button:hover { color: var(--text); }
+.tdr-mode-bar .tdr-level-hero { flex: 0 1 auto; max-height: 38vh; overflow-y: auto; }
+/* TDR workspace: the left edge belongs to the sidebar, so the info stack keeps top-right, the
+   HUD box moves bottom-right beside the PFD, and the fullscreen buttons hide like in the other
+   pinned modals. */
+html.pref-tracker-3d #mapPanel.tdr-mode:is(:fullscreen, .fake-fs) #mapInfoStack { left: auto; right: 16px; top: 18px; align-items: flex-end; text-align: right; transform-origin: top right; }
+/* TDR mode hides the 2D/scale filter toggles that make no sense inside the radar workspace. */
+html:has(#mapPanel.tdr-mode) label:has(#toggleRealScale), html:has(#mapPanel.tdr-mode) label:has(#simpleTrackerIcon) { display: none; }
+/* With those two hidden, the remaining filters (Cockpit PFD + its child, S.I Units) stack in
+   one column so the bottom bar's filter block stays narrow while the workspace is up. */
+html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !important; }
+#mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; bottom: 440px; align-items: flex-end; transform-origin: bottom right; }
+#mapPanel.tdr-mode #fullscreenMapBtn { display: none; }
+/* While the workspace waits for its first volume, both HUDs grey out with the skeleton. */
+#mapPanel.tdr-loading #mapInfoStack, #mapPanel.tdr-loading .overlays-wrapper { filter: grayscale(1) opacity(0.45); transition: filter 0.2s; }
+
+/* TDR level column plus its action row. */
 .tdr-hero-actions { display: flex; gap: 6px; margin: 8px 0 2px; }
 .tdr-hero-actions button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 3px 10px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-hero-actions button:hover { color: var(--accent); border-color: var(--accent); }
 .tdr-hero-note-top { font-size: 10px; color: var(--text-faint); margin: 6px 0 4px; line-height: 1.35; }
+.tdr-leg-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.tdr-leg-row button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; font-weight: 600; border-radius: 4px; padding: 2px 8px; cursor: pointer; transition: color .12s, border-color .12s; }
+.tdr-leg-row button:hover { color: var(--accent); border-color: var(--accent); }
+.tdr-leg-row button.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
 .tdr-level-hero { display: flex; flex-direction: column; gap: 2px; max-height: 44vh; overflow-y: auto; }
 .tdr-level-row { display: flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-strip); color: var(--text-muted); font-size: 10.5px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-level-row:hover { color: var(--text); border-color: var(--accent); }
@@ -470,6 +494,14 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .tdr-level-ft { min-width: 88px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; }
 .tdr-level-bar { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--accent) 30%, transparent); }
 .tdr-hero-note { font-size: 10.5px; color: var(--text-faint); padding: 6px 2px; }
+/* Skeleton cover while the TDR workspace waits for its first volume (a few seconds per leg). */
+.tdr-skel-cover { position: absolute; inset: 0; z-index: 55; display: flex; align-items: center; justify-content: center; background: color-mix(in oklab, var(--bg) 72%, transparent); }
+.tdr-skel-box { display: flex; flex-direction: column; gap: 10px; width: 260px; }
+.tdr-skel-bar { height: 14px; border-radius: 4px; background: color-mix(in oklab, var(--text-faint) 25%, transparent); animation: tdrskel 1.2s ease-in-out infinite; }
+.tdr-skel-bar:nth-child(2) { animation-delay: 0.15s; width: 80%; }
+.tdr-skel-bar:nth-child(3) { animation-delay: 0.3s; width: 60%; }
+.tdr-skel-text { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+@keyframes tdrskel { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
 /* band rows while the first radar volume downloads: dimmed, inert, spinner instead of the bar */
 .tdr-level-row.loading { cursor: default; opacity: 0.55; }
 .tdr-level-row.loading:hover { color: var(--text-muted); border-color: var(--border); }
@@ -517,6 +549,12 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
    would also span the 4px vertical padding and protrude past the checkbox grid. */
 #cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 8px; padding: 4px 0 4px 10px; border-left: none !important; position: relative; }
 #cmdFiltersGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
+/* Record Clip / Share Link: stacked pair to the right of the filters, same separator treatment,
+   both buttons sized so the pair matches the filter block's height. */
+#cmdClipShareGroup { order: 1; padding: 4px 0 4px 10px; border-left: none !important; position: relative; }
+#cmdClipShareGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
+#cmdClipShareGroup > .cmd-row { flex-direction: column; align-items: stretch; gap: 4px !important; }
+.sticky-bottom-bar #cmdClipShareGroup button { height: 21px !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: 10px !important; }
 /* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
    in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
    reflowing the other filters. */

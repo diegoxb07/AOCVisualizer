@@ -423,6 +423,7 @@
         const drawTdr2D = () => {
             if (typeof tdr2DImage === 'undefined' || !tdr2DImage || !tdr2DBox) return;
             bgCtx.globalAlpha = (typeof tdr2DOpacity !== 'undefined') ? tdr2DOpacity : 0.85;
+            bgCtx.imageSmoothingEnabled = false;   // 2 km radar cells stay crisp cells, not smears
             const tMinLon = wrapLon(tdr2DBox.minLon), tMaxLon = wrapLon(tdr2DBox.maxLon);
             if (clipBox && tMinLon < tMaxLon) {
                 const iMinLon = Math.max(tMinLon, clipBox.minLon), iMaxLon = Math.min(tMaxLon, clipBox.maxLon);
@@ -437,6 +438,7 @@
                 const dx = getX(tdr2DBox.minLon), dy = getY(tdr2DBox.maxLat), dw = getX(tdr2DBox.maxLon) - getX(tdr2DBox.minLon), dh = getY(tdr2DBox.minLat) - getY(tdr2DBox.maxLat);
                 bgCtx.drawImage(tdr2DImage, dx, dy, dw, dh);
             }
+            bgCtx.imageSmoothingEnabled = true;
             bgCtx.globalAlpha = 1.0;
         };
         if (satHidesBasemap) { drawLandFeatures(); drawSatImage(); }
@@ -717,6 +719,9 @@
         measureButtons = [];
         drawnShapes.forEach((shape, i) => drawShapeGeometry(shape.type, shape.points, false, i, i === hoveredShapeIndex));
         if (measurePointsGeo.length > 0) drawShapeGeometry(measureShape, measurePointsGeo, true, -1, false);
+        // TDR cross-section pick feedback (endpoint dots + dashed line, js/07d-tdr.js), drawn in
+        // the same map-transformed space as the measure shapes.
+        if (typeof drawTdrSliceOverlay === 'function') drawTdrSliceOverlay();
 
         ctx.restore();
         // Every repaint re-arms the spin, so pausing, loading a storm, or switching back to 2D picks

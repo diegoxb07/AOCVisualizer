@@ -23,6 +23,7 @@
     document.getElementById('videoInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
         markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
+        if (typeof ocrResetWatchdog === 'function') ocrResetWatchdog();   // fresh video, fresh 30 s no-lock clock
         video.src = URL.createObjectURL(e.target.files[0]); document.getElementById('videoPlaceholder').style.display = 'none'; videoLoaded = true;
         // First video of the session: start pulling the ~12 MB OCR engine, which loads on demand. Not
         // awaited, the video is usable meanwhile; evaluateAutoSyncDefault below flips on Auto and
@@ -60,7 +61,16 @@
             isNcFile = isNc; if (videoLoaded) videoSyncMode.disabled = false;
             const reader = new FileReader();
             reader.onload = (evt) => {
-                parseEntireFile(evt.target.result).catch(err => {
+                // Parse and apply in two steps (rather than parseEntireFile) so the parsed rows
+                // are in hand to register the upload in the previously-loaded list afterward.
+                parseFlightSource(evt.target.result).then(parsed => {
+                    applyParsedFlight(parsed);
+                    // An uploaded flight is not an archive mission: it joins the previously-loaded
+                    // list like a preload-modal upload, and the archive cascade goes back to blank
+                    // so the pickers never claim it came from the archive.
+                    if (typeof registerUploadedFlight === 'function') registerUploadedFlight(fName, parsed, isNc);
+                    if (typeof resetArchiveCascade === 'function') resetArchiveCascade();
+                }).catch(err => {
                     hideLoadingOverlay();
                     showToast('Could not load ' + fName + ': ' + err.message, 10000);
                 });
@@ -81,6 +91,7 @@
         try { URL.revokeObjectURL(video.src); } catch (e) {}
         video.removeAttribute('src'); video.load();
         videoLoaded = false;
+        if (typeof ocrResetWatchdog === 'function') ocrResetWatchdog();
         document.getElementById('videoPlaceholder').style.display = '';
         document.getElementById('videoInput').value = '';
         resetDropZone('videoDropZone', 'videoDropLabel', 'Choose File/Drag & Drop');

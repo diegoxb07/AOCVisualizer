@@ -52,6 +52,43 @@
         el.classList.toggle('show', !!(warming || hunting));
     }
 
+    // --- Shared frame capture for both OCR paths ---------------------------------------------
+    // MMR exports differ: the burned-in clock is usually bottom-right, but compiled and cropped
+    // videos move it (often near the center) and aspect ratios vary, so the WHOLE frame is
+    // captured at native resolution and the sync logic picks the candidate time that advances
+    // with the video clock. Grayscale always; the aggressive flag adds a hard threshold for
+    // low-contrast frames.
+    function ocrCaptureFullFrame(aggressive) {
+        const vw = video.videoWidth, vh = video.videoHeight;
+        if (!vw || !vh) return null;
+        if (!window.ocrCanvas) { window.ocrCanvas = document.createElement('canvas'); window.ocrCtx = window.ocrCanvas.getContext('2d', { willReadFrequently: true }); }
+        window.ocrCanvas.width = vw; window.ocrCanvas.height = vh;
+        window.ocrCtx.drawImage(video, 0, 0, vw, vh);
+        const imgData = window.ocrCtx.getImageData(0, 0, vw, vh); const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            let luma = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+            if (aggressive) luma = luma > 140 ? 255 : 0;
+            data[i] = data[i + 1] = data[i + 2] = luma;
+        }
+        window.ocrCtx.putImageData(imgData, 0, 0);
+        return window.ocrCanvas;
+    }
+
+    // --- 30-second no-lock watchdog ------------------------------------------------------------
+    // Compiled nose-radar videos re-render the clock somewhere unusual (or too small) and
+    // routinely defeat the scan. Once 30 s pass after the first scan with no lock ever landing,
+    // say so once; a new video resets the clock.
+    let ocrHuntStartMs = 0, ocrEverLocked = false, ocrCompiledWarned = false;
+    function ocrNoteScanStart() { if (!ocrHuntStartMs) ocrHuntStartMs = performance.now(); }
+    function ocrNoteLock() { ocrEverLocked = true; }
+    function ocrResetWatchdog() { ocrHuntStartMs = 0; ocrEverLocked = false; ocrCompiledWarned = false; }
+    function ocrMaybeWarnCompiled() {
+        if (ocrEverLocked || ocrCompiledWarned || !ocrHuntStartMs) return;
+        if (performance.now() - ocrHuntStartMs < 30000) return;
+        ocrCompiledWarned = true;
+        showToast('Auto-Sync has not found the MMR clock after 30 seconds of trying. Upload only the MMR video, not the nose-radar compiled video: compiled videos place the clock somewhere unusual and often cannot sync. Manual Time Input also works.', 14000);
+    }
+
     // Inverse of markDropZoneLoaded: returns a drop zone to its dashed waiting state.
     function resetDropZone(zoneId, labelId, text) {
         const zone = document.getElementById(zoneId);

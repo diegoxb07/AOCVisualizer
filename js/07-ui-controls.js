@@ -39,9 +39,9 @@
         const endEl = document.getElementById('endTimeInput');
         if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
         if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
-        // The time inputs only exist for manual syncing; everywhere else the window and offset
-        // come from the data and the video clock, so the fields stay out of the header.
-        document.querySelectorAll('.manual-sync-field').forEach(el => { el.style.display = isAuto ? 'none' : ''; });
+        // The time inputs live in the Manual Time Input modal (#manualSyncModal); the dropdown's
+        // change handler pops it open, and leaving manual mode closes it.
+        if (isAuto) { const m = document.getElementById('manualSyncModal'); if (m) m.style.display = 'none'; }
     }
 
     function evaluateAutoSyncDefault() {
@@ -870,6 +870,9 @@
         const d = visualRow || filteredData[idx];
         const pos = get3DCoord(d.lon, d.lat, track3DAltMeters(d));
         planeGroup3D.position.copy(pos);
+        // Reset All hides the plane and arrows; a placed frame means a flight is loaded again,
+        // so un-hide here rather than relying on every load path to remember to.
+        if (!planeGroup3D.visible) { planeGroup3D.visible = true; if (trackArrow3D) trackArrow3D.visible = true; }
         // keep the world-vertical streaks on the plane and sized to it; animate3D streams/fades them.
         _vertBump = vertBump(idx);
         ensureWindStreaks();
@@ -1226,8 +1229,11 @@
     document.getElementById('toggleGpsAlt').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '3d') build3DScene(); updateVisualComponents(currentIdx); } });
     
     videoSyncMode.addEventListener('change', (e) => {
-        if (e.target.value === 'auto') { ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; } 
-        else { ocrIndicator.style.display = 'none'; if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none'; }
+        if (e.target.value === 'auto') { ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; }
+        else {
+            ocrIndicator.style.display = 'none'; if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none';
+            const m = document.getElementById('manualSyncModal'); if (m) m.style.display = 'flex';
+        }
         applySyncModeLock();
         refreshSyncingIndicator();  // hide the badge immediately when leaving Auto-Sync
     });

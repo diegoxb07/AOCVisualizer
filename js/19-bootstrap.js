@@ -1226,7 +1226,8 @@
        Restoring dispatches 'change' so each control's normal handler runs; all of them
        no-op safely when no flight is loaded yet. */
     (function persistDisplayPrefs() {
-        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'toggleRealScale', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
+        // toggleRealScale is deliberately absent: Real Scale always starts off, never remembered.
+        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
         try {
             const saved = JSON.parse(localStorage.getItem(KEY) || '{}');

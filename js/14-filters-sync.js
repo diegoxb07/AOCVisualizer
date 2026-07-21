@@ -46,23 +46,14 @@
 
         if (mode === 'auto' && ocrAvailable && ocrWorker && !isOcrRunning && forceOcrSyncNextTick && (now - lastOcrTime > 500 || lastOcrTime === 0)) {
             isOcrRunning = true; lastOcrTime = now; refreshSyncingIndicator();
-            if (!window.ocrCanvas) { window.ocrCanvas = document.createElement('canvas'); window.ocrCtx = window.ocrCanvas.getContext('2d', { willReadFrequently: true }); }
-            
-            const vw = video.videoWidth, vh = video.videoHeight;
-            if (vw > 0 && vh > 0 && ocrWorker) {
-                const scanW = vw, scanH = vh * 0.40;
-                window.ocrCanvas.width = scanW; window.ocrCanvas.height = scanH;
-                window.ocrCtx.fillStyle = "black"; window.ocrCtx.fillRect(0, 0, scanW, scanH);
-                
-                window.ocrCtx.drawImage(video, 0, 0, vw, vh * 0.15, 0, 0, scanW, vh * 0.15);
-                window.ocrCtx.drawImage(video, 0, vh * 0.75, vw, vh * 0.25, 0, vh * 0.15, scanW, vh * 0.25);
-                
-                const imgData = window.ocrCtx.getImageData(0, 0, scanW, scanH); const data = imgData.data;
-                for(let i = 0; i < data.length; i += 4) { let avg = data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114; data[i] = data[i+1] = data[i+2] = avg; }
-                window.ocrCtx.putImageData(imgData, 0, 0);
-
+            ocrNoteScanStart();
+            // Whole frame, native resolution (ocrCaptureFullFrame in js/06-ocr.js): the clock can
+            // sit anywhere depending on the export, and the drift-hunt below already keys on the
+            // candidate that advances with the video clock.
+            const cv = ocrCaptureFullFrame(false);
+            if (cv && ocrWorker) {
                 try {
-                    const { data: { text } } = await ocrWorker.recognize(window.ocrCanvas);
+                    const { data: { text } } = await ocrWorker.recognize(cv);
                     let cleanText = text.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').replace(/[Z]/g, '2').replace(/[S]/g, '5').replace(/[,;.]/g, ':');
                     const timeRegex = /([0-2]?\d):([0-5]\d):([0-5]\d)/g;
                     let matches = [...cleanText.matchAll(timeRegex)], timeFoundAndVerified = false, currentVTime = video.currentTime;
@@ -88,9 +79,10 @@
                                     videoStartSeconds = dynamicBase;
 
                                     document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
-                                    flashAutoSyncLabel(); forceOcrSyncNextTick = false; isManualSyncRequest = false; updateEndWindowFromVideo(true); 
+                                    flashAutoSyncLabel(); forceOcrSyncNextTick = false; isManualSyncRequest = false; updateEndWindowFromVideo(true);
                                 } else { forceOcrSyncNextTick = false; isManualSyncRequest = false; }
-                                
+
+                                ocrNoteLock();
                                 timeFoundAndVerified = true; ocrHistory = []; break;
                             }
                         }
@@ -98,7 +90,7 @@
                         ocrHistory.push({ vTime: currentVTime, ocrSecs: ocrSecs });
                     }
                     ocrHistory = ocrHistory.filter(h => (currentVTime - h.vTime) <= 10.0);
-                } catch(e) { } finally { isOcrRunning = false; }
+                } catch(e) { } finally { isOcrRunning = false; ocrMaybeWarnCompiled(); }
             } else { isOcrRunning = false; }
         }
 

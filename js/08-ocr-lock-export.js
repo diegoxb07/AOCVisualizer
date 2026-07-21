@@ -14,99 +14,105 @@
         isOcrRunning = true;
         refreshSyncingIndicator();  // hunting for the timestamp frame
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
-        
+
         videoSyncMode.value = 'auto'; document.getElementById('ocrIndicator').style.display = 'block'; document.getElementById('videoStartInput').disabled = true;
         applySyncModeLock();
-        
-        if (!silent) showToast("Scanning frame at native resolution... Please wait.", 4000);
-        
-        if (!window.ocrCanvas) { window.ocrCanvas = document.createElement('canvas'); window.ocrCtx = window.ocrCanvas.getContext('2d', { willReadFrequently: true }); }
 
-        let attempts = 0; const maxAttempts = 4; const originalVideoTime = video.currentTime;
+        if (!silent) showToast("Scanning the frame for the MMR clock... Please wait.", 4000);
+        ocrNoteScanStart();
+
+        let attempts = 0; const maxAttempts = 6; const originalVideoTime = video.currentTime;
+        const seen = [];      // { vTime, secs: [candidates] } per attempt, for the moving-clock check
+        let fallback = null;  // first in-range candidate, taken at exhaustion if nothing confirmed moving
+
+        const finishFail = () => {
+            isOcrRunning = false; refreshSyncingIndicator();
+            video.currentTime = originalVideoTime;
+            if (wasPlaying) video.play().catch(e => {});
+            ocrMaybeWarnCompiled();
+            if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
+        };
+
+        const commitLock = (ocrSecs, atVTime) => {
+            isOcrRunning = false; refreshSyncingIndicator();
+            const currentGap = Math.abs(ocrSecs - (videoStartSeconds + atVTime));
+            if (gateGapSeconds != null && currentGap < gateGapSeconds) { if (wasPlaying) video.play().catch(e => {}); return; }
+
+            videoStartSeconds = ocrSecs - atVTime;
+            document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
+            flashAutoSyncLabel(); updateEndWindowFromVideo(true);
+
+            // If the video begins before any flight-level data exists, skip the intro:
+            // jump the playhead forward to the data's start time, then let the sync follow.
+            const hasTelemetry = allParsedData.length > 0;
+            const minSecs = hasTelemetry ? allParsedData[0].absSeconds : 0;
+            if (gateGapSeconds == null && hasTelemetry && videoStartSeconds < minSecs - 0.5) {
+                const skipTo = minSecs - videoStartSeconds;
+                if (skipTo > 0.1 && video.currentTime < skipTo && (!video.duration || skipTo < video.duration - 0.05)) {
+                    video.currentTime = skipTo;
+                    if (!silent) showToast("Video started before flight data, skipped ahead to data start.", 3500);
+                }
+            }
+
+            if (!silent) showToast("Sync Locked Successfully!", 2000);
+            ocrNoteLock();
+            ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
+            refreshSyncingIndicator();  // lock settled, clear the badge even when paused
+            if (wasPlaying) video.play().catch(e => {});
+        };
 
         async function attemptSync() {
             if (attempts >= maxAttempts) {
-                isOcrRunning = false; refreshSyncingIndicator();
-                video.currentTime = originalVideoTime;
-                if (wasPlaying) video.play().catch(e=>{});
-                if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000); return;
+                if (fallback) { commitLock(fallback.secs, fallback.vTime); return; }
+                finishFail(); return;
             }
 
-            attempts++; const vw = video.videoWidth; const vh = video.videoHeight;
-            if (vw === 0 || vh === 0) { attemptSync(); return; }
-
-            const scanW = vw; const scanH = vh * 0.40;
-            window.ocrCanvas.width = scanW; window.ocrCanvas.height = scanH;
-            window.ocrCtx.fillStyle = "black"; window.ocrCtx.fillRect(0, 0, scanW, scanH);
-            
-            window.ocrCtx.drawImage(video, 0, 0, vw, vh * 0.15, 0, 0, scanW, vh * 0.15);
-            window.ocrCtx.drawImage(video, 0, vh * 0.75, vw, vh * 0.25, 0, vh * 0.15, scanW, vh * 0.25);
-            
-            const imgData = window.ocrCtx.getImageData(0, 0, scanW, scanH); const data = imgData.data;
-            const isAggressive = (attempts % 2 === 0);
-            
-            for(let i = 0; i < data.length; i += 4) {
-                let luma = data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114;
-                if (isAggressive) { luma = luma > 140 ? 255 : 0; }
-                data[i] = data[i+1] = data[i+2] = luma;
-            }
-            window.ocrCtx.putImageData(imgData, 0, 0);
+            attempts++;
+            const cv = ocrCaptureFullFrame(attempts % 2 === 0);
+            if (!cv) { attemptSync(); return; }
 
             try {
-                const { data: { text } } = await ocrWorker.recognize(window.ocrCanvas);
-                let cleanText = text.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').replace(/[Z]/g, '2').replace(/[S]/g, '5').replace(/[,;.]/g, ':'); 
+                const { data: { text } } = await ocrWorker.recognize(cv);
+                let cleanText = text.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').replace(/[Z]/g, '2').replace(/[S]/g, '5').replace(/[,;.]/g, ':');
                 const timeRegex = /([0-2]?\d):([0-5]\d):([0-5]\d)/g;
-                let matches = [...cleanText.matchAll(timeRegex)]; let validLock = false;
-                
-                if (matches.length > 0) {
-                    const hasTelemetry = allParsedData.length > 0;
-                    const minSecs = hasTelemetry ? allParsedData[0].absSeconds : 0;
-                    const maxSecs = hasTelemetry ? allParsedData[allParsedData.length - 1].absSeconds : 0;
+                const matches = [...cleanText.matchAll(timeRegex)];
+                const hasTelemetry = allParsedData.length > 0;
+                const minSecs = hasTelemetry ? allParsedData[0].absSeconds : 0;
+                const maxSecs = hasTelemetry ? allParsedData[allParsedData.length - 1].absSeconds : 0;
+                const vNow = video.currentTime;
 
-                    for (const match of matches) {
-                        const h = parseInt(match[1], 10); const m = parseInt(match[2], 10); const s = parseInt(match[3], 10);
-                        let ocrSecs = h * 3600 + m * 60 + s;
-                        
-                        if (hasTelemetry) {
-                            if (minSecs > 43200 && ocrSecs < 43200 && maxSecs > 86400) ocrSecs += 86400;
-                            if (ocrSecs < minSecs - 14400 || ocrSecs > maxSecs + 14400) continue;
-                        }
-                        
-                        validLock = true; isOcrRunning = false; refreshSyncingIndicator();
-                        const currentGap = Math.abs(ocrSecs - (videoStartSeconds + video.currentTime));
-                        if (gateGapSeconds != null && currentGap < gateGapSeconds) {
-                            if (wasPlaying) video.play().catch(e=>{}); break;
-                        }
-
-                        const dynamicBase = ocrSecs - video.currentTime;
-                        videoStartSeconds = dynamicBase;
-
-                        document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
-                        flashAutoSyncLabel(); updateEndWindowFromVideo(true); 
-
-                        // If the video begins before any flight-level data exists, skip the intro:
-                        // jump the playhead forward to the data's start time, then let the sync follow.
-                        if (gateGapSeconds == null && hasTelemetry && videoStartSeconds < minSecs - 0.5) {
-                            const skipTo = minSecs - videoStartSeconds;
-                            if (skipTo > 0.1 && video.currentTime < skipTo && (!video.duration || skipTo < video.duration - 0.05)) {
-                                video.currentTime = skipTo;
-                                if (!silent) showToast("Video started before flight data, skipped ahead to data start.", 3500);
-                            }
-                        }
-
-                        if (!silent) showToast("Sync Locked Successfully!", 2000);
-                        
-                        ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
-                        refreshSyncingIndicator();  // lock settled, clear the badge even when paused
-                        if (wasPlaying) video.play().catch(e=>{});
-                        break;
+                const cands = [];
+                for (const match of matches) {
+                    const h = parseInt(match[1], 10); const m = parseInt(match[2], 10); const s = parseInt(match[3], 10);
+                    let ocrSecs = h * 3600 + m * 60 + s;
+                    if (hasTelemetry) {
+                        if (minSecs > 43200 && ocrSecs < 43200 && maxSecs > 86400) ocrSecs += 86400;
+                        if (ocrSecs < minSecs - 14400 || ocrSecs > maxSecs + 14400) continue;
                     }
+                    if (!cands.includes(ocrSecs)) cands.push(ocrSecs);
                 }
-                
-                if (!validLock) { video.currentTime += 0.5; video.addEventListener('seeked', attemptSync, { once: true }); }
+
+                if (cands.length) {
+                    if (!fallback) fallback = { secs: cands[0], vTime: vNow };
+                    // One plausible clock on screen: that is the MMR clock. Several (a compiled
+                    // video can burn in more than one time): only lock the one that ADVANCES with
+                    // the video clock across the stepped frames; a static number holds still.
+                    if (cands.length === 1 && seen.length === 0) { commitLock(cands[0], vNow); return; }
+                    for (const c of cands) {
+                        for (const past of seen) {
+                            const dv = vNow - past.vTime;
+                            if (dv < 1.5) continue;   // below this a real HH:MM:SS may legitimately not tick
+                            if (past.secs.some(p => Math.abs((c - p) - dv) <= 1.25)) { commitLock(c, vNow); return; }
+                        }
+                    }
+                    seen.push({ vTime: vNow, secs: cands });
+                }
+
+                video.currentTime += 0.5;
+                video.addEventListener('seeked', attemptSync, { once: true });
             } catch(e) { isOcrRunning = false; refreshSyncingIndicator(); if (wasPlaying) video.play().catch(e=>{}); }
         }
-        attemptSync(); 
+        attemptSync();
     }
 
     document.getElementById('forceSyncBtn').addEventListener('click', () => performImmediateOcrLock({ silent: false }));

@@ -972,6 +972,30 @@
         renderLoadedPickerPanel();
     }
 
+    // A flight uploaded through the main drop zone joins the previously-loaded list exactly like
+    // a preload-modal upload: keyed by base filename, saved on-device, no archive metadata.
+    function registerUploadedFlight(fileName, parsed, isNc) {
+        const id = fileName.replace(/\.(txt|nc)$/i, '');
+        const dm = id.match(/^(\d{4})(\d{2})(\d{2})([a-zA-Z])?/);
+        const tail = dm && dm[4] ? dm[4].toUpperCase() : '';
+        const aircraft = { H: 'NOAA42 (WP-3D Orion)', I: 'NOAA43 (WP-3D Orion)', N: 'NOAA49 (Gulfstream IV-SP)' }[tail] || '';
+        savePreloadedMission(id, {
+            mission: { mission_id: id, storm_name: '', flight_date: dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : '', aircraft },
+            parsed, isNc, storm: null, uploaded: true
+        });
+        updatePreloadedSelect(id);   // the fresh upload reads as the picker's active row
+    }
+
+    // Puts the archive Year -> Storm -> Flight cascade back to blank (the year change handler
+    // empties the downstream selects), so a manually uploaded flight never shows the archive
+    // pickers still sitting on some earlier mission.
+    function resetArchiveCascade() {
+        const yearSel = document.getElementById('reconYearSelect');
+        if (yearSel && yearSel.value) { yearSel.value = ''; yearSel.dispatchEvent(new Event('change')); }
+        const search = document.getElementById('missionSearchInput'); if (search) search.value = '';
+        setReconStatus('Pick a year to browse every archived hurricane-hunter mission.');
+    }
+
     function positionLoadedPicker() {
         const panel = document.getElementById('loadedPickerPanel'), btn = document.getElementById('loadedPickerBtn');
         if (!panel || !btn || panel.classList.contains('hidden')) return;

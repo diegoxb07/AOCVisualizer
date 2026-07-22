@@ -191,6 +191,14 @@
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.
         if (typeof resetSatPreload === 'function') resetSatPreload();
+        // The satellite preference does NOT carry over: a new mission starts with the picker on
+        // Off (a held-over layer/product would auto-rebuild its cache for the new flight
+        // unasked). The old flight's auto cache pass stops with it; a modal batch pass caches
+        // its own chosen flights and is left alone.
+        if (typeof batchCaching !== 'undefined' && batchCaching && batchCacheIsAuto && typeof cancelSatCachePass === 'function') cancelSatCachePass('Stopped');
+        const satSelReset = document.getElementById('satelliteSelect'); if (satSelReset) satSelReset.value = 'none';
+        const bandSelReset = document.getElementById('satBandSelect'); if (bandSelReset) bandSelReset.value = '';
+        satLoadedInfo = null; satImageBox = null;
         // Clear any storm best-track / archive-mission metadata from the previous flight, it's
         // re-set after this returns by loadReconMission for an archive load.
         stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;

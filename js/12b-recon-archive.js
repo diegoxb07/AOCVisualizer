@@ -729,6 +729,27 @@
         return { point: stormTrackPoints[bestIdx], idx: bestIdx, diffMs: bestDiff };
     }
 
+    // Expected storm center at a moment: linear interpolation between the two best-track fixes
+    // bracketing that time, weighted by how far the clock sits from each observation. The fixes
+    // are ~6-hourly and the storm moves meaningfully between them, so this lands on where the
+    // center IS rather than where the nearest observation put it. Clamped to the track's ends.
+    function interpStormCenter(ms) {
+        if (!stormTrackPoints.length) return null;
+        const pts = stormTrackPoints;
+        if (ms <= pts[0].ms) return { lat: pts[0].lat, lon: pts[0].lon };
+        if (ms >= pts[pts.length - 1].ms) return { lat: pts[pts.length - 1].lat, lon: pts[pts.length - 1].lon };
+        for (let i = 1; i < pts.length; i++) {
+            if (ms <= pts[i].ms) {
+                const a = pts[i - 1], b = pts[i];
+                const f = (b.ms - a.ms) > 0 ? (ms - a.ms) / (b.ms - a.ms) : 0;
+                let dLon = b.lon - a.lon;   // short way round for a dateline-straddling pair
+                if (dLon > 180) dLon -= 360; else if (dLon < -180) dLon += 360;
+                return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + dLon * f };
+            }
+        }
+        return { lat: pts[pts.length - 1].lat, lon: pts[pts.length - 1].lon };
+    }
+
     // The fix the status card refers to; both trackers mark it with a discreet thin ring
     // (drawStormTrack2D in 2D, stormFixRing3D in 3D), kept in step with the card here.
     let currentStormFixIdx = -1;

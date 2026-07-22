@@ -35,8 +35,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260721c">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260721c">
+    <link rel="stylesheet" href="css/fonts.css?v=20260722za">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260722za">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260721c">
+    <link rel="stylesheet" href="css/app.css?v=20260722za">
 </head>
 <body class="font-sans antialiased">
 
@@ -247,7 +247,10 @@
                             </select>
                             <div id="measureCluster" class="relative flex items-center flex-none">
                                 <button id="measureBtn" class="px-1.5 py-0.5 bg-accent hover:bg-accent text-accent-ink text-[10px] rounded border border-accent transition-colors shadow-sm whitespace-nowrap" title="Measure distance / area">Measure</button>
-                                <div id="measureGroup" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-2 bg-[color-mix(in_oklab,var(--panel)_95%,transparent)] border border-hairline border-l-2 border-l-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
+                                <div id="measureGroup" class="hidden absolute right-0 top-full mt-2 z-30 items-center gap-2 bg-[color-mix(in_oklab,var(--panel)_95%,transparent)] border border-hairline border-l-2 border-l-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
+                                    <!-- The stop control lives here, not on the header button: the shape select's
+                                         native popup can cover the header, so stopping never depends on reaching it. -->
+                                    <button id="stopMeasureBtn" style="display:none" class="px-2 py-0.5 bg-danger hover:bg-danger text-white text-[11px] rounded border border-danger transition-colors shadow-sm whitespace-nowrap">Stop Measuring</button>
                                     <select id="measureShapeSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-0.5 text-[11px] outline-none cursor-pointer">
                                         <option value="polygon">Polygon</option>
                                         <option value="circle">Circle</option>
@@ -284,7 +287,8 @@
                                  loaded mission, reads "TDR Loading…" until data is usable, and opens the pinned
                                  radar workspace (js/07d-tdr.js enterTdrMode, sidebar #tdrModeBar). -->
                             <div id="tdrControlGroup" style="display:none;" class="relative gap-1 items-center flex-none">
-                                <button id="tdrPickerBtn" type="button" title="Open the Tail Doppler Radar workspace: a pinned 3D radar view with pressure-band layers and cross-sections" class="flex items-center gap-1 bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer transition-colors">
+                                <span id="tdrPickerSkel" style="display:none;" class="tdr-btn-skel" title="Checking the archive for Tail Doppler Radar…"></span>
+                                <button id="tdrPickerBtn" type="button" title="Open the Tail Doppler Radar workspace: a pinned radar view with pressure-band layers and cross-sections" class="flex items-center gap-1 bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer transition-colors">
                                     <span id="tdrPickerBtnLabel" class="truncate">TDR Mode</span>
                                 </button>
                             </div>
@@ -292,10 +296,6 @@
                     </div>
                     <!-- Cross-section picking hint, shown while the TDR slice tool waits for its two map clicks. -->
                     <div id="tdrSliceHint" style="display:none;position:absolute;top:46px;left:50%;transform:translateX(-50%);z-index:40;" class="px-4 py-1.5 rounded bg-panel border border-hairline text-[13px] text-white shadow-lg whitespace-nowrap"></div>
-                    <!-- Return path from the pinned-2D cross-section view to the radar workspace. -->
-                    <!-- Sits just above the recenter overlay's bottom-center spot, styled to match it
-                         (the recenter pill tops out ~78px above the panel bottom, so 90px clears it). -->
-                    <button id="tdrBackBtn" style="display:none;position:absolute;bottom:90px;left:50%;transform:translateX(-50%);z-index:2400;" class="px-2 py-1 bg-accent text-accent-ink border border-accent rounded text-[10px] font-semibold shadow-lg whitespace-nowrap">Back to 3D TDR</button>
                     <!-- Skeleton cover while the TDR workspace waits for its first radar volume. -->
                     <div id="tdrModeLoading" style="display:none;" class="tdr-skel-cover">
                         <div class="tdr-skel-box">
@@ -310,10 +310,14 @@
                     <div id="tdrModeBar" style="display:none;" class="tdr-mode-bar">
                         <div class="tdr-mode-head">
                             <span>TDR Mode</span>
-                            <button id="tdrModeCloseBtn" title="Exit the TDR view">✕</button>
+                            <button id="tdrModeCloseBtn" title="Exit TDR mode">✕</button>
                         </div>
-                        <div class="tdr-hero-actions">
-                            <button id="tdrSliceBtn" title="Exit to the 2D map and pick two points for a vertical cross-section">2D cross section mode</button>
+                        <div class="tdr-hero-note-top">Switch the tracker to 2D for the map view with cross-sections; 3D shows the radar volume.</div>
+                        <!-- 2D display only: fades the radar composite so satellite imagery reads through it. -->
+                        <div id="tdrOpacityRow" class="sat-opacity-row" style="display:none">
+                            <span class="sat-opacity-label">TDR opacity</span>
+                            <input type="range" id="tdr2dOpacitySlider" min="20" max="100" value="85" title="Radar overlay opacity on the 2D map">
+                            <span id="tdr2dOpacityVal" class="sat-opacity-val">85%</span>
                         </div>
                         <div class="tdr-hero-note-top">Pick a leg to view it alone (click again for all legs):</div>
                         <div id="tdrLegRow" class="tdr-leg-row"></div>
@@ -323,6 +327,8 @@
                             <button id="tdrLevelsNone" title="Hide all layers">None</button>
                         </div>
                         <div id="tdrLevelHero" class="tdr-level-hero"></div>
+                        <!-- 2D display only, between picks; starts the two-point section pick. -->
+                        <button id="tdrSliceAgainBtn" style="display:none" class="tdr-slice-start">Do a Cross-Section</button>
                     </div>
                     <!-- Keep as a direct child of #mapPanel: #mapHeader's z-20 stacking context would trap it below the fullscreen bottom bar. -->
                     <div id="satStepCluster" style="display:none;" class="flex items-center gap-1 normal-case">
@@ -860,7 +866,7 @@
                 <li><b>2D:</b> a whole-world map (coastlines, US states) with satellite imagery and wind barbs. Wheel to zoom and drag to pan, and a <b>Recenter on Aircraft</b> button reappears once you pan away.</li>
                 <li><b>3D:</b> a Three.js scene with terrain and a plane model, the track drawn by GPS or pressure altitude. Orbit and zoom with the mouse.</li>
                 <li>Bottom-bar options: <b>Track Color</b> (wind speed or warming/cooling), <b>Barb Color</b> (wind speed or hurricane wind field, which stays black until 64 kt and above), <b>3D Track Altitude</b>, <b>S.I. Units</b>, <b>Simple Icon</b>, and <b>Real Scale (3D)</b>.</li>
-                <li><b>TDR Mode:</b> the <b>TDR Mode</b> button appears in the map header when the archive has Tail Doppler Radar for the mission, and opens the radar workspace: a pinned 3D view with the camera overhead of the recorded coverage and a sidebar of pressure layers (millibars) to display alone or combined, plus leg buttons that show a chosen leg alone at its end. The radar scans in around the aircraft as it flies each leg, and a tall white beam marks the aircraft. <b>2D cross section mode</b> exits to the 2D map, centered on the storm, to pick two points for a vertical slice; picked layers also draw over the 2D map. Closing the workspace restores the previous view. Only quality-controlled (level 2) radar is used; missions with just the real-time product show the control as unavailable.</li>
+                <li><b>TDR Mode:</b> the <b>TDR Mode</b> button in the map header greys out as "TDR Unavailable" for missions without Tail Doppler Radar, and opens the radar workspace, pinned over the page in whichever tracker view is active (3D parks the camera overhead of the recorded coverage), with a sidebar of pressure layers (millibars) to display alone or combined, plus leg buttons that show a chosen leg alone at its end. The radar scans in around the aircraft as it flies each leg, and a tall white beam marks the aircraft. Switching the tracker to <b>2D</b> inside TDR Mode shows the radar layers over the map, centered on the storm, with the lower pressure layers (500-1000 mb) selected, a <b>TDR opacity</b> slider for use with satellite imagery, and two-point vertical cross-sections with compass directions at their ends; <b>Do a Cross-Section</b> starts the pick, and switching back to 3D restores the volume view. Exiting TDR mode clears the radar display and returns both trackers to their default view on the aircraft. Only quality-controlled (level 2) radar is used; missions with just the real-time product show the control as unavailable.</li>
                 <li><b>Measure</b> (map header) draws a polygon, circle, or rectangle for distance and area. <b>Mark Point</b> (bottom bar) drops a marker, and clicking a marker opens point-data analysis you can download.</li>
             </ul>
 
@@ -958,35 +964,34 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260721c"></script>
-    <script src="js/01-state.js?v=20260721c"></script>
-    <script src="js/02-satellite.js?v=20260721c"></script>
-    <script src="js/03-metrics.js?v=20260721c"></script>
-    <script src="js/04-geo-measure.js?v=20260721c"></script>
-    <script src="js/05-interpolation.js?v=20260721c"></script>
-    <script src="js/06-ocr.js?v=20260721c"></script>
-    <script src="js/07-ui-controls.js?v=20260721c"></script>
-    <script src="js/07b-plane-models.js?v=20260721c"></script>
-    <script src="js/07c-terrain.js?v=20260721c"></script>
-    <script src="js/07d-tdr.js?v=20260721c"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260721c"></script>
-    <script src="js/09-interaction.js?v=20260721c"></script>
-    <script src="js/10-point-analysis.js?v=20260721c"></script>
-    <script src="js/11-layout.js?v=20260721c"></script>
-    <script src="js/11b-parser-core.js?v=20260721c"></script>
-    <script src="js/12-file-parsing.js?v=20260721c"></script>
-    <script src="js/12b-recon-archive.js?v=20260721c"></script>
-    <script src="js/13-charts-master.js?v=20260721c"></script>
-    <script src="js/14-filters-sync.js?v=20260721c"></script>
-    <script src="js/15-map-render.js?v=20260721c"></script>
-    <script src="js/16-pfd-hud.js?v=20260721c"></script>
-    <script src="js/17-charts.js?v=20260721c"></script>
-    <script src="js/18-engine.js?v=20260721c"></script>
-    <script src="js/18b-flight-search.js?v=20260721c"></script>
-    <script src="js/19-bootstrap.js?v=20260721c"></script>
-    <script src="js/20-ui-polish.js?v=20260721c"></script>
-    <script src="js/21-report.js?v=20260721c"></script>
-
+    <script src="js/00-var-catalog.js?v=20260722za"></script>
+    <script src="js/01-state.js?v=20260722za"></script>
+    <script src="js/02-satellite.js?v=20260722za"></script>
+    <script src="js/03-metrics.js?v=20260722za"></script>
+    <script src="js/04-geo-measure.js?v=20260722za"></script>
+    <script src="js/05-interpolation.js?v=20260722za"></script>
+    <script src="js/06-ocr.js?v=20260722za"></script>
+    <script src="js/07-ui-controls.js?v=20260722za"></script>
+    <script src="js/07b-plane-models.js?v=20260722za"></script>
+    <script src="js/07c-terrain.js?v=20260722za"></script>
+    <script src="js/07d-tdr.js?v=20260722za"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260722za"></script>
+    <script src="js/09-interaction.js?v=20260722za"></script>
+    <script src="js/10-point-analysis.js?v=20260722za"></script>
+    <script src="js/11-layout.js?v=20260722za"></script>
+    <script src="js/11b-parser-core.js?v=20260722za"></script>
+    <script src="js/12-file-parsing.js?v=20260722za"></script>
+    <script src="js/12b-recon-archive.js?v=20260722za"></script>
+    <script src="js/13-charts-master.js?v=20260722za"></script>
+    <script src="js/14-filters-sync.js?v=20260722za"></script>
+    <script src="js/15-map-render.js?v=20260722za"></script>
+    <script src="js/16-pfd-hud.js?v=20260722za"></script>
+    <script src="js/17-charts.js?v=20260722za"></script>
+    <script src="js/18-engine.js?v=20260722za"></script>
+    <script src="js/18b-flight-search.js?v=20260722za"></script>
+    <script src="js/19-bootstrap.js?v=20260722za"></script>
+    <script src="js/20-ui-polish.js?v=20260722za"></script>
+    <script src="js/21-report.js?v=20260722za"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

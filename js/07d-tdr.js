@@ -31,12 +31,14 @@
     // 2D overlay + picker (the TDR dropdown, the satellite picker's sibling)
     let tdr2DImage = null;         // composited canvas the 2D basemap draws (current analysis, picked levels)
     let tdr2DBox = null;           // { minLat, maxLat, minLon, maxLon } of that canvas
-    let tdr2DOpacity = 0.85;       // fixed opacity the 2D basemap draws the overlay at
+    let tdr2DOpacity = 0.85;       // opacity the 2D basemap draws the overlay at; the sidebar's TDR opacity slider moves it in the workspace's 2D display
     let tdrSelectedKm = new Set(); // altitude levels picked in the panel, km values
     let tdrCurrent = null;         // analysis record the 2D overlay and panel currently reflect
     let _tdr2DStamp = '';          // analysis + selection fingerprint; recomposite only when it changes
     let tdrSliceArm = 0;           // cross-section picking: 0 off, 1 first point pending, 2 second point pending
     let tdrSlicePtA = null;        // first picked endpoint { lat, lon }
+    let tdr3DSelSaved = null;      // 3D layer selection parked while the workspace's 2D display shows 500-1000 mb
+    let tdrSliceDone = false;      // a section was completed this workspace session; the pill reads Do Another
     let tdrLevel2Missing = false;  // mission has TDR but no QC'd level 2: control shown disabled
 
     const TDR_FIELD = 'reflectivity';
@@ -53,7 +55,6 @@
     let tdrSliceLine = null;          // committed { A, B } endpoints, drawn while the modal is up
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrModeOn = false;            // the pinned radar workspace is up
-    let tdrModeSaved = null;          // camera/follow/tracker state to restore on exit
     let tdrModeAutoAll = false;       // first workspace entry with nothing picked selects all bands
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
     let tdrIntroDone = false;         // one fast leg fly-through per mode entry, once data exists
@@ -66,7 +67,7 @@
     // mission with TDR coverage.
     function resetTdrOverlay() {
         if (tdrModeOn) exitTdrMode();   // restores camera/tracker before the teardown below
-        tdrModeSaved = null; tdrModeAutoAll = false;
+        tdrModeAutoAll = false;
         tdrGeneration++;
         tdrFetchActive = false;
         // meshes may or may not be parented into tdrGroup3D yet (a 2D-only session builds them
@@ -97,6 +98,10 @@
         tdrAnalyses = []; tdrMissionId = ''; _tdrLastSec = 0;
         tdrSelectedKm.clear(); tdrCurrent = null; tdr2DImage = null; tdr2DBox = null; _tdr2DStamp = '';
         tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null; setTdrSliceHint('');
+        tdr3DSelSaved = null; tdrSliceDone = false;
+        tdr2DOpacity = 0.85;
+        const opSlReset = document.getElementById('tdr2dOpacitySlider'); if (opSlReset) opSlReset.value = 85;
+        const opValReset = document.getElementById('tdr2dOpacityVal'); if (opValReset) opValReset.textContent = '85%';
         tdrLevel2Missing = false; tdrLegPick = null;
         if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
         tdrIntroDone = false;
@@ -109,14 +114,15 @@
         _tdrScanWallSec = -1;
         bgNeedsUpdate = true;
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.style.display = 'none';
+        const sk = document.getElementById('tdrPickerSkel'); if (sk) sk.style.display = 'none';
         const pb = document.getElementById('tdrPickerBtn');
         if (pb) {
-            pb.disabled = false; pb.classList.remove('opacity-60');
+            pb.disabled = false; pb.classList.remove('opacity-60'); pb.style.display = '';
             if (pb.dataset.defaultTitle) pb.title = pb.dataset.defaultTitle;
         }
         const sm = document.getElementById('tdrSliceModal'); if (sm) sm.style.display = 'none';
         const skel = document.getElementById('tdrModeLoading'); if (skel) skel.style.display = 'none';
-        const bb = document.getElementById('tdrBackBtn'); if (bb) bb.style.display = 'none';
+        tdrUpdateSliceButtons();
         updateTdrPickerBtn();
     }
 
@@ -132,11 +138,32 @@
         if (!idMatch) return;
         const id = idMatch[1];
         if (typeof RECON_API_BASE === 'undefined' || typeof reconAuthHeaders !== 'function') return;
+        // The control shimmers in the header while the probe runs, resolving to the button (or
+        // hiding again), instead of a button popping in from nowhere when the archive answers.
+        const grp0 = document.getElementById('tdrControlGroup'); if (grp0) grp0.style.display = 'flex';
+        const skel0 = document.getElementById('tdrPickerSkel'); if (skel0) skel0.style.display = '';
+        const pb0 = document.getElementById('tdrPickerBtn'); if (pb0) pb0.style.display = 'none';
+        const tdrProbeResolve = hasTdr => {
+            const sk = document.getElementById('tdrPickerSkel'); if (sk) sk.style.display = 'none';
+            const pb = document.getElementById('tdrPickerBtn'); if (pb) pb.style.display = '';
+            if (!hasTdr) {
+                // No TDR for this mission: the button greys out instead of vanishing, so the
+                // control reads as answered rather than missing.
+                tdrLevel2Missing = true;   // holds the disabled state against updateTdrPickerBtn repaints
+                if (pb) {
+                    if (!pb.dataset.defaultTitle) pb.dataset.defaultTitle = pb.title;
+                    pb.disabled = true; pb.classList.add('opacity-60');
+                    pb.title = 'No Tail Doppler Radar data exists for this mission.';
+                }
+                const pl = document.getElementById('tdrPickerBtnLabel'); if (pl) pl.textContent = 'TDR Unavailable';
+            }
+        };
         const gen = tdrGeneration;
         fetch(`${RECON_API_BASE}/v1/tdr/mission/${encodeURIComponent(id)}`, { headers: reconAuthHeaders() })
             .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
             .then(info => {
                 if (gen !== tdrGeneration) return;
+                tdrProbeResolve(true);
                 // QC'd level 2 only: a level-1b-only mission surfaces the control disabled
                 // instead of quietly rendering the unreviewed real-time product.
                 if (!info.has_level2) {
@@ -156,7 +183,7 @@
                 let files = (info.files || []).filter(f => f.level === '2' && f.product === TDR_PRODUCT);
                 if (!files.length) files = (info.files || []).filter(f => f.level === '2');
                 const times = [...new Set(files.map(f => f.analysis_time).filter(Boolean))];
-                if (!times.length) return;
+                if (!times.length) { tdrProbeResolve(false); return; }
                 // Analysis HHMM onto the flight clock: rows past midnight keep counting beyond
                 // 24h (absSeconds), so a time far below the first row's clock wrapped midnight.
                 const t0 = (allParsedData[0] && allParsedData[0].absSeconds) || 0;
@@ -194,7 +221,7 @@
                 // resolves); kick the overlay once so fetching does not wait for a playback tick.
                 updateTdr3D();
             })
-            .catch(() => {});
+            .catch(() => { if (gen === tdrGeneration) tdrProbeResolve(false); });
     }
 
     // The API colorscale is [fraction, '#hex'] stops against zmin..zmax.
@@ -427,6 +454,20 @@
                     if (tdrModeOn && tdrModeAutoAll && !tdrSelectedKm.size) {
                         a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
                         tdrModeAutoAll = false;
+                    } else if (tdrModeOn && !tdrSelectedKm.size && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d') {
+                        // A 2D-entered session before any data had nothing to filter; the first
+                        // volume fills the 2D display's lower half in.
+                        a.levels.forEach(l => { if (l.canvas && tdrMb(l.km) >= 500) tdrSelectedKm.add(l.km); });
+                    } else if (tdrSelectedKm.size) {
+                        // A later volume can carry data at levels the earlier analyses lacked
+                        // (usually the very top of the column). While the selection still covers
+                        // every data level seen so far, the new analysis's levels join it, so
+                        // "all layers" stays all layers instead of the top band silently reading
+                        // unselected once this analysis becomes current. A hand-trimmed
+                        // selection no longer covers everything, so it is left alone.
+                        const others = tdrAnalyses.filter(x => x !== a && x.state === 'ready' && x.levels);
+                        if (others.every(x => x.levels.every(l => !l.canvas || tdrSelectedKm.has(l.km))))
+                            a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
                     }
                     buildTdrHero();
                     tdrIntroSweep();   // first data in this workspace session starts the fly-through
@@ -453,7 +494,7 @@
             if (a.lastStampSec !== null || a.maskFull) {   // slid back before the leg: hide it all again
                 a.maskCtx.clearRect(0, 0, a.maskCanvas.width, a.maskCanvas.height);
                 a.maskFull = false; a.floodedOnce = false; a.lastStampSec = null; a._stampIdx = 0;
-                a._scanPrev = null; a._scanPrevGeo = null;
+                a._scanPath = null; a._scanGeo = null;
                 a.maskTex.needsUpdate = true; a.maskStamp++;
                 // This leg's rescan had punched holes in every EARLIER analysis; with the leg
                 // now uncrossed those holes are stale, so earlier masks reset and reflood clean
@@ -462,7 +503,7 @@
                     if (b === a || b.state !== 'ready' || !b.maskCanvas || b.sec >= a.sec) continue;
                     b.maskCtx.clearRect(0, 0, b.maskCanvas.width, b.maskCanvas.height);
                     b.maskFull = false; b.floodedOnce = false; b.lastStampSec = null; b._stampIdx = 0;
-                    b._scanPrev = null; b._scanPrevGeo = null;
+                    b._scanPath = null; b._scanGeo = null;
                     b.maskTex.needsUpdate = true; b.maskStamp++;
                 }
             }
@@ -482,7 +523,7 @@
         if (a.maskFull || a.floodedOnce || (a.lastStampSec !== null && t < a.lastStampSec)) {   // slid back inside the leg: rebuild
             a.maskCtx.clearRect(0, 0, a.maskCanvas.width, a.maskCanvas.height);
             a.maskFull = false; a.floodedOnce = false; a._stampIdx = 0;
-            a._scanPrev = null; a._scanPrevGeo = null;
+            a._scanPath = null; a._scanGeo = null;
         }
         const g = a.geo, ctx2 = a.maskCtx;
         const cellKm = (g.x1 - g.x0) / Math.max(1, a.maskCanvas.width - 1);
@@ -490,38 +531,39 @@
         // The TDR scans a vertical plane perpendicular to the track, so the reveal is LINEAR: a
         // butt-capped stroke along the flown path uncovers a flat-ended ribbon +-70 km to each
         // side, its leading edge a straight line through the aircraft, never ahead of it.
+        // The WHOLE flown path restrokes as ONE stroke every tick (cheap on a 250px mask):
+        // stroking only the new segment left a butt-cap seam at every tick boundary, which read
+        // as hairline missing lines across the crisp 2D composite.
+        if (!a._scanPath) { a._scanPath = []; a._scanGeo = []; }
         let stamped = false;
-        ctx2.strokeStyle = '#fff';
-        ctx2.lineWidth = rCells * 2;
-        ctx2.lineCap = 'butt';
-        ctx2.lineJoin = 'round';
-        ctx2.beginPath();
-        let prev = a._scanPrev || null;
-        const geoPts = a._scanPrevGeo ? [a._scanPrevGeo] : [];
-        if (prev) ctx2.moveTo(prev.col, prev.cy);
         for (let i = a._stampIdx; i < filteredData.length; i++) {
             const row = filteredData[i];
             if (row.absSeconds > t) break;
             a._stampIdx = i;
             if (row.absSeconds < a.startSec || row.lat == null || row.lon == null) continue;
             const px = (row.lon - g.originLon) / g.lonDegPerKm, py = (row.lat - g.originLat) / g.latDegPerKm;
-            const col = (px - g.x0) / cellKm, cy = (a.maskCanvas.height - 1) - (py - g.y0) / cellKm;
-            if (prev) { ctx2.lineTo(col, cy); stamped = true; }
-            else ctx2.moveTo(col, cy);
-            prev = { col, cy };
-            geoPts.push({ lat: row.lat, lon: row.lon });
+            a._scanPath.push({ col: (px - g.x0) / cellKm, cy: (a.maskCanvas.height - 1) - (py - g.y0) / cellKm });
+            a._scanGeo.push({ lat: row.lat, lon: row.lon });
+            stamped = true;
         }
-        if (stamped) ctx2.stroke();
-        a._scanPrev = prev;
-        a._scanPrevGeo = geoPts.length ? geoPts[geoPts.length - 1] : a._scanPrevGeo;
         a.lastStampSec = t;
-        if (stamped) { a.maskTex.needsUpdate = true; a.maskStamp++; }
+        if (stamped && a._scanPath.length > 1) {
+            ctx2.strokeStyle = '#fff';
+            ctx2.lineWidth = rCells * 2;
+            ctx2.lineCap = 'butt';
+            ctx2.lineJoin = 'round';
+            ctx2.beginPath();
+            a._scanPath.forEach((p, i2) => { if (i2 === 0) ctx2.moveTo(p.col, p.cy); else ctx2.lineTo(p.col, p.cy); });
+            ctx2.stroke();
+            a.maskTex.needsUpdate = true; a.maskStamp++;
+        }
         // A re-flown area holds only the LATEST radar, but old data is punched out ONLY where
         // the new analysis actually has data (otherwise the old leg vanishes before anything
         // replaces it): the ribbon is intersected with the new volume's footprint on a scratch
         // canvas, then mapped into each earlier analysis's grid (same 2 km cells, different
-        // origin, so one affine drawImage) and erased there.
-        if (stamped && geoPts.length > 1) {
+        // origin, so one affine drawImage) and erased there. The full path erases every tick for
+        // the same seam-free reason as the reveal; repeating a destination-out is idempotent.
+        if (stamped && a._scanGeo.length > 1) {
             const W2 = a.maskCanvas.width, H2 = a.maskCanvas.height;
             if (!tdrScratch) tdrScratch = document.createElement('canvas');
             tdrScratch.width = W2; tdrScratch.height = H2;   // re-assigning also clears it
@@ -531,7 +573,7 @@
             sctx.lineCap = 'butt';
             sctx.lineJoin = 'round';
             sctx.beginPath();
-            geoPts.forEach((p, i2) => {
+            a._scanGeo.forEach((p, i2) => {
                 const sx = ((p.lon - g.originLon) / g.lonDegPerKm - g.x0) / cellKm;
                 const sy = (H2 - 1) - ((p.lat - g.originLat) / g.latDegPerKm - g.y0) / cellKm;
                 if (i2 === 0) sctx.moveTo(sx, sy); else sctx.lineTo(sx, sy);
@@ -694,7 +736,11 @@
                 tdrCamPark(false);
             }
         }
-        for (const a of tdrAnalyses) { if (a.state === 'ready') updateTdrScan(a); }
+        // Scan masks update NEWEST leg first: a backward jump makes a later leg's uncross reset
+        // wipe every earlier mask, and the earlier legs must decide their reflood AFTER that
+        // wipe. In flight order the flood ran first and the wipe left the mask blank until the
+        // next tick, which never came while paused (a leg-button pick needed a second click).
+        for (let i = tdrAnalyses.length - 1; i >= 0; i--) { if (tdrAnalyses[i].state === 'ready') updateTdrScan(tdrAnalyses[i]); }
         updateTdr2D();
         // Once TDR is in use every remaining leg keeps preloading even if the selection is
         // cleared mid-flight, so the next leg's data is always in hand when the aircraft
@@ -786,9 +832,16 @@
             if (btn) { btn.classList.add('opacity-60'); btn.classList.remove('sat-on'); }
             return;
         }
-        // A plain mode button, not a dropdown: the label states the action it will take.
+        // A plain mode button, not a dropdown: the label states the action it will take. The
+        // pinned-2D section state counts as TDR mode here, so its top-right exit reads right.
         lbl.textContent = tdrModeOn ? 'Exit TDR Mode' : 'TDR Mode';
-        if (btn) { btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn); }
+        if (btn) {
+            btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn);
+            // Red while it reads Exit TDR Mode, so the way out is unmistakable; inline styles
+            // beat the utility classes in both themes (the danger var is theme-tuned).
+            if (tdrModeOn) { btn.style.background = 'var(--danger)'; btn.style.borderColor = 'var(--danger)'; btn.style.color = '#fff'; }
+            else { btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+        }
     }
 
     // The panel's level column: the pressure bands laid out top-down (highest altitude first),
@@ -803,7 +856,10 @@
                 const b = document.createElement('button');
                 b.textContent = 'Leg ' + (i + 1);
                 b.title = a.legLabel + (a.state === 'ready' ? '' : ' (loads on jump)') + (tdrLegPick === a ? ' · click again to show all legs' : '');
-                if (tdrLegPick === a) b.classList.add('on');
+                // In the workspace's 2D display exactly one analysis is on screen, so its leg
+                // button highlights even without an explicit pick (tdrCurrent is what draws).
+                const in2dNow = tdrModeOn && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
+                if (tdrLegPick === a || (in2dNow && !tdrLegPick && tdrCurrent === a)) b.classList.add('on');
                 b.addEventListener('click', () => {
                     if (!filteredData.length) return;
                     if (tdrLegPick === a) {   // toggle back to every crossed leg
@@ -878,26 +934,20 @@
 
     // ---- TDR mode: the dedicated radar workspace ----------------------------------------------
     // Clicking the TDR button pins the tracker (the same .fake-fs mechanism the panel ⛶ buttons
-    // use), forces the 3D view, parks the camera overhead, and docks the band sidebar. The
-    // normal tracker never shows radar and its camera is never touched: entering saves the
-    // camera, follow flag, and tracker mode, and exiting restores all three exactly.
+    // use) and docks the band sidebar, KEEPING whichever tracker display is up: a 3D entry gets
+    // the parked overhead radar volume, a 2D entry goes straight to the map display with the
+    // section pick. The normal tracker never shows radar; exit resets both to default framing.
     function enterTdrMode() {
         if (tdrModeOn || !tdrAnalyses.length) return;
         tdrModeOn = true;
         tdrLegPick = null;   // each session starts on the progressive all-legs view, nothing preselected
-        const bb = document.getElementById('tdrBackBtn'); if (bb) bb.style.display = 'none';
+        tdrSliceDone = false;
+        tdrUpdateSliceButtons();
         // An abandoned section pick must not follow the user into the workspace.
         if (tdrSliceArm || tdrSliceLine) {
             tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
             setTdrSliceHint('');
         }
-        tdrModeSaved = {
-            was2d: typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d',
-            follow: (typeof followAircraft3D !== 'undefined') ? followAircraft3D : true,
-            camPos: (typeof camera3D !== 'undefined' && camera3D) ? camera3D.position.clone() : null,
-            target: (typeof controls3D !== 'undefined' && controls3D) ? controls3D.target.clone() : null
-        };
-        if (tdrModeSaved.was2d) { trackerModeSelect.value = '3d'; trackerModeSelect.dispatchEvent(new Event('change')); }
         // Pin through the app's own mechanism so the top-right cluster hides exactly like the
         // other pinned panels; .tdr-mode carries the workspace-only layout rules.
         if (typeof setFakePanel === 'function' && typeof mapPanel !== 'undefined') setFakePanel(mapPanel);
@@ -914,19 +964,25 @@
             currentIdx = idx;
             if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
         }
-        // An empty selection auto-fills on entry (immediately when data is here, else when the
-        // first volume lands), so the workspace never opens onto an empty scene.
-        tdrModeAutoAll = tdrSelectedKm.size === 0;
-        if (tdrModeAutoAll) {
-            const ref = tdrCurrent || tdrAnalyses.find(x => x.state === 'ready');
-            if (ref && ref.levels) {
-                ref.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
-                tdrModeAutoAll = false;
+        if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d') {
+            // 2D entry: straight into the map display (lower layers, storm centering, pick).
+            tdrModeAutoAll = false;
+            tdrEnter2DSection();
+        } else {
+            // An empty selection auto-fills on entry (immediately when data is here, else when
+            // the first volume lands), so the workspace never opens onto an empty scene.
+            tdrModeAutoAll = tdrSelectedKm.size === 0;
+            if (tdrModeAutoAll) {
+                const ref = tdrCurrent || tdrAnalyses.find(x => x.state === 'ready');
+                if (ref && ref.levels) {
+                    ref.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
+                    tdrModeAutoAll = false;
+                }
             }
         }
         buildTdrHero();
         updateTdrPickerBtn();
-        tdrCamFixed = false;   // the mode block below parks overhead on the next tick
+        tdrCamFixed = false;   // in the 3D display the mode block parks overhead on the next tick
         tdrIntroDone = false;
         updateTdr3D();
         tdrIntroSweep();   // no-op until the first volume is ready; the fetch retriggers it
@@ -967,32 +1023,28 @@
         tdrIntroRaf = requestAnimationFrame(step);
     }
 
-    // keepPinned leaves the panel pinned (the cross-section flow lands on the 2D map without
-    // dropping out of the pinned view); a plain exit unpins through the app's own mechanism
-    // and drops real browser fullscreen too, so closing the workspace lands on the normal page.
-    function exitTdrMode(keepPinned) {
+    // Leaving the workspace, from either its 3D or 2D display: unpins, drops real browser
+    // fullscreen, clears the radar display (selection + 2D composite) and any section pick,
+    // returns the tracker mode the user entered from, and lands both trackers on their default
+    // framing, following the aircraft at the home zoom.
+    function exitTdrMode() {
         if (!tdrModeOn) return;
         if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
         tdrModeOn = false; tdrCamFixed = false;
+        tdr3DSelSaved = null; tdrSliceDone = false;
+        tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
+        setTdrSliceHint('');
+        const sm = document.getElementById('tdrSliceModal'); if (sm) sm.style.display = 'none';
+        tdrUpdateSliceButtons();
         const panel = document.getElementById('mapPanel'); if (panel) panel.classList.remove('tdr-mode', 'tdr-loading');
-        if (!keepPinned) {
-            if (typeof setFakePanel === 'function') setFakePanel(null);
-            if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-        }
+        if (typeof setFakePanel === 'function') setFakePanel(null);
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'none';
-        if (tdrModeSaved) {
-            if (typeof camera3D !== 'undefined' && camera3D && tdrModeSaved.camPos && typeof controls3D !== 'undefined' && controls3D && tdrModeSaved.target) {
-                camera3D.position.copy(tdrModeSaved.camPos);
-                controls3D.target.copy(tdrModeSaved.target);
-                controls3D.update();
-            }
-            if (typeof followAircraft3D !== 'undefined') followAircraft3D = tdrModeSaved.follow;
-            if (typeof updateFollowButton === 'function') updateFollowButton();
-            if (!keepPinned && tdrModeSaved.was2d && typeof trackerModeSelect !== 'undefined') {
-                trackerModeSelect.value = '2d'; trackerModeSelect.dispatchEvent(new Event('change'));
-            }
-        }
-        tdrModeSaved = null;
+        tdrSelectedKm.clear();
+        tdr2DImage = null; tdr2DBox = null; _tdr2DStamp = '';
+        bgNeedsUpdate = true;
+        if (typeof reset3DView === 'function') reset3DView();
+        if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d' && typeof resetMapView === 'function') resetMapView();
         if (typeof resizeCanvasLayout === 'function') resizeCanvasLayout();
         updateTdrPickerBtn();
         updateTdr3D();
@@ -1003,20 +1055,102 @@
         const el = document.getElementById('tdrSliceHint');
         if (el) { el.textContent = t; el.style.display = t ? 'block' : 'none'; }
     }
+
+    // The 2D display's own controls: the cross-section pill (only between picks, the hint pill
+    // covers the armed stretch; "Do a Cross-Section" until the session's first section, "Do
+    // Another Cross-Section" after) and the sidebar's TDR opacity row (the slider only affects
+    // the 2D composite, so it hides in the 3D display).
+    function tdrUpdateSliceButtons() {
+        const in2d = tdrModeOn && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
+        const ab = document.getElementById('tdrSliceAgainBtn');
+        if (ab) {
+            ab.style.display = (in2d && !tdrSliceArm) ? 'block' : 'none';
+            ab.textContent = tdrSliceDone ? 'Do Another Cross-Section' : 'Do a Cross-Section';
+        }
+        const or = document.getElementById('tdrOpacityRow');
+        if (or) or.style.display = in2d ? '' : 'none';
+    }
+
+    // The workspace's 2D display, entered by switching the tracker select to 2D while the mode
+    // is up: the pinned map shows the radar composite with the cross-section pick armed. The 3D
+    // selection parks aside and the LOWER half of the column shows (500-1000 mb; the sparse
+    // upper bands hide), the view centers on the storm center expected at the playback time,
+    // and the two-click pick arms. Switching back to 3D restores the parked selection.
+    function tdrEnter2DSection() {
+        tdr3DSelSaved = new Set(tdrSelectedKm);
+        const cur = tdrCurrent;
+        if (cur && cur.levels) {
+            tdrSelectedKm.clear();
+            cur.levels.forEach(l => { if (l.canvas && tdrMb(l.km) >= 500) tdrSelectedKm.add(l.km); });
+        }
+        buildTdrHero();
+        let cLat = (cur && cur.geo) ? cur.geo.originLat : null;
+        let cLon = (cur && cur.geo) ? cur.geo.originLon : null;
+        if (typeof interpStormCenter === 'function' && typeof stormTrackPoints !== 'undefined' && stormTrackPoints.length && filteredData.length && flightMetaData.date !== 'Unknown') {
+            const row = filteredData[currentIdx];
+            const est = row ? interpStormCenter(new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000) : null;
+            if (est) { cLat = est.lat; cLon = est.lon; }
+        }
+        if (cLat !== null && typeof applyMapViewportGeo === 'function') {
+            if (typeof disengageFollowAircraft === 'function') disengageFollowAircraft();
+            applyMapViewportGeo({ cLon, cLat, spanLon: 6 });
+            bgNeedsUpdate = true;
+        }
+        // The pick waits for the pill: nothing arms until the user clicks Do a Cross-Section.
+        tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
+        setTdrSliceHint('');
+        tdrUpdateSliceButtons();
+        if (typeof renderMapEngineFrame === 'function' && filteredData.length) renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+    function tdrLeave2DSection() {
+        tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
+        setTdrSliceHint('');
+        const sm = document.getElementById('tdrSliceModal'); if (sm) sm.style.display = 'none';
+        if (tdr3DSelSaved) { tdrSelectedKm = tdr3DSelSaved; tdr3DSelSaved = null; }
+        // A 2D-entered session parked an empty set; the 3D stack still needs layers to show.
+        if (!tdrSelectedKm.size) {
+            const ref = tdrCurrent || tdrAnalyses.find(x => x.state === 'ready');
+            if (ref && ref.levels) ref.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
+        }
+        buildTdrHero();
+        tdrUpdateSliceButtons();
+        updateTdr3D();
+    }
+    // A section endpoint only counts where the radar has scanned in: sample the current
+    // analysis's reveal mask at the picked spot (a flooded mask short-circuits).
+    function tdrRevealedAt(geo) {
+        const cur = tdrCurrent;
+        if (!cur || !cur.geo || !cur.maskCtx || !cur.maskCanvas) return false;
+        if (cur.maskFull) return true;
+        const g = cur.geo;
+        const cellKm = (g.x1 - g.x0) / Math.max(1, cur.maskCanvas.width - 1);
+        const eK = (geo.lon - g.originLon) / g.lonDegPerKm, nK = (geo.lat - g.originLat) / g.latDegPerKm;
+        const col = Math.round((eK - g.x0) / cellKm), row = Math.round((nK - g.y0) / cellKm);
+        if (col < 0 || col >= cur.maskCanvas.width || row < 0 || row >= cur.maskCanvas.height) return false;
+        try { return cur.maskCtx.getImageData(col, (cur.maskCanvas.height - 1) - row, 1, 1).data[3] >= 128; } catch (e) { return false; }
+    }
+
     // Consumes 2D map clicks while armed; returns true when the click was taken.
     function tdrSliceMapClick(geo) {
         if (!tdrSliceArm || !geo) return false;
+        if (!tdrRevealedAt(geo)) {
+            setTdrSliceHint('The radar has not scanned that spot yet. Play further into the leg, or pick inside the shown radar.');
+            setTimeout(() => { if (tdrSliceArm) setTdrSliceHint('Click on two points to do a cross-section. Drag to move the map.'); }, 3500);
+            return true;   // consumed; the pick stays armed
+        }
         if (tdrSliceArm === 1) {
             tdrSlicePtA = { lat: geo.lat, lon: geo.lon };
             tdrSliceArm = 2;
             return true;
         }
         tdrSliceArm = 0;
+        tdrSliceDone = true;   // the pill reads Do Another Cross-Section from here on
         const B = { lat: geo.lat, lon: geo.lon };
         tdrSliceLine = { A: tdrSlicePtA, B };   // stays drawn on the map while the modal is up
         fetchTdrSlice(tdrSlicePtA, B);
         tdrSlicePtA = null;
         tdrSliceMouse = null;
+        tdrUpdateSliceButtons();   // pick done: Do Another Cross Section joins the back button
         return true;
     }
 
@@ -1080,6 +1214,22 @@
         c2.imageSmoothingEnabled = false;
         c2.clearRect(0, 0, cv.width, cv.height);
         if (painted) c2.drawImage(painted, 0, 0, cv.width, cv.height);
+        // Compass labels at the section's ends, from the picked line's bearing: the plot runs
+        // A (left edge) to B (right edge), so each end is labelled with the direction it lies in.
+        if (tdrSliceLine && tdrSliceLine.A && tdrSliceLine.B) {
+            const A = tdrSliceLine.A, B = tdrSliceLine.B;
+            const dE = (B.lon - A.lon) * Math.cos(((A.lat + B.lat) / 2) * Math.PI / 180);
+            const brg = Math.atan2(dE, B.lat - A.lat) * 180 / Math.PI;   // bearing A to B, 0 = N
+            const dir8 = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round((((d % 360) + 360) % 360) / 45) % 8];
+            const fs = Math.max(13, Math.round(cv.height * 0.055));
+            c2.font = '700 ' + fs + 'px Inter, ui-sans-serif, sans-serif';
+            c2.textBaseline = 'top';
+            c2.lineWidth = Math.max(2, fs / 6); c2.strokeStyle = 'rgba(5,12,20,0.85)'; c2.fillStyle = '#fff';
+            c2.textAlign = 'left';
+            c2.strokeText(dir8(brg + 180), 8, 8); c2.fillText(dir8(brg + 180), 8, 8);
+            c2.textAlign = 'right';
+            c2.strokeText(dir8(brg), cv.width - 8, 8); c2.fillText(dir8(brg), cv.width - 8, 8);
+        }
         const lenKm = Math.abs(sl.x[sl.x.length - 1] - sl.x[0]);
         const topKm = sl.y[sl.y.length - 1];
         if (info) info.textContent = (sl.storm_name ? sl.storm_name + ' · ' : '') + 'analysis ' + sl.analysis_time +
@@ -1096,15 +1246,11 @@
         });
         const closeBtn = document.getElementById('tdrModeCloseBtn');
         if (closeBtn) closeBtn.addEventListener('click', exitTdrMode);
+        // Esc collapses everything at once, matching the app-wide convention: a full TDR exit
+        // from either display (modal, pick, overlay, pin all clear together).
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             exitTdrMode();
-            if (tdrSliceArm || tdrSliceLine) {
-                tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
-                setTdrSliceHint('');
-                const bb2 = document.getElementById('tdrBackBtn'); if (bb2) bb2.style.display = 'none';
-                if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-            }
         });
         // Live pick line: track the cursor while the second point is pending, redrawing the map
         // one frame at a time.
@@ -1128,59 +1274,44 @@
             buildTdrHero(); updateTdr3D();
             if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         });
-
-        const sliceBtn = document.getElementById('tdrSliceBtn');
-        if (sliceBtn) sliceBtn.addEventListener('click', () => {
-            if (!tdrCurrent) { setTdrSliceHint('Radar data is still loading; try again in a moment.'); setTimeout(() => { if (!tdrSliceArm) setTdrSliceHint(''); }, 3000); return; }
-            // The section is picked on the 2D map: swap the pinned view to the 2D tracker
-            // without dropping out of fullscreen, and arm the two clicks.
-            const cur = tdrCurrent;
-            exitTdrMode(true);
-            if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value !== '2d') {
-                trackerModeSelect.value = '2d'; trackerModeSelect.dispatchEvent(new Event('change'));
-            }
-            // Sections read the storm's upper structure, so only 500 mb and above stays on the
-            // 2D map (the low bands would bury the line being drawn).
-            if (cur && cur.levels) {
-                tdrSelectedKm.clear();
-                cur.levels.forEach(l => { if (l.canvas && tdrMb(l.km) <= 500) tdrSelectedKm.add(l.km); });
-                buildTdrHero();
-            }
-            // Center the view where the section happens: the current best-track fix, else the
-            // analysis's own storm-center origin.
-            const fix = (typeof stormTrackPoints !== 'undefined' && typeof currentStormFixIdx !== 'undefined' && currentStormFixIdx >= 0) ? stormTrackPoints[currentStormFixIdx] : null;
-            const cLat = fix ? fix.lat : (cur && cur.geo ? cur.geo.originLat : null);
-            const cLon = fix ? fix.lon : (cur && cur.geo ? cur.geo.originLon : null);
-            if (cLat !== null && typeof applyMapViewportGeo === 'function') {
-                if (typeof disengageFollowAircraft === 'function') disengageFollowAircraft();
-                applyMapViewportGeo({ cLon, cLat, spanLon: 6 });
-                bgNeedsUpdate = true;
-            }
-            tdrSliceArm = 1; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
-            setTdrSliceHint('Click on two points to do a cross-section.');
-            const bb = document.getElementById('tdrBackBtn'); if (bb) bb.style.display = 'block';
+        // 2D-only radar opacity: fades the composite so satellite imagery reads through it.
+        const opSl = document.getElementById('tdr2dOpacitySlider');
+        if (opSl) opSl.addEventListener('input', () => {
+            const v = Math.max(20, Math.min(100, parseFloat(opSl.value) || 85));
+            tdr2DOpacity = v / 100;
+            const ov = document.getElementById('tdr2dOpacityVal'); if (ov) ov.textContent = Math.round(v) + '%';
+            bgNeedsUpdate = true;
             if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         });
-        // Leaving the 2D map abandons a pending section pick; the prompt must not linger in 3D.
+
+        // The tracker select is the workspace's display switch: 2D shows the map + section
+        // pick, 3D shows the radar volume; the mode itself stays up either way. Outside the
+        // mode, a stray pick must not linger when the 2D map goes away.
         if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect) trackerModeSelect.addEventListener('change', () => {
+            if (tdrModeOn) {
+                if (trackerModeSelect.value === '2d') tdrEnter2DSection(); else tdrLeave2DSection();
+                return;
+            }
             if (trackerModeSelect.value !== '2d' && (tdrSliceArm || tdrSliceLine)) {
                 tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
                 setTdrSliceHint('');
-                const bb2 = document.getElementById('tdrBackBtn'); if (bb2) bb2.style.display = 'none';
+                tdrUpdateSliceButtons();
             }
         });
-        const backBtn = document.getElementById('tdrBackBtn');
-        if (backBtn) backBtn.addEventListener('click', () => {
-            backBtn.style.display = 'none';
-            if (tdrSliceArm) { tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; setTdrSliceHint(''); }
+        const againBtn = document.getElementById('tdrSliceAgainBtn');
+        if (againBtn) againBtn.addEventListener('click', () => {
             tdrSliceLine = null;
-            enterTdrMode();
+            tdrSliceArm = 1; tdrSlicePtA = null; tdrSliceMouse = null;
+            setTdrSliceHint('Click on two points to do a cross-section. Drag to move the map.');
+            tdrUpdateSliceButtons();
+            if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         });
         ['tdrSliceCloseX', 'tdrSliceCloseBtn'].forEach(id => {
             const b = document.getElementById(id);
             if (b) b.addEventListener('click', () => {
                 const m = document.getElementById('tdrSliceModal'); if (m) m.style.display = 'none';
                 tdrSliceLine = null;
+                tdrUpdateSliceButtons();   // between picks now, so Do Another Cross Section surfaces
                 if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             });
         });

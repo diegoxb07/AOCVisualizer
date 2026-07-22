@@ -116,6 +116,8 @@
         function clampMediaToViewport() {
             const mapPanelEl = document.getElementById('mapPanel'), videoPanelEl = document.getElementById('videoPanel');
             if (mapPanelEl.classList.contains('fake-fs') || (videoPanelEl && videoPanelEl.classList.contains('fake-fs'))) return;
+            // A floating map panel sizes itself; its rect must not drive the docked height var.
+            if (mapPanelEl.classList.contains('float-panel')) return;
             const mx = maxMediaH();
             if (mapPanelEl.getBoundingClientRect().height > mx + 1) {
                 applyMediaH(mx);

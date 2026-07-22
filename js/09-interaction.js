@@ -41,6 +41,7 @@
         const showPopout = isMeasuring || hasPoints;
         document.getElementById('measureGroup').style.display = showPopout ? 'flex' : 'none';
         document.getElementById('measureShapeSelect').style.display = isMeasuring ? 'inline-block' : 'none';
+        const stopBtn = document.getElementById('stopMeasureBtn'); if (stopBtn) stopBtn.style.display = isMeasuring ? 'inline-block' : 'none';
         document.getElementById('clearMeasureBtn').style.display = hasPoints ? 'inline-block' : 'none';
         const hintEl = document.getElementById('measureHint');
         if (isMeasuring) {
@@ -54,23 +55,29 @@
         }
     }
 
+    // The header button only starts (or toggles) measuring and keeps its "Measure" face; the
+    // popout's red Stop Measuring button is the stop control.
     function stopMeasuringState() {
         commitActivePolygon();  // keep a finished (3+ pt) polygon; discard an unfinished stub
-        isMeasuring = false; liveMouseGeo = null; hoveredShapeIndex = -1; const btn = document.getElementById('measureBtn');
-        btn.innerText = 'Measure'; btn.classList.remove('bg-danger', 'hover:bg-danger', 'border-danger'); btn.classList.add('bg-accent', 'hover:bg-accent', 'border-accent'); updateMeasureUI();
+        isMeasuring = false; liveMouseGeo = null; hoveredShapeIndex = -1;
+        updateMeasureUI();
     }
 
     document.getElementById('measureBtn').addEventListener('click', () => {
         const wasMeasuring = isMeasuring;
-        isMeasuring = !isMeasuring; const btn = document.getElementById('measureBtn');
-        if(isMeasuring) { btn.classList.remove('bg-accent', 'hover:bg-accent', 'border-accent'); btn.classList.add('bg-danger', 'hover:bg-danger', 'border-danger'); btn.innerText = 'Stop Measuring'; } 
-        else { btn.classList.remove('bg-danger', 'hover:bg-danger', 'border-danger'); btn.classList.add('bg-accent', 'hover:bg-accent', 'border-accent'); btn.innerText = 'Measure'; }
+        isMeasuring = !isMeasuring;
         if (isMeasuring) { measurePointsGeo = []; }
         else { if (wasMeasuring) commitActivePolygon(); liveMouseGeo = null; }
         updateMeasureUI(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     });
 
-    document.getElementById('clearMeasureBtn').addEventListener('click', () => { 
+    const stopMeasureBtn = document.getElementById('stopMeasureBtn');
+    if (stopMeasureBtn) stopMeasureBtn.addEventListener('click', () => {
+        stopMeasuringState();
+        if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    });
+
+    document.getElementById('clearMeasureBtn').addEventListener('click', () => {
         measurePointsGeo = []; drawnShapes = []; 
         isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1; measureButtons = [];
         updateMeasureUI(); 
@@ -216,8 +223,14 @@
             updateMeasureUI(); if (filteredData.length > 0) renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return;
         }
 
-        // TDR cross-section picking consumes the click while armed (js/07d-tdr.js).
-        if (typeof tdrSliceMapClick === 'function' && tdrSliceMapClick(geo)) { measureClickHandled = true; return; }
+        // TDR cross-section picking (js/07d-tdr.js): while armed, mousedown only starts a map
+        // pan; the point lands on mouseup when the mouse did not drag. The auto-centered view
+        // often sits off the radar data, so the map must stay draggable mid-pick.
+        if (typeof tdrSliceArm !== 'undefined' && tdrSliceArm) {
+            isDraggingMap = true; dragStartX = e.clientX - mapOffsetX; dragStartY = e.clientY - mapOffsetY; canvas.dataset.downX = e.clientX; canvas.dataset.downY = e.clientY;
+            canvas.dataset.maxDrag = '0';
+            return;
+        }
 
         if (isMeasuring) {
             if (measureShape === 'polygon') {
@@ -261,7 +274,14 @@
             }
         }
         if (isMeasuring && (measurePointsGeo.length > 0 || drawnShapes.length > 0)) { liveMouseGeo = geo; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
-        if (isDraggingMap) { disengageFollowAircraft(); mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+        if (isDraggingMap) {
+            disengageFollowAircraft(); mapOffsetX = e.clientX - dragStartX; mapOffsetY = e.clientY - dragStartY; bgNeedsUpdate = true;
+            // Peak distance from the press point: a to-and-fro pan ends near its start, so the
+            // net down-to-up distance alone would misread it as a click (see the mouseup).
+            const peak = Math.hypot(e.clientX - parseFloat(canvas.dataset.downX || e.clientX), e.clientY - parseFloat(canvas.dataset.downY || e.clientY));
+            if (peak > parseFloat(canvas.dataset.maxDrag || 0)) canvas.dataset.maxDrag = peak;
+            renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+        }
     });
     
     canvas.addEventListener('mouseup', (e) => { 
@@ -269,6 +289,14 @@
         if (isDraggingShape) { isDraggingShape = false; draggingShapeIndex = -1; return; }
         isDraggingMap = false; if (trackerModeSelect.value === '3d') return;
         const totalDist = Math.sqrt(Math.pow(e.clientX - parseFloat(canvas.dataset.downX || 0), 2) + Math.pow(e.clientY - parseFloat(canvas.dataset.downY || 0), 2));
+        // A clean click while the cross-section pick is armed places that point; any drag was a
+        // pan. Judged by PEAK distance (a to-and-fro pan nets near zero), and the point lands at
+        // the PRESS position so a release slip cannot pull it off the aimed spot.
+        if (typeof tdrSliceArm !== 'undefined' && tdrSliceArm && typeof tdrSliceMapClick === 'function') {
+            const maxDrag = Math.max(totalDist, parseFloat(canvas.dataset.maxDrag || 0));
+            if (maxDrag < 5 && tdrSliceMapClick(screenToGeo(parseFloat(canvas.dataset.downX || e.clientX), parseFloat(canvas.dataset.downY || e.clientY))) && filteredData.length) renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            return;
+        }
         if (totalDist < 5) handleTrackerCoordinatesClick(e);
     });
 

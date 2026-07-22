@@ -159,6 +159,7 @@
 
         // unload the MMR video (revokes its object URL, resets both drop zones + speeds) and drop its zoom/pan.
         if (typeof clearLoadedMedia === 'function') clearLoadedMedia();
+        if (typeof floatPanelsDockAll === 'function') floatPanelsDockAll();
         currentSpeedIdx = 0; if (typeof updateSpeedDisplay === 'function') updateSpeedDisplay();
         vidZoom = 1; vidPanX = 0; vidPanY = 0; if (radarVid) radarVid.style.transform = '';
 

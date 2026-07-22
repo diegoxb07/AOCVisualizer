@@ -100,7 +100,7 @@ in `js/02-satellite.js`.)
 | **Record Clip** | Yes | Yes |
 | **MODIS / VIIRS** satellite overlays (NASA GIBS) | Yes | Needs GIBS, independent of the recon-api |
 | **GOES-East / GOES-West** archive imagery | Yes | No (disabled, "API Offline") |
-| **TDR radar overlays** (2D layers and 3D columns) | Yes | No for new analyses and cross-sections; already-fetched ones keep showing |
+| **TDR overlays** (2D layers and 3D columns) | Yes | No for new analyses and cross-sections; already-fetched ones keep showing |
 | **Storm best-track** overlay | Yes (comes with archive load) | No for new loads; an already-loaded track stays until reset |
 | **Batch satellite pre-cache** (GOES) | Yes | No (GOES disabled) |
 | Imagery already in the **local cache** | Yes | Yes (served from cache, no fetch) |

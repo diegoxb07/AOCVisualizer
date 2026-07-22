@@ -857,7 +857,9 @@
             const ringGeo = new THREE.RingGeometry(0.60, 0.76, 48);
             ringGeo.rotateX(-Math.PI / 2);
             stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
-            stormFixRing3D.renderOrder = 5;
+            // Above the ribbon (1) and the current fix's arms (2), but BELOW the storm symbols (3)
+            // and the TDR level planes (3+), so the ring never paints through the radar volume.
+            stormFixRing3D.renderOrder = 2.5;
             stormFixRing3D.position.y = STORM_LAYER_Y;
             stormFixRing3D.visible = false;
             threeMapGroup.add(stormFixRing3D);
@@ -925,6 +927,9 @@
     // fullscreen too if it isn't already, so panel/page switches are a single click.
     const refreshAfterViewChange = () => setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
     const setFakePanel = (panel) => {
+        // A floating panel's inline rect would beat .fake-fs's inset:0; the float manager
+        // suspends it for the pin and restores it on release (js/11c-float-panels.js).
+        if (typeof floatPanelsOnPinChange === 'function') floatPanelsOnPinChange(panel);
         mapPanel.classList.toggle('fake-fs', panel === mapPanel);
         videoPanel.classList.toggle('fake-fs', panel === videoPanel);
         // the whole top-right sticky cluster (help, reset, theme, fullscreen) sits over the pinned
@@ -1101,20 +1106,30 @@
                  +  (opt.disabled ? `<span class="sat-pick-tag">unavailable</span>` : ``)
                  +  `</button>`;
             if (expanded && def && def.bands) {
+                // Daylight-dependent GOES products (reflective bands 1-6, sandwich) lock out
+                // when the flight is in night by its halfway point; the native select's options
+                // are disabled the same way in updateBandOptions, but the user clicks HERE.
+                const nightFlight = def.isReconApi && typeof flightNightByHalf === 'function' && flightNightByHalf();
+                const isDark = b => nightFlight && (b.product === 'sandwich' || (b.band != null && b.band <= 6));
+                // Pickable products list first; unavailable and night-locked ones sink below
+                // them (stable sort, so band order holds within each half).
+                const bySelectable = defs => defs.slice().sort((a, b2) => ((a.available === false || isDark(a)) ? 1 : 0) - ((b2.available === false || isDark(b2)) ? 1 : 0));
                 const renderBand = b => {
                     const unavail = b.available === false;   // api online but this product isn't being served
-                    return `<button type="button" class="sat-pick-prod${(isActive && activeBand === b.id) ? ' active' : ''}${unavail ? ' unavailable' : ''}"`
-                        + (unavail ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`) + `>`
+                    const dark = isDark(b);
+                    const off = unavail || dark;
+                    return `<button type="button" class="sat-pick-prod${(isActive && activeBand === b.id) ? ' active' : ''}${off ? ' unavailable' : ''}"`
+                        + (off ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`) + `>`
                         + `<span class="sat-pick-name">${escapeHtml(b.name)}</span>`
-                        + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : ``) + `</button>`;
+                        + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : (dark ? `<span class="sat-pick-tag">night flight</span>` : ``)) + `</button>`;
                 };
                 html += `<div class="sat-pick-products">`;
                 if (def.isReconApi) {
                     const spectral = def.bands.filter(b => !b.isComposite), comps = def.bands.filter(b => b.isComposite);
-                    if (spectral.length) html += `<div class="sat-pick-group">Spectral Bands</div>` + spectral.map(renderBand).join('');
-                    if (comps.length) html += `<div class="sat-pick-group">Composites</div>` + comps.map(renderBand).join('');
+                    if (spectral.length) html += `<div class="sat-pick-group">Spectral Bands</div>` + bySelectable(spectral).map(renderBand).join('');
+                    if (comps.length) html += `<div class="sat-pick-group">Composites</div>` + bySelectable(comps).map(renderBand).join('');
                 } else {
-                    html += def.bands.map(renderBand).join('');
+                    html += bySelectable(def.bands).map(renderBand).join('');
                 }
                 html += `</div>`;
             }

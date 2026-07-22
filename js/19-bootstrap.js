@@ -49,6 +49,12 @@
         async function openModal() {
             populateBatchSatSelect(); populateBatchBandChecks();
             modal.style.display = 'flex';
+            // A running auto pass is not this modal's pass; say so up front instead of letting
+            // the Start click read as dead (or worse, cancel it).
+            if (typeof batchCaching !== 'undefined' && batchCaching && batchCacheIsAuto) {
+                const st = document.getElementById('batchCacheStatus');
+                if (st) st.textContent = "The loaded flight's satellite imagery is still loading in; the batch can start once it finishes.";
+            }
             const offline = typeof isReconApiDown === 'function' && isReconApiDown();
             const toast = document.getElementById('batchApiOfflineToast');
             if (toast) toast.classList.toggle('hidden', !offline);
@@ -77,7 +83,16 @@
             document.getElementById('batchCacheStatus').textContent = picked.length ? `${picked.length} file(s) selected.` : 'No files selected.';
         });
         startBtn.addEventListener('click', () => {
-            if (batchCaching) { requestCacheCancel(); return; }
+            if (batchCaching) {
+                // Stop applies only to THIS modal's own pass. The auto pass (the loaded flight's
+                // imagery warming behind the media display) keeps running; clicking what reads
+                // as "Start caching" must not tear it down.
+                if (batchCacheIsAuto) {
+                    document.getElementById('batchCacheStatus').textContent = "The loaded flight's satellite imagery is still loading in. Let it finish, or cancel it from the on-map pill, then start the batch.";
+                    return;
+                }
+                requestCacheCancel(); return;
+            }
             const bands = Array.from(document.querySelectorAll('#batchBandChecks input:checked')).map(c => c.value);
             // Unify the two inputs into one source list: checked archive missions (read via the recon
             // API / on-device store) and uploaded files. Order is archive first, then files.
@@ -144,6 +159,7 @@
 
         // unload the MMR video (revokes its object URL, resets both drop zones + speeds) and drop its zoom/pan.
         if (typeof clearLoadedMedia === 'function') clearLoadedMedia();
+        if (typeof floatPanelsDockAll === 'function') floatPanelsDockAll();
         currentSpeedIdx = 0; if (typeof updateSpeedDisplay === 'function') updateSpeedDisplay();
         vidZoom = 1; vidPanX = 0; vidPanY = 0; if (radarVid) radarVid.style.transform = '';
 

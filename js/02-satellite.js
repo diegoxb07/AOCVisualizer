@@ -653,6 +653,35 @@
         if (grp && band) grp.classList.toggle('split', band.style.display !== 'none');
     }
 
+    // Solar elevation (degrees) at a UTC millisecond timestamp and position. Standard astronomy
+    // (days since J2000 -> ecliptic longitude -> declination, hour angle via GMST), accurate to
+    // well under a degree, which is far tighter than the day/night gate needs.
+    function sunElevationDeg(ms, lat, lon) {
+        const rad = Math.PI / 180;
+        const n = ms / 86400000 - 10957.5;                                     // days since J2000.0
+        const L = (280.460 + 0.9856474 * n) % 360;                             // mean longitude
+        const g = ((357.528 + 0.9856003 * n) % 360) * rad;                     // mean anomaly
+        const lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad; // ecliptic longitude
+        const eps = 23.439 * rad;
+        const dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+        const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
+        const gmst = ((18.697374558 + 24.06570982441908 * n) % 24 + 24) % 24;  // sidereal hours
+        const ha = ((gmst * 15 + lon) * rad - ra + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+        return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+    }
+
+    // True when the loaded flight is in night by its halfway point (sun below -2 degrees at the
+    // midpoint row's time and position): daylight-dependent products would show black for most
+    // of the playback, so the picker disables them rather than let the pick disappoint.
+    function flightNightByHalf() {
+        if (!allParsedData || !allParsedData.length || !flightMetaData || flightMetaData.date === 'Unknown') return false;
+        const mid = allParsedData[Math.floor(allParsedData.length / 2)];
+        if (!mid || mid.lat == null || mid.lon == null) return false;
+        const ms = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + mid.absSeconds * 1000;
+        if (!isFinite(ms)) return false;
+        return sunElevationDeg(ms, mid.lat, mid.lon) < -2;
+    }
+
     function updateBandOptions() {
         const satSelect = document.getElementById('satelliteSelect');
         const bandSelect = document.getElementById('satBandSelect');
@@ -684,6 +713,10 @@
                 bandSelect.appendChild(ph);
             }
             if (layerDef.isReconApi) {
+                // Daylight-dependent products (reflective bands 1-6 and the vis+IR sandwich)
+                // disable for flights that are in night by their halfway point.
+                const night = flightNightByHalf();
+                const needsDay = b => b.product === 'sandwich' || (b.band != null && b.band <= 6);
                 // Spectral bands and multi-band composites in separate groups, so a blend like
                 // "IR/VIS Sandwich" can't be misread as just another band.
                 const addGroup = (label, defs) => {
@@ -695,15 +728,19 @@
                         opt.value = b.id;
                         // a product the api isn't currently serving stays listed but disabled, labelled
                         // "unavailable", so it reads as temporarily offline rather than silently vanishing.
-                        opt.textContent = b.available === false ? b.name + ' (unavailable)' : b.name;
-                        opt.title = b.name;   // full name on hover, the closed select ellipsizes long ones (CSS max-width)
-                        if (b.available === false) opt.disabled = true;
+                        const dark = night && needsDay(b);
+                        opt.textContent = b.available === false ? b.name + ' (unavailable)' : (dark ? b.name + ' (night flight)' : b.name);
+                        opt.title = dark ? b.name + ': needs daylight, and this flight is in night by its halfway point' : b.name;
+                        if (b.available === false || dark) opt.disabled = true;
                         og.appendChild(opt);
                     });
                     bandSelect.appendChild(og);
                 };
-                addGroup('Spectral Bands', layerDef.bands.filter(b => !b.isComposite));
-                addGroup('Composites (multi-band)', layerDef.bands.filter(b => b.isComposite));
+                // Pickable products list first; unavailable and night-locked ones sink below
+                // them (stable sort, band order holds within each half), matching the picker.
+                const offRank = b => (b.available === false || (night && needsDay(b))) ? 1 : 0;
+                addGroup('Spectral Bands', layerDef.bands.filter(b => !b.isComposite).sort((a, b2) => offRank(a) - offRank(b2)));
+                addGroup('Composites (multi-band)', layerDef.bands.filter(b => b.isComposite).sort((a, b2) => offRank(a) - offRank(b2)));
             } else {
                 layerDef.bands.forEach(b => {
                     const opt = document.createElement('option');
@@ -835,14 +872,20 @@
     // requiring the token), retry by fetching the bytes WITH the header and decoding them via a blob
     // url. Resolves a canvas, or null on failure (same contract as loadImageToCanvas).
     async function loadReconImageToCanvas(url) {
-        const direct = await loadImageToCanvas(url);
-        if (direct) return direct;
+        // fetch-first so the PNG's true byte size and download time are measured (the cache
+        // pill's MB/s shows real network numbers, accumulated only while a pass runs);
+        // Image() stays as the fallback when the fetch path fails.
         try {
+            const t0 = performance.now();
             const resp = await fetch(url, { headers: reconAuthHeaders() });
-            if (!resp.ok) return null;
-            const obj = URL.createObjectURL(await resp.blob());
-            try { return await loadImageToCanvas(obj); } finally { URL.revokeObjectURL(obj); }
-        } catch (_) { return null; }
+            if (resp.ok) {
+                const blob = await resp.blob();
+                if (batchCaching) { satPassBytes += blob.size; satPassDlMs += performance.now() - t0; }
+                const obj = URL.createObjectURL(blob);
+                try { const c = await loadImageToCanvas(obj); if (c) return c; } finally { URL.revokeObjectURL(obj); }
+            }
+        } catch (_) {}
+        return await loadImageToCanvas(url);
     }
 
     // Discovery endpoint: every band/composite the API can render, plus each spacecraft's active date
@@ -1214,7 +1257,7 @@
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
                     satLoadedInfo = null; updateSatTimeBadge();
-                    showToast('Satellite: No imagery found for ' + idTimePart + ' in this band/area.', 6000);
+                    showToast('Satellite: no imagery found for this day and area.', 6000);
                 }
             } catch(e) {
                 hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
@@ -1392,8 +1435,10 @@
                 } else {
                     // Keep the last good tile on screen instead of blanking, so the user always sees
                     // imagery even when a bucket has no scan / errors. (attempt-once: lastSatFetchTime is
-                    // already set to this bucket, so we won't hammer the API retrying it.)
-                    showToast(`GOES Archive ${bandName}: ${(r && r.error) || 'no scan'} near ${timeIso.slice(11,16)}Z, keeping previous image.`, 5000);
+                    // already set to this bucket, so we won't hammer the API retrying it.) The toast
+                    // stays short and plain: the API's raw error text (URLs, HTTP details) only scares,
+                    // and a cache pass's own skip messages cover the batchCaching case.
+                    if (!batchCaching) showToast(`GOES Archive ${bandName}: no scan available near ${timeIso.slice(11,16)}Z, keeping the previous image.`, 5000);
                 }
             } catch(e) {
                 hideSatLoader();   // transient error, leave the previous tile up rather than blanking
@@ -1490,7 +1535,7 @@
     function showSatPrefetchBar() {
         clearSatPrefetchHide();
         const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden');
-        const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Preparing satellite cache…';
+        const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Preparing satellite loader…';
         setPrefetchIndeterminate(true);   // bounce until the first tile actually lands
     }
     function hideSatPrefetchBar() {
@@ -1550,6 +1595,24 @@
         // Background pill (visible on the 2D map when the modal is closed).
         const pf = document.getElementById('satPrefetchFill'); if (pf && done > 0) pf.style.width = pct + '%';
         const pl = document.getElementById('satPrefetchLabel'); if (pl && note) pl.textContent = note;
+    }
+
+    // The cache pill's trailing "~time left · MB/s". Every number is MEASURED: the ETA is the
+    // remaining uncached tiles times the average wall seconds of the LAST FEW attempted tiles
+    // (a rolling window: the first tile carries the server's cold start and would inflate an
+    // all-time mean for the whole pass), and the speed is real PNG bytes over real download
+    // milliseconds (loadReconImageToCanvas accumulates them while a pass runs). Parts with no
+    // measurements yet stay off the pill.
+    function satPassNote(done, total, remainUncached, recentMs) {
+        let note = `Loading in satellite image ${done}/${total}…`;
+        if (recentMs.length > 0 && remainUncached > 0) {
+            const avg = recentMs.reduce((a, b) => a + b, 0) / recentMs.length;
+            const sec = remainUncached * avg / 1000;
+            const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+            note += ' ~' + (m ? m + 'm ' + s + 's' : s + 's') + ' left';
+        }
+        if (satPassDlMs > 400 && satPassBytes > 0) note += ' · ' + ((satPassBytes / 1048576) / (satPassDlMs / 1000)).toFixed(1) + ' MB/s';
+        return note;
     }
 
     // Build the list of {fetchId, run} tiles to cache for one storm's rows+date, for the USER-CHOSEN
@@ -1658,14 +1721,28 @@
         batchCaching = true; batchCacheIsAuto = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
         showSatPrefetchBar();   // background pill (has its own Cancel) so playback stays usable
+        // Playback returns to the flight's start: the tiles cache in chronological order from
+        // there, so imagery appears under the playhead in step with the loading.
+        if (filteredData.length) {
+            currentIdx = 0;
+            if (typeof updateVisualComponents === 'function') updateVisualComponents(0);
+        }
         const total = targets.length;
         let done = 0, fetched = 0;
-        for (const t of targets) {
+        const recentMs = [];   // last few attempt durations, the ETA's rolling window
+        satPassBytes = 0; satPassDlMs = 0;
+        for (let ti = 0; ti < targets.length; ti++) {
+            const t = targets[ti];
             if (batchCacheCancel || myPass !== batchCachePass) break;
-            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`); continue; }
-            try { const r = await t.run(); if (r && r.canvas) fetched++; } catch (e) {}
+            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Loading in satellite image ${done}/${total}…`); continue; }
+            let ok = false;
+            const t0 = performance.now();
+            try { const r = await t.run(); if (r && r.canvas) { fetched++; ok = true; } } catch (e) {}
+            recentMs.push(performance.now() - t0); if (recentMs.length > 5) recentMs.shift();
             done++;
-            setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
+            if (!ok) showToast(`Issue finding satellite image ${done}/${total}, skipping…`, 4000);
+            const remain = targets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
+            setBatchProgress(done, total, satPassNote(done, total, remain, recentMs));
         }
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
         batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
@@ -1750,15 +1827,21 @@
         // Pass 2: pull each tile once (skip anything already cached), gently one at a time.
         const total = allTargets.length;
         let done = 0, fetched = 0, failed = 0;
-        for (const t of allTargets) {
+        const recentMs = [];   // last few attempt durations, the ETA's rolling window
+        satPassBytes = 0; satPassDlMs = 0;
+        for (let ti = 0; ti < allTargets.length; ti++) {
+            const t = allTargets[ti];
             if (batchCacheCancel || myPass !== batchCachePass) break;
-            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`); continue; }
+            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Loading in satellite image ${done}/${total}…`); continue; }
+            const t0 = performance.now();
             try {
                 const r = await t.run();
                 if (r && r.canvas) fetched++; else failed++;
             } catch (e) { failed++; }
+            recentMs.push(performance.now() - t0); if (recentMs.length > 5) recentMs.shift();
             done++;
-            setBatchProgress(done, total, `Caching ${done}/${total} (${fetched} new)…`);
+            const remain = allTargets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
+            setBatchProgress(done, total, satPassNote(done, total, remain, recentMs));
         }
 
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)

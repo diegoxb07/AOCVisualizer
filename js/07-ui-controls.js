@@ -927,6 +927,9 @@
     // fullscreen too if it isn't already, so panel/page switches are a single click.
     const refreshAfterViewChange = () => setTimeout(() => { resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }, 100);
     const setFakePanel = (panel) => {
+        // A floating panel's inline rect would beat .fake-fs's inset:0; the float manager
+        // suspends it for the pin and restores it on release (js/11c-float-panels.js).
+        if (typeof floatPanelsOnPinChange === 'function') floatPanelsOnPinChange(panel);
         mapPanel.classList.toggle('fake-fs', panel === mapPanel);
         videoPanel.classList.toggle('fake-fs', panel === videoPanel);
         // the whole top-right sticky cluster (help, reset, theme, fullscreen) sits over the pinned

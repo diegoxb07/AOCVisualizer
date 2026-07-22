@@ -49,6 +49,7 @@ const PRECACHE = [
     'js/10-point-analysis.js',
     'js/11-layout.js',
     'js/11b-parser-core.js',
+    'js/11c-float-panels.js',
     'js/12-file-parsing.js',
     'js/12b-recon-archive.js',
     'js/13-charts-master.js',

@@ -87,6 +87,8 @@
         document.getElementById('fileInput').value = '';
         resetDropZone('dataDropZone', 'dataDropLabel', 'Choose File/Drag & Drop');
         if (!videoLoaded) return;
+        // An unloaded video panel has nothing to float; back to the bar before the video goes.
+        if (typeof floatDock === 'function') floatDock('videoPanel');
         video.pause();
         try { URL.revokeObjectURL(video.src); } catch (e) {}
         video.removeAttribute('src'); video.load();

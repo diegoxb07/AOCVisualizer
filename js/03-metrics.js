@@ -8,7 +8,7 @@
     let threeMarkersGroup = new THREE.Group();
     let threeDInitialized = false;
 
-    // Console redesign: neon data palette (equal-weight lines, no gradient fills).
+    // Neon data palette for the charts: equal-weight lines, no gradient fills.
     const METRIC_DEFS = {
         'pAlt': { label: 'Press Altitude (m)', color: '#c2beb5', yAxisID: 'y' },
         'gpsAlt': { label: 'GPS Altitude (m)', color: '#9aa1ad', yAxisID: 'y' },

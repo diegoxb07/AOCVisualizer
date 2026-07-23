@@ -11,8 +11,6 @@
         el.addEventListener('change', handleChange);
         el.addEventListener('keyup', (e) => { if (e.key === 'Enter') el.blur(); });
     });
-    
-    // The old "Apply & Run" button is gone, the Play button folds it in (see the play handler below).
 
     // Batch satellite cache modal (works across many storms without loading each flight into the app).
     (function wireBatchCache() {
@@ -315,8 +313,8 @@
     })();
 
     playPauseBtn.addEventListener('click', function() {
-        // Fold the old "Apply & Run" into Play: when starting playback in manual mode, if the start/end
-        // time window was edited since it was last applied, apply it (from the window start) then play.
+        // When starting playback in manual mode, if the start/end time window was edited since it
+        // was last applied, apply it (from the window start) then play.
         if (!isPlaying && allParsedData.length && videoSyncMode.value !== 'auto') {
             const win = document.getElementById('startTimeInput').value + '|' + document.getElementById('endTimeInput').value + '|' + document.getElementById('videoStartInput').value;
             if (win !== window._appliedWindow) { applyFiltersAndInit(true); return; }

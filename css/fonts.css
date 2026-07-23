@@ -1,6 +1,6 @@
-/* Locally hosted fonts (latin), replacing the Google Fonts CDN so the app stays fully offline.
-   Manrope (UI) + IBM Plex Mono (telemetry/numbers) are the console-redesign faces; Inter + Roboto
-   Mono are kept below as fallbacks. */
+/* Locally hosted fonts (latin) so the app loads fully offline with no external font request.
+   Manrope (UI) + IBM Plex Mono (telemetry/numbers) are the primary faces; Inter + Roboto Mono
+   are the fallbacks below. */
 @font-face {
   font-family: 'Manrope';
   font-style: normal;

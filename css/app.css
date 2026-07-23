@@ -67,10 +67,9 @@ body {
 button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
 button { transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s; }
 
-/* Theme-aware utility classes: small, hand-written replacements for the old Tailwind
-   slate-blue-amber-red-* usages, so the whole app follows [data-theme] with no
-   colors baked at build time. Used both directly in index.html and via classList
-   add/toggle in js/*.js (see tailwind.config.js safelist). */
+/* Theme-aware utility classes: small, hand-written color utilities bound to CSS variables, so
+   the whole app follows [data-theme] with no colors baked at build time. Used both directly in
+   index.html and via classList add/toggle in js/*.js (see tailwind.config.js safelist). */
 .bg-app { background-color: var(--bg); }
 .bg-panel { background-color: var(--panel); }
 .bg-panel-strip { background-color: var(--panel-strip); }

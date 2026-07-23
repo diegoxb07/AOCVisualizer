@@ -49,7 +49,7 @@ sign-in. A user with their own token can override it by setting `reconApiToken` 
 2. **Archive GOES imagery.** It renders **GOES-East / GOES-West** ABI tiles **server-side from
    NOAA's AWS S3 archive**, auto-resolving the right spacecraft for the date (East: GOES-16/19,
    West: GOES-17/18). This is what makes GOES available for the *historical* dates recon flights
-   fall on, which NASA GIBS no longer keeps.
+   fall on, which NASA GIBS does not serve.
 
 Because it's actively developed, the tool **discovers** the available satellite products at
 startup (`GET /v1/satellite/products`) rather than hardcoding them. New bands and composites

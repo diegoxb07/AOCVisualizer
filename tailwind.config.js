@@ -1,7 +1,7 @@
 /** Tailwind config for the static build (css/tailwind.css).
  *  Regenerate after adding/removing Tailwind classes in index.html or js/*.js:
  *    npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify
- *  Theme matches the old cdn.tailwindcss.com inline config exactly. */
+ *  Theme (below) sets only font families; app colors live as CSS variables in css/app.css. */
 module.exports = {
   content: ['./index.html', './js/*.js'],
   // Classes toggled from JS (classList.add/toggle), listed explicitly so a scanner

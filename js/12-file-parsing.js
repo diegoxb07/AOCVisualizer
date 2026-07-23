@@ -191,6 +191,13 @@
     // preloader) and make it the loaded flight: resets, globals, and the post-parse UI setup.
     // Throws when the rows are empty.
     function applyParsedFlight(parsed) {
+        // A new flight starts from the docked, expanded media layout: pull any floating player back
+        // into the bar and open the media if it was collapsed.
+        if (typeof floatPanelsDockAll === 'function') floatPanelsDockAll();
+        const mediaBarEl = document.getElementById('stickyMediaBar');
+        if (mediaBarEl && mediaBarEl.classList.contains('collapsed')) {
+            const cb = document.getElementById('mediaCollapseBtn'); if (cb) cb.click();
+        }
         // New flight: KEEP the satellite tile cache (it accumulates across storms until the tab closes;
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.

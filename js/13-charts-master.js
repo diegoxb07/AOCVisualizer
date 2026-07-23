@@ -46,11 +46,22 @@
         });
     }
 
+    // Card title for a Create Your Own Graph: the picked variables (units stripped, joined with
+    // "vs"), or the default prompt when empty. Shared by the master card and every spawned extra
+    // card so they read alike.
+    function setCustomGraphTitle(titleEl, chart) {
+        if (!titleEl) return;
+        const labels = chart ? chart.data.datasets.map(ds => (ds.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()).filter(Boolean) : [];
+        if (!labels.length) titleEl.innerHTML = 'Create Your Own Graph <span class="text-faint font-normal normal-case">: You can use this to compare any variables you\'d like!</span>';
+        else titleEl.textContent = labels.length <= 3 ? labels.join(' vs ') : labels.slice(0, 3).join(', ') + ' +' + (labels.length - 3) + ' more';
+    }
+
     function updateMasterGraphVisibility() {
         const wrapper = document.getElementById('masterGraphWrapper'), prompt = document.getElementById('masterCreatePrompt');
         const hasData = masterChartInstance && masterChartInstance.data.datasets.length > 0;
         if (hasData) { wrapper.classList.remove('hidden'); wrapper.classList.add('block'); if (prompt) prompt.classList.add('hidden'); masterChartInstance.resize(); }
         else { wrapper.classList.remove('block'); wrapper.classList.add('hidden'); if (prompt) prompt.classList.remove('hidden'); }
+        setCustomGraphTitle(document.querySelector('#title-masterChart > span'), masterChartInstance);
         ensureExtraCreateBox();
     }
 
@@ -85,11 +96,13 @@
         if (!host || typeof Chart === 'undefined' || typeof getBaseChartOptions !== 'function') return;
         const id = 'extraChart' + (++extraGraphSeq);
         const card = document.createElement('div');
-        card.className = 'bg-panel border border-hairline rounded p-4 shadow-sm relative flex flex-col';
+        // Mirrors the master Create Your Own Graph card: same min height, title bar, centered create
+        // prompt while empty, and chart wrapper once variables are picked.
+        card.className = 'bg-panel border border-hairline rounded p-4 shadow-sm relative flex flex-col min-h-[300px]';
         card.dataset.extraChart = id;
         card.innerHTML =
-            '<div class="flex justify-between items-center text-xs font-semibold text-muted uppercase tracking-wider mb-2 z-20">'
-            + '<span>Custom Graph</span>'
+            `<div class="flex justify-between items-center text-xs font-semibold text-muted uppercase tracking-wider mb-2 z-20" id="title-${id}">`
+            + '<span class="extra-graph-title">Create Your Own Graph <span class="text-faint font-normal normal-case">: You can use this to compare any variables you\'d like!</span></span>'
             + '<div class="flex items-center gap-2">'
             + `<button class="reset-scale-btn text-muted text-base hover:text-accent hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('${id}')" title="Reset Zoom / scale">↺</button>`
             + '<div class="relative">'
@@ -98,19 +111,37 @@
             + '</div>'
             + `<button class="text-muted text-base hover:text-ink transition-colors focus:outline-none" onclick="removeExtraGraph('${id}')" title="Remove this graph">✕</button>`
             + '</div></div>'
-            + `<div class="w-full relative h-full max-h-[300px] mt-1"><canvas id="${id}"></canvas></div>`;
+            + `<button id="prompt-${id}" type="button" onclick="toggleMenu(event, 'menu-${id}')" class="group w-full flex-grow create-graph-box flex flex-col items-center justify-center gap-1.5 rounded border-2 border-dashed border-hairline hover:border-[color-mix(in_oklab,var(--accent)_70%,transparent)] hover:bg-panel-strip/40 transition-colors cursor-pointer">`
+            + '<span class="text-accent cg-plus font-light leading-none group-hover:scale-110 transition-transform">＋</span>'
+            + '<span class="text-ink text-sm font-bold tracking-[0.25em] uppercase">Create Graph</span>'
+            + '<span class="text-faint text-[11px] normal-case font-normal">Click to choose the variables you want to plot</span>'
+            + '</button>'
+            + `<div id="wrapper-${id}" class="w-full flex-grow relative hidden h-full max-h-[300px] mt-1"><canvas id="${id}"></canvas></div>`;
         host.appendChild(card);
         extraMasterCharts[id] = new Chart(document.getElementById(id).getContext('2d'), {
             type: 'line',
-            data: { labels: (typeof labelsTimeline !== 'undefined') ? labelsTimeline : [], datasets: [] },
+            data: { labels: filteredData.map(d => `${d.time.slice(0, 2)}:${d.time.slice(2, 4)}:${d.time.slice(4)}`), datasets: [] },
             options: getBaseChartOptions('Custom Comparison', { enforceIntegers: false, minRange: 2, isMaster: true }),
             plugins: [markerPlugin],
         });
         buildExtraMenu(id);
-        ensureExtraCreateBox();   // the fresh box lands under the new card
+        updateExtraGraphVisibility(id);   // starts on the create prompt with the default title
+        ensureExtraCreateBox();   // the fresh add box lands under the new card
         // Open the new card's variable menu right away, matching the master prompt's flow.
         const addBtn = card.querySelector(`[onclick*="menu-${id}"]`);
         if (addBtn) addBtn.click();
+    }
+
+    // Toggle a spawned card between its create prompt (empty) and its chart (populated), and refresh
+    // its variable-based title. Mirrors updateMasterGraphVisibility for the master card.
+    function updateExtraGraphVisibility(id) {
+        const chart = extraMasterCharts[id];
+        const wrapper = document.getElementById('wrapper-' + id), prompt = document.getElementById('prompt-' + id);
+        if (!chart || !wrapper || !prompt) return;
+        if (chart.data.datasets.length > 0) { wrapper.classList.remove('hidden'); wrapper.classList.add('block'); prompt.classList.add('hidden'); chart.resize(); }
+        else { wrapper.classList.remove('block'); wrapper.classList.add('hidden'); prompt.classList.remove('hidden'); }
+        const card = document.querySelector(`[data-extra-chart="${id}"]`);
+        if (card) setCustomGraphTitle(card.querySelector('.extra-graph-title'), chart);
     }
 
     function toggleExtraMetric(id, metricKey, isChecked) {
@@ -124,7 +155,7 @@
             const idx = chart.data.datasets.findIndex(ds => ds.metricKey === metricKey);
             if (idx > -1) chart.data.datasets.splice(idx, 1);
         }
-        chart.update('none'); buildExtraMenu(id);
+        chart.update('none'); buildExtraMenu(id); updateExtraGraphVisibility(id);
     }
 
     function buildExtraMenu(id) {
@@ -133,7 +164,7 @@
         menu.innerHTML = ''; const isImp = !document.getElementById('toggleSI').checked;
         const activeKeys = chart.data.datasets.map(ds => ds.metricKey);
         const clearAllItem = document.createElement('div'); clearAllItem.className = 'dropdown-item'; clearAllItem.style.color = '#ef4444'; clearAllItem.style.fontWeight = 'bold'; clearAllItem.innerText = '✕ Clear All';
-        clearAllItem.onclick = (e) => { e.stopPropagation(); chart.data.datasets = []; chart.update('none'); buildExtraMenu(id); };
+        clearAllItem.onclick = (e) => { e.stopPropagation(); chart.data.datasets = []; chart.update('none'); buildExtraMenu(id); updateExtraGraphVisibility(id); };
         menu.appendChild(clearAllItem);
         const breakHr = document.createElement('div'); breakHr.style.borderTop = '1px solid #20262f'; breakHr.style.margin = '4px 0'; menu.appendChild(breakHr);
         Object.keys(METRIC_DEFS).forEach(key => {

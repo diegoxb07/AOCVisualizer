@@ -32,7 +32,32 @@
         }
     };
 
-    function resetChartScale(chartId) { const c = (chartId === 'masterChart') ? masterChartInstance : customCharts[chartId]; if (c) { try { c.resetZoom(); } catch(e){} c.draw(); } }
+    // The status chips (flight data window, mission id, aircraft, date) copy their value on a
+    // plain click, toast-confirmed; a drag selection inside a chip skips the auto-copy so
+    // manual selection still works.
+    document.querySelectorAll('.status-chip').forEach(chip => {
+        chip.title = 'Click to copy';
+        chip.addEventListener('click', () => {
+            const sel = window.getSelection && window.getSelection();
+            if (sel && !sel.isCollapsed) return;
+            const v = chip.querySelector('.chip-v');
+            const text = v ? v.textContent.trim() : '';
+            if (!text || text === '-' || text === 'Waiting') return;
+            try {
+                navigator.clipboard.writeText(text).then(() => showToast('Copied: ' + text, 2500));
+            } catch (e) { /* clipboard unavailable; the text stays selectable by hand */ }
+        });
+    });
+
+    // A leftover text selection clears on the next press anywhere, so clicking selected text
+    // (or anything else) unselects it. Text fields keep their native selection behavior.
+    document.addEventListener('mousedown', (e) => {
+        if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+        const sel = window.getSelection && window.getSelection();
+        if (sel && !sel.isCollapsed) sel.removeAllRanges();
+    });
+
+    function resetChartScale(chartId) { const c = (chartId === 'masterChart') ? masterChartInstance : (customCharts[chartId] || (typeof extraMasterCharts !== 'undefined' ? extraMasterCharts[chartId] : null)); if (c) { try { c.resetZoom(); } catch(e){} c.draw(); } }
 
     document.getElementById('measureShapeSelect').addEventListener('change', (e) => { measureShape = e.target.value; measurePointsGeo = []; liveMouseGeo = null; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
 

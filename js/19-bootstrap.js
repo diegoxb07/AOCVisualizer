@@ -167,6 +167,7 @@
         if (masterChartInstance) { try { masterChartInstance.destroy(); } catch (e) {} }
         masterChartInstance = null;
         Object.values(customCharts).forEach(c => { try { c.destroy(); } catch (e) {} }); customCharts = {};
+        if (typeof resetExtraGraphs === 'function') resetExtraGraphs();
         if (typeof destroyClipPreviews === 'function') destroyClipPreviews();
 
         // clear the loaded flight, storm-track, analysis, measure and slide state.
@@ -358,7 +359,7 @@
         if (videoLoaded) { video.pause(); video.playbackRate = speeds[currentSpeedIdx]; } if (animationFrameId) cancelAnimationFrame(animationFrameId);
         
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0,0, canvas.width, canvas.height);
-        [masterChartInstance, ...Object.values(customCharts)].forEach(c => { if(c) { c.resetZoom(); c.draw(); } });
+        [masterChartInstance, ...Object.values(customCharts), ...(typeof extraMasterCharts !== 'undefined' ? Object.values(extraMasterCharts) : [])].forEach(c => { if(c) { c.resetZoom(); c.draw(); } });
         
         resetMapView(); if (trackerModeSelect.value === '3d') build3DScene(); updateMasterGraphVisibility();
         
@@ -1283,14 +1284,15 @@
         const syncAria = () => btn.setAttribute('aria-checked', document.documentElement.dataset.theme === 'light' ? 'true' : 'false');
         syncAria();
         let themeAnimTimer = null;
-        btn.addEventListener('click', () => {
+        // One switch path for the button AND the OS listener below; persist only for the button,
+        // so an unsaved session keeps following the computer's theme.
+        const applyTheme = (next, persist) => {
             const root = document.documentElement;
             // Fade the token-driven colors across the switch (see css/app.css .theme-anim), then drop
             // the class so it never affects ordinary hover/focus color changes.
             root.classList.add('theme-anim');
             clearTimeout(themeAnimTimer);
             themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 420);
-            const next = root.dataset.theme === 'light' ? 'dark' : 'light';
             root.dataset.theme = next;
             syncAria();
             // the 2D basemap palette is theme-aware, so drop its cached render and repaint the tracker.
@@ -1306,6 +1308,7 @@
             // animation; the zoom plugin preserves any pan/zoom across it.
             try {
                 if (typeof customCharts !== 'undefined') Object.values(customCharts).forEach(c => c && c.update('none'));
+                if (typeof extraChartsEach === 'function') extraChartsEach(c => c.update('none'));
             } catch (e) { /* charts not built yet */ }
             // Variable-menu label colors are theme-aware (mutedMetricColor), baked in at build time, so
             // rebuild the dropdowns on toggle.
@@ -1313,10 +1316,26 @@
                 if (typeof buildDropdownMenus === 'function') buildDropdownMenus();
                 if (typeof buildMasterMenu === 'function') buildMasterMenu();
             } catch (e) { /* menus not built yet */ }
+            if (!persist) return;
             try {
                 const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
                 saved.theme = next;
                 localStorage.setItem(KEY, JSON.stringify(saved));
             } catch (e) { /* localStorage unavailable (private mode) */ }
-        });
+        };
+        btn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
+        // The head script starts an unsaved session on the OS theme; this keeps it tracking the
+        // OS live until the toggle records an explicit choice.
+        try {
+            if (window.matchMedia) {
+                const mq = window.matchMedia('(prefers-color-scheme: light)');
+                const followSystem = ev => {
+                    let saved = {};
+                    try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e2) {}
+                    if (!saved.theme) applyTheme(ev.matches ? 'light' : 'dark', false);
+                };
+                if (mq.addEventListener) mq.addEventListener('change', followSystem);
+                else if (mq.addListener) mq.addListener(followSystem);
+            }
+        } catch (e) { /* matchMedia unavailable */ }
     })();

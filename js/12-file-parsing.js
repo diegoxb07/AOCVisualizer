@@ -30,10 +30,12 @@
         // shows the warmup badge, and the locks await it themselves.
         ensureOCR();
         syncMediaGridLayout();
+        // A floating map means the user works in PiP; the fresh video joins it at its side.
+        if (typeof floatVideoBesideMap === 'function') floatVideoBesideMap();
         speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
         if (allParsedData.length > 0) document.getElementById('videoStartInput').value = allParsedData[0].time;
-        video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); }, { once: true });
+        video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); if (typeof syncVideoCrop === 'function') syncVideoCrop(); }, { once: true });
         video.addEventListener('seeking', syncTelemetryToVideoClock);
         evaluateAutoSyncDefault();
         // No ocrAvailable precondition: it reads false until the engine finishes warming up, so

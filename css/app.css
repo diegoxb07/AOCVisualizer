@@ -283,6 +283,18 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { displ
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
 
 /* Sticky media bar + resize handle (functional) */
+/* Drags all over the app (panels, sliders, measure, scrubbing) kept starting text selections
+   that then stuck highlighted. The app is an instrument panel, not a document, so selection is
+   off globally and back on only where typing or copyable report text lives (modal cards carry
+   the point-analysis report, cross-section info, and the help guide). */
+body { -webkit-user-select: none; user-select: none; }
+input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
+/* Copyable data stays selectable for sharing: the status chips (flight data window, mission id,
+   aircraft, date), the parser ledger (samples and what was filtered), the mission subline, the
+   archive status line, the storm card's metrics, and the playback clock. */
+.status-chip, #dataReportLine, #missionSubline, #reconArchiveStatus, #stormStatusCard, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
+.status-chip { cursor: copy; }   /* a plain click copies the chip's value (js/09-interaction.js) */
+
 .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
 /* collapser: on the drag grip's line at the bottom left (grip stays centered), so it adds no extra
    row. z-index above the resize handle so its clicks collapse instead of starting a drag.
@@ -332,6 +344,10 @@ canvas#mapCanvas:active { cursor: grabbing; }
 #videoPanel { height: var(--media-h); display: flex; flex-direction: column; overflow: hidden; }
 #videoPanel .media-container { width: 100%; flex-grow: 1; min-height: 0; position: relative; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: var(--bg); box-shadow: inset 0 0 0 1px var(--border); }
 video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contain; pointer-events: none; background-color: var(--bg); border-radius: 4px; }
+/* Video box flatter than the frame, docked or floating: cover crops the top/bottom instead of
+   shrinking the picture, and the MMR's baked-in black bands are what gets trimmed first
+   (syncVideoCrop in js/11c-float-panels.js toggles the class from the live container aspect). */
+#videoPanel.video-crop video#radarVideo { object-fit: cover; }
 
 #threeDContainer { display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; background-color: var(--bg); cursor: grab; z-index: 2; }
 
@@ -510,10 +526,16 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
    panel (1500) and the sticky bottom bar (2000). The height chain runs through flex, and the
    !important beats the docked layout's var(--media-h) inline/class heights. */
 .float-panel { position: fixed; z-index: 1400; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); cursor: grab; }
+/* The docked panels clip their content (overflow:hidden on the ids, which outranks the class);
+   floating must stay visible or the dock lip below the bottom edge is cut off. The inner
+   .media-container keeps its own overflow:hidden, so the map/video stay clipped either way. */
+#mapPanel.float-panel, #videoPanel.float-panel { overflow: visible; }
 .float-panel .media-container { flex: 1 1 auto; min-height: 0; height: auto !important; }
 .float-resize-grip, .float-dock-btn { display: none; }
 .float-panel .float-resize-grip { display: block; position: absolute; right: 3px; bottom: 3px; width: 18px; height: 18px; cursor: nwse-resize; z-index: 2700; border-right: 3px solid var(--text-faint); border-bottom: 3px solid var(--text-faint); border-radius: 0 0 6px 0; opacity: 0.8; }
-.float-panel .float-dock-btn { display: block; position: absolute; top: 8px; left: 8px; z-index: 2700; padding: 2px 8px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; }
+/* Dock control as a lip standing on the panel's top-left corner, clear of the title and the
+   map itself; the bottom-right corner stays the resize grip's. */
+.float-panel .float-dock-btn { display: block; position: absolute; top: -21px; left: 10px; z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-bottom: none; border-radius: 6px 6px 0 0; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.3); }
 /* Small float: the big overlays would bury the map, so they hide until the panel grows back. */
 #mapPanel.panel-compact .overlays-wrapper, #mapPanel.panel-compact #satStepCluster, #mapPanel.panel-compact #pfdOverlay { display: none !important; }
 /* A floated panel leaves the grid; the one still docked takes the full row. */
@@ -521,6 +543,12 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
 #mediaGrid.map-floating #videoPanel, #mediaGrid.video-floating #mapPanel { grid-column: 1; }
 .sticky-media-bar.all-floating #mediaResizeHandle { display: none; }
 .sticky-media-bar.all-floating #mediaBarContent { min-height: 20px; }
+
+/* Create Graph boxes (the master prompt and the trailing extra box). Plain CSS on purpose: a
+   Tailwind arbitrary value like min-h-[160px] only works if it existed at compile time, and
+   these heights were introduced after the build. */
+.create-graph-box { min-height: 160px; }
+.cg-plus { font-size: 30px; }   /* the box's ＋ glyph; plain CSS for the same compile-time reason */
 
 /* Sidebar row under the pressure layers that starts the 2D display's section pick. */
 .tdr-slice-start { width: 100%; padding: 6px 8px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: filter 0.12s; }

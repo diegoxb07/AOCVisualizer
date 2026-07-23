@@ -53,6 +53,7 @@
             }
             if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
         }
+        if (typeof syncVideoCrop === 'function') syncVideoCrop();
     });
 
     // collapses the mmr panel out of the media bar whenever no video is loaded, so the
@@ -63,6 +64,7 @@
         if (!grid) return;
         grid.classList.toggle('no-video', !videoLoaded);
         resizeCanvasLayout();
+        if (typeof syncVideoCrop === 'function') syncVideoCrop();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             const keepView = isMapPanned() ? getMapViewportGeo() : null;
             calculateMapScales();
@@ -102,11 +104,12 @@
                 requestAnimationFrame(() => {
                     rafPending = false; resizeCanvasLayout();
                     if (filteredData.length > 0 && trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+                    if (typeof syncVideoCrop === 'function') syncVideoCrop();   // squashed flat enough, the MMR starts cropping its baked-in bands
                 });
             }
             if (e.cancelable) e.preventDefault();
         }
-        function onUp() { if (!dragging) return; dragging = false; isResizingMedia = false; bar.classList.remove('resizing'); resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } }
+        function onUp() { if (!dragging) return; dragging = false; isResizingMedia = false; bar.classList.remove('resizing'); resizeCanvasLayout(); if (filteredData.length > 0) { if (trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); } if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]); } if (typeof syncVideoCrop === 'function') syncVideoCrop(); }
         handle.addEventListener('mousedown', onDown); handle.addEventListener('touchstart', onDown, { passive: false });
         window.addEventListener('mousemove', onMove); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('mouseup', onUp); window.addEventListener('touchend', onUp);
 

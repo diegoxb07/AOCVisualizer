@@ -139,6 +139,7 @@
         if (!btn || !bar) return;
         btn.addEventListener('click', () => {
             const collapsed = bar.classList.toggle('collapsed');
+            document.body.classList.toggle('media-collapsed', collapsed);   // also hides any floating players
             btn.setAttribute('aria-expanded', String(!collapsed));
             btn.innerHTML = collapsed ? '&#9660; Show media' : '&#9650; Collapse media';
             // while the media is collapsed the full playback bar is hidden; the mini bar in the strip covers play/slide/mark.

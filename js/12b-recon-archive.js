@@ -235,16 +235,25 @@
                 } else { s._newestUnix = -Infinity; s._dateSpan = ''; }
             });
             reconStormsForYear.sort((a, b) => (b._newestUnix - a._newestUnix) || a.storm_name.localeCompare(b.storm_name));
+            // Flights already on the device are hidden from the cascade so the loader lists only what
+            // the user still needs. A storm whose every flight is loaded drops out too, and the option
+            // count reflects the flights still available.
+            let shownStorms = 0;
             reconStormsForYear.forEach(s => {
+                const known = reconMissionListCache[s.storm_name];
+                const avail = known ? known.filter(m => !preloadedMissions.has(m.mission_id)).length : null;
+                if (avail === 0) return;
+                const count = avail != null ? avail : s.mission_count;
                 const opt = document.createElement('option'); opt.value = s.storm_name;
-                opt.textContent = `${boldUnicode(s.storm_name)} (${s.mission_count} flight${s.mission_count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
+                opt.textContent = `${boldUnicode(s.storm_name)} (${count} flight${count === 1 ? '' : 's'}${s._dateSpan ? ', ' + s._dateSpan : ''})`;
                 reconStormSelect.appendChild(opt);
+                shownStorms++;
             });
             reconStormSelect.options[0].textContent = 'Storm…';
             reconStormSelect.disabled = false;
             reconStormSelect.style.cursor = '';
             syncReconLoadButtonState();   // mission lists just landed, the preload modal is usable now
-            setReconStatus(reconStormsForYear.length ? '' : 'No archived recon flights found for ' + year + '.');
+            setReconStatus(reconStormsForYear.length ? (shownStorms ? '' : 'Every archived flight for ' + year + ' is already loaded.') : 'No archived recon flights found for ' + year + '.');
         } catch (e) {
             if (req === stormListReqId) {
                 reconStormSelect.options[0].textContent = 'Storm…';
@@ -272,7 +281,9 @@
                 missions = ((data && data.missions) || []).slice().sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
             }
             reconMissionsForStorm = missions;
-            reconMissionsForStorm.forEach(m => {
+            // Flights already on the device are left out so the loader lists only what's still needed.
+            const availMissions = reconMissionsForStorm.filter(m => !preloadedMissions.has(m.mission_id));
+            availMissions.forEach(m => {
                 const opt = document.createElement('option'); opt.value = m.mission_id;
                 // Mission id leads (its first 8 digits are the date, so a separate date column
                 // would just repeat it in this narrow select).
@@ -283,8 +294,8 @@
             reconMissionSelect.options[0].textContent = 'Flight…';
             reconMissionSelect.disabled = false;
             reconMissionSelect.style.cursor = '';
-            reconLoadBtn.disabled = reconMissionsForStorm.length === 0;
-            setReconStatus(reconMissionsForStorm.length ? '' : 'No archived flights found for ' + stormName + '.');
+            reconLoadBtn.disabled = availMissions.length === 0;
+            setReconStatus(availMissions.length ? '' : (reconMissionsForStorm.length ? 'Every flight for ' + stormName + ' is already loaded.' : 'No archived flights found for ' + stormName + '.'));
         } catch (e) {
             reconMissionSelect.options[0].textContent = 'Flight…';
             reconMissionSelect.style.cursor = '';

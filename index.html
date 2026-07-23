@@ -37,8 +37,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260723j">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260723j">
+    <link rel="stylesheet" href="css/fonts.css?v=20260723k">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260723k">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -46,7 +46,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260723j">
+    <link rel="stylesheet" href="css/app.css?v=20260723k">
 </head>
 <body class="font-sans antialiased">
 
@@ -226,7 +226,7 @@
         <div id="mediaBarContent" class="media-content-wrapper">
             <!-- Both media panels drag out by their padding ring into floating picture-in-picture
                  windows (js/11c-float-panels.js): fixed, movable, resizable from every edge, with
-                 a ⇱ Dock lip that returns them here. The grid collapses to one column while a
+                 a ⇱ Dock button that returns them here. The grid collapses to one column while a
                  panel is out. -->
             <div id="mediaGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch no-video">
                 <div class="bg-panel border border-hairline rounded p-4 shadow-sm relative flex flex-col" id="mapPanel">
@@ -415,8 +415,10 @@
              keeps play/pause, sliding, marking and S.I. usable inside the thin media strip. -->
         <div id="miniPlaybackBar" class="mini-playback-bar">
             <button id="miniPlayBtn" type="button" class="mini-pb-btn mini-pb-accent" title="Play / pause">Play</button>
-            <button id="miniMarkBtn" type="button" class="mini-pb-btn mini-pb-accent" title="Mark point">Mark</button>
-            <button id="miniClearBtn" type="button" class="mini-pb-btn" title="Clear marks">&#10005;</button>
+            <div class="mini-pb-group">
+                <button id="miniMarkBtn" type="button" class="mini-pb-btn mini-pb-accent" title="Mark point">Mark</button>
+                <button id="miniClearBtn" type="button" class="mini-pb-btn mini-pb-accent" title="Clear marks">&#10005;</button>
+            </div>
             <label class="mini-pb-si" title="S.I units"><input type="checkbox" id="miniToggleSI"> S.I</label>
             <input type="range" id="miniTimelineSlider" min="0" max="100" value="0" class="mini-timeline" title="Slide through the flight" />
             <span id="miniTimeDisplay" class="mini-pb-time">00:00:00 UTC</span>
@@ -973,35 +975,35 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260723j"></script>
-    <script src="js/01-state.js?v=20260723j"></script>
-    <script src="js/02-satellite.js?v=20260723j"></script>
-    <script src="js/03-metrics.js?v=20260723j"></script>
-    <script src="js/04-geo-measure.js?v=20260723j"></script>
-    <script src="js/05-interpolation.js?v=20260723j"></script>
-    <script src="js/06-ocr.js?v=20260723j"></script>
-    <script src="js/07-ui-controls.js?v=20260723j"></script>
-    <script src="js/07b-plane-models.js?v=20260723j"></script>
-    <script src="js/07c-terrain.js?v=20260723j"></script>
-    <script src="js/07d-tdr.js?v=20260723j"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260723j"></script>
-    <script src="js/09-interaction.js?v=20260723j"></script>
-    <script src="js/10-point-analysis.js?v=20260723j"></script>
-    <script src="js/11-layout.js?v=20260723j"></script>
-    <script src="js/11c-float-panels.js?v=20260723j"></script>
-    <script src="js/11b-parser-core.js?v=20260723j"></script>
-    <script src="js/12-file-parsing.js?v=20260723j"></script>
-    <script src="js/12b-recon-archive.js?v=20260723j"></script>
-    <script src="js/13-charts-master.js?v=20260723j"></script>
-    <script src="js/14-filters-sync.js?v=20260723j"></script>
-    <script src="js/15-map-render.js?v=20260723j"></script>
-    <script src="js/16-pfd-hud.js?v=20260723j"></script>
-    <script src="js/17-charts.js?v=20260723j"></script>
-    <script src="js/18-engine.js?v=20260723j"></script>
-    <script src="js/18b-flight-search.js?v=20260723j"></script>
-    <script src="js/19-bootstrap.js?v=20260723j"></script>
-    <script src="js/20-ui-polish.js?v=20260723j"></script>
-    <script src="js/21-report.js?v=20260723j"></script>
+    <script src="js/00-var-catalog.js?v=20260723k"></script>
+    <script src="js/01-state.js?v=20260723k"></script>
+    <script src="js/02-satellite.js?v=20260723k"></script>
+    <script src="js/03-metrics.js?v=20260723k"></script>
+    <script src="js/04-geo-measure.js?v=20260723k"></script>
+    <script src="js/05-interpolation.js?v=20260723k"></script>
+    <script src="js/06-ocr.js?v=20260723k"></script>
+    <script src="js/07-ui-controls.js?v=20260723k"></script>
+    <script src="js/07b-plane-models.js?v=20260723k"></script>
+    <script src="js/07c-terrain.js?v=20260723k"></script>
+    <script src="js/07d-tdr.js?v=20260723k"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260723k"></script>
+    <script src="js/09-interaction.js?v=20260723k"></script>
+    <script src="js/10-point-analysis.js?v=20260723k"></script>
+    <script src="js/11-layout.js?v=20260723k"></script>
+    <script src="js/11c-float-panels.js?v=20260723k"></script>
+    <script src="js/11b-parser-core.js?v=20260723k"></script>
+    <script src="js/12-file-parsing.js?v=20260723k"></script>
+    <script src="js/12b-recon-archive.js?v=20260723k"></script>
+    <script src="js/13-charts-master.js?v=20260723k"></script>
+    <script src="js/14-filters-sync.js?v=20260723k"></script>
+    <script src="js/15-map-render.js?v=20260723k"></script>
+    <script src="js/16-pfd-hud.js?v=20260723k"></script>
+    <script src="js/17-charts.js?v=20260723k"></script>
+    <script src="js/18-engine.js?v=20260723k"></script>
+    <script src="js/18b-flight-search.js?v=20260723k"></script>
+    <script src="js/19-bootstrap.js?v=20260723k"></script>
+    <script src="js/20-ui-polish.js?v=20260723k"></script>
+    <script src="js/21-report.js?v=20260723k"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

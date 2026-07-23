@@ -142,11 +142,14 @@
         if (typeof videoLoaded === 'undefined' || !videoLoaded) return;
         const r = mapSt.rect, vw = window.innerWidth, vh = window.innerHeight, gap = 12;
         const w = r.w, h = r.h;
-        let x = r.x + r.w + gap, y = r.y;
-        if (x + w > vw - 8) x = r.x - w - gap;
-        if (x < 8) { x = Math.max(8, Math.min(r.x, vw - w - 8)); y = r.y + r.h + gap; }
-        x = Math.max(8, Math.min(x, vw - 80));
-        y = Math.max(22, Math.min(y, vh - 60));
+        // Clamp a corner so the WHOLE panel stays on screen (near margin when it is larger than the
+        // viewport), so an awkwardly-parked map never strands the video off-screen.
+        const clampX = px => Math.max(8, Math.min(px, Math.max(8, vw - w - 8)));
+        const clampY = py => Math.max(22, Math.min(py, Math.max(22, vh - h - 8)));
+        let x, y;
+        if (r.x + r.w + gap + w <= vw - 8) { x = r.x + r.w + gap; y = clampY(r.y); }   // fits fully to the right
+        else if (r.x - gap - w >= 8) { x = r.x - gap - w; y = clampY(r.y); }           // fits fully to the left
+        else { x = clampX(r.x); y = clampY(r.y + r.h + gap); }                         // otherwise directly below
         floatDetach('videoPanel', { x, y, w, h });
     }
 
@@ -258,7 +261,7 @@
             const vw = window.innerWidth, vh = window.innerHeight;
             if (floatDrag.mode === 'move') {
                 st.rect.x = Math.max(80 - st.rect.w, Math.min(floatDrag.rect0.x + dx, vw - 80));
-                st.rect.y = Math.max(22, Math.min(floatDrag.rect0.y + dy, vh - 60));   // 22px keeps the top dock lip on screen
+                st.rect.y = Math.max(22, Math.min(floatDrag.rect0.y + dy, vh - 60));   // 22px keeps the panel's top (with the dock button) on screen
                 floatApplyRect(floatDrag.id);   // position only; nothing needs re-rendering
             } else {
                 const ed = floatDrag.edges || { s: true, e: true };
@@ -273,7 +276,7 @@
                     st.rect.x = r0.x + (r0.w - w); st.rect.w = w;
                 }
                 if (ed.n) {
-                    const h = Math.max(minH, Math.min(r0.h - dy, r0.y + r0.h - 22));   // 22px keeps the top dock lip on screen
+                    const h = Math.max(minH, Math.min(r0.h - dy, r0.y + r0.h - 22));   // 22px keeps the panel's top (with the dock button) on screen
                     st.rect.y = r0.y + (r0.h - h); st.rect.h = h;
                 }
                 floatApplyRect(floatDrag.id);

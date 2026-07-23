@@ -1107,9 +1107,9 @@
                  +  `</button>`;
             if (expanded && def && def.bands) {
                 // Daylight-dependent GOES products (reflective bands 1-6, sandwich) lock out
-                // when the flight is in night by its halfway point; the native select's options
+                // when the flight is dark for most (70%+) of its frames; the native select's options
                 // are disabled the same way in updateBandOptions, but the user clicks HERE.
-                const nightFlight = def.isReconApi && typeof flightNightByHalf === 'function' && flightNightByHalf();
+                const nightFlight = def.isReconApi && typeof flightMostlyDark === 'function' && flightMostlyDark();
                 const isDark = b => nightFlight && (b.product === 'sandwich' || (b.band != null && b.band <= 6));
                 // Pickable products list first; unavailable and night-locked ones sink below
                 // them (stable sort, so band order holds within each half).

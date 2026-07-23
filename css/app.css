@@ -26,7 +26,7 @@
     --val-cool: #7dd3fc;
     --val-alt: #7c93ff;
     --val-warm: #fbbf24;
-    --media-h: clamp(420px, 50vh, 560px); /* JS-resizable via the media drag handle */
+    --media-h: clamp(460px, 54vh, 600px); /* JS-resizable via the media drag handle */
 }
 :root[data-theme="light"] {
     color-scheme: light;
@@ -314,6 +314,13 @@ input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
 .mini-pb-btn { flex: none; padding: 3px 9px; font-size: 11px; font-weight: 700; border-radius: 5px; border: 1px solid var(--border); background: var(--panel-strip); color: var(--text-muted); cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s; }
 .mini-pb-btn:hover { background: var(--elevated); color: var(--text); }
 .mini-pb-accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* Mark + Clear joined into one segmented control: flush edges, shared outer rounding, a hairline
+   divider between the two halves, each still clickable on its own. */
+.mini-pb-group { display: flex; flex: none; }
+.mini-pb-group .mini-pb-btn { border-radius: 0; }
+.mini-pb-group .mini-pb-btn:first-child { border-radius: 5px 0 0 5px; }
+.mini-pb-group .mini-pb-btn:last-child { border-radius: 0 5px 5px 0; }
+.mini-pb-group .mini-pb-btn + .mini-pb-btn { margin-left: -1px; border-left: 1px solid rgba(0, 0, 0, 0.2); }
 .mini-pb-si { flex: none; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
 .mini-timeline { flex: 1 1 auto; min-width: 100px; accent-color: var(--accent); cursor: pointer; }
 .mini-pb-time { flex: none; font-size: 12px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: var(--accent); min-width: 88px; text-align: right; }
@@ -529,12 +536,14 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
    floating must stay visible or the dock lip below the bottom edge is cut off. The inner
    .media-container keeps its own overflow:hidden, so the map/video stay clipped either way. */
 #mapPanel.float-panel, #videoPanel.float-panel { overflow: visible; }
+/* Collapsing the media bar hides the floating players too, so the collapse button clears the
+   flight-level and MMR displays whether they are docked or floating. */
+body.media-collapsed .float-panel { display: none !important; }
 .float-panel .media-container { flex: 1 1 auto; min-height: 0; height: auto !important; }
 .float-resize-grip, .float-dock-btn { display: none; }
 .float-panel .float-resize-grip { display: block; position: absolute; right: 3px; bottom: 3px; width: 18px; height: 18px; cursor: nwse-resize; z-index: 2700; border-right: 3px solid var(--text-faint); border-bottom: 3px solid var(--text-faint); border-radius: 0 0 6px 0; opacity: 0.8; }
-/* Dock control as a lip standing on the panel's top-left corner, clear of the title and the
-   map itself; the bottom-right corner stays the resize grip's. */
-.float-panel .float-dock-btn { display: block; position: absolute; top: -21px; left: 10px; z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-bottom: none; border-radius: 6px 6px 0 0; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.3); }
+/* Dock control inside the panel's top center, above the canvas and overlays via z-index. */
+.float-panel .float-dock-btn { display: block; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
 /* Small float: the big overlays would bury the map, so they hide until the panel grows back. */
 #mapPanel.panel-compact .overlays-wrapper, #mapPanel.panel-compact #satStepCluster, #mapPanel.panel-compact #pfdOverlay { display: none !important; }
 /* A floated panel leaves the grid; the one still docked takes the full row. */

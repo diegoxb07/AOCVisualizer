@@ -670,16 +670,24 @@
         return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
     }
 
-    // True when the loaded flight is in night by its halfway point (sun below -2 degrees at the
-    // midpoint row's time and position): daylight-dependent products would show black for most
-    // of the playback, so the picker disables them rather than let the pick disappoint.
-    function flightNightByHalf() {
+    // True when a reflective (daylight-only) band would be dark for most of the flight: sample the
+    // flight's frames and take the share with the sun below civil twilight (-6 degrees). At or above
+    // 70% the picker disables those bands rather than let the pick disappoint; below it the daytime
+    // frames still cache, since batchTargetsForFlight skips the dark frames one by one. The elevation
+    // comes from each frame's real date, so the cutoff tracks the season's day length.
+    function flightMostlyDark() {
         if (!allParsedData || !allParsedData.length || !flightMetaData || flightMetaData.date === 'Unknown') return false;
-        const mid = allParsedData[Math.floor(allParsedData.length / 2)];
-        if (!mid || mid.lat == null || mid.lon == null) return false;
-        const ms = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + mid.absSeconds * 1000;
-        if (!isFinite(ms)) return false;
-        return sunElevationDeg(ms, mid.lat, mid.lon) < -2;
+        const baseMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime();
+        if (!isFinite(baseMs)) return false;
+        const N = allParsedData.length, step = Math.max(1, Math.floor(N / 200));
+        let dark = 0, total = 0;
+        for (let i = 0; i < N; i += step) {
+            const r = allParsedData[i];
+            if (!r || r.lat == null || r.lon == null) continue;
+            total++;
+            if (sunElevationDeg(baseMs + r.absSeconds * 1000, r.lat, r.lon) < -6) dark++;
+        }
+        return total > 0 && dark / total >= 0.7;
     }
 
     function updateBandOptions() {
@@ -714,8 +722,8 @@
             }
             if (layerDef.isReconApi) {
                 // Daylight-dependent products (reflective bands 1-6 and the vis+IR sandwich)
-                // disable for flights that are in night by their halfway point.
-                const night = flightNightByHalf();
+                // disable only when the flight is dark for most (70%+) of its frames.
+                const night = flightMostlyDark();
                 const needsDay = b => b.product === 'sandwich' || (b.band != null && b.band <= 6);
                 // Spectral bands and multi-band composites in separate groups, so a blend like
                 // "IR/VIS Sandwich" can't be misread as just another band.
@@ -730,7 +738,7 @@
                         // "unavailable", so it reads as temporarily offline rather than silently vanishing.
                         const dark = night && needsDay(b);
                         opt.textContent = b.available === false ? b.name + ' (unavailable)' : (dark ? b.name + ' (night flight)' : b.name);
-                        opt.title = dark ? b.name + ': needs daylight, and this flight is in night by its halfway point' : b.name;
+                        opt.title = dark ? b.name + ': needs daylight, and this flight is in night for most of its length' : b.name;
                         if (b.available === false || dark) opt.disabled = true;
                         og.appendChild(opt);
                     });
@@ -1597,22 +1605,52 @@
         const pl = document.getElementById('satPrefetchLabel'); if (pl && note) pl.textContent = note;
     }
 
-    // The cache pill's trailing "~time left · MB/s". Every number is MEASURED: the ETA is the
-    // remaining uncached tiles times the average wall seconds of the LAST FEW attempted tiles
-    // (a rolling window: the first tile carries the server's cold start and would inflate an
-    // all-time mean for the whole pass), and the speed is real PNG bytes over real download
-    // milliseconds (loadReconImageToCanvas accumulates them while a pass runs). Parts with no
-    // measurements yet stay off the pill.
-    function satPassNote(done, total, remainUncached, recentMs) {
-        let note = `Loading in satellite image ${done}/${total}…`;
-        if (recentMs.length > 0 && remainUncached > 0) {
-            const avg = recentMs.reduce((a, b) => a + b, 0) / recentMs.length;
-            const sec = remainUncached * avg / 1000;
-            const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+    // The cache pill's live "~time left · MB/s". Both numbers ride rolling windows of the LAST FEW
+    // tiles and re-anchor as each image completes, so they track current conditions instead of an
+    // all-time average. Every number is MEASURED, never estimated: the ETA is remaining uncached
+    // tiles times the recent average wall seconds per tile, and the speed is recent PNG bytes over
+    // recent download milliseconds (loadReconImageToCanvas measures both). Since the download time is
+    // part of each tile's wall time, a change in download speed moves the ETA with it. The ETA ticks
+    // DOWN each second between images. Parts with no measurement yet stay off the pill.
+    let satEtaTimer = null;   // 1s ticker that decrements the displayed ETA between image loads
+    let satEta = null;        // { done, total, etaSec, anchorMs, mbps } for the running pass, or null
+    function satEtaText() {
+        if (!satEta) return '';
+        let note = `Loading in satellite image ${satEta.done}/${satEta.total}…`;
+        if (satEta.etaSec != null) {
+            const live = Math.max(0, satEta.etaSec - (performance.now() - satEta.anchorMs) / 1000);
+            const m = Math.floor(live / 60), s = Math.round(live % 60);
             note += ' ~' + (m ? m + 'm ' + s + 's' : s + 's') + ' left';
         }
-        if (satPassDlMs > 400 && satPassBytes > 0) note += ' · ' + ((satPassBytes / 1048576) / (satPassDlMs / 1000)).toFixed(1) + ' MB/s';
+        if (satEta.mbps != null) note += ' · ' + satEta.mbps.toFixed(1) + ' MB/s';
         return note;
+    }
+    // Each completed image re-anchors both windows: the ETA from recent per-tile wall times and the
+    // speed from recent per-tile bytes over download ms. The 1s ticker keeps counting the ETA down
+    // until the next completion.
+    function satEtaAnchor(done, total, remainUncached, recentMs, recentDl) {
+        let etaSec = null;
+        if (recentMs.length > 0 && remainUncached > 0) {
+            const avg = recentMs.reduce((a, b) => a + b, 0) / recentMs.length;
+            etaSec = remainUncached * avg / 1000;
+        }
+        let mbps = null;
+        if (recentDl && recentDl.length) {
+            const bytes = recentDl.reduce((a, d) => a + d.bytes, 0), ms = recentDl.reduce((a, d) => a + d.dlMs, 0);
+            if (bytes > 0 && ms > 0) mbps = (bytes / 1048576) / (ms / 1000);
+        }
+        satEta = { done, total, etaSec, anchorMs: performance.now(), mbps };
+        setBatchProgress(done, total, satEtaText());
+        if (!satEtaTimer) satEtaTimer = setInterval(() => { if (satEta) setBatchProgress(satEta.done, satEta.total, satEtaText()); }, 1000);
+    }
+    // A cached tile is instant, so advance the counter without re-anchoring the ETA.
+    function satEtaBump(done, total) {
+        if (satEta) { satEta.done = done; satEta.total = total; setBatchProgress(done, total, satEtaText()); }
+        else setBatchProgress(done, total, `Loading in satellite image ${done}/${total}…`);
+    }
+    function satEtaStop() {
+        if (satEtaTimer) { clearInterval(satEtaTimer); satEtaTimer = null; }
+        satEta = null;
     }
 
     // Build the list of {fetchId, run} tiles to cache for one storm's rows+date, for the USER-CHOSEN
@@ -1633,19 +1671,44 @@
             const startMs = goesBucketMs(layerDef, rows[0].absSeconds, dateStr);
             const endMs   = goesBucketMs(layerDef, rows[rows.length - 1].absSeconds, dateStr);
             if (startMs == null || endMs == null) return [];
+            const cLat = (extent.minLat + extent.maxLat) / 2, cLon = (extent.minLon + extent.maxLon) / 2;
+            // Chronological buckets with their darkness (sun below -6 deg, civil twilight), computed
+            // once so the daytime skip and the skipped-frames note share one frame numbering. The
+            // elevation reads each bucket's own date, so the cutoff tracks the season's day length.
+            const buckets = [];
+            for (let ms = startMs; ms <= endMs; ms += cadMs) buckets.push({ ms, dark: sunElevationDeg(ms, cLat, cLon) < -6 });
             for (const bandId of bandIds) {
                 const bandObj = layerDef.bands.find(b => b.id === bandId); if (!bandObj) continue;
                 // Composite products (sandwich/geocolor) don't support bbox, a full-timeframe build
                 // would mean a slow full-disk render per bucket, which isn't what "cache this flight's
                 // area" is for. They're still viewable live (fetchReconApiSat), just not pre-built here.
                 if (bandObj.bboxSupported === false) continue;
-                for (let ms = startMs; ms <= endMs; ms += cadMs) {
-                    const timeIso = goesTimeStr(ms);
+                // Reflective bands (1-6) are daylight-only, so their dark buckets are skipped: a pass
+                // that starts before dawn jumps straight to the usable daytime frames instead of
+                // caching a run of black tiles first.
+                const needsDay = bandObj.product === 'sandwich' || (bandObj.band != null && bandObj.band <= 6);
+                buckets.forEach(bk => {
+                    if (needsDay && bk.dark) return;
+                    const timeIso = goesTimeStr(bk.ms);
                     const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
-                    if (seen.has(fetchId)) continue; seen.add(fetchId);
+                    if (seen.has(fetchId)) return; seen.add(fetchId);
                     const params = { band: bandObj.band, cmap: bandObj.cmap, timeIso, center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite };
                     out.push({ fetchId, run: () => getOrFetchReconTile(fetchId, params) });
+                });
+            }
+            // Frame numbers (1-based, chronological) skipped for daylight-only bands, as contiguous
+            // ranges, so a starting pass can note them once. Only bands 1-6 are cached here, so those
+            // are what darkness skips.
+            const anyDaytime = bandIds.some(id => { const b = layerDef.bands.find(x => x.id === id); return b && b.bboxSupported !== false && b.band != null && b.band <= 6; });
+            if (anyDaytime) {
+                const ranges = [];
+                for (let i = 0; i < buckets.length; i++) {
+                    if (!buckets[i].dark) continue;
+                    let j = i; while (j + 1 < buckets.length && buckets[j + 1].dark) j++;
+                    ranges.push(i === j ? String(i + 1) : (i + 1) + '-' + (j + 1));
+                    i = j;
                 }
+                if (ranges.length) out.skippedDark = ranges.join(', ');
             }
         } else {
             // Polar (MODIS/VIIRS GIBS): one tile per band per calendar day. A polar orbiter gives one
@@ -1702,6 +1765,7 @@
         const sb = document.getElementById('batchCacheStartBtn'); if (sb) sb.textContent = 'Start caching';
         const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = label || 'Stopped';
         const ml = document.getElementById('batchCacheStatus'); if (ml) ml.textContent = 'Cache stopped.';
+        satEtaStop();
         fadeSatPrefetchBar(800);
     }
 
@@ -1717,6 +1781,7 @@
         }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
+        if (targets.skippedDark) showToast('Skipping frames ' + targets.skippedDark + ', as they are in darkness.', 6000);
         const myPass = ++batchCachePass;
         batchCaching = true; batchCacheIsAuto = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
@@ -1729,22 +1794,26 @@
         }
         const total = targets.length;
         let done = 0, fetched = 0;
-        const recentMs = [];   // last few attempt durations, the ETA's rolling window
+        const recentMs = [];   // last few attempt wall-times, the ETA's rolling window
+        const recentDl = [];   // last few tiles' { bytes, dlMs }, the download-speed rolling window
         satPassBytes = 0; satPassDlMs = 0;
         for (let ti = 0; ti < targets.length; ti++) {
             const t = targets[ti];
             if (batchCacheCancel || myPass !== batchCachePass) break;
-            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Loading in satellite image ${done}/${total}…`); continue; }
+            if (satBlobStore.has(t.fetchId)) { done++; satEtaBump(done, total); continue; }
             let ok = false;
-            const t0 = performance.now();
+            const t0 = performance.now(), b0 = satPassBytes, d0 = satPassDlMs;
             try { const r = await t.run(); if (r && r.canvas) { fetched++; ok = true; } } catch (e) {}
             recentMs.push(performance.now() - t0); if (recentMs.length > 5) recentMs.shift();
+            const tb = satPassBytes - b0, td = satPassDlMs - d0;
+            if (tb > 0 && td > 0) { recentDl.push({ bytes: tb, dlMs: td }); if (recentDl.length > 5) recentDl.shift(); }
             done++;
             if (!ok) showToast(`Issue finding satellite image ${done}/${total}, skipping…`, 4000);
             const remain = targets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
-            setBatchProgress(done, total, satPassNote(done, total, remain, recentMs));
+            satEtaAnchor(done, total, remain, recentMs, recentDl);
         }
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
+        satEtaStop();
         batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         const doneMsg = `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
@@ -1827,24 +1896,28 @@
         // Pass 2: pull each tile once (skip anything already cached), gently one at a time.
         const total = allTargets.length;
         let done = 0, fetched = 0, failed = 0;
-        const recentMs = [];   // last few attempt durations, the ETA's rolling window
+        const recentMs = [];   // last few attempt wall-times, the ETA's rolling window
+        const recentDl = [];   // last few tiles' { bytes, dlMs }, the download-speed rolling window
         satPassBytes = 0; satPassDlMs = 0;
         for (let ti = 0; ti < allTargets.length; ti++) {
             const t = allTargets[ti];
             if (batchCacheCancel || myPass !== batchCachePass) break;
-            if (satBlobStore.has(t.fetchId)) { done++; setBatchProgress(done, total, `Loading in satellite image ${done}/${total}…`); continue; }
-            const t0 = performance.now();
+            if (satBlobStore.has(t.fetchId)) { done++; satEtaBump(done, total); continue; }
+            const t0 = performance.now(), b0 = satPassBytes, d0 = satPassDlMs;
             try {
                 const r = await t.run();
                 if (r && r.canvas) fetched++; else failed++;
             } catch (e) { failed++; }
             recentMs.push(performance.now() - t0); if (recentMs.length > 5) recentMs.shift();
+            const tb = satPassBytes - b0, td = satPassDlMs - d0;
+            if (tb > 0 && td > 0) { recentDl.push({ bytes: tb, dlMs: td }); if (recentDl.length > 5) recentDl.shift(); }
             done++;
             const remain = allTargets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
-            setBatchProgress(done, total, satPassNote(done, total, remain, recentMs));
+            satEtaAnchor(done, total, remain, recentMs, recentDl);
         }
 
         if (myPass !== batchCachePass) return;   // a Cancel already tore this pass down (and maybe started a new one)
+        satEtaStop();
         batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';

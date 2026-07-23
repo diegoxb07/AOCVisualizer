@@ -235,9 +235,9 @@
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(scene3DBgColor());
-        // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so it is
-        // small in world units and used to near-clip before you could get close); the huge near/far
-        // span rides a logarithmic depth buffer to stay z-fight-free.
+        // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so
+        // small in world units that a default near plane clips it before the camera gets close);
+        // the huge near/far span rides a logarithmic depth buffer to stay z-fight-free.
         camera3D = new THREE.PerspectiveCamera(45, aspect, 0.001, 50000);
         camera3D.position.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);   // starts zoomed into the aircraft, no scroll-in needed
         renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true });

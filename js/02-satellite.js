@@ -1046,9 +1046,9 @@
         const yTop = mercY(box.maxLat), yBot = mercY(box.minLat), span = yTop - yBot;
         if (!isFinite(span) || span === 0) return src;
 
-        // Vertical remap only (Mercator-Y → latitude); X is identity. Do it as ONE getImageData +
-        // whole-row 32-bit copies + ONE putImageData, instead of H separate drawImage() calls, the
-        // per-row drawImage overhead was the slow part (H can be >1000 px, ×N tiles when pre-caching).
+        // Vertical remap only (Mercator-Y → latitude); X is identity. Done as ONE getImageData +
+        // whole-row 32-bit copies + ONE putImageData, instead of H separate drawImage() calls whose
+        // per-row overhead dominates (H can be >1000 px, ×N tiles when pre-caching).
         let srcData;
         try { srcData = src.getContext('2d').getImageData(0, 0, W, H); }
         catch (e) { return src; }   // tainted canvas (shouldn't happen, CORS image) → leave as-is
@@ -1218,7 +1218,7 @@
         const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
         const aspect = boxLonSpan / boxLatSpan;
         const NATIVE_PX_PER_DEG = 111320 / 250;
-        const SAT_PX_CAP = 3072;                   // capped lower than before (was 4096), fewer pixels to fetch/decode per frame
+        const SAT_PX_CAP = 3072;                   // caps the pixels fetched/decoded per frame
         const nativeW = Math.round(boxLonSpan * NATIVE_PX_PER_DEG);
         let pxW = Math.min(SAT_PX_CAP, Math.max(canvas.width, nativeW));
         let pxH = Math.round(pxW / aspect);

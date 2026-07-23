@@ -101,8 +101,8 @@ button { transition: background-color 0.15s, border-color 0.15s, color 0.15s, op
 .hover\:border-accent:hover { border-color: var(--accent); }
 .focus\:border-accent:focus { border-color: var(--accent); }
 /* the .border-* rules above use the border-color shorthand and load AFTER tailwind's
-   .border-t-transparent, so they were painting the ring's top edge solid too, leaving spinner rings
-   with no gap (so they looked static even while spinning). restore the transparent top here. */
+   .border-t-transparent, so the transparent top must be re-asserted here or spinner rings paint
+   their top edge solid and read as static even while spinning. */
 .border-t-transparent { border-top-color: transparent; }
 .accent-accent { accent-color: var(--accent); }
 .accent-muted { accent-color: var(--text-muted); }
@@ -123,7 +123,7 @@ select {
 select:not(:disabled):hover { border-color: var(--border-strong); }
 select:not(:disabled):focus { border-color: var(--accent); }
 
-/* Sharp edges: flat 3px radius on all controls (was a forced 9999px pill everywhere). */
+/* Sharp edges: flat 3px radius on all controls. */
 button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):not([type="checkbox"]) { border-radius: 3px; }
 #dataDropZone, #videoDropZone, #reconSourceLink { border-radius: 3px; }
 .status-chip { border-radius: 4px; }
@@ -283,8 +283,8 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { displ
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
 
 /* Sticky media bar + resize handle (functional) */
-/* Drags all over the app (panels, sliders, measure, scrubbing) kept starting text selections
-   that then stuck highlighted. The app is an instrument panel, not a document, so selection is
+/* Drags all over the app (panels, sliders, measure, scrubbing) would otherwise start text
+   selections that stick highlighted. The app is an instrument panel, not a document, so selection is
    off globally and back on only where typing or copyable report text lives (modal cards carry
    the point-analysis report, cross-section info, and the help guide). */
 body { -webkit-user-select: none; user-select: none; }
@@ -546,7 +546,7 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
 
 /* Create Graph boxes (the master prompt and the trailing extra box). Plain CSS on purpose: a
    Tailwind arbitrary value like min-h-[160px] only works if it existed at compile time, and
-   these heights were introduced after the build. */
+   the compiled css/tailwind.css does not include these heights. */
 .create-graph-box { min-height: 160px; }
 .cg-plus { font-size: 30px; }   /* the box's ＋ glyph; plain CSS for the same compile-time reason */
 
@@ -639,8 +639,7 @@ input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; b
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; transition: 0.2s; border: 2px solid var(--bg); }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
-/* Elapsed-portion fill, --fill is painted by js/20-ui-polish.js. Flat single-hue fill (was a
-   two-tone blue gradient). */
+/* Elapsed-portion fill, --fill is painted by js/20-ui-polish.js. Flat single-hue fill. */
 #timelineSlider { background: linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--fill, 0%), var(--panel-strip) var(--fill, 0%)); }
 
 @media (prefers-reduced-motion: reduce) {

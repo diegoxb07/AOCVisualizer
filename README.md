@@ -31,9 +31,12 @@ flowchart TD
     SAT -- "Yes" --> FROMARC{"Is the API<br>online?"}
     FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> picker → GOES East/West (archive)<br>pick a product; imagery pre-caches<br>for the whole flight"]
     FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> picker → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
-    SAT -- "No" --> PLAY["<b>Play</b>, scroll through timeline, filters: change speed,<br>toggle 8Hz Smoothing / PFD / S.I Units"]
-    SATGOES --> PLAY
-    SATPOLAR --> PLAY
+    SAT -- "No" --> TDRQ{"Want Tail Doppler Radar?<br>(needs the API online)"}
+    SATGOES --> TDRQ
+    SATPOLAR --> TDRQ
+    TDRQ -- "Yes" --> TDRMODE["<b>TDR Mode</b> (map header)<br>pinned radar workspace: pressure layers,<br>flight legs & two-point cross-sections"]
+    TDRQ -- "No, or it reads TDR Unavailable" --> PLAY["<b>Play</b>, scroll through timeline, filters: change speed,<br>toggle 8Hz Smoothing / PFD / S.I Units"]
+    TDRMODE --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
     EXPORT -- "Briefing video" --> CLIP["Record Clip (.webm)"]
     EXPORT -- "No, just analyzing" --> DONE(["Done: measure, mark & compare freely"])
@@ -42,17 +45,19 @@ flowchart TD
     classDef data fill:#d1fae5,stroke:#059669,color:#064e3b
     classDef mmr fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
     classDef sat fill:#cffafe,stroke:#0891b2,color:#164e63
+    classDef tdr fill:#fce7f3,stroke:#db2777,color:#831843
     classDef playback fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
     classDef term fill:#e2e8f0,stroke:#475569,color:#0f172a
-    class ARCHIVE,MMR,SAT,FROMARC,EXPORT decision
+    class ARCHIVE,MMR,SAT,FROMARC,TDRQ,EXPORT decision
     class LOADARC,UPLOAD,LOADED data
     class VIDEO,CLIP mmr
     class SATGOES,SATPOLAR sat
+    class TDRMODE tdr
     class PLAY playback
     class START,DONE term
     %% linkStyle numbers = edge definition order above; update them if edges are added or reordered
-    linkStyle 1,6,9,10 stroke:#059669,stroke-width:2px
-    linkStyle 2,7,11,12,17 stroke:#dc2626,stroke-width:2px
+    linkStyle 1,6,9,10,15 stroke:#059669,stroke-width:2px
+    linkStyle 2,7,11,12,16,20 stroke:#dc2626,stroke-width:2px
 ```
 
 ---

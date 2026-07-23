@@ -73,7 +73,7 @@
         panel.classList.toggle('video-crop', box.width / box.height > ar);
     }
 
-    // The proven redraw combo the media height handle uses: sizes first, then the 2D reframe
+    // The same redraw combo the media height handle uses: sizes first, then the 2D reframe
     // with the panned view preserved (resizeCanvasLayout keeps it as geography), then the PFD.
     function floatRedraw() {
         resizeCanvasLayout();

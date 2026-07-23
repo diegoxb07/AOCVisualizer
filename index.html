@@ -224,6 +224,10 @@
 
     <div class="sticky-media-bar" id="stickyMediaBar">
         <div id="mediaBarContent" class="media-content-wrapper">
+            <!-- Both media panels drag out by their padding ring into floating picture-in-picture
+                 windows (js/11c-float-panels.js): fixed, movable, resizable from every edge, with
+                 a ⇱ Dock lip that returns them here. The grid collapses to one column while a
+                 panel is out. -->
             <div id="mediaGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch no-video">
                 <div class="bg-panel border border-hairline rounded p-4 shadow-sm relative flex flex-col" id="mapPanel">
                     <button id="fullscreenMapBtn" title="Fullscreen tracker" class="absolute top-2 right-2 z-[2600] px-2 py-1 bg-[color-mix(in_oklab,var(--panel-strip)_90%,transparent)] text-muted rounded border border-hairline hover:bg-elevated hover:text-ink transition-colors text-[11px] shadow-sm">⛶</button>

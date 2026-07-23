@@ -63,7 +63,7 @@
     // restarts (pre-cached flights replay with zero network on a later visit). The in-memory Map
     // stays the working set; IndexedDB is write-through on put and rehydrated once at startup.
     // Everything is try/catch-guarded so environments without IndexedDB (some file:// contexts)
-    // just run tab-lifetime caching as before.
+    // fall back to tab-lifetime in-memory caching.
     let satDB = null;
     const satStoreReady = (function rehydrateSatStore() {
         return new Promise(resolve => {
@@ -1072,7 +1072,7 @@
     // Request a recon-api GOES tile and poll until it renders. Resolves to
     // { canvas, box:{minLon,minLat,maxLon,maxLat}, scanStartMs } or { error }.
     // `product` (e.g. 'sandwich'/'geocolor') is a composite, when given, band/cmap are ignored
-    // server-side. Composites accept the same center/dims bbox as a single band now, so send it
+    // server-side. Composites accept the same center/dims bbox as a single band, so send it
     // whenever one was computed (caller only computes it for bbox-capable products).
     async function fetchReconApiTile({ band, cmap, product, timeIso, center, dims, unit, satellite }) {
         const params = new URLSearchParams({ time: timeIso });

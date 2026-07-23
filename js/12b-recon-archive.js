@@ -447,7 +447,7 @@
             if (idHit) frag.appendChild(missionRow({ mission_id: idHit }, true));
             if (!years.length) {
                 // no year in the text and none picked in the cascade: treat the query as a storm
-                // name and search every season (the old behavior asked for a year and gave up)
+                // name and search every season
                 if (idHit) { renderRows(frag); return; }
                 frag.appendChild(noteRow('Searching all years…'));
                 renderRows(frag);
@@ -890,8 +890,7 @@
             tx.objectStore('missions').delete(id); tx.objectStore('meta').delete(id);
         } catch (e) {}
     }
-    // Forget every previously loaded flight: clears the in-memory list and both IndexedDB stores so the
-    // "Previously Loaded Missions" dropdown starts empty (the currently open flight stays loaded).
+    // Read one preloaded mission's stored record back from IndexedDB by id, resolving null if absent.
     function missionIdbGet(id) {
         return new Promise(resolve => {
             if (!missionDB) return resolve(null);

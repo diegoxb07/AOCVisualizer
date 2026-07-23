@@ -239,8 +239,8 @@
         if (availableMetrics.has('tempr')) h += addHUD('AMBIENT TEMP', tDisp, true);
         if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', tdDisp, true);
         
-        // Core metrics end here. Extra metrics are ALWAYS shown now (no toggle); they live below the
-        // fold and scroll into view, so the HUD stays pinned to its core size and never covers content above.
+        // Core metrics end here. Extra metrics live below the fold and scroll into view, so the
+        // HUD stays pinned to its core size and never covers content above.
         let coreHtml = h;
         let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };

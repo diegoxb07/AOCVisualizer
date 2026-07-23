@@ -95,6 +95,7 @@
 
     function buildChartLayout() {
         if (masterChartInstance) masterChartInstance.destroy(); Object.values(customCharts).forEach(c => c.destroy()); customCharts = {};
+        if (typeof resetExtraGraphs === 'function') resetExtraGraphs();   // extra cards rebuild away with the layout
         const labelsTimeline = filteredData.map(d => `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
         const isImp = !document.getElementById('toggleSI').checked;
 
@@ -227,5 +228,6 @@
         Object.values(customCharts).forEach(c => {
             if(c) c.draw();
         });
+        if (typeof extraChartsEach === 'function') extraChartsEach(c => c.draw());
         _lastStaticIdx = idx;
     }

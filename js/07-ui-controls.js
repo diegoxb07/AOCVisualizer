@@ -160,7 +160,11 @@
     // White tropical-cyclone symbol (disc + spiral arms above depression strength) carrying its
     // dark category label, cached per label; the mesh material tints the white per intensity
     // while the label stays dark and readable. Drawn flat on the sea, never billboarded or spun.
-    let stormFixRing3D = null;   // current-fix marker on the 3D best track, positioned per frame
+    // Estimated-current-center marker on the 3D best track: a cyclone disc + spiral arms moved
+    // along the track to the playback time and spun each frame (animate3D). _stormNowLabel caches
+    // the disc's drawn category so its texture is only rebuilt when the interpolated intensity
+    // crosses a category boundary.
+    let stormNowDisc3D = null, stormNowArms3D = null, _stormNowLabel = '';
     let _stormSymTex = {};
     // The symbols lie flat on the map and are read from a low camera, so they sample at a grazing
     // angle, which is what smears them. Anisotropy is the setting that addresses that; trilinear
@@ -212,6 +216,7 @@
     // scratch axes/quaternions for the per-frame symbol orientation, allocated once
     const _stormAxisX = new THREE.Vector3(1, 0, 0), _stormAxisY = new THREE.Vector3(0, 1, 0);
     const _stormQYaw = new THREE.Quaternion(), _stormQTilt = new THREE.Quaternion(), _stormQSpin = new THREE.Quaternion();
+    const _stormNowAt = new THREE.Vector3();   // the estimated-center marker's current world position
     const STORM_RIBBON_OPACITY = 0.55;   // the ribbon reads through; the symbols stay solid
     // One height for the whole layer. renderOrder stacks it and none of it writes depth, so a
     // vertical gap buys nothing and costs alignment: the symbols scale with camera distance, so
@@ -281,24 +286,6 @@
             requestAnimationFrame(animate3D); if (controls3D) controls3D.update();
             // props spin only while playback runs; pausing freezes them with everything else
             if (typeof planeSpinners3D !== 'undefined' && isPlaying) for (let i = 0; i < planeSpinners3D.length; i++) planeSpinners3D[i].rotation.z += 0.3;
-            // wind streaks: while playing in 3D, stream the small vertical streaks up on an updraft/bump
-            // and down on a downdraft/dip, with brightness and speed scaled by the vertical bump size.
-            if (windStreaks3D) {
-                const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
-                const vb = (isPlaying && in3d) ? _vertBump : 0, inten = Math.abs(vb);
-                const active = inten > 0.4;   // only clear updrafts/downdrafts, not minor bumps
-                windStreaks3D.visible = active;
-                if (active) {
-                    const dir = vb > 0 ? 1 : -1;   // updraft rises, downdraft falls
-                    const H = WIND_STREAK_H, tnow = performance.now() / 1000, speed = 0.8 + 1.6 * inten;
-                    for (let i = 0; i < windStreaks3D.children.length; i++) {
-                        const ln = windStreaks3D.children[i];
-                        const yy = (((ln.userData.baseY + dir * tnow * speed) % (2 * H)) + (2 * H)) % (2 * H) - H;
-                        ln.position.y = yy;
-                        ln.material.opacity = Math.min(0.9, inten) * (1 - Math.abs(yy) / H);
-                    }
-                }
-            }
             // the state the plane is over: one label at that state's own centre. Runs before the
             // country labels, which read _stateLabelIdx to stand down under it.
             if (_stateLabels.length) {
@@ -330,8 +317,8 @@
             // Storm symbols and ribbon hold one screen size off camera distance, capped at
             // STORM_SYM_MAX_K so far fixes stop growing in world size and recede normally. Each
             // symbol also yaws toward the camera and pitches up slightly (STORM_SYM_TILT) so the
-            // category labels read at low viewing angles; the current fix's arms compose their
-            // cyclonic spin on top of that orientation.
+            // category labels read at low viewing angles. The moving estimated-center marker below
+            // composes its cyclonic spin on top of that same orientation.
             if (camera3D && (_stormSyms.length || _stormStrips.length)) {
                 const cp = camera3D.position;
                 _stormQTilt.setFromAxisAngle(_stormAxisX, STORM_SYM_TILT);
@@ -343,27 +330,37 @@
                     _stormQYaw.setFromAxisAngle(_stormAxisY, Math.atan2(cp.x - s.at.x, cp.z - s.at.z));
                     s.mesh.quaternion.copy(_stormQYaw).multiply(_stormQTilt);
                 }
-                // +y turns counterclockwise seen from above, the northern-hemisphere sense
-                if (_stormArmMeshes.length) {
-                    const spin = (performance.now() / 12000) * 2 * Math.PI;
-                    for (let i = 0; i < _stormArmMeshes.length; i++) {
-                        const am = _stormArmMeshes[i];
-                        if (am.idx !== currentStormFixIdx) continue;
-                        _stormQSpin.setFromAxisAngle(_stormAxisY, am.lat < 0 ? -spin : spin);
-                        am.mesh.quaternion.multiply(_stormQSpin);
-                    }
-                }
                 for (let i = 0; i < _stormStrips.length; i++) {
                     const s = _stormStrips[i], k = (cp.distanceTo(s.at) || 1) * STORM_RIBBON_SCALE;
                     s.mesh.scale.set(k, 1, 1);   // width only; the leg keeps the length it was built at
                 }
-                if (stormFixRing3D && stormFixRing3D.visible) {
-                    const k = Math.min(STORM_SYM_MAX_K, (cp.distanceTo(stormFixRing3D.position) || 1) * STORM_SYM_SCALE);
-                    stormFixRing3D.scale.set(k, 1, k);
-                    // outer radius 0.76, so the ring needs a proportionally larger lift than the glyphs
-                    stormFixRing3D.position.y = STORM_LAYER_Y + 0.76 * k * Math.sin(STORM_SYM_TILT);
-                    _stormQYaw.setFromAxisAngle(_stormAxisY, Math.atan2(cp.x - stormFixRing3D.position.x, cp.z - stormFixRing3D.position.z));
-                    stormFixRing3D.quaternion.copy(_stormQYaw).multiply(_stormQTilt);
+                // Estimated storm center now (interpStormCenter, via updateStormNowMarker): one
+                // cyclone symbol moved smoothly along the track to the playback time, its arms spun
+                // cyclonically (+y turns counterclockwise seen from above, the northern-hemisphere
+                // sense). Placed here each frame rather than pinned to a fix.
+                const est = (typeof stormNow !== 'undefined') ? stormNow : null;
+                const showNow = !!(est && showStormTrack);
+                if (stormNowDisc3D) stormNowDisc3D.visible = showNow;
+                if (stormNowArms3D) stormNowArms3D.visible = showNow && est.windKt >= 34;
+                if (showNow && stormNowDisc3D) {
+                    const c = get3DCoord(est.lon, est.lat, 0);
+                    const lbl = stormCatLabel(est.windKt);
+                    if (lbl !== _stormNowLabel) { stormNowDisc3D.material.map = stormSymbolTex(lbl || ' '); stormNowDisc3D.material.needsUpdate = true; _stormNowLabel = lbl; }
+                    const nowCol = stormWindColor(est.windKt);
+                    stormNowDisc3D.material.color.set(nowCol); stormNowArms3D.material.color.set(nowCol);
+                    _stormNowAt.set(c.x, STORM_LAYER_Y, c.z);
+                    const k = Math.min(STORM_SYM_MAX_K, (cp.distanceTo(_stormNowAt) || 1) * STORM_SYM_SCALE);
+                    const yy = STORM_LAYER_Y + (k / 2) * Math.sin(STORM_SYM_TILT);
+                    _stormQYaw.setFromAxisAngle(_stormAxisY, Math.atan2(cp.x - c.x, cp.z - c.z));
+                    stormNowDisc3D.position.set(c.x, yy, c.z);
+                    stormNowDisc3D.scale.set(k, 1, k);
+                    stormNowDisc3D.quaternion.copy(_stormQYaw).multiply(_stormQTilt);
+                    if (stormNowArms3D.visible) {
+                        stormNowArms3D.position.set(c.x, yy, c.z);
+                        stormNowArms3D.scale.set(k, 1, k);
+                        _stormQSpin.setFromAxisAngle(_stormAxisY, (est.lat < 0 ? -1 : 1) * (performance.now() / 12000) * 2 * Math.PI);
+                        stormNowArms3D.quaternion.copy(_stormQYaw).multiply(_stormQTilt).multiply(_stormQSpin);
+                    }
                 }
             }
             // country labels: sit at the nearest coastline point to the plane, only while that coast is in
@@ -399,13 +396,10 @@
     // instead of the default enlarged glyph. Real fuselage lengths per type, defaulting to the WP-3D
     // when the aircraft is unknown; at 20 units/deg the model is tiny, so it only reads once dollied in.
     let realScale3D = false;
-    let windStreaks3D = null;   // small vertical wind streaks on the plane for updrafts/downdrafts
-    let _vertBump = 0;          // signed vertical bump at the current frame (updraft +, downdraft -)
     let _borderLines = [];      // { line, mat, box, base } coastline/border lines, faded by distance to the plane
     let _countryLabels = [];    // { sprite, mat, aspect, pts, isUSA } country name labels shown near visible coastlines
     let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
     let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
-    let _stormArmMeshes = [];   // { mesh, lat, idx } the spiral arms of each storm fix, the current one turning
     let _stormSyms = [];        // { mesh, at } storm fix symbols, held to one screen size by camera distance
     let _stormStrips = [];      // { mesh, at } storm ribbon legs, width held the same way
     let followAircraft3D = true;   // the 3D twin of followAircraft2D: update3DFrame only re-centers while it is set
@@ -542,46 +536,6 @@
         return [0, -360, 360].some(s => !(bbox[0] + s > viewMaxLon || bbox[2] + s < viewMinLon));
     }
 
-    // A few small world-vertical wind streaks near the plane that rise on an updraft/altitude bump and
-    // fall on a downdraft/dip, so vertical air motion reads on the model. Kept off the rolling plane
-    // group so they stay vertical; positioned and scaled onto the plane each frame (update3DFrame), and
-    // streamed and faded by the signed vertical bump (vertBump) in animate3D.
-    const WIND_STREAK_H = 0.40;     // half-range each streak streams over, in local space
-    const WIND_STREAK_SPREAD = 0.3; // how far off the fuselage they sit, roughly the wing
-    function ensureWindStreaks() {
-        if (windStreaks3D || typeof scene3D === 'undefined' || !scene3D) return;
-        windStreaks3D = new THREE.Group();
-        for (let i = 0; i < 8; i++) {
-            const mat = new THREE.LineBasicMaterial({ color: 0xdfeaf7, transparent: true, opacity: 0, depthWrite: false });
-            const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -0.5, 0), new THREE.Vector3(0, 0.5, 0)]);
-            const line = new THREE.Line(geo, mat);
-            const ox = (Math.random() * 2 - 1) * WIND_STREAK_SPREAD, oz = (Math.random() * 2 - 1) * WIND_STREAK_SPREAD;
-            const wingShrink = 1 - 0.55 * Math.min(1, Math.abs(ox) / WIND_STREAK_SPREAD);   // shorter toward the tips
-            line.userData = { ox, oz, baseY: (Math.random() * 2 - 1) * WIND_STREAK_H };
-            line.scale.y = (0.11 + Math.random() * 0.10) * wingShrink;
-            line.position.set(ox, line.userData.baseY, oz);
-            windStreaks3D.add(line);
-        }
-        windStreaks3D.visible = false;
-        scene3D.add(windStreaks3D);
-    }
-    // Plane vertical rate (m/s) over a short window centered on idx; positive is a climb.
-    function planeVertRateMps(idx) {
-        if (!filteredData.length) return 0;
-        const i0 = Math.max(0, idx - 4), i1 = Math.min(filteredData.length - 1, idx + 4);
-        const dt = filteredData[i1].absSeconds - filteredData[i0].absSeconds;
-        return dt > 0 ? (track3DAltMeters(filteredData[i1]) - track3DAltMeters(filteredData[i0])) / dt : 0;
-    }
-    // Signed vertical bump at idx: positive on an updraft/upward bump, negative on a downdraft/dip.
-    // Driven by vertical wind (the updraft/downdraft signal) and the jerk in vertical rate (sudden dips).
-    function vertBump(idx) {
-        const d = filteredData[idx]; if (!d) return 0;
-        let s = (d.vtWnd != null ? d.vtWnd / 5 : 0);
-        const jerk = (planeVertRateMps(idx) - planeVertRateMps(Math.max(0, idx - 3))) / 7;
-        if (Math.abs(jerk) > Math.abs(s)) s = jerk;
-        return Math.max(-1.3, Math.min(1.3, s));
-    }
-
     // A small text sprite for a country name (white with a dark outline so it reads on any terrain).
     // The label keeps a constant on-screen size in animate3D by scaling with its camera distance.
     function countryLabelSprite(name) {
@@ -687,7 +641,7 @@
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
         // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
-        _stormArmMeshes = []; _stormSyms = []; _stormStrips = [];
+        _stormSyms = []; _stormStrips = [];
         const light3D = document.documentElement.dataset.theme === 'light';
         const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // coastlines carry, internal (state) borders sit back, so countries read against the terrain
@@ -794,7 +748,7 @@
         // Storm best-track overlay (js/12b-recon-archive.js), same points as the 2D layer, flattened to
         // sea level (get3DCoord's altitude term stays 0) since it spans the storm's whole life, not the
         // flight's altitude profile.
-        stormFixRing3D = null;
+        stormNowDisc3D = null; stormNowArms3D = null;
         if (showStormTrack && stormTrackPoints.length > 1) {
             const stormPts = [];
             stormTrackPoints.forEach(p => stormPts.push(get3DCoord(p.lon, p.lat, 0)));
@@ -829,8 +783,9 @@
             // flat cyclone symbol at each fix with its category printed on it
             stormTrackPoints.forEach((p, i) => {
                 const col3 = new THREE.Color(stormWindColor(p.windKt));
-                // Arms on their own quad under the disc, so the current fix can turn them (animate3D)
-                // without tumbling its category letter. Below tropical-storm strength there are none.
+                // Arms on their own quad under the disc so they scale with the camera like the disc.
+                // Static at each fix; the moving estimated-center marker is the one that spins. Below
+                // tropical-storm strength there are none.
                 if (p.windKt >= 34) {
                     const armGeo = new THREE.PlaneGeometry(1, 1);
                     armGeo.rotateX(-Math.PI / 2);
@@ -839,7 +794,6 @@
                     arms.position.copy(stormPts[i]); arms.position.y = STORM_LAYER_Y;
                     arms.renderOrder = 2;
                     threeMapGroup.add(arms);
-                    _stormArmMeshes.push({ mesh: arms, lat: p.lat, idx: i });
                     _stormSyms.push({ mesh: arms, at: arms.position.clone() });
                 }
                 const geo = new THREE.PlaneGeometry(1, 1);
@@ -851,18 +805,17 @@
                 threeMapGroup.add(sym);
                 _stormSyms.push({ mesh: sym, at: sym.position.clone() });
             });
-            // marker for the best-track fix the status card refers to: a flat ring around that fix's
-            // symbol in the sky-blue accent, the same one the 2D layer keylines it with, moved by
-            // updateStormTrackBadge() as playback advances, and scaled with the symbols in animate3D
-            const ringGeo = new THREE.RingGeometry(0.60, 0.76, 48);
-            ringGeo.rotateX(-Math.PI / 2);
-            stormFixRing3D = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
-            // Above the ribbon (1) and the current fix's arms (2), but BELOW the storm symbols (3)
-            // and the TDR level planes (3+), so the ring never paints through the radar volume.
-            stormFixRing3D.renderOrder = 2.5;
-            stormFixRing3D.position.y = STORM_LAYER_Y;
-            stormFixRing3D.visible = false;
-            threeMapGroup.add(stormFixRing3D);
+            // Estimated-current-center marker: one cyclone symbol (disc + spiral arms) moved along
+            // the track to the playback time each frame and spun cyclonically (animate3D). Built
+            // once, hidden until placed; drawn above the static fixes (disc 4, arms 3.5) so it reads
+            // as the live element. Color and category are set per frame from the interpolated wind.
+            const nowArmGeo = new THREE.PlaneGeometry(1, 1); nowArmGeo.rotateX(-Math.PI / 2);
+            stormNowArms3D = new THREE.Mesh(nowArmGeo, new THREE.MeshBasicMaterial({ map: stormArmsTex(), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+            stormNowArms3D.renderOrder = 3.5; stormNowArms3D.visible = false; threeMapGroup.add(stormNowArms3D);
+            const nowDiscGeo = new THREE.PlaneGeometry(1, 1); nowDiscGeo.rotateX(-Math.PI / 2);
+            stormNowDisc3D = new THREE.Mesh(nowDiscGeo, new THREE.MeshBasicMaterial({ map: stormSymbolTex(' '), transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+            stormNowDisc3D.renderOrder = 4; stormNowDisc3D.visible = false; threeMapGroup.add(stormNowDisc3D);
+            _stormNowLabel = ' ';
         }
         sync3DMarkers();
     }
@@ -875,10 +828,6 @@
         // Reset All hides the plane and arrows; a placed frame means a flight is loaded again,
         // so un-hide here rather than relying on every load path to remember to.
         if (!planeGroup3D.visible) { planeGroup3D.visible = true; if (trackArrow3D) trackArrow3D.visible = true; }
-        // keep the world-vertical streaks on the plane and sized to it; animate3D streams/fades them.
-        _vertBump = vertBump(idx);
-        ensureWindStreaks();
-        if (windStreaks3D) { windStreaks3D.position.copy(pos); windStreaks3D.scale.setScalar(Math.max(1e-4, planeGroup3D.scale.x) * 4); }
         // fade coastline/border lines by the plane's distance to each, so only nearby ones show.
         if (_borderLines.length) {
             const px = pos.x, pz = pos.z, R0 = 26, R1 = 74;   // full within R0 units (~1.3deg), gone by R1
@@ -965,7 +914,8 @@
         const satBandSelect = document.getElementById('satBandSelect');
 
         // Keep the early-boot FOUC guard (index.html <head>) in sync with the live mode: its CSS
-        // rule hides the 2D-only controls, and clearing an inline display cannot override it.
+        // hides the measure cluster and greys the satellite picker in 3D, and clearing an inline
+        // display cannot override a class rule.
         document.documentElement.classList.toggle('pref-tracker-3d', e.target.value === '3d');
 
         if (e.target.value === '3d') {
@@ -978,8 +928,6 @@
             if (typeof closeSatPicker === 'function') closeSatPicker();   // popover has no place in 3d mode
             syncSatSplit();
             buildSatDayStepper();
-            const satBadge = document.getElementById('satTimeBadge');
-            if (satBadge) satBadge.classList.add('hidden');
 
             setTimeout(() => {
                 resizeCanvasLayout();
@@ -1013,9 +961,8 @@
         updateBandOptions();
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         satLoadedInfo = null; satImageBox = null;
-        satDayOffset = 0;            
+        satDayOffset = 0;
         buildSatDayStepper();
-        updateSatTimeBadge();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             // Drop the auto pass for the satellite being left: its tiles are for imagery that is off
             // screen, and maybeAutoPrecacheSatellite below returns early while any pass holds

@@ -35,21 +35,52 @@
         return ocrInitPromise;
     }
 
-    // --- Non-blocking "Syncing…" badge, shown while Auto-Sync is hunting for the MMR timestamp ---
+    // --- Non-blocking "Syncing…" badge, shown while Auto-Sync aligns the MMR timestamp ---
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
-    // Visible whenever Auto-Sync has a video and is either warming the engine up (ensureOCR),
-    // scanning (isOcrRunning), or holding a queued (re)lock (forceOcrSyncNextTick). A badge rather
-    // than a cover, since the MMR plays through the warmup and only the alignment is pending.
+    // Visible while Auto-Sync has a video and is warming the engine up (ensureOCR), and while it
+    // hunts for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked).
+    // Once a lock lands the periodic 60-second re-syncs run silently, so a good alignment stays
+    // quiet. A badge rather than a cover, since the MMR plays through the warmup and only the
+    // alignment is pending.
     function refreshSyncingIndicator() {
         const el = document.getElementById('syncingIndicator');
         if (!el) return;
         const onAuto = videoLoaded && videoSyncMode && videoSyncMode.value === 'auto';
         const warming = onAuto && ocrWarmingUp;
-        const hunting = onAuto && ocrAvailable && (isOcrRunning || forceOcrSyncNextTick);
+        const hunting = onAuto && ocrAvailable && !ocrEverLocked && (isOcrRunning || forceOcrSyncNextTick);
         const label = el.querySelector('.sync-label'), sub = el.querySelector('.sync-sub');
         if (label) label.textContent = warming ? 'Preparing Auto-Sync…' : 'Syncing…';
         if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : 'aligning tracker';
         el.classList.toggle('show', !!(warming || hunting));
+        updateTimelineSyncLock();
+    }
+
+    // The initial MMR sync steps the video by seeking; a user scrub mid-hunt hijacks those seeks and
+    // locks the sync to the wrong place (and can strand the OCR mid-scan). So the timeline is held
+    // until the first lock lands, shown by a loader over a greyed slider, then handed back. Every
+    // scrub path also checks syncLockActive() so a forwarded or keyboard slide can't slip through.
+    let syncLockTimer = null, syncLockTimedOut = false;
+    function syncLockActive() {
+        if (!videoLoaded || typeof filteredData === 'undefined' || filteredData.length === 0) return false;
+        if (!videoSyncMode || videoSyncMode.value !== 'auto') return false;   // manual mode: the user sets the times
+        if (ocrEverLocked || ocrCompiledWarned || syncLockTimedOut) return false;   // synced, gave up, or timed out
+        return ocrWarmingUp || ocrAvailable;   // warming the engine or still hunting; a dead engine never locks
+    }
+    function updateTimelineSyncLock() {
+        const slider = document.getElementById('timelineSlider');
+        const loader = document.getElementById('timelineSyncLoader');
+        const locked = syncLockActive();
+        if (loader) loader.classList.toggle('show', locked);
+        if (slider) {
+            if (locked) slider.disabled = true;
+            else if (typeof filteredData !== 'undefined' && filteredData.length > 0) slider.disabled = false;
+        }
+        // Safety: never hold the slider hostage, release it even if the sync never lands.
+        if (locked && syncLockTimer === null) {
+            syncLockTimer = setTimeout(() => { syncLockTimedOut = true; syncLockTimer = null; updateTimelineSyncLock(); }, 20000);
+        } else if (!locked && syncLockTimer !== null) {
+            clearTimeout(syncLockTimer); syncLockTimer = null;
+        }
     }
 
     // --- Shared frame capture for both OCR paths ---------------------------------------------
@@ -81,7 +112,7 @@
     let ocrHuntStartMs = 0, ocrEverLocked = false, ocrCompiledWarned = false;
     function ocrNoteScanStart() { if (!ocrHuntStartMs) ocrHuntStartMs = performance.now(); }
     function ocrNoteLock() { ocrEverLocked = true; }
-    function ocrResetWatchdog() { ocrHuntStartMs = 0; ocrEverLocked = false; ocrCompiledWarned = false; }
+    function ocrResetWatchdog() { ocrHuntStartMs = 0; ocrEverLocked = false; ocrCompiledWarned = false; pendingSyncBase = null; pendingSyncCount = 0; syncLockTimedOut = false; if (syncLockTimer) { clearTimeout(syncLockTimer); syncLockTimer = null; } }
     function ocrMaybeWarnCompiled() {
         if (ocrEverLocked || ocrCompiledWarned || !ocrHuntStartMs) return;
         if (performance.now() - ocrHuntStartMs < 30000) return;

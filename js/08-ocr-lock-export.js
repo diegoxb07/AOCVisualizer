@@ -13,6 +13,10 @@
 
         isOcrRunning = true;
         refreshSyncingIndicator();  // hunting for the timestamp frame
+        // A manual Sync Now means the user is telling us the current lock is wrong, so drop the
+        // drift-hunt history and the pending-correction hysteresis and re-derive the offset from
+        // scratch below. The commit is ungated for a manual request, so it always replaces the lock.
+        if (!silent) { ocrHistory = []; pendingSyncBase = null; pendingSyncCount = 0; }
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
 
         videoSyncMode.value = 'auto'; document.getElementById('ocrIndicator').style.display = 'block'; document.getElementById('videoStartInput').disabled = true;
@@ -28,7 +32,7 @@
         const finishFail = () => {
             isOcrRunning = false; refreshSyncingIndicator();
             video.currentTime = originalVideoTime;
-            if (wasPlaying) video.play().catch(e => {});
+            if (wasPlaying && isPlaying) video.play().catch(e => {});
             ocrMaybeWarnCompiled();
             if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
         };
@@ -36,7 +40,7 @@
         const commitLock = (ocrSecs, atVTime) => {
             isOcrRunning = false; refreshSyncingIndicator();
             const currentGap = Math.abs(ocrSecs - (videoStartSeconds + atVTime));
-            if (gateGapSeconds != null && currentGap < gateGapSeconds) { if (wasPlaying) video.play().catch(e => {}); return; }
+            if (gateGapSeconds != null && currentGap < gateGapSeconds) { if (wasPlaying && isPlaying) video.play().catch(e => {}); return; }
 
             videoStartSeconds = ocrSecs - atVTime;
             document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
@@ -58,7 +62,7 @@
             ocrNoteLock();
             ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
             refreshSyncingIndicator();  // lock settled, clear the badge even when paused
-            if (wasPlaying) video.play().catch(e => {});
+            if (wasPlaying && isPlaying) video.play().catch(e => {});
         };
 
         async function attemptSync() {
@@ -108,12 +112,31 @@
                     seen.push({ vTime: vNow, secs: cands });
                 }
 
-                video.currentTime += 0.5;
-                video.addEventListener('seeked', attemptSync, { once: true });
-            } catch(e) { isOcrRunning = false; refreshSyncingIndicator(); if (wasPlaying) video.play().catch(e=>{}); }
+                stepAndContinue();
+            } catch(e) { isOcrRunning = false; refreshSyncingIndicator(); if (wasPlaying && isPlaying) video.play().catch(e=>{}); }
+        }
+        // Step the clock forward and continue the hunt on 'seeked', but never wait on it forever: a
+        // seek to a non-seekable or near-end spot, or one a user interaction interrupts, can silently
+        // skip the event, which would strand the hunt with isOcrRunning stuck true and dead-lock every
+        // later sync (including Sync Now). The timeout guarantees the hunt always reaches its end.
+        function stepAndContinue() {
+            let advanced = false;
+            const go = () => { if (advanced) return; advanced = true; video.removeEventListener('seeked', go); attemptSync(); };
+            video.addEventListener('seeked', go, { once: true });
+            setTimeout(go, 1500);
+            video.currentTime += 0.5;
         }
         attemptSync();
     }
 
-    document.getElementById('forceSyncBtn').addEventListener('click', () => performImmediateOcrLock({ silent: false }));
+    document.getElementById('forceSyncBtn').addEventListener('click', () => {
+        // Never drop a manual Sync Now: if an automatic scan is momentarily holding the OCR worker
+        // (they run briefly and, while a correction is disputed, often), wait it out and then run
+        // the fresh re-sync, rather than silently ignoring the click.
+        const runManualSync = (tries) => {
+            if (isOcrRunning && tries > 0) { setTimeout(() => runManualSync(tries - 1), 120); return; }
+            performImmediateOcrLock({ silent: false });
+        };
+        runManualSync(16);
+    });
 

@@ -109,8 +109,8 @@
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); 
     });
 
-    timelineSlider.addEventListener('mousedown', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
-    timelineSlider.addEventListener('touchstart', () => { isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
+    timelineSlider.addEventListener('mousedown', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
+    timelineSlider.addEventListener('touchstart', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
 
     // Only treat a click as a slide if it lands inside the chart's plotting area.
     // The legend strip above chartArea acts as the per-variable filter toggles, so
@@ -122,6 +122,7 @@
 
     window.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'CANVAS') {
+            if (typeof syncLockActive === 'function' && syncLockActive()) return;
             const chart = Chart.getChart(e.target);
             if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
                 const rect = e.target.getBoundingClientRect(); const xPixel = e.clientX - rect.left; const yPixel = e.clientY - rect.top;
@@ -135,6 +136,7 @@
 
     window.addEventListener('touchstart', (e) => {
         if (e.target.tagName === 'CANVAS') {
+            if (typeof syncLockActive === 'function' && syncLockActive()) return;
             const chart = Chart.getChart(e.target);
             if (chart && chart.scales && chart.scales.x && filteredData.length > 0) {
                 const rect = e.target.getBoundingClientRect(); const xPixel = e.touches[0].clientX - rect.left; const yPixel = e.touches[0].clientY - rect.top;
@@ -175,7 +177,7 @@
                     clearTimeout(scrubSyncTimeout); scrubSyncTimeout = setTimeout(() => { performImmediateOcrLock({ silent: true, gateGapSeconds: 30 }); }, 650);
                 }
             }
-            if (wasPlayingBeforeScrub) { isPlaying = true; if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{}); lastTickTime = performance.now(); masterSyncEngineTick(); }
+            if (wasPlayingBeforeScrub) { isPlaying = true; if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{}); lastTickTime = performance.now(); masterSyncEngineTick(); }
             updateVisualComponents(currentIdx, false);
         }
     };
@@ -183,6 +185,7 @@
 
     timelineSlider.addEventListener('input', function(e) {
         if (filteredData.length === 0) return;
+        if (typeof syncLockActive === 'function' && syncLockActive()) { e.target.value = currentIdx; return; }
         currentIdx = parseInt(e.target.value, 10);
         if (!scrubDebounceTimer) { requestAnimationFrame(() => { updateVisualComponents(currentIdx, true); scrubDebounceTimer = null; }); scrubDebounceTimer = true; }
         if (videoLoaded && filteredData[currentIdx]) { clearTimeout(slideSyncTimer); slideSyncTimer = setTimeout(() => { let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); if (video.duration) targetVT = Math.min(targetVT, video.duration); video.currentTime = targetVT; }, 80); }
@@ -200,6 +203,7 @@
             e.preventDefault(); if (!playPauseBtn.disabled) playPauseBtn.click(); return;
         }
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            if (typeof syncLockActive === 'function' && syncLockActive()) { e.preventDefault(); return; }   // no scrubbing until the MMR sync lands
             // Shift+arrow = jump 10 flight-minutes (same step as the satellite scan buttons).
             if (e.shiftKey) { e.preventDefault(); skipFlightMinutes(e.key === 'ArrowRight' ? 10 : -10); return; }
             e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1;

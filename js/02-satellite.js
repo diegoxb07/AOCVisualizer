@@ -139,78 +139,6 @@
         return Math.asin(Math.sin(rad * latDeg) * Math.sin(rad * decl) + Math.cos(rad * latDeg) * Math.cos(rad * decl) * Math.cos(rad * ha)) / rad;
     }
 
-    function updateSatTimeBadge() {
-        const badge = document.getElementById('satTimeBadge');
-        if (!badge) return;
-        const satSel = document.getElementById('satelliteSelect');
-        const on2d = satSel && satSel.value !== 'none' && (!trackerModeSelect || trackerModeSelect.value === '2d');
-        if (!on2d) { satUnavailableNote = null; badge.classList.add('hidden'); return; }
-        // GOES requested for a date outside the GIBS rolling archive, explain instead of showing nothing.
-        if (satUnavailableNote) { badge.innerHTML = satUnavailableNote; badge.classList.remove('hidden'); return; }
-        if (!satLoadedInfo || !satImageLoaded || !satSel || satSel.value === 'none') {
-            badge.classList.add('hidden');
-            return;
-        }
-        const row = filteredData[currentIdx];
-        if (!row || flightMetaData.date === 'Unknown') { badge.classList.add('hidden'); return; }
-        const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
-
-        const imgMs = satLoadedInfo.imageTimeMs;
-        const fmt = (ms, withTime) => {
-            const d = new Date(ms);
-            const Y=d.getUTCFullYear(), M=String(d.getUTCMonth()+1).padStart(2,'0'), D=String(d.getUTCDate()).padStart(2,'0'),
-                  h=String(d.getUTCHours()).padStart(2,'0'), m=String(d.getUTCMinutes()).padStart(2,'0');
-            return withTime ? `${Y}-${M}-${D} ${h}:${m}Z` : `${Y}-${M}-${D}`;
-        };
-
-        let imgLabel;
-        if (satLoadedInfo.isModis) {
-            if (satLoadedInfo.modisTimePending) {
-                imgLabel = fmt(imgMs, false) + ' (looking up overpass time…)';
-            } else if (satLoadedInfo.modisExact) {
-                imgLabel = fmt(imgMs, true) + ' (actual overpass)';
-            } else {
-                imgLabel = fmt(imgMs, false) + ' (daily composite)';
-            }
-        } else if (satLoadedInfo.isReconApi) {
-            imgLabel = fmt(imgMs, true) + ' (archive GOES, nearest scan)';
-        } else if (satLoadedInfo.isGoes) {
-            imgLabel = fmt(imgMs, true) + ` (new frame every ${satLoadedInfo.cadenceMin || 10} minutes)`;
-        } else {
-            imgLabel = fmt(imgMs, true);
-        }
-
-        const diffMs = imgMs - flightMs;
-        const absMin = Math.abs(diffMs) / 60000;
-        let offStr;
-        if (satLoadedInfo.isModis && satLoadedInfo.modisTimePending) {
-            offStr = '';
-        } else if (absMin < 1) {
-            offStr = 'matches flight time';
-        } else if (absMin < 60) {
-            offStr = `${Math.round(absMin)} min ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
-        } else if (absMin < 1440) {
-            offStr = `${(absMin/60).toFixed(1)} hr ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
-        } else {
-            offStr = `${Math.round(absMin/1440)} day(s) ${diffMs >= 0 ? 'AFTER' : 'BEFORE'} this point`;
-        }
-
-        const closeThresh = satLoadedInfo.isModis ? 90 : 15;
-        const within = absMin <= closeThresh;
-        badge.innerHTML = `${escapeHtml(satLoadedInfo.layerLabel)}<br>`
-            + `Image: <b>${imgLabel}</b><br>`
-            + (offStr ? `<span style="color:${within ? 'var(--accent)' : 'var(--text-muted)'}">${offStr}</span>` : '');
-        // reflective GOES bands (1-6) are daylight-only; warn if the flight point is in darkness now.
-        const nightBandSel = document.getElementById('satBandSelect');
-        const nightLayerDef = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === satSel.value) : null;
-        const nightBandObj = (nightLayerDef && nightLayerDef.bands && nightBandSel) ? nightLayerDef.bands.find(b => b.id === nightBandSel.value) : null;
-        if (nightBandObj && nightBandObj.band >= 1 && nightBandObj.band <= 6 && row.lat != null && row.lon != null
-            && solarElevationDeg(row.lat, row.lon, new Date(flightMs)) < -6) {
-            badge.innerHTML += `<br><span style="color:#fbbf24">⚠ daytime band, it's night at this point (imagery will be dark)</span>`;
-        }
-        badge.classList.remove('hidden');
-    }
-
     // Order is the order the satellite picker lists them in (updateSatelliteOptions fills the native
     // select from this array, and the picker panel walks that select). Geostationary GOES first: it
     // is the everyday choice, with continuous 10-min scans through a whole mission. The polar
@@ -304,8 +232,6 @@
         const ms = new Date(d + 'T00:00:00Z').getTime() + absSeconds * 1000;
         return Math.floor(ms / cadMs) * cadMs;
     }
-    // When set, the sat time-badge shows this note instead of imagery info (e.g. "out of view").
-    let satUnavailableNote = null;
     let _goesLabelMs = null;  // last 10-min bucket reflected in the GOES dropdown label
     let reconApiHealthChecked = false;
     let reconApiHealthOk = true;
@@ -581,14 +507,12 @@
                         satLoadedInfo.imageTimeMs = midMs;
                         satLoadedInfo.modisTimePending = false;
                         satLoadedInfo.modisExact = true;
-                        updateSatTimeBadge();
                     }
                     if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 } else {
                     opt.textContent = `${layerDef.baseLabel} [Daily]`;
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
                         satLoadedInfo.modisTimePending = false;
-                        updateSatTimeBadge();
                     }
                     if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 }
@@ -1201,9 +1125,8 @@
         // fall back to a default product, or caching/fetching would start before they've actually chosen.
         if (layerDef.isReconApi) {
             if (!isReconApiAvailable()) {
-                satUnavailableNote = 'GOES archive API unavailable';
                 satImageLoaded = false; bgNeedsUpdate = true;
-                satLoadedInfo = null; updateSatTimeBadge();
+                satLoadedInfo = null;
                 return;
             }
             if (!bandId) return;
@@ -1221,8 +1144,6 @@
 
         // Polar layers (MODIS/VIIRS) use the calendar day picked by the day-stepper.
         const wmsLayer = layerDef.wmsPrefix + bandId, wmsTime = dateStr, idTimePart = dateStr;
-        satUnavailableNote = null;  // a fetchable layer/date, clear any prior "unavailable" note
-
         const boxLonSpan = box.maxLon - box.minLon, boxLatSpan = box.maxLat - box.minLat;
         const aspect = boxLonSpan / boxLatSpan;
         const NATIVE_PX_PER_DEG = 111320 / 250;
@@ -1264,7 +1185,7 @@
                     applyPolarSatResult(r.canvas, r.box, layerDef, dateStr);
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
-                    satLoadedInfo = null; updateSatTimeBadge();
+                    satLoadedInfo = null;
                     showToast('Satellite: no imagery found for this day and area.', 6000);
                 }
             } catch(e) {
@@ -1331,8 +1252,6 @@
             modisExact: exact,
             dayOffset: satDayOffset
         };
-
-        updateSatTimeBadge();
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }
 
@@ -1376,8 +1295,6 @@
         // Outside this satellite's Earth disk, bail with a clear note (the option is disabled too).
         if (!goesInCoverage(layerDef)) {
             satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true;
-            satUnavailableNote = `${shortLabel} can't see this area<br><span style="color:#fbbf24">flight is outside the satellite's Earth-disk view</span>`;
-            updateSatTimeBadge();
             if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             return;
         }
@@ -1390,7 +1307,6 @@
             const selOpt = satSelect.options[satSelect.selectedIndex];
             if (selOpt) setGoesOptionState(selOpt, layerDef);
         }
-        satUnavailableNote = null;
 
         // Warm the buckets around the playhead in the background so sliding stays smooth.
         // bboxSupported is read from the /products discovery endpoint (bands and composites both
@@ -1523,7 +1439,6 @@
             isReconApi: true,
             cadenceMin: layerDef.cadenceMin || 10
         };
-        updateSatTimeBadge();
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }
 

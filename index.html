@@ -37,8 +37,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260723k">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260723k">
+    <link rel="stylesheet" href="css/fonts.css?v=20260724b">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260724b">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -46,7 +46,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260723k">
+    <link rel="stylesheet" href="css/app.css?v=20260724b">
 </head>
 <body class="font-sans antialiased">
 
@@ -360,13 +360,6 @@
                         <!-- vertical color-scale legend for the active satellite product, built by
                              updateSatColorLegend() in js/02-satellite.js from the api colortable endpoint -->
                         <div id="satColorLegend" class="hidden"></div>
-                        <div id="mapInfoStack" class="absolute top-14 right-3 z-[2400] flex flex-col items-end gap-1.5 pointer-events-none text-right">
-                            <div id="satTimeBadge" class="hidden bg-[color-mix(in_oklab,var(--bg)_85%,transparent)] border border-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2.5 py-1 text-[10px] font-mono text-accent leading-tight"></div>
-                            <div id="stormStatusCard" class="hidden bg-[color-mix(in_oklab,var(--bg)_85%,transparent)] border border-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2.5 py-1 text-[10px] font-mono text-ink leading-tight">
-                                <div class="text-accent font-bold mb-0.5">Last Storm Observation</div>
-                                <div id="stormStatusBody"></div>
-                            </div>
-                        </div>
                         <div id="satPrefetchBar" class="hidden">
                             <div id="satPrefetchLabel">Caching satellite imagery…</div>
                             <div id="satPrefetchTrack"><div id="satPrefetchFill"></div></div>
@@ -600,6 +593,9 @@
         <div class="cmd-row">
             <input type="range" id="timelineSlider" min="0" max="100" value="0" disabled class="flex-grow" />
             <div id="timelineTimeDisplay" class="text-sm text-accent font-bold font-mono min-w-[185px] text-right">00:00:00 UTC</div>
+            <!-- Covers the timeline while the MMR is doing its first sync, so scrubbing can't
+                 corrupt the lock; hidden by updateTimelineSyncLock() (js/06-ocr.js) once synced. -->
+            <div id="timelineSyncLoader"><span class="spin"></span><span>Syncing MMR to flight data&hellip;</span></div>
         </div>
     </div>
 </div>
@@ -897,7 +893,7 @@
             </ul>
 
             <h3 id="hs-storm">6. Storm best-track overlay</h3>
-            <p>Archive loads automatically draw the storm's whole-life, intensity-colored, dashed best-track on both trackers. Toggle it with the <b>Storm Track</b> checkbox, and the <b>Last Storm Observation</b> card shows the nearest fix.</p>
+            <p>Archive loads automatically draw the storm's whole-life, intensity-colored, dashed best-track on both trackers. Toggle it with the <b>Storm Track</b> checkbox. A spinning cyclone marker rides the track at the storm's estimated position for the current playback moment, interpolated between the best-track fixes so it moves smoothly as playback advances.</p>
 
             <h3 id="hs-charts">7. Charts, PFD, and HUD</h3>
             <ul>
@@ -975,35 +971,35 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260723k"></script>
-    <script src="js/01-state.js?v=20260723k"></script>
-    <script src="js/02-satellite.js?v=20260723k"></script>
-    <script src="js/03-metrics.js?v=20260723k"></script>
-    <script src="js/04-geo-measure.js?v=20260723k"></script>
-    <script src="js/05-interpolation.js?v=20260723k"></script>
-    <script src="js/06-ocr.js?v=20260723k"></script>
-    <script src="js/07-ui-controls.js?v=20260723k"></script>
-    <script src="js/07b-plane-models.js?v=20260723k"></script>
-    <script src="js/07c-terrain.js?v=20260723k"></script>
-    <script src="js/07d-tdr.js?v=20260723k"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260723k"></script>
-    <script src="js/09-interaction.js?v=20260723k"></script>
-    <script src="js/10-point-analysis.js?v=20260723k"></script>
-    <script src="js/11-layout.js?v=20260723k"></script>
-    <script src="js/11c-float-panels.js?v=20260723k"></script>
-    <script src="js/11b-parser-core.js?v=20260723k"></script>
-    <script src="js/12-file-parsing.js?v=20260723k"></script>
-    <script src="js/12b-recon-archive.js?v=20260723k"></script>
-    <script src="js/13-charts-master.js?v=20260723k"></script>
-    <script src="js/14-filters-sync.js?v=20260723k"></script>
-    <script src="js/15-map-render.js?v=20260723k"></script>
-    <script src="js/16-pfd-hud.js?v=20260723k"></script>
-    <script src="js/17-charts.js?v=20260723k"></script>
-    <script src="js/18-engine.js?v=20260723k"></script>
-    <script src="js/18b-flight-search.js?v=20260723k"></script>
-    <script src="js/19-bootstrap.js?v=20260723k"></script>
-    <script src="js/20-ui-polish.js?v=20260723k"></script>
-    <script src="js/21-report.js?v=20260723k"></script>
+    <script src="js/00-var-catalog.js?v=20260724b"></script>
+    <script src="js/01-state.js?v=20260724b"></script>
+    <script src="js/02-satellite.js?v=20260724b"></script>
+    <script src="js/03-metrics.js?v=20260724b"></script>
+    <script src="js/04-geo-measure.js?v=20260724b"></script>
+    <script src="js/05-interpolation.js?v=20260724b"></script>
+    <script src="js/06-ocr.js?v=20260724b"></script>
+    <script src="js/07-ui-controls.js?v=20260724b"></script>
+    <script src="js/07b-plane-models.js?v=20260724b"></script>
+    <script src="js/07c-terrain.js?v=20260724b"></script>
+    <script src="js/07d-tdr.js?v=20260724b"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260724b"></script>
+    <script src="js/09-interaction.js?v=20260724b"></script>
+    <script src="js/10-point-analysis.js?v=20260724b"></script>
+    <script src="js/11-layout.js?v=20260724b"></script>
+    <script src="js/11c-float-panels.js?v=20260724b"></script>
+    <script src="js/11b-parser-core.js?v=20260724b"></script>
+    <script src="js/12-file-parsing.js?v=20260724b"></script>
+    <script src="js/12b-recon-archive.js?v=20260724b"></script>
+    <script src="js/13-charts-master.js?v=20260724b"></script>
+    <script src="js/14-filters-sync.js?v=20260724b"></script>
+    <script src="js/15-map-render.js?v=20260724b"></script>
+    <script src="js/16-pfd-hud.js?v=20260724b"></script>
+    <script src="js/17-charts.js?v=20260724b"></script>
+    <script src="js/18-engine.js?v=20260724b"></script>
+    <script src="js/18b-flight-search.js?v=20260724b"></script>
+    <script src="js/19-bootstrap.js?v=20260724b"></script>
+    <script src="js/20-ui-polish.js?v=20260724b"></script>
+    <script src="js/21-report.js?v=20260724b"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

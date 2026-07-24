@@ -747,61 +747,32 @@
     function interpStormCenter(ms) {
         if (!stormTrackPoints.length) return null;
         const pts = stormTrackPoints;
-        if (ms <= pts[0].ms) return { lat: pts[0].lat, lon: pts[0].lon };
-        if (ms >= pts[pts.length - 1].ms) return { lat: pts[pts.length - 1].lat, lon: pts[pts.length - 1].lon };
+        if (ms <= pts[0].ms) return { lat: pts[0].lat, lon: pts[0].lon, windKt: pts[0].windKt };
+        const end = pts[pts.length - 1];
+        if (ms >= end.ms) return { lat: end.lat, lon: end.lon, windKt: end.windKt };
         for (let i = 1; i < pts.length; i++) {
             if (ms <= pts[i].ms) {
                 const a = pts[i - 1], b = pts[i];
                 const f = (b.ms - a.ms) > 0 ? (ms - a.ms) / (b.ms - a.ms) : 0;
                 let dLon = b.lon - a.lon;   // short way round for a dateline-straddling pair
                 if (dLon > 180) dLon -= 360; else if (dLon < -180) dLon += 360;
-                return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + dLon * f };
+                const wa = a.windKt != null ? a.windKt : 0, wb = b.windKt != null ? b.windKt : 0;
+                return { lat: a.lat + (b.lat - a.lat) * f, lon: a.lon + dLon * f, windKt: wa + (wb - wa) * f };
             }
         }
-        return { lat: pts[pts.length - 1].lat, lon: pts[pts.length - 1].lon };
+        return { lat: end.lat, lon: end.lon, windKt: end.windKt };
     }
 
-    // The fix the status card refers to; both trackers mark it with a discreet thin ring
-    // (drawStormTrack2D in 2D, stormFixRing3D in 3D), kept in step with the card here.
-    let currentStormFixIdx = -1;
-    function setCurrentStormFix(idx) {
-        currentStormFixIdx = idx;
-        if (typeof stormFixRing3D === 'undefined' || !stormFixRing3D) return;
-        const p = idx >= 0 ? stormTrackPoints[idx] : null;
-        if (!p) { stormFixRing3D.visible = false; return; }
-        const c = get3DCoord(p.lon, p.lat, 0);
-        stormFixRing3D.position.x = c.x; stormFixRing3D.position.z = c.z;
-        stormFixRing3D.visible = true;
-    }
-
-    // Per-frame storm status card (left side, next to the archive controls, not an on-map overlay),
-    // refreshed from updateVisualComponents() alongside the sat time badge.
-    function updateStormTrackBadge() {
-        const card = document.getElementById('stormStatusCard');
-        const body = document.getElementById('stormStatusBody');
-        if (!card || !body) return;
-        if (!showStormTrack || stormTrackPoints.length === 0 || !stormTrackMeta || flightMetaData.date === 'Unknown' || filteredData.length === 0) {
-            card.classList.add('hidden'); setCurrentStormFix(-1); return;
-        }
-        const row = filteredData[currentIdx]; if (!row) { card.classList.add('hidden'); setCurrentStormFix(-1); return; }
+    // Estimated storm center at the current playback time: the point on the best track where the
+    // storm is interpolated to be right now (interpStormCenter), which the spinning cyclone marker
+    // both trackers draw follows (drawStormTrack2D in 2D, stormNowDisc3D/stormNowArms3D in 3D).
+    // Null when no track or flight is loaded. Refreshed from updateVisualComponents().
+    let stormNow = null;
+    function updateStormNowMarker() {
+        if (!showStormTrack || stormTrackPoints.length === 0 || flightMetaData.date === 'Unknown' || filteredData.length === 0) { stormNow = null; return; }
+        const row = filteredData[currentIdx]; if (!row) { stormNow = null; return; }
         const flightMs = new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000;
-        const near = nearestStormPoint(flightMs); if (!near) { card.classList.add('hidden'); setCurrentStormFix(-1); return; }
-        setCurrentStormFix(near.idx);
-        const p = near.point;
-        const windTxt = p.windKt != null ? `${p.windKt}kt` : '-';
-        const presTxt = p.pressureMb != null ? `${p.pressureMb}mb` : '-';
-        // Direction relative to the aircraft's current playback time: positive = observation is in the
-        // past (ago), negative = the nearest best-track fix is still ahead of the flight clock (from now).
-        const rawDiffMs = flightMs - p.ms;
-        const totalMin = Math.round(Math.abs(rawDiffMs) / 60000);
-        const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
-        const mm = String(totalMin % 60).padStart(2, '0');
-        const dirTxt = rawDiffMs >= 0 ? 'ago' : 'from now';
-        const hrsOff = near.diffMs / 3600000;
-        body.innerHTML = `${escapeHtml(stormTrackMeta.name)} · <b>${escapeHtml(p.category || p.status || '')}</b><br>`
-            + `${escapeHtml(windTxt)} / ${escapeHtml(presTxt)}<br>`
-            + `<span style="color:${hrsOff <= 3 ? 'var(--accent)' : 'var(--text-muted)'}">Data Observed ${hh}:${mm} ${dirTxt}</span>`;
-        card.classList.remove('hidden');
+        stormNow = interpStormCenter(flightMs);
     }
 
     // Hover tooltip for individual best-track points on the 2D map. Uses ONLY the storm-track fix's

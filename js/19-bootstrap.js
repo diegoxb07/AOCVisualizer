@@ -114,6 +114,7 @@
     // Jump the playhead by N flight-minutes (10-min steps line up with the GOES scan cadence).
     function skipFlightMinutes(mins) {
         if (!filteredData.length || !filteredData[currentIdx]) return;
+        if (typeof syncLockActive === 'function' && syncLockActive()) return;   // hold the playhead until the MMR sync lands
         const targetSec = filteredData[currentIdx].absSeconds + mins * 60;
         let bestIdx = currentIdx, bestDiff = Infinity;
         for (let i = 0; i < filteredData.length; i++) {
@@ -200,7 +201,7 @@
         if (threeDInitialized) {
             while (threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]);
             if (typeof sync3DMarkers === 'function') sync3DMarkers();   // customMarkers is [] now, so this empties the marker group
-            [planeGroup3D, trackArrow3D, headingArrow3D, stormFixRing3D].forEach(o => { if (o) o.visible = false; });
+            [planeGroup3D, trackArrow3D, headingArrow3D, stormNowDisc3D, stormNowArms3D].forEach(o => { if (o) o.visible = false; });
             attitudeHud.innerHTML = '';
         }
 
@@ -212,7 +213,6 @@
         const stormCb = document.getElementById('toggleStormTrack'); if (stormCb) stormCb.checked = true;
         const dataLine = document.getElementById('dataReportLine'); if (dataLine) dataLine.classList.add('hidden');
         const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
-        const badge = document.getElementById('satTimeBadge'); if (badge) badge.classList.add('hidden');
         if (ocrIndicator) ocrIndicator.style.display = 'none';
         ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn','startTimeInput','endTimeInput','exportClipBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
         const startI = document.getElementById('startTimeInput'); if (startI) startI.value = '';
@@ -337,11 +337,11 @@
                 }, 2000);
             }
 
-            if (videoLoaded && speeds[currentSpeedIdx] <= 16) { 
+            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) {
                 try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e) {}
-                video.play().catch(e=>{}); 
-            } 
-            masterSyncEngineTick(); 
+                video.play().catch(e=>{});
+            }
+            masterSyncEngineTick();
         }
     });
 
@@ -1213,7 +1213,7 @@
 
         isPlaying = true; playPauseBtn.innerText = "Pause";
         playbackAccumulator = 0; lastTickTime = performance.now();
-        if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e => {});
+        if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e => {});
 
         document.getElementById('recordProgress').classList.add('show');
         setRecordProgress(0);

@@ -96,6 +96,7 @@
         video.removeAttribute('src'); video.load();
         videoLoaded = false;
         if (typeof ocrResetWatchdog === 'function') ocrResetWatchdog();
+        if (typeof updateTimelineSyncLock === 'function') updateTimelineSyncLock();   // no video, no sync lock: hand the slider back
         document.getElementById('videoPlaceholder').style.display = '';
         document.getElementById('videoInput').value = '';
         resetDropZone('videoDropZone', 'videoDropLabel', 'Choose File/Drag & Drop');
@@ -253,7 +254,7 @@
 
         if (filteredData.length > 0 && !isPlaying) {
             isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now();
-            if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
+            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
             masterSyncEngineTick();
         }
 

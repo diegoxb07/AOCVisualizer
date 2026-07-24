@@ -157,16 +157,15 @@
         return Math.min(16, Math.max(8, 30 / zoom));
     }
 
-    // Frames for the current fix's arms while paused, when nothing else repaints the map.
-    // js/18-engine.js owns them while playing, where it also supplies the interpolated row. Parks
-    // itself whenever there are no arms to turn.
+    // Frames for the estimated-center marker's arms while paused, when nothing else repaints the
+    // map. js/18-engine.js owns them while playing, where it also supplies the interpolated row.
+    // Parks itself whenever there are no arms to turn.
     let _stormSpinRaf = null;
     function stormSpinWanted() {
         return !isPlaying && showStormTrack && stormTrackPoints.length > 1
             && filteredData.length > 0
             && trackerModeSelect && trackerModeSelect.value === '2d'
-            && typeof currentStormFixIdx !== 'undefined' && currentStormFixIdx >= 0
-            && stormTrackPoints[currentStormFixIdx] && stormTrackPoints[currentStormFixIdx].windKt >= 34;
+            && typeof stormNow !== 'undefined' && stormNow && stormNow.windKt >= 34;
     }
     function stormSpinTick() {
         _stormSpinRaf = null;
@@ -200,33 +199,25 @@
         // slightly translucent so the basemap/satellite stays readable underneath.
         stormTrackPoints.forEach((p, i) => {
             const hovered = i === hoveredStormIdx;
-            // The fix the status card refers to carries a sky-blue keyline, the accent the rest of
-            // the UI uses for "this is the live one". Hover keeps white, so the two never collide.
-            const isCurrent = typeof currentStormFixIdx !== 'undefined' && i === currentStormFixIdx;
-            const ringCol = hovered ? '#ffffff' : (isCurrent ? '#38bdf8' : 'rgba(0,0,0,0.85)');
+            const ringCol = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)';
             const col = stormWindColor(p.windKt), lbl = stormCatLabel(p.windKt);
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
             ctx.globalAlpha = hovered ? 1.0 : 0.9;
             if (!lbl) {   // unknown intensity: keep a plain small fix marker
                 ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-                ctx.strokeStyle = ringCol; ctx.lineWidth = isCurrent ? 2 : 1.2; ctx.stroke();
+                ctx.strokeStyle = ringCol; ctx.lineWidth = 1.2; ctx.stroke();
                 ctx.restore(); return;
             }
             const r = hovered ? 8 : 6;
             if (p.windKt >= 34) {
                 ctx.save();
-                // The current fix's arms turn cyclonically, one revolution per 12s. Canvas +y points
-                // down, so a negative angle reads counterclockwise, the northern-hemisphere sense.
-                // Only the arms turn: the category letter would tumble, and the disc is symmetric.
-                // Rotation is orthonormal, so the symbol holds its size.
-                if (isCurrent) ctx.rotate((p.lat < 0 ? 1 : -1) * (performance.now() / 12000) * 2 * Math.PI);
                 ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
                 ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
                 ctx.restore();
             }
             ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-            ctx.strokeStyle = ringCol; ctx.lineWidth = (hovered || isCurrent) ? 2 : 1.2; ctx.stroke();
+            ctx.strokeStyle = ringCol; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
             // Every category color carries this dark label legibly, the lighter ones included.
             ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -234,6 +225,32 @@
             ctx.fillText(lbl, 0, 0.5);
             ctx.restore();
         });
+        // Estimated storm center now (interpStormCenter, via updateStormNowMarker): a spinning
+        // cyclone symbol moved smoothly along the track to the playback time, drawn over the static
+        // fixes with a sky-blue keyline, the accent the UI uses for the live element.
+        if (typeof stormNow !== 'undefined' && stormNow) {
+            const col = stormWindColor(stormNow.windKt), lbl = stormCatLabel(stormNow.windKt), r = 8;
+            ctx.save(); ctx.translate(getX(stormNow.lon), getY(stormNow.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
+            if (lbl && stormNow.windKt >= 34) {
+                ctx.save();
+                // Arms turn cyclonically, one revolution per 12s. Canvas +y points down, so a negative
+                // angle reads counterclockwise, the northern-hemisphere sense. Only the arms turn: the
+                // category letter would tumble, and the disc is symmetric. Rotation holds the size.
+                ctx.rotate((stormNow.lat < 0 ? 1 : -1) * (performance.now() / 12000) * 2 * Math.PI);
+                ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
+                ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
+                ctx.restore();
+            }
+            ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
+            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.stroke();
+            if (lbl) {
+                ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#111827';
+                ctx.fillText(lbl, 0, 0.5);
+            }
+            ctx.restore();
+        }
         ctx.restore();
     }
 

@@ -5,7 +5,7 @@
     function updateSpeedDisplay() {
         speedDisplayBtn.innerText = `${speeds[currentSpeedIdx]}x`;
         if (videoLoaded && isPlaying) {
-            if (speeds[currentSpeedIdx] <= 16) {
+            if (speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) {
                 try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e) {}
                 if (video.paused) video.play().catch(e=>{});
             } else {
@@ -24,19 +24,27 @@
             if (video.ended) { isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return; }
             
             const curSpeed = speeds[currentSpeedIdx];
-            if (curSpeed <= 16) {
+            if (curSpeed <= MAX_NATIVE_PLAYBACK_RATE) {
                 if (video.paused && isPlaying) video.play().catch(e => {});
             } else {
+                // High speed: step the clock by seeking rather than raising playbackRate, which the
+                // decoder cannot sustain (the picture and telemetry freeze). Small forward seeks keep
+                // both moving. A paused seek never fires 'ended', so stop at the video's end here.
                 if (!video.paused) video.pause();
-                videoPlaybackAccumulator += (deltaMs / 1000) * curSpeed;
+                // Cap the per-tick step so a backgrounded tab (rAF paused, large deltaMs on return)
+                // catches up over several frames instead of seeking seconds ahead in one jump.
+                videoPlaybackAccumulator += (Math.min(deltaMs, 250) / 1000) * curSpeed;
                 if (videoPlaybackAccumulator > 0.25 || !window.lastVideoSeek) {
                     video.currentTime += videoPlaybackAccumulator;
                     videoPlaybackAccumulator = 0;
                     window.lastVideoSeek = performance.now();
                 }
+                if (video.duration && video.currentTime >= video.duration - 0.1) {
+                    isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return;
+                }
             }
 
-            syncTelemetryToVideoClock(); 
+            syncTelemetryToVideoClock();
             animationFrameId = requestAnimationFrame(masterSyncEngineTick);
         } else {
             if (deltaMs < 1000) {

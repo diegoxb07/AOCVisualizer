@@ -219,18 +219,20 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #mapPanel:is(:fullscreen, .fake-fs) .media-container, #videoPanel:is(:fullscreen, .fake-fs) .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
 #mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
 #mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: 170px; width: 210px; height: 210px; }
-/* Only in 3D fullscreen does the info stack move left, because #attitudeHud takes the top-right
-   there (see below) and the sat legend is 2D-only, so the left is free. In 2D fullscreen it keeps
-   its default top-right: #satColorLegend owns the top-left, and an unscoped left move here put the
-   stack straight on top of it. Both live in #mapContainer, so no fullscreen offset is needed.
-   #mapInfoStack is itself a flex column, so the sat badge and storm card stack, never overlap. */
-html.pref-tracker-3d #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { left: 16px; right: auto; align-items: flex-start; text-align: left; }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
-/* Pre-hide the 2D-only controls on a 3D-preference refresh (class set by the inline head script
-   in index.html) so they don't flash before persistDisplayPrefs restores the 3D tracker mode. */
-html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { display: none; }
+/* Pre-hide the measure cluster on a 3D-preference refresh (class set by the inline head script
+   in index.html) so it doesn't flash before persistDisplayPrefs restores the 3D tracker mode. */
+html.pref-tracker-3d #measureCluster { display: none; }
+/* Satellite overlay is 2D only. The picker stays visible in 3D but greys out and stops taking
+   clicks, so it reads as a control that exists yet does not apply to the 3D tracker. */
+html.pref-tracker-3d #satPickerBtn { opacity: 0.45; pointer-events: none; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
-#mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: 130px; z-index: 2001; } /* above the timeline bar so its shadow gradient doesn't darken the buttons */
+/* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
+   clear the bar by position (child z-index can't beat it from the z-1500 panel), so they ride on
+   the bar's live measured height (--bottom-bar-h, js/11-layout.js) plus a margin, which stays
+   correct when the bar wraps taller. z-2001 lifts them over the bar's shadow gradient. Recenter
+   sits a row above the 10-minute skip cluster. */
+#mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: calc(var(--bottom-bar-h, 96px) + 18px); z-index: 2001; }
 #mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
 #mapPanel:is(:fullscreen, .fake-fs) .map-controls { padding-right: 50px; }
 #mapPanel:is(:fullscreen, .fake-fs) #fullscreenMapBtn { position: absolute; top: 16px; right: 22px; z-index: 200; }
@@ -243,8 +245,8 @@ html.pref-tracker-3d #measureCluster, html.pref-tracker-3d #satPickerBtn { displ
    exit-fullscreen step. z-index stays below the sticky bottom bar (2000) so the playback
    controls remain usable on top. */
 #mapPanel.fake-fs, #videoPanel.fake-fs { position: fixed; inset: 0; width: 100vw; z-index: 1500; }
-/* Each panel is its own stacking context so one panel's overlays (#mapInfoStack z-2400, HUD,
-   PFD…) can't bleed over the OTHER panel while it's pinned at z-1500. The map panel sits higher
+/* Each panel is its own stacking context so one panel's overlays (the HUD, PFD, sat legend…)
+   can't bleed over the OTHER panel while it's pinned at z-1500. The map panel sits higher
    by default so its popups (measure group, day stepper) can still overflow onto the video panel. */
 #mapPanel { z-index: 1; }
 #videoPanel { z-index: 0; }
@@ -290,8 +292,8 @@ body { -webkit-user-select: none; user-select: none; }
 input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
 /* Copyable data stays selectable for sharing: the status chips (flight data window, mission id,
    aircraft, date), the parser ledger (samples and what was filtered), the mission subline, the
-   archive status line, the storm card's metrics, and the playback clock. */
-.status-chip, #dataReportLine, #missionSubline, #reconArchiveStatus, #stormStatusCard, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
+   archive status line, and the playback clock. */
+.status-chip, #dataReportLine, #missionSubline, #reconArchiveStatus, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
 .status-chip { cursor: copy; }   /* a plain click copies the chip's value (js/09-interaction.js) */
 
 .sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
@@ -389,14 +391,13 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
 /* The polar-orbiter day stepper overhangs the map's top-right corner, and this pill covers it: the
    pill's z-50 escapes #mapContainer (which sets no z-index, so opens no stacking context) and beats
-   the header's z-20. Move the pill to the top-left while the stepper is up, which is free in exactly
-   that case, since #satColorLegend parked there is recon-GOES-only and the stepper is polar-only.
-   Class set by buildSatDayStepper in js/02-satellite.js. */
+   the header's z-20. Move the pill to the top-left while the stepper is up, clear of the stepper and
+   of the color legend (top right, recon-GOES-only). Class set by buildSatDayStepper in js/02-satellite.js. */
 #mapContainer.sat-daystepper-open #satLoadingOverlay { left: 12px; right: auto; }
 
-/* satellite product color-scale legend: compact vertical bar tucked into the top-left corner of the
-   2d player, clear of the sat/storm info (top right), pfd (bottom right), and hud (bottom left). */
-#satColorLegend { position: absolute; left: 8px; top: 8px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+/* satellite product color-scale legend: compact vertical bar tucked into the top-right corner of the
+   2d player, below the fetch pill, clear of the pfd (bottom right) and hud (bottom left). */
+#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
 #satColorLegend.hidden { display: none; }
 #satColorLegend .leg-title { font-size: 8px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 3px; text-align: center; }
 #satColorLegend .leg-body { position: relative; display: flex; gap: 4px; height: 124px; }
@@ -405,7 +406,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satColorLegend .leg-ticks span { position: absolute; left: 0; transform: translateY(-50%); font-size: 8px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
 #satColorLegend .leg-unit { text-align: center; font-size: 8px; font-weight: 700; color: var(--text-muted); margin-top: 6px; }
 /* mmr uploaded means a narrower two-column map, so tuck the legend further into the corner and shrink it */
-#mediaGrid:not(.no-video) #satColorLegend { top: 5px; left: 5px; width: 50px; padding: 3px 4px; }
+#mediaGrid:not(.no-video) #satColorLegend { top: 48px; right: 5px; width: 50px; padding: 3px 4px; }
 #mediaGrid:not(.no-video) #satColorLegend .leg-title { font-size: 7.5px; margin-bottom: 2px; }
 #mediaGrid:not(.no-video) #satColorLegend .leg-body { height: 100px; gap: 3px; }
 #mediaGrid:not(.no-video) #satColorLegend .leg-bar { width: 10px; }
@@ -445,8 +446,8 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #recordProgress #recordStopBtn { background: var(--danger); color: var(--accent-ink); border: none; border-radius: 3px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: filter 0.15s; }
 #recordProgress #recordStopBtn:hover { filter: brightness(1.15); }
 
-/* HUD + sat badges read in Inter with tabular digits for cleaner numbers */
-#hudOverlay, #satTimeBadge, #satDayLabel {
+/* HUD + sat day label read in Inter with tabular digits for cleaner numbers */
+#hudOverlay, #satDayLabel {
     font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
@@ -488,7 +489,6 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* TDR workspace: the left edge belongs to the sidebar, so the info stack keeps top-right, the
    HUD box moves bottom-right beside the PFD, and the fullscreen buttons hide like in the other
    pinned modals. */
-html.pref-tracker-3d #mapPanel.tdr-mode:is(:fullscreen, .fake-fs) #mapInfoStack { left: auto; right: 16px; top: 18px; align-items: flex-end; text-align: right; transform-origin: top right; }
 /* TDR mode hides the 2D/scale filter toggles that make no sense inside the radar workspace. */
 html:has(#mapPanel.tdr-mode) label:has(#toggleRealScale), html:has(#mapPanel.tdr-mode) label:has(#simpleTrackerIcon) { display: none; }
 /* With those two hidden, the remaining filters (Cockpit PFD + its child, S.I Units) stack in
@@ -496,8 +496,8 @@ html:has(#mapPanel.tdr-mode) label:has(#toggleRealScale), html:has(#mapPanel.tdr
 html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !important; }
 #mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; bottom: 440px; align-items: flex-end; transform-origin: bottom right; }
 #mapPanel.tdr-mode #fullscreenMapBtn { display: none; }
-/* While the workspace waits for its first volume, both HUDs grey out with the skeleton. */
-#mapPanel.tdr-loading #mapInfoStack, #mapPanel.tdr-loading .overlays-wrapper { filter: grayscale(1) opacity(0.45); transition: filter 0.2s; }
+/* While the workspace waits for its first volume, the HUD greys out with the skeleton. */
+#mapPanel.tdr-loading .overlays-wrapper { filter: grayscale(1) opacity(0.45); transition: filter 0.2s; }
 
 /* TDR level column plus its action row. */
 .tdr-hero-actions { display: flex; gap: 6px; margin: 8px 0 2px; }
@@ -542,8 +542,10 @@ body.media-collapsed .float-panel { display: none !important; }
 .float-panel .media-container { flex: 1 1 auto; min-height: 0; height: auto !important; }
 .float-resize-grip, .float-dock-btn { display: none; }
 .float-panel .float-resize-grip { display: block; position: absolute; right: 3px; bottom: 3px; width: 18px; height: 18px; cursor: nwse-resize; z-index: 2700; border-right: 3px solid var(--text-faint); border-bottom: 3px solid var(--text-faint); border-radius: 0 0 6px 0; opacity: 0.8; }
-/* Dock control inside the panel's top center, above the canvas and overlays via z-index. */
-.float-panel .float-dock-btn { display: block; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+/* Dock control at the panel's top center, lifted just above the top edge so it clears the canvas
+   and overlays. The panel floats overflow:visible and its rect clamps to y >= 22, so the button
+   rides above the content yet stays on screen. */
+.float-panel .float-dock-btn { display: block; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
 /* Small float: the big overlays would bury the map, so they hide until the panel grows back. */
 #mapPanel.panel-compact .overlays-wrapper, #mapPanel.panel-compact #satStepCluster, #mapPanel.panel-compact #pfdOverlay { display: none !important; }
 /* A floated panel leaves the grid; the one still docked takes the full row. */
@@ -592,8 +594,14 @@ body.media-collapsed .float-panel { display: none !important; }
 .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
 #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
-#cmdTimelineGroup > .cmd-row { gap: 16px; }
+#cmdTimelineGroup > .cmd-row { gap: 16px; position: relative; }
 #cmdTimelineGroup > .cmd-label { font-size: 10.5px; color: var(--accent); }
+/* Loader over the timeline while the MMR runs its first sync (js/06-ocr.js updateTimelineSyncLock):
+   it blocks scrub clicks on the greyed slider beneath and reads as a busy state, not a dead control. */
+#timelineSyncLoader { display: none; position: absolute; left: 0; top: 0; bottom: 0; right: 200px; align-items: center; justify-content: center; gap: 8px; background: color-mix(in oklab, var(--panel-strip) 95%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 55%, transparent); border-radius: 6px; z-index: 6; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
+#timelineSyncLoader.show { display: flex; }
+#timelineSyncLoader .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
+#timelineSlider:disabled { opacity: 0.45; cursor: not-allowed; }
 #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
 #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
@@ -627,15 +635,11 @@ body.media-collapsed .float-panel { display: none !important; }
 .filter-child::before { content: ""; position: absolute; left: -12px; top: -3px; width: 11px; height: 10px; border-left: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong); border-bottom-left-radius: 3px; pointer-events: none; }
 .filter-child.child-off { visibility: hidden; }   /* reserved space kept when the PFD sub-option is off */
 .filter-note { margin-left: 17px; margin-top: -2px; font-size: 8.5px; font-weight: 600; font-style: italic; letter-spacing: 0.3px; color: var(--text-faint); text-transform: uppercase; user-select: none; }
-/* Pitch/roll HUD and the info stack scale with --hud-scale (set by the media resize handle in
-   js/11-layout.js), staying in step with the metric HUD/PFD. Each scales from its anchored corner. */
+/* Pitch/roll HUD scales with --hud-scale (set by the media resize handle in js/11-layout.js),
+   staying in step with the metric HUD/PFD. It scales from its anchored corner. */
 #attitudeHud { transform: scale(var(--hud-scale, 1)); transform-origin: top left; font-size: 10px; padding: 7px; }
-#mapInfoStack { transform: scale(var(--hud-scale, 1)); transform-origin: top right; }
-/* Sat time badge + storm status card: smaller text/padding for a lower-profile info stack. */
-#satTimeBadge, #stormStatusCard { font-size: 9px; padding: 3px 7px; }
-/* In 3D fullscreen the pitch/roll HUD moves to the top-right and the info stack to the top-left. */
+/* In 3D fullscreen the pitch/roll HUD moves to the top-right. */
 #mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; transform-origin: top right; }
-html.pref-tracker-3d #mapPanel:is(:fullscreen, .fake-fs) #mapInfoStack { transform-origin: top left; }
 /* Hide the pitch/roll box until it actually has telemetry, otherwise it's an odd empty bordered
    square floating in the 3D view before a flight is loaded. */
 #attitudeHud:empty { display: none !important; }
@@ -678,8 +682,10 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 .sticky-bottom-bar .cmd-group button#playPauseBtn:hover { filter: brightness(1.12); }
 
 /* Recenter-on-aircraft button: sits above the 10-min satellite stepper (bottom: 12px) instead
-   of overlapping it. */
+   of overlapping it. In fullscreen it clears the fixed bottom bar and stays one row above the
+   skip cluster, riding the same live bar height. */
 #recenterPlaneBtn { bottom: 36px !important; }
+#mapPanel:is(:fullscreen, .fake-fs) #recenterPlaneBtn { bottom: calc(var(--bottom-bar-h, 96px) + 58px) !important; z-index: 2001; }
 
 /* Light/dark theme switch: a sliding pill below Fullscreen in the fixed top-right corner. The knob
    position and which icon lights are driven off [data-theme] on <html>, so the switch reflects the

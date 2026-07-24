@@ -130,6 +130,21 @@
         }
         window.addEventListener('resize', clampMediaToViewport);
         clampMediaToViewport();
+
+        // The sticky bottom bar's height varies: it wraps to more rows on narrow widths and grows
+        // once a loaded mission enables the Share/Record controls. Publish the live height as
+        // --bottom-bar-h so the fullscreen recenter/skip overlays sit just above it via calc(),
+        // and re-clamp the docked media height on every change so the map never slips under a bar
+        // that just grew taller.
+        const bottomBar = document.getElementById('stickyBottomBar');
+        if (bottomBar) {
+            const publishBarH = () => {
+                document.documentElement.style.setProperty('--bottom-bar-h', bottomBar.getBoundingClientRect().height + 'px');
+                clampMediaToViewport();
+            };
+            publishBarH();
+            if (typeof ResizeObserver !== 'undefined') { try { new ResizeObserver(publishBarH).observe(bottomBar); } catch (e) {} }
+        }
     })();
 
     // collapser button above the player titles: toggles a collapsed class that hides the media
@@ -173,7 +188,7 @@
                         updateVisualComponents(currentIdx);
                         if (wasPlaying) {
                             isPlaying = true; playPauseBtn.innerText = "Pause"; lastTickTime = performance.now();
-                            if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{});
+                            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
                             masterSyncEngineTick();
                         }
                     }

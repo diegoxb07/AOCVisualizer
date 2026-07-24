@@ -46,8 +46,12 @@
     let isDraggingMap = false, dragStartX = 0, dragStartY = 0;
     let followAircraft2D = true;   // 2D map keeps the plane centered until the user pans/zooms away
     let playbackAccumulator = 0;
-    let speeds = [1, 2, 4, 8, 16, 32, 64, 128]; 
+    let speeds = [1, 2, 4, 8, 16, 32, 64, 128];
     let currentSpeedIdx = 0;
+    // Fastest speed the loaded MMR video is driven by raising playbackRate. Above it the loop
+    // steps the video clock by seeking instead: past ~4x native playback outruns the frame
+    // decoder, so the picture (and the telemetry that follows its clock) stalls until the speed drops.
+    const MAX_NATIVE_PLAYBACK_RATE = 4;
     let plotMinLon, plotMaxLon, plotMinLat, plotMaxLat, deltaLon, deltaLat;
     let lonDomainCenter = 0;   // 0 for normal flights; the flight's circular-mean lon for dateline crossers (see wrapLon)
 
@@ -57,5 +61,9 @@
     let isScrubbing = false, activeScrubChart = null, wasPlayingBeforeScrub = false;
     let hasInitialSyncOccurred = false, scrubSyncTimeout = null, forceOcrSyncNextTick = false;
     let isManualSyncRequest = false, scrubDebounceTimer = null;
+    // Auto-sync hysteresis: once a good lock exists, a re-sync that disagrees must hold the SAME new
+    // offset across several scans (pendingSyncCount) before it replaces the lock, so a momentary
+    // OCR mispick cannot abruptly ruin an alignment that was consistently good.
+    let pendingSyncBase = null, pendingSyncCount = 0;
     let isDraggingShape = false, lastDragGeo = null;
     let draggingShapeIndex = -1, hoveredShapeIndex = -1, measureButtons = [], measureClickHandled = false;

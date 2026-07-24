@@ -15,7 +15,8 @@
         customMarkers = []; computeTempBaseline(); mapPlaceholder.style.display = 'none'; hud.style.display = 'block';
         const pfd = document.getElementById('pfdOverlay'); pfd.style.display = document.getElementById('togglePfd').checked ? 'block' : 'none';
         ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn'].forEach(id => document.getElementById(id).disabled = false);
-        
+        if (typeof updateTimelineSyncLock === 'function') updateTimelineSyncLock();   // re-lock the slider if the MMR is still doing its first sync
+
         timelineSlider.min = 0; timelineSlider.max = filteredData.length - 1; timelineSlider.value = 0;
         resizeCanvasLayout(); calculateMapScales(); resetMapView(); buildChartLayout();
         
@@ -27,22 +28,35 @@
 
         updateSatelliteOptions(); satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
-        if (videoLoaded) { video.pause(); if(speeds[currentSpeedIdx] <= 16) { try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e){} } syncTelemetryToVideoClock(); } 
+        if (videoLoaded) { video.pause(); if(speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) { try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e){} } syncTelemetryToVideoClock(); }
         else updateVisualComponents(currentIdx);
 
         if (shouldPlay === true) {
             isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); 
             if (videoSyncMode.value === 'auto' && !hasInitialSyncOccurred) { setTimeout(() => { forceOcrSyncNextTick = true; hasInitialSyncOccurred = true; }, 2000); }
-            if (videoLoaded && speeds[currentSpeedIdx] <= 16) video.play().catch(e=>{}); 
+            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
             masterSyncEngineTick();
         }
+    }
+
+    // Commit a newly locked video/telemetry offset: shift videoStartSeconds and reflect it in the
+    // manual time field, the auto-sync flash, and the end-of-window derivation.
+    function applyAutoSyncBase(base) {
+        videoStartSeconds = base;
+        document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
+        flashAutoSyncLabel(); updateEndWindowFromVideo(true);
     }
 
     async function syncTelemetryToVideoClock() {
         if (!videoLoaded || filteredData.length === 0 || isScrubbing) return;
         const mode = videoSyncMode.value, now = performance.now();
-        
-        if (mode === 'auto' && !isOcrRunning) { if (Math.abs(video.currentTime - lastOcrVideoTime) >= 60) forceOcrSyncNextTick = true; }
+
+        if (mode === 'auto' && !isOcrRunning) {
+            // Re-verify the lock periodically; while a disagreeing offset is pending confirmation,
+            // re-check more often so a genuine correction still lands within seconds, not minutes.
+            const recheckGap = pendingSyncBase != null ? 8 : 60;
+            if (Math.abs(video.currentTime - lastOcrVideoTime) >= recheckGap) forceOcrSyncNextTick = true;
+        }
 
         if (mode === 'auto' && ocrAvailable && ocrWorker && !isOcrRunning && forceOcrSyncNextTick && (now - lastOcrTime > 500 || lastOcrTime === 0)) {
             isOcrRunning = true; lastOcrTime = now; refreshSyncingIndicator();
@@ -73,14 +87,34 @@
                             if (vTimeDelta >= 1.0 && Math.abs(ocrDelta - vTimeDelta) <= 1.0) {
                                 const dynamicBase = ocrSecs - currentVTime;
                                 const timeDiff = Math.abs(dynamicBase - videoStartSeconds);
-                                lastOcrVideoTime = currentVTime; 
-                                
-                                if (timeDiff > 120 || (isManualSyncRequest && timeDiff > 1)) {
-                                    videoStartSeconds = dynamicBase;
+                                lastOcrVideoTime = currentVTime;
 
-                                    document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
-                                    flashAutoSyncLabel(); forceOcrSyncNextTick = false; isManualSyncRequest = false; updateEndWindowFromVideo(true);
-                                } else { forceOcrSyncNextTick = false; isManualSyncRequest = false; }
+                                if (isManualSyncRequest && timeDiff > 1) {
+                                    // Explicit user re-sync request: take the new offset immediately.
+                                    applyAutoSyncBase(dynamicBase);
+                                    forceOcrSyncNextTick = false; isManualSyncRequest = false;
+                                    pendingSyncBase = null; pendingSyncCount = 0;
+                                } else if (timeDiff > 120) {
+                                    if (!ocrEverLocked) {
+                                        // No established sync yet: the first good lock takes the offset directly.
+                                        applyAutoSyncBase(dynamicBase);
+                                        pendingSyncBase = null; pendingSyncCount = 0;
+                                    } else {
+                                        // A good sync already exists and this scan disagrees. A single frame can
+                                        // misread, so require the SAME new offset to hold across several scans
+                                        // before switching; a scan that agrees with the current offset (below)
+                                        // clears the pending candidate, so a momentary mispick never yanks the lock.
+                                        if (pendingSyncBase != null && Math.abs(dynamicBase - pendingSyncBase) <= 3) pendingSyncCount++;
+                                        else { pendingSyncBase = dynamicBase; pendingSyncCount = 1; }
+                                        if (pendingSyncCount >= 3) { applyAutoSyncBase(dynamicBase); pendingSyncBase = null; pendingSyncCount = 0; }
+                                    }
+                                    forceOcrSyncNextTick = false;
+                                } else {
+                                    // This scan agrees with the current sync: it is still good, so forget any
+                                    // pending disagreement (it was momentary).
+                                    pendingSyncBase = null; pendingSyncCount = 0;
+                                    forceOcrSyncNextTick = false; isManualSyncRequest = false;
+                                }
 
                                 ocrNoteLock();
                                 timeFoundAndVerified = true; ocrHistory = []; break;

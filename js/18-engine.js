@@ -5,7 +5,7 @@
     function updateSpeedDisplay() {
         speedDisplayBtn.innerText = `${speeds[currentSpeedIdx]}x`;
         if (videoLoaded && isPlaying) {
-            if (speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) {
+            if (speeds[currentSpeedIdx] <= nativePlaybackCeiling) {
                 try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e) {}
                 if (video.paused) video.play().catch(e=>{});
             } else {
@@ -13,6 +13,9 @@
             }
         }
     }
+
+    // Native-rate stall watchdog state (see the high-rate branch of masterSyncEngineTick).
+    let _natWatchLastVt = null, _natWatchWallMs = 0, _natWatchVidSec = 0;
 
     function masterSyncEngineTick() {
         if (!isPlaying) return;
@@ -28,12 +31,34 @@
             if (isOcrRunning && video.paused) { animationFrameId = requestAnimationFrame(masterSyncEngineTick); return; }
 
             const curSpeed = speeds[currentSpeedIdx];
-            if (curSpeed <= MAX_NATIVE_PLAYBACK_RATE) {
+            if (curSpeed <= nativePlaybackCeiling) {
                 if (video.paused && isPlaying) video.play().catch(e => {});
+                // Stall watchdog for high native rates: a decoder that cannot sustain the rate
+                // stops advancing the video clock, freezing both players. The clock is measured
+                // against wall time; when it runs under 70% of the requested rate across a 1.5 s
+                // window, the ceiling demotes to 4 and higher speeds go through the seek-stepping
+                // branch below. A scrub or sync jump restarts the window rather than polluting it.
+                if (curSpeed > 4) {
+                    const vt = video.currentTime;
+                    if (_natWatchLastVt != null && !video.seeking) {
+                        const dv = vt - _natWatchLastVt;
+                        if (dv < 0 || dv > (deltaMs / 1000) * curSpeed * 3 + 0.5) { _natWatchWallMs = 0; _natWatchVidSec = 0; }
+                        else { _natWatchWallMs += deltaMs; _natWatchVidSec += dv; }
+                        if (_natWatchWallMs >= 1500) {
+                            if (_natWatchVidSec < (_natWatchWallMs / 1000) * curSpeed * 0.7) {
+                                nativePlaybackCeiling = 4;
+                                updateSpeedDisplay();
+                            }
+                            _natWatchWallMs = 0; _natWatchVidSec = 0;
+                        }
+                    }
+                    _natWatchLastVt = vt;
+                } else _natWatchLastVt = null;
             } else {
-                // High speed: step the clock by seeking rather than raising playbackRate, which the
-                // decoder cannot sustain (the picture and telemetry freeze). Small forward seeks keep
-                // both moving. A paused seek never fires 'ended', so stop at the video's end here.
+                _natWatchLastVt = null;
+                // High speed past the native ceiling: step the clock by seeking rather than raising
+                // playbackRate further. Small forward seeks keep both players moving at the selected
+                // rate. A paused seek never fires 'ended', so stop at the video's end here.
                 if (!video.paused) video.pause();
                 // Cap the per-tick step so a backgrounded tab (rAF paused, large deltaMs on return)
                 // catches up over several frames instead of seeking seconds ahead in one jump.

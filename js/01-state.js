@@ -46,7 +46,6 @@
     let satPreloadQueue = [];                // upcoming buckets queued to warm around the playhead
     let satPreloadActive = false;            // the preload worker loop is running
     let _satPreloadBucket = null;            // last playhead bucket we queued neighbors for (avoids requeue spam)
-    let slideSyncTimer = null;  
     let isResizingMedia = false; 
 
     let mapFeatures = [];

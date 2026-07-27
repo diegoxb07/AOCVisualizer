@@ -109,6 +109,27 @@
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); 
     });
 
+    // Seek pump for scrubbing: always seek the video to the newest drag position the moment the
+    // previous seek completes, so the picture tracks the drag as fast as the decoder allows
+    // instead of updating in sparse bursts. 'seeked' can be silently skipped on an interrupted
+    // seek, so a timeout keeps the pump alive.
+    let scrubSeekTarget = null, scrubSeekBusy = false;
+    function pumpScrubSeek(vt) {
+        scrubSeekTarget = vt;
+        if (scrubSeekBusy) return;
+        const step = () => {
+            if (scrubSeekTarget == null || !videoLoaded) { scrubSeekBusy = false; return; }
+            scrubSeekBusy = true;
+            const t = scrubSeekTarget; scrubSeekTarget = null;
+            let done = false;
+            const go = () => { if (done) return; done = true; video.removeEventListener('seeked', go); step(); };
+            video.addEventListener('seeked', go, { once: true });
+            setTimeout(go, 400);
+            video.currentTime = t;
+        };
+        step();
+    }
+
     timelineSlider.addEventListener('mousedown', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
     timelineSlider.addEventListener('touchstart', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
 
@@ -129,7 +150,7 @@
                 if (!pointInChartPlotArea(chart, xPixel, yPixel)) return;
                 isScrubbing = true; activeScrubChart = chart; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
                 let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel)); clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
-                if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx, true); }
+                if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) pumpScrubSeek(Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds)); updateVisualComponents(currentIdx, true); }
             }
         }
     });
@@ -143,7 +164,7 @@
                 if (!pointInChartPlotArea(chart, xPixel, yPixel)) return;
                 isScrubbing = true; activeScrubChart = chart; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); }
                 let clickedIdx = Math.round(chart.scales.x.getValueForPixel(xPixel)); clickedIdx = Math.max(0, Math.min(filteredData.length - 1, clickedIdx));
-                if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx, true); }
+                if (clickedIdx !== currentIdx) { currentIdx = clickedIdx; if (videoLoaded) pumpScrubSeek(Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds)); updateVisualComponents(currentIdx, true); }
             }
         }
     }, {passive: true});
@@ -156,7 +177,8 @@
                 currentIdx = dragIdx;
                 if (videoLoaded) {
                     let targetVideoTime = filteredData[currentIdx].absSeconds - videoStartSeconds;
-                    if (targetVideoTime < 0) targetVideoTime = 0; if (video.duration && targetVideoTime > video.duration) targetVideoTime = video.duration; video.currentTime = targetVideoTime;
+                    if (targetVideoTime < 0) targetVideoTime = 0; if (video.duration && targetVideoTime > video.duration) targetVideoTime = video.duration;
+                    pumpScrubSeek(targetVideoTime);
                 }
                 if (!scrubDebounceTimer) { requestAnimationFrame(() => { updateVisualComponents(currentIdx, true); scrubDebounceTimer = null; }); scrubDebounceTimer = true; }
             }
@@ -168,14 +190,14 @@
 
     const commitScrub = () => {
         if(isScrubbing) {
-            isScrubbing = false; activeScrubChart = null; clearTimeout(slideSyncTimer);
+            isScrubbing = false; activeScrubChart = null;
             if (videoLoaded && filteredData[currentIdx]) {
                 let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
                 if (video.duration) targetVT = Math.min(targetVT, video.duration);
-                video.currentTime = targetVT;
+                pumpScrubSeek(targetVT);
                 scheduleOcrRecheck();
             }
-            if (wasPlayingBeforeScrub) { isPlaying = true; if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{}); lastTickTime = performance.now(); masterSyncEngineTick(); }
+            if (wasPlayingBeforeScrub) { isPlaying = true; if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) video.play().catch(e=>{}); lastTickTime = performance.now(); masterSyncEngineTick(); }
             updateVisualComponents(currentIdx, false);
         }
     };
@@ -186,7 +208,7 @@
         if (typeof syncLockActive === 'function' && syncLockActive()) { e.target.value = currentIdx; return; }
         currentIdx = parseInt(e.target.value, 10);
         if (!scrubDebounceTimer) { requestAnimationFrame(() => { updateVisualComponents(currentIdx, true); scrubDebounceTimer = null; }); scrubDebounceTimer = true; }
-        if (videoLoaded && filteredData[currentIdx]) { clearTimeout(slideSyncTimer); slideSyncTimer = setTimeout(() => { let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); if (video.duration) targetVT = Math.min(targetVT, video.duration); video.currentTime = targetVT; }, 80); }
+        if (videoLoaded && filteredData[currentIdx]) { let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); if (video.duration) targetVT = Math.min(targetVT, video.duration); pumpScrubSeek(targetVT); }
     });
     
     let arrowSkipSpeed = 1;

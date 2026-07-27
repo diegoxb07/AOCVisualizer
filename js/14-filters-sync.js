@@ -30,13 +30,13 @@
 
         updateSatelliteOptions(); satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
-        if (videoLoaded) { video.pause(); if(speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) { try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e){} } syncTelemetryToVideoClock(); }
+        if (videoLoaded) { video.pause(); if(speeds[currentSpeedIdx] <= nativePlaybackCeiling) { try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e){} } syncTelemetryToVideoClock(); }
         else updateVisualComponents(currentIdx);
 
         if (shouldPlay === true) {
             isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now(); 
             if (videoSyncMode.value === 'auto' && !hasInitialSyncOccurred) { setTimeout(() => { forceOcrSyncNextTick = true; hasInitialSyncOccurred = true; }, 2000); }
-            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
+            if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) video.play().catch(e=>{});
             masterSyncEngineTick();
         }
     }

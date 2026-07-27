@@ -132,12 +132,14 @@
         // seek to a non-seekable or near-end spot, or one a user interaction interrupts, can silently
         // skip the event, which would strand the hunt with isOcrRunning stuck true and dead-lock every
         // later sync (including Sync Now). The timeout guarantees the hunt always reaches its end.
+        // The 2 s step clears the dv >= 1.5 motion threshold on the very next attempt, so a
+        // disagreeing clock verifies within two reads and a post-slide correction lands fast.
         function stepAndContinue() {
             let advanced = false;
             const go = () => { if (advanced) return; advanced = true; video.removeEventListener('seeked', go); attemptSync(); };
             video.addEventListener('seeked', go, { once: true });
             setTimeout(go, 1500);
-            video.currentTime += 0.5;
+            video.currentTime += 2.0;
         }
         attemptSync();
     }

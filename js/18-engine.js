@@ -22,7 +22,11 @@
 
         if (videoLoaded) {
             if (video.ended) { isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return; }
-            
+            // An immediate OCR hunt pauses and steps the video itself; the engine idles until it
+            // finishes so the play-restart below and the high-speed seek stepping never fight the
+            // hunt's frame steps.
+            if (isOcrRunning && video.paused) { animationFrameId = requestAnimationFrame(masterSyncEngineTick); return; }
+
             const curSpeed = speeds[currentSpeedIdx];
             if (curSpeed <= MAX_NATIVE_PLAYBACK_RATE) {
                 if (video.paused && isPlaying) video.play().catch(e => {});

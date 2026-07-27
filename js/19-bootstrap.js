@@ -128,6 +128,7 @@
             let vt = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
             if (video.duration) vt = Math.min(vt, video.duration);
             video.currentTime = vt;
+            scheduleOcrRecheck();
         }
         updateVisualComponents(currentIdx);
     }

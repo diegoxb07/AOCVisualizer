@@ -35,22 +35,35 @@
         return ocrInitPromise;
     }
 
+    // A detected time mismatch between the MMR clock and the current offset. While it is being
+    // corrected the "Syncing…" pill shows and the timeline holds still (syncLockActive), so the
+    // user cannot slide against a wrong offset. Set by the scrub-release recheck and the playback
+    // drift check when a reading disagrees, and by a manual Sync Now; cleared when a lock commits,
+    // a hunt gives up, or a scan agrees with the current offset. Self-expires so a mismatch that
+    // never resolves cannot hold the timeline hostage.
+    let ocrMismatchHold = false, ocrMismatchHoldSince = 0;
+    function ocrSetMismatchHold(on) {
+        if (ocrMismatchHold === on) { if (on) ocrMismatchHoldSince = performance.now(); return; }
+        ocrMismatchHold = on; ocrMismatchHoldSince = on ? performance.now() : 0;
+        refreshSyncingIndicator();
+    }
+
     // --- Non-blocking "Syncing…" badge, shown while Auto-Sync aligns the MMR timestamp ---
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
-    // Visible while Auto-Sync has a video and is warming the engine up (ensureOCR), and while it
-    // hunts for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked).
-    // Once a lock lands the periodic 60-second re-syncs run silently, so a good alignment stays
-    // quiet. A badge rather than a cover, since the MMR plays through the warmup and only the
-    // alignment is pending.
+    // Visible while Auto-Sync has a video and is warming the engine up (ensureOCR), while it
+    // hunts for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked),
+    // and while a detected mismatch is being corrected (ocrMismatchHold). The periodic re-syncs
+    // that agree with the current offset run silently, so a good alignment stays quiet. A badge
+    // rather than a cover, since the MMR plays through and only the alignment is pending.
     function refreshSyncingIndicator() {
         const el = document.getElementById('syncingIndicator');
         if (!el) return;
         const onAuto = videoLoaded && videoSyncMode && videoSyncMode.value === 'auto';
         const warming = onAuto && ocrWarmingUp;
-        const hunting = onAuto && ocrAvailable && !ocrEverLocked && (isOcrRunning || forceOcrSyncNextTick);
+        const hunting = onAuto && ocrAvailable && ((!ocrEverLocked && (isOcrRunning || forceOcrSyncNextTick)) || ocrMismatchHold);
         const label = el.querySelector('.sync-label'), sub = el.querySelector('.sync-sub');
         if (label) label.textContent = warming ? 'Preparing Auto-Sync…' : 'Syncing…';
-        if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : 'aligning tracker';
+        if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : (ocrMismatchHold ? 'correcting a time mismatch' : 'aligning tracker');
         el.classList.toggle('show', !!(warming || hunting));
         updateTimelineSyncLock();
     }
@@ -63,6 +76,8 @@
     function syncLockActive() {
         if (!videoLoaded || typeof filteredData === 'undefined' || filteredData.length === 0) return false;
         if (!videoSyncMode || videoSyncMode.value !== 'auto') return false;   // manual mode: the user sets the times
+        if (ocrMismatchHold && performance.now() - ocrMismatchHoldSince > 15000) ocrMismatchHold = false;   // never hold the timeline hostage
+        if (ocrMismatchHold) return true;   // a detected mismatch is being corrected: no scrubbing until it lands
         if (ocrEverLocked || ocrCompiledWarned || syncLockTimedOut) return false;   // synced, gave up, or timed out
         return ocrWarmingUp || ocrAvailable;   // warming the engine or still hunting; a dead engine never locks
     }
@@ -112,7 +127,7 @@
     let ocrHuntStartMs = 0, ocrEverLocked = false, ocrCompiledWarned = false;
     function ocrNoteScanStart() { if (!ocrHuntStartMs) ocrHuntStartMs = performance.now(); }
     function ocrNoteLock() { ocrEverLocked = true; }
-    function ocrResetWatchdog() { ocrHuntStartMs = 0; ocrEverLocked = false; ocrCompiledWarned = false; pendingSyncBase = null; pendingSyncCount = 0; syncLockTimedOut = false; if (syncLockTimer) { clearTimeout(syncLockTimer); syncLockTimer = null; } }
+    function ocrResetWatchdog() { ocrHuntStartMs = 0; ocrEverLocked = false; ocrCompiledWarned = false; pendingSyncBase = null; pendingSyncCount = 0; syncLockTimedOut = false; ocrMismatchHold = false; ocrMismatchHoldSince = 0; if (syncLockTimer) { clearTimeout(syncLockTimer); syncLockTimer = null; } }
     function ocrMaybeWarnCompiled() {
         if (ocrEverLocked || ocrCompiledWarned || !ocrHuntStartMs) return;
         if (performance.now() - ocrHuntStartMs < 30000) return;

@@ -16,7 +16,7 @@
         // A manual Sync Now means the user is telling us the current lock is wrong, so drop the
         // drift-hunt history and the pending-correction hysteresis and re-derive the offset from
         // scratch below. The commit is ungated for a manual request, so it always replaces the lock.
-        if (!silent) { ocrHistory = []; pendingSyncBase = null; pendingSyncCount = 0; }
+        if (!silent) { ocrHistory = []; pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(true); }
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
 
         videoSyncMode.value = 'auto'; document.getElementById('ocrIndicator').style.display = 'block'; document.getElementById('videoStartInput').disabled = true;
@@ -30,7 +30,7 @@
         let fallback = null;  // first in-range candidate, taken at exhaustion if nothing confirmed moving
 
         const finishFail = () => {
-            isOcrRunning = false; refreshSyncingIndicator();
+            isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator();
             video.currentTime = originalVideoTime;
             if (wasPlaying && isPlaying) video.play().catch(e => {});
             ocrMaybeWarnCompiled();
@@ -38,13 +38,12 @@
         };
 
         const commitLock = (ocrSecs, atVTime) => {
-            isOcrRunning = false; refreshSyncingIndicator();
+            isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator();
             const currentGap = Math.abs(ocrSecs - (videoStartSeconds + atVTime));
             if (gateGapSeconds != null && currentGap < gateGapSeconds) { if (wasPlaying && isPlaying) video.play().catch(e => {}); return; }
 
-            videoStartSeconds = ocrSecs - atVTime;
-            document.getElementById('videoStartInput').value = toHHMMSS(videoStartSeconds);
-            flashAutoSyncLabel(); updateEndWindowFromVideo(true);
+            applyAutoSyncBase(ocrSecs - atVTime);
+            lastOcrVideoTime = atVTime;
 
             // If the video begins before any flight-level data exists, skip the intro:
             // jump the playhead forward to the data's start time, then let the sync follow.
@@ -62,18 +61,24 @@
             ocrNoteLock();
             ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
             refreshSyncingIndicator();  // lock settled, clear the badge even when paused
+            syncTelemetryToVideoClock();   // snap the data player onto the corrected offset, even while paused
             if (wasPlaying && isPlaying) video.play().catch(e => {});
         };
 
         async function attemptSync() {
             if (attempts >= maxAttempts) {
-                if (fallback) { commitLock(fallback.secs, fallback.vTime); return; }
+                // The unverified fallback serves only ungated requests (Sync Now, first lock); a
+                // gated recheck never moves an established lock on a single unconfirmed read.
+                if (fallback && gateGapSeconds == null) { commitLock(fallback.secs, fallback.vTime); return; }
                 finishFail(); return;
             }
 
             attempts++;
             const cv = ocrCaptureFullFrame(attempts % 2 === 0);
             if (!cv) { attemptSync(); return; }
+            // The video clock is read at frame capture: recognize() can take seconds, and on a
+            // playing video a clock read after it would skew the derived offset by that latency.
+            const vNow = video.currentTime;
 
             try {
                 const { data: { text } } = await ocrWorker.recognize(cv);
@@ -83,7 +88,6 @@
                 const hasTelemetry = allParsedData.length > 0;
                 const minSecs = hasTelemetry ? allParsedData[0].absSeconds : 0;
                 const maxSecs = hasTelemetry ? allParsedData[allParsedData.length - 1].absSeconds : 0;
-                const vNow = video.currentTime;
 
                 const cands = [];
                 for (const match of matches) {
@@ -98,10 +102,19 @@
 
                 if (cands.length) {
                     if (!fallback) fallback = { secs: cands[0], vTime: vNow };
-                    // One plausible clock on screen: that is the MMR clock. Several (a compiled
-                    // video can burn in more than one time): only lock the one that ADVANCES with
-                    // the video clock across the stepped frames; a static number holds still.
-                    if (cands.length === 1 && seen.length === 0) { commitLock(cands[0], vNow); return; }
+                    // One plausible clock on screen: that is the MMR clock. An ungated request
+                    // (Sync Now, first lock) takes it immediately; a gated recheck that disagrees
+                    // with the current offset falls through to the motion check below, so an
+                    // established lock only moves on a reading that advances with the video clock.
+                    // Several candidates (a compiled video can burn in more than one time): only
+                    // lock the one that ADVANCES across the stepped frames; a static number holds
+                    // still.
+                    if (cands.length === 1 && seen.length === 0
+                        && (gateGapSeconds == null || Math.abs(cands[0] - (videoStartSeconds + vNow)) < gateGapSeconds)) { commitLock(cands[0], vNow); return; }
+                    // A gated recheck reading a clock that disagrees with the current offset: a
+                    // mismatch is being corrected, so show the pill and hold the timeline while
+                    // the motion check confirms it.
+                    if (gateGapSeconds != null && cands.some(c => Math.abs(c - (videoStartSeconds + vNow)) >= gateGapSeconds)) ocrSetMismatchHold(true);
                     for (const c of cands) {
                         for (const past of seen) {
                             const dv = vNow - past.vTime;
@@ -113,7 +126,7 @@
                 }
 
                 stepAndContinue();
-            } catch(e) { isOcrRunning = false; refreshSyncingIndicator(); if (wasPlaying && isPlaying) video.play().catch(e=>{}); }
+            } catch(e) { isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator(); if (wasPlaying && isPlaying) video.play().catch(e=>{}); }
         }
         // Step the clock forward and continue the hunt on 'seeked', but never wait on it forever: a
         // seek to a non-seekable or near-end spot, or one a user interaction interrupts, can silently
@@ -129,14 +142,29 @@
         attemptSync();
     }
 
-    document.getElementById('forceSyncBtn').addEventListener('click', () => {
-        // Never drop a manual Sync Now: if an automatic scan is momentarily holding the OCR worker
-        // (they run briefly and, while a correction is disputed, often), wait it out and then run
-        // the fresh re-sync, rather than silently ignoring the click.
-        const runManualSync = (tries) => {
-            if (isOcrRunning && tries > 0) { setTimeout(() => runManualSync(tries - 1), 120); return; }
-            performImmediateOcrLock({ silent: false });
-        };
-        runManualSync(16);
-    });
+    // Runs an OCR lock as soon as the worker is free: a full-frame recognize can hold the worker
+    // for seconds, so the request waits it out (up to ~8 s) instead of being silently dropped on
+    // a busy worker; a manual request that still cannot run says so. A request arriving mid-scrub
+    // is dropped; the release handler schedules its own recheck.
+    function requestOcrLock(opts, tries = 40) {
+        if (isScrubbing) return;
+        if (isOcrRunning) {
+            if (tries > 0) { setTimeout(() => requestOcrLock(opts, tries - 1), 200); return; }
+            if (!opts || !opts.silent) showToast('Auto-Sync is busy scanning. Try Sync Now again in a moment.', 5000);
+            return;
+        }
+        performImmediateOcrLock(opts);
+    }
+
+    // Recheck once the players reach a stable state: half a second after the last playhead jump
+    // settles, the frame is re-read and the lock re-derived when the burned-in clock disagrees
+    // with the current offset by 3 seconds or more (the motion check above confirms the reading
+    // before the lock moves).
+    function scheduleOcrRecheck() {
+        if (!videoLoaded || videoSyncMode.value !== 'auto') return;
+        clearTimeout(scrubSyncTimeout);
+        scrubSyncTimeout = setTimeout(() => { requestOcrLock({ silent: true, gateGapSeconds: 3 }); }, 500);
+    }
+
+    document.getElementById('forceSyncBtn').addEventListener('click', () => requestOcrLock({ silent: false }));
 

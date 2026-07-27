@@ -122,13 +122,32 @@
             return;
         }
         window.addEventListener('load', async () => {
-            await loadReconMission(shared.toUpperCase());
+            const id = shared.toUpperCase();
+            // A mission already in the on-device store opens from disk, the same path as the
+            // previously-loaded picker, instead of downloading and parsing again. Only a store
+            // miss (or a sparse preview-era record) goes through the network load.
+            let opened = false;
+            try {
+                await missionStoreReady;
+                let rec = preloadedMissions.get(id) || null;
+                if (!rec || !rec.parsed) {
+                    const stored = await missionIdbGet(id);
+                    if (stored && stored.parsed) { rec = stored; preloadedMissions.set(id, rec); }
+                }
+                if (rec && rec.parsed && rec.isNc && !rec.uploaded) {
+                    await openPreloadedMission(id);
+                    opened = !!(reconArchiveMeta && reconArchiveMeta.missionId === id && filteredData.length);
+                }
+            } catch (e) { opened = false; }
+            if (!opened) await loadReconMission(id);
+            // The seek/tracker params apply as soon as the rows exist, ahead of the slower
+            // storm-track fetch, so the shared moment is on screen from the first playable frame.
+            applySharedPlaybackParams(sharedT, sharedView);
             // Let the storm-track fetch land its final status message BEFORE the selector
             // reflection suppresses status writes, otherwise "Loaded … + N obs best-track"
             // arrives mid-reflection and gets swallowed.
             try { await stormTrackFetchPromise; } catch (e) { }
             reflectLoadedMissionInSelectors();
-            applySharedPlaybackParams(sharedT, sharedView);
         });
     })();
 
@@ -167,14 +186,14 @@
                 url = u.toString();
             } catch (e) { return; }
             const hhmmss = row.time.slice(0,2) + ':' + row.time.slice(2,4) + ':' + row.time.slice(4);
-            // The address bar stays as it is, so a refresh still resets cleanly; only the
-            // clipboard-unavailable fallback writes the link into the URL as a last resort.
+            // The address bar mirrors the exact copied link, so copying the URL by hand shares the
+            // same moment too; a later F5 still resets cleanly (the reload check strips the params).
+            try { history.replaceState(null, '', url); } catch (e2) {}
             try {
                 await navigator.clipboard.writeText(url);
                 showToast('Share link copied. It opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
             } catch (e) {
-                try { history.replaceState(null, '', url); } catch (e2) {}
-                showToast('Could not access the clipboard, but the address bar now holds the share link.', 6000);
+                showToast('Could not access the clipboard, but the address bar holds the share link.', 6000);
             }
         });
     })();

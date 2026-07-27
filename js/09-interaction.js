@@ -173,9 +173,7 @@
                 let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
                 if (video.duration) targetVT = Math.min(targetVT, video.duration);
                 video.currentTime = targetVT;
-                if (videoLoaded && ocrAvailable && videoSyncMode.value === 'auto') {
-                    clearTimeout(scrubSyncTimeout); scrubSyncTimeout = setTimeout(() => { performImmediateOcrLock({ silent: true, gateGapSeconds: 30 }); }, 650);
-                }
+                scheduleOcrRecheck();
             }
             if (wasPlayingBeforeScrub) { isPlaying = true; if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{}); lastTickTime = performance.now(); masterSyncEngineTick(); }
             updateVisualComponents(currentIdx, false);
@@ -208,7 +206,7 @@
             if (e.shiftKey) { e.preventDefault(); skipFlightMinutes(e.key === 'ArrowRight' ? 10 : -10); return; }
             e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1;
             let dir = e.key === 'ArrowRight' ? 1 : -1; let newIdx = currentIdx + (dir * arrowSkipSpeed); newIdx = Math.max(0, Math.min(filteredData.length - 1, newIdx)); 
-            if (newIdx !== currentIdx) { currentIdx = newIdx; if (videoLoaded) video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); updateVisualComponents(currentIdx); }
+            if (newIdx !== currentIdx) { currentIdx = newIdx; if (videoLoaded) { video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); scheduleOcrRecheck(); } updateVisualComponents(currentIdx); }
         }
     });
     document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });

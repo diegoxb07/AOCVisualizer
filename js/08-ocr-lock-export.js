@@ -66,6 +66,13 @@
         };
 
         async function attemptSync() {
+            // A scrub grabbed the playhead mid-hunt: the gated recheck yields (its release
+            // schedules a fresh one) rather than stepping on top of the user's drag or
+            // reverting the finished scrub through finishFail's position restore.
+            if (gateGapSeconds != null && isScrubbing) {
+                isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator();
+                return;
+            }
             if (attempts >= maxAttempts) {
                 // The unverified fallback serves only ungated requests (Sync Now, first lock); a
                 // gated recheck never moves an established lock on a single unconfirmed read.
@@ -79,6 +86,10 @@
             // The video clock is read at frame capture: recognize() can take seconds, and on a
             // playing video a clock read after it would skew the derived offset by that latency.
             const vNow = video.currentTime;
+            // A capture taken while a step's seek is still settling (the timeout path in
+            // stepAndContinue) shows the PREVIOUS frame under the new clock value; pairing it
+            // would poison the motion history, so such a read is discarded below.
+            const midSeekCapture = video.seeking;
 
             try {
                 const { data: { text } } = await ocrWorker.recognize(cv);
@@ -100,7 +111,7 @@
                     if (!cands.includes(ocrSecs)) cands.push(ocrSecs);
                 }
 
-                if (cands.length) {
+                if (cands.length && !midSeekCapture) {
                     if (!fallback) fallback = { secs: cands[0], vTime: vNow };
                     // One plausible clock on screen: that is the MMR clock. An ungated request
                     // (Sync Now, first lock) takes it immediately; a gated recheck that disagrees
@@ -119,6 +130,9 @@
                         for (const past of seen) {
                             const dv = vNow - past.vTime;
                             if (dv < 1.5) continue;   // below this a real HH:MM:SS may legitimately not tick
+                            // Gated rechecks pair ADJACENT reads only: a wide pairing would let a
+                            // static timestamp plus a single digit misread mimic a moving clock.
+                            if (gateGapSeconds != null && dv > 2.5) continue;
                             if (past.secs.some(p => Math.abs((c - p) - dv) <= 1.25)) { commitLock(c, vNow); return; }
                         }
                     }

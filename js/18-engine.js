@@ -16,6 +16,11 @@
 
     // Native-rate stall watchdog state (see the high-rate branch of masterSyncEngineTick).
     let _natWatchLastVt = null, _natWatchWallMs = 0, _natWatchVidSec = 0;
+    // Demotion retry: while high speeds run through seek-stepping, the ceiling is periodically
+    // restored so playback returns to native 16x once the decoder can sustain it again (a stall
+    // can be transient: background load, another tab, a heavy stretch of video). Each failed
+    // retry doubles the wait; a sustained healthy native window resets it.
+    let nativeRetryAtMs = 0, nativeRetryDelayMs = 20000;
 
     function masterSyncEngineTick() {
         if (!isPlaying) return;
@@ -24,11 +29,12 @@
         lastTickTime = now;
 
         if (videoLoaded) {
-            if (video.ended) { isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return; }
             // An immediate OCR hunt pauses and steps the video itself; the engine idles until it
             // finishes so the play-restart below and the high-speed seek stepping never fight the
-            // hunt's frame steps.
+            // hunt's frame steps. Checked BEFORE the ended test: a hunt step clamped at the
+            // video's end reports ended=true, which must not stop playback mid-hunt.
             if (isOcrRunning && video.paused) { animationFrameId = requestAnimationFrame(masterSyncEngineTick); return; }
+            if (video.ended) { isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return; }
 
             const curSpeed = speeds[currentSpeedIdx];
             if (curSpeed <= nativePlaybackCeiling) {
@@ -47,7 +53,11 @@
                         if (_natWatchWallMs >= 1500) {
                             if (_natWatchVidSec < (_natWatchWallMs / 1000) * curSpeed * 0.7) {
                                 nativePlaybackCeiling = 4;
+                                nativeRetryAtMs = performance.now() + nativeRetryDelayMs;
+                                nativeRetryDelayMs = Math.min(nativeRetryDelayMs * 2, 300000);
                                 updateSpeedDisplay();
+                            } else {
+                                nativeRetryDelayMs = 20000;   // the decoder holds this rate; a later stall starts a fresh retry clock
                             }
                             _natWatchWallMs = 0; _natWatchVidSec = 0;
                         }
@@ -56,6 +66,14 @@
                 } else _natWatchLastVt = null;
             } else {
                 _natWatchLastVt = null;
+                // The backoff window has passed: hand the speed back to the native branch and let
+                // the watchdog re-demote if the decoder still cannot hold it.
+                if (nativePlaybackCeiling < 16 && performance.now() >= nativeRetryAtMs) {
+                    nativePlaybackCeiling = 16;
+                    updateSpeedDisplay();
+                    animationFrameId = requestAnimationFrame(masterSyncEngineTick);
+                    return;
+                }
                 // High speed past the native ceiling: step the clock by seeking rather than raising
                 // playbackRate further. Small forward seeks keep both players moving at the selected
                 // rate. A paused seek never fires 'ended', so stop at the video's end here.

@@ -33,7 +33,7 @@
         // A floating map means the user works in PiP; the fresh video joins it at its side.
         if (typeof floatVideoBesideMap === 'function') floatVideoBesideMap();
         speeds = [1, 2, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
-        nativePlaybackCeiling = 16;   // a new file gets its own decoder judgment (see the stall watchdog)
+        nativePlaybackCeiling = 16; nativeRetryAtMs = 0; nativeRetryDelayMs = 20000;   // a new file gets its own decoder judgment (see the stall watchdog)
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
         if (allParsedData.length > 0) document.getElementById('videoStartInput').value = allParsedData[0].time;
         video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); if (typeof syncVideoCrop === 'function') syncVideoCrop(); }, { once: true });

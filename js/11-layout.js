@@ -197,7 +197,7 @@
                         updateVisualComponents(currentIdx);
                         if (wasPlaying) {
                             isPlaying = true; playPauseBtn.innerText = "Pause"; lastTickTime = performance.now();
-                            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
+                            if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) video.play().catch(e=>{});
                             masterSyncEngineTick();
                         }
                     }

@@ -147,8 +147,8 @@
         // stop playback and any pending sync/render timers.
         isPlaying = false; playPauseBtn.innerText = 'Play';
         if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-        [scrubSyncTimeout, scrubDebounceTimer, slideSyncTimer, satDebounceTimer].forEach(t => { if (t) clearTimeout(t); });
-        scrubSyncTimeout = null; scrubDebounceTimer = null; slideSyncTimer = null; satDebounceTimer = null;
+        [scrubSyncTimeout, scrubDebounceTimer, satDebounceTimer].forEach(t => { if (t) clearTimeout(t); });
+        scrubSyncTimeout = null; scrubDebounceTimer = null; satDebounceTimer = null; scrubSeekTarget = null;
         playbackAccumulator = 0; lastTickTime = 0; videoPlaybackAccumulator = 0; videoStartSeconds = 0;
 
         // stop any running satellite cache pass and clear the tile preloader queue. The bar hides at
@@ -340,7 +340,7 @@
                 }, 2000);
             }
 
-            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) {
+            if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) {
                 try { video.playbackRate = speeds[currentSpeedIdx]; } catch(e) {}
                 video.play().catch(e=>{});
             }
@@ -366,7 +366,7 @@
         
         const pfdC = document.getElementById('pfdCanvas'); if(pfdC) { const pfdCtx = pfdC.getContext('2d'); pfdCtx.clearRect(0,0, pfdC.width, pfdC.height); }
 
-        hasInitialSyncOccurred = false; clearTimeout(scrubSyncTimeout); clearTimeout(slideSyncTimer);
+        hasInitialSyncOccurred = false; clearTimeout(scrubSyncTimeout); scrubSeekTarget = null;
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true;
 
         if (videoLoaded) { video.currentTime = 0; currentIdx = 0; syncTelemetryToVideoClock(); } 
@@ -1231,7 +1231,7 @@
 
         isPlaying = true; playPauseBtn.innerText = "Pause";
         playbackAccumulator = 0; lastTickTime = performance.now();
-        if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e => {});
+        if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) video.play().catch(e => {});
 
         document.getElementById('recordProgress').classList.add('show');
         setRecordProgress(0);

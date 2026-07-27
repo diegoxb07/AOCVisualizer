@@ -32,7 +32,8 @@
         syncMediaGridLayout();
         // A floating map means the user works in PiP; the fresh video joins it at its side.
         if (typeof floatVideoBesideMap === 'function') floatVideoBesideMap();
-        speeds = [1, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
+        speeds = [1, 2, 4, 8, 16]; currentSpeedIdx = 0; updateSpeedDisplay();
+        nativePlaybackCeiling = 16;   // a new file gets its own decoder judgment (see the stall watchdog)
         videoSyncMode.disabled = false; document.getElementById('videoStartInput').disabled = false;
         if (allParsedData.length > 0) document.getElementById('videoStartInput').value = allParsedData[0].time;
         video.addEventListener('loadedmetadata', () => { updateEndWindowFromVideo(true); if (typeof syncVideoCrop === 'function') syncVideoCrop(); }, { once: true });
@@ -254,7 +255,7 @@
 
         if (filteredData.length > 0 && !isPlaying) {
             isPlaying = true; playPauseBtn.innerText = "Pause"; playbackAccumulator = 0; lastTickTime = performance.now();
-            if (videoLoaded && speeds[currentSpeedIdx] <= MAX_NATIVE_PLAYBACK_RATE) video.play().catch(e=>{});
+            if (videoLoaded && speeds[currentSpeedIdx] <= nativePlaybackCeiling) video.play().catch(e=>{});
             masterSyncEngineTick();
         }
 

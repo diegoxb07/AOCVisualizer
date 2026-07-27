@@ -48,10 +48,12 @@
     let playbackAccumulator = 0;
     let speeds = [1, 2, 4, 8, 16, 32, 64, 128];
     let currentSpeedIdx = 0;
-    // Fastest speed the loaded MMR video is driven by raising playbackRate. Above it the loop
-    // steps the video clock by seeking instead: past ~4x native playback outruns the frame
-    // decoder, so the picture (and the telemetry that follows its clock) stalls until the speed drops.
-    const MAX_NATIVE_PLAYBACK_RATE = 4;
+    // Fastest speed the loaded MMR video is driven by raising playbackRate; Chromium accepts up
+    // to 16x and drops frames as needed to hold the clock. A decoder that cannot hold a high rate
+    // stalls the video clock (and both players with it), so the engine's stall watchdog
+    // (masterSyncEngineTick) demotes this ceiling to 4 and higher speeds advance by seek-stepping
+    // instead. A newly loaded video resets it: each file gets its own decoder judgment.
+    let nativePlaybackCeiling = 16;
     let plotMinLon, plotMaxLon, plotMinLat, plotMaxLat, deltaLon, deltaLat;
     let lonDomainCenter = 0;   // 0 for normal flights; the flight's circular-mean lon for dateline crossers (see wrapLon)
 

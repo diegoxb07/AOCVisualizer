@@ -215,6 +215,8 @@
         const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
         if (ocrIndicator) ocrIndicator.style.display = 'none';
         ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn','startTimeInput','endTimeInput','exportClipBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+        const ovBtn = document.getElementById('satPickerBtn'); if (ovBtn) ovBtn.disabled = true;   // grey the Overlays dropdown again with nothing loaded
+        if (typeof closeSatPicker === 'function') closeSatPicker();
         const startI = document.getElementById('startTimeInput'); if (startI) startI.value = '';
         const endI = document.getElementById('endTimeInput'); if (endI) endI.value = '';
         const vsi = document.getElementById('videoStartInput'); if (vsi) { vsi.value = '000000'; vsi.disabled = true; }

@@ -612,15 +612,13 @@
             usedFullRes = true;
         } catch (e) {
             hideProgress();
-            setReconStatus(`Download/parse failed (${e.message}), loading the decimated preview…`);
-            try {
-                await parseEntireFile(reconObsToTsv(mission));
-            } catch (e2) {
-                setReconStatus(`Could not load mission ${missionId} (${e2.message}).`);
-                hideLoadingOverlay();
-                syncReconLoadButtonState();
-                return;
-            }
+            // Full resolution only: no decimated-preview fallback, so a loaded flight always carries
+            // every recorded variable rather than the sparse ~7-field copy. A failed download/parse
+            // reports and aborts instead of opening a preview.
+            setReconStatus(`Could not load the full-resolution flight for ${missionId} (${e.message}). Try loading it again.`);
+            hideLoadingOverlay();
+            syncReconLoadButtonState();
+            return;
         }
         hideProgress();
         if (subtext) subtext.textContent = 'Pulling variables...';   // restore the default for the next (manual-upload) use of this overlay
@@ -1034,18 +1032,14 @@
         try {
             const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
-            let parsed, isNc = false;
-            try {
-                const buf = await fetchArrayBufferWithProgress(
-                    RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
-                    (r, t) => status('Batch loading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
-                parsed = await parseFlightSource(buf);
-                if (!parsed.rows.length) throw new Error('no usable rows');
-                isNc = true;
-            } catch (e) {
-                parsed = await parseFlightSource(reconObsToTsv(mission));   // decimated preview fallback
-            }
+            // Full resolution only: no decimated-preview fallback (see loadReconMission). A download
+            // or parse failure propagates to the outer catch, so the mission is not saved as a preview.
+            const buf = await fetchArrayBufferWithProgress(
+                RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
+                (r, t) => status('Batch loading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
+            const parsed = await parseFlightSource(buf);
             if (!parsed.rows.length) throw new Error('no usable rows');
+            const isNc = true;
             let storm = null;
             try { storm = await fetchStormTrackData(mission); } catch (e) { }
             savePreloadedMission(missionId, { mission, parsed, isNc, storm });
@@ -1076,6 +1070,11 @@
             }
             rec = stored; preloadedMissions.set(missionId, rec);
         }
+        // A record saved before full resolution was mandatory holds only the decimated preview
+        // (isNc falsy, the same test the "(preview)" tag uses); re-fetch it at full resolution
+        // rather than reopening the sparse copy. Uploaded files have no archive source, so they open
+        // as stored.
+        if (!rec.uploaded && !rec.isNc) { return loadReconMission(missionId); }
         const mission = rec.mission;
         clearLoadedMedia();
         flightMetaData = { id: mission.storm_name ? `${mission.mission_id} (${mission.storm_name})` : mission.mission_id, date: mission.flight_date || 'Unknown', aircraft: mission.aircraft || mission.tail_num || 'Unknown' };

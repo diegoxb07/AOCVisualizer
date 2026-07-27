@@ -568,14 +568,9 @@
         if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
     }
 
-    // Keeps the satellite cluster's footprint constant (the .split rule in app.css): the layer
-    // select gives up half its width to the product picker instead of the header row growing
-    // and wrapping. Call after any change to #satBandSelect's display.
-    function syncSatSplit() {
-        const grp = document.getElementById('satControlGroup');
-        const band = document.getElementById('satBandSelect');
-        if (grp && band) grp.classList.toggle('split', band.style.display !== 'none');
-    }
+    // Retired: the satellite selects are hidden behind the Overlays dropdown now, so the header no
+    // longer needs the old .split footprint trick. Kept as a no-op for its existing callers.
+    function syncSatSplit() {}
 
     // Solar elevation (degrees) at a UTC millisecond timestamp and position. Standard astronomy
     // (days since J2000 -> ecliptic longitude -> declination, hour angle via GMST), accurate to

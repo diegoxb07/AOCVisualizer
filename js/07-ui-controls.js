@@ -1006,20 +1006,24 @@
     // coverage and scan time labels) keeps working unchanged. satPickerExpanded is the layer whose
     // product list is currently open in the panel.
     let satPickerExpanded = null;
+    let satLastActive = null;   // { sat, band } of the last chosen layer, restored when the on/off box is re-checked
 
+    // The header button is the umbrella "Overlays" trigger now, so its label stays fixed; the accent
+    // (sat-on) just signals that the satellite layer, at least, is currently drawing.
     function updateSatPickerButton() {
         const sat = document.getElementById('satelliteSelect');
-        const band = document.getElementById('satBandSelect');
         const btn = document.getElementById('satPickerBtn');
         const lbl = document.getElementById('satPickerBtnLabel');
         if (!sat || !btn || !lbl) return;
-        if (sat.value === 'none') { lbl.textContent = 'Sat: Off'; btn.classList.remove('sat-on'); return; }
-        const def = (typeof GIBS_LAYERS !== 'undefined') ? GIBS_LAYERS.find(d => d.value === sat.value) : null;
-        const base = def ? def.baseLabel : sat.value;
-        let prod = '';
-        if (band && band.value) { const o = band.options[band.selectedIndex]; prod = o ? o.textContent : ''; }
-        lbl.textContent = prod ? `${base} · ${prod}` : base;
-        btn.classList.add('sat-on');
+        lbl.textContent = 'Overlays';
+        const on = sat.value !== 'none';
+        btn.classList.toggle('sat-on', on);
+        // Keep the satellite section's on/off checkbox and its opacity row in step with the layer:
+        // opacity only means something with a layer drawing, so it appears with one.
+        const chk = document.getElementById('satToggleCheck');
+        if (chk) chk.checked = on;
+        const opRow = document.getElementById('satOpacityRow');
+        if (opRow) opRow.style.display = on ? 'flex' : 'none';
     }
 
     function renderSatPickerPanel() {
@@ -1028,7 +1032,8 @@
         const band = document.getElementById('satBandSelect');
         if (!list || !sat) return;
         const activeSat = sat.value, activeBand = band ? band.value : '';
-        let html = `<button type="button" class="sat-pick-off${activeSat === 'none' ? ' active' : ''}" data-off="1">Off (no overlay)</button>`;
+        // No Off row: the section's on/off checkbox is the "no satellite" control now.
+        let html = '';
         // Heading wherever the list crosses between the two kinds of satellite (GIBS_LAYERS is
         // ordered geostationary-first). They behave very differently, so the split is worth calling
         // out: GOES scans continuously, a polar orbiter gives one usable pass per day.
@@ -1105,10 +1110,15 @@
         const panel = document.getElementById('satPickerPanel');
         if (!panel) return;
         const sat = document.getElementById('satelliteSelect');
-        if (sat && sat.value !== 'none') satPickerExpanded = sat.value;   // open with the active layer expanded already
+        const body = document.getElementById('satExpandBody'), expandBtn = document.getElementById('satExpandBtn');
+        if (sat && sat.value !== 'none') {
+            satPickerExpanded = sat.value;   // open with the active layer expanded already
+            if (body) body.classList.remove('hidden');   // and the satellite section expanded, so the choice shows
+            if (expandBtn) expandBtn.setAttribute('aria-expanded', 'true');
+        }
         renderSatPickerPanel();
         panel.classList.remove('hidden');
-        panel.scrollTop = 0;   // always reopen scrolled to the top (opacity slider + first products)
+        panel.scrollTop = 0;   // always reopen scrolled to the top
         positionSatPicker();
     }
     function closeSatPicker() { const p = document.getElementById('satPickerPanel'); if (p) p.classList.add('hidden'); }
@@ -1120,12 +1130,13 @@
         if (!sat || !band) return;
         if (sat.value !== satValue) { sat.value = satValue; sat.dispatchEvent(new Event('change')); }
         if (band.value !== bandId) { band.value = bandId; band.dispatchEvent(new Event('change')); }
-        closeSatPicker();
+        satLastActive = { sat: satValue, band: bandId };   // remembered so the on/off box can restore it
+        // Stay open: this is one control in the shared Overlays dropdown, so picking a layer should
+        // not dismiss the storm-track and TDR toggles above.
     }
     function satPickerChooseOff() {
         const sat = document.getElementById('satelliteSelect');
         if (sat && sat.value !== 'none') { sat.value = 'none'; sat.dispatchEvent(new Event('change')); }
-        closeSatPicker();
     }
 
     (function wireSatPicker() {
@@ -1142,6 +1153,26 @@
             if (prod) { satPickerChooseProduct(prod.getAttribute('data-sat'), prod.getAttribute('data-band')); return; }
             const row = e.target.closest('.sat-pick-sat-row[data-sat]');
             if (row) { const v = row.getAttribute('data-sat'); satPickerExpanded = (satPickerExpanded === v) ? null : v; renderSatPickerPanel(); }
+        });
+        // The "Satellite" button expands/collapses the layer picker below it.
+        const satExpandBtn = document.getElementById('satExpandBtn');
+        if (satExpandBtn) satExpandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const body = document.getElementById('satExpandBody');
+            if (!body) return;
+            const open = !body.classList.toggle('hidden');
+            satExpandBtn.setAttribute('aria-expanded', String(open));
+            if (open) { renderSatPickerPanel(); positionSatPicker(); }
+        });
+        // The checkbox is the layer's on/off: unchecking turns it off; checking restores the last
+        // layer, or opens the picker to choose one when nothing has been selected yet.
+        const satChk = document.getElementById('satToggleCheck');
+        if (satChk) satChk.addEventListener('change', () => {
+            if (!satChk.checked) { satPickerChooseOff(); return; }
+            if (satLastActive) { satPickerChooseProduct(satLastActive.sat, satLastActive.band); return; }
+            satChk.checked = false;   // nothing to turn on yet; open the list so the user picks
+            const body = document.getElementById('satExpandBody');
+            if (body && body.classList.contains('hidden') && satExpandBtn) satExpandBtn.click();
         });
         // outside click or esc closes, like the measure popover.
         document.addEventListener('mousedown', (e) => {

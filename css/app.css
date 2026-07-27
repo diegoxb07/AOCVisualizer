@@ -131,13 +131,8 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
    text-transform/letter-spacing override the parent's uppercase styling. */
 .panel-subhead { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--text); }
 
-/* The satellite cluster keeps one constant footprint so the header controls never move: alone,
-   the layer select owns the full width; once a product picker appears (.split, toggled wherever
-   #satBandSelect's display changes), the two selects share the same total. Widened (and biased
-   toward the band/product select) so the picker reads as more than "Choos…" before being opened. */
-#satelliteSelect { width: 190px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-#satControlGroup.split #satelliteSelect { width: 92px; }
-#satBandSelect { width: 150px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* #satelliteSelect / #satBandSelect are the hidden source-of-truth selects behind the Overlays
+   dropdown (never shown), so they need no header sizing. */
 
 /* when the recon api is offline, manual upload is the only way in, so enlarge the upload button
    to make it obvious. toggled by updateReconApiUiState in js/02-satellite.js. */
@@ -158,6 +153,29 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
    z-20 stacking context so the panel layers above the pfd and hud overlays (z-2500) and scrolls. */
 .sat-picker-panel { position: fixed; z-index: 3200; width: 250px; max-height: 340px; overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
 .sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 2px 4px 6px; }
+/* Umbrella "Overlays" dropdown: on/off toggle rows above the satellite picker section. */
+.ov-toggle-group { display: flex; flex-direction: column; gap: 1px; }
+.ov-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.ov-row:hover:not(:disabled) { background: var(--panel-strip); }
+.ov-row-name { flex: 1 1 auto; min-width: 0; }
+.ov-row-wrap { width: 100%; }
+.ov-row-btn:disabled { cursor: not-allowed; }
+/* One checkbox look for both toggles: Storm Track fills it from its hidden native input's :checked,
+   TDR from the button's .sat-on class (set while TDR mode is on). */
+.ov-native-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; margin: 0; }
+.ov-check { flex: none; width: 15px; height: 15px; border: 1.5px solid color-mix(in oklab, var(--text-faint) 85%, transparent); border-radius: 3px; background: transparent; position: relative; transition: background 0.12s, border-color 0.12s; }
+.ov-native-check:checked ~ .ov-check, #tdrPickerBtn.sat-on .ov-check { background: var(--accent); border-color: var(--accent); }
+.ov-native-check:checked ~ .ov-check::after, #tdrPickerBtn.sat-on .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+/* Tile opacity sits at the foot of the satellite section, so it reads with a top divider (not the
+   shared bottom one) separating it from the product list above. */
+#satOpacityRow { border-bottom: none; border-top: 1px solid var(--border); margin: 6px 0 0; padding: 8px 4px 2px; }
+/* Satellite section: a toggle + expander header over a collapsible picker body. */
+#ovSatSection { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
+.ov-sat-row { gap: 7px; }
+.ov-sat-toggle { display: inline-flex; align-items: center; flex: none; margin: 0; padding: 2px 0; cursor: pointer; }
+.ov-sat-expand { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; background: transparent; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.ov-caret { margin-left: auto; color: var(--text-muted); font-size: 9px; line-height: 1; transition: transform 0.15s; }
+.ov-sat-expand[aria-expanded="true"] .ov-caret { transform: rotate(90deg); }
 .sat-opacity-row { display: flex; align-items: center; gap: 6px; padding: 4px 4px 7px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
 .sat-opacity-label { font-size: 10px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 .sat-opacity-row input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 3px; cursor: pointer; }
@@ -223,9 +241,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* Pre-hide the measure cluster on a 3D-preference refresh (class set by the inline head script
    in index.html) so it doesn't flash before persistDisplayPrefs restores the 3D tracker mode. */
 html.pref-tracker-3d #measureCluster { display: none; }
-/* Satellite overlay is 2D only. The picker stays visible in 3D but greys out and stops taking
-   clicks, so it reads as a control that exists yet does not apply to the 3D tracker. */
-html.pref-tracker-3d #satPickerBtn { opacity: 0.45; pointer-events: none; }
+/* Satellite overlay is 2D only. The Overlays dropdown stays usable in 3D for storm track and TDR;
+   only its satellite section greys out and stops taking clicks, so it reads as present-but-N/A. */
+html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
 /* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
    clear the bar by position (child z-index can't beat it from the z-1500 panel), so they ride on

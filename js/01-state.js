@@ -42,6 +42,7 @@
     let satPassDlMs = 0;
     // Smooth sliding: a background preloader warms the buckets around the playhead into the cache.
     const satFetchInFlight = new Map();      // fetchId -> in-flight Promise (dedupe live + preload + prefetch)
+    const satFetchAborters = new Map();      // fetchId -> AbortController for that in-flight network fetch
     let satPreloadQueue = [];                // upcoming buckets queued to warm around the playhead
     let satPreloadActive = false;            // the preload worker loop is running
     let _satPreloadBucket = null;            // last playhead bucket we queued neighbors for (avoids requeue spam)
@@ -60,6 +61,9 @@
     // Airfields for the 2D basemap: { code, name, lat, lon, big, mil }, filled by loadAirports()
     // (js/19-bootstrap.js) from data/airports.json. Empty until it lands, and stays empty if it fails.
     let airports = [];
+    // City labels for the 2D basemap: { name, lat, lon, big }, filled by loadCities()
+    // (js/19-bootstrap.js) from data/cities.json. Empty until it lands, and stays empty if it fails.
+    let cities = [];
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
     let showStormTrack = true;        // "Storm Track" toggle; the track draws only once a best-track loads
     let hoveredStormIdx = -1;         // index into stormTrackPoints currently under the mouse (2D map hover), -1 = none

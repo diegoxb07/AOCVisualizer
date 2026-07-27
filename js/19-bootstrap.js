@@ -402,6 +402,20 @@
             .catch(() => {});
     }
 
+    // City names for the 2D basemap, as [name, lat, lon, tier] (tier 1 = major). Local-only like
+    // the airfields: a failed fetch just leaves the layer off.
+    function loadCities() {
+        fetch('data/cities.json' + (typeof assetVer === 'function' ? assetVer() : ''))
+            .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(rows => {
+                if (!Array.isArray(rows)) return;
+                cities = rows.map(c => ({ name: c[0], lat: c[1], lon: c[2], big: c[3] === 1 }));
+                bgNeedsUpdate = true;
+                if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            })
+            .catch(() => {});
+    }
+
     // Local copies first (data/ ships with the app, so the basemap works offline);
     // fall back to the original remote sources if the local fetch fails (e.g. file://).
     const fetchGeo = (localPath, remoteUrl) =>
@@ -425,6 +439,7 @@
         }
         bgNeedsUpdate = true; if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         loadAirports();
+        loadCities();
     }).catch(e => {});
 
     // --- MP4 Video Zoom & Pan Logic ---

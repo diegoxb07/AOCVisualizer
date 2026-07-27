@@ -568,8 +568,8 @@
         if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
     }
 
-    // Retired: the satellite selects are hidden behind the Overlays dropdown now, so the header no
-    // longer needs the old .split footprint trick. Kept as a no-op for its existing callers.
+    // A no-op kept for its existing callers: the satellite selects sit behind the Overlays dropdown,
+    // so the header layout needs no .split footprint adjustment.
     function syncSatSplit() {}
 
     // Solar elevation (degrees) at a UTC millisecond timestamp and position. Standard astronomy

@@ -14,7 +14,8 @@
 
         customMarkers = []; computeTempBaseline(); mapPlaceholder.style.display = 'none'; hud.style.display = 'block';
         const pfd = document.getElementById('pfdOverlay'); pfd.style.display = document.getElementById('togglePfd').checked ? 'block' : 'none';
-        ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn'].forEach(id => document.getElementById(id).disabled = false);
+        ['replayBtn','playPauseBtn','markBtn','timelineSlider','skipBack10Btn','skipFwd10Btn'].forEach(id => document.getElementById(id).disabled = false);
+        if (typeof syncClearMarksBtn === 'function') syncClearMarksBtn();   // stays disabled until a point is marked
         const ovBtn = document.getElementById('satPickerBtn'); if (ovBtn) ovBtn.disabled = false;   // enable the Overlays dropdown now that a flight is loaded
         if (typeof updateTimelineSyncLock === 'function') updateTimelineSyncLock();   // re-lock the slider if the MMR is still doing its first sync
 

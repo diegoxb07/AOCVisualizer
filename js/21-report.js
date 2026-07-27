@@ -22,7 +22,7 @@
                 '<label for="reportBody">Details</label>' +
                 '<textarea id="reportBody" rows="7"></textarea>' +
                 '<div class="report-actions">' +
-                  '<span class="report-note">Sends as an email to <b class="text-muted" style="font-weight:600">' + REPORT_EMAIL + '</b>. The loaded mission id is attached automatically; your draft is kept here until it is sent.</span>' +
+                  '<span class="report-note">Sends as an email to <b class="text-muted" style="font-weight:600">' + REPORT_EMAIL + '</b>. The loaded mission id is attached automatically. Your draft is kept here until it is sent.</span>' +
                   '<button id="reportSend" type="button" class="report-btn" style="background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700">Send</button>' +
                 '</div>' +
               '</div>' +

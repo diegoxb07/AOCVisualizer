@@ -244,6 +244,9 @@ html.pref-tracker-3d #measureCluster { display: none; }
 /* Satellite overlay is 2D only. The Overlays dropdown stays usable in 3D for storm track and TDR;
    only its satellite section greys out and stops taking clicks, so it reads as present-but-N/A. */
 html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
+/* Reset Zoom is disabled inside the TDR workspace (js/07d-tdr.js enter/exitTdrMode), where it would
+   fight the radar view's framing; grey it so it reads as unavailable rather than dead. */
+#resetMapZoomBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
 /* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
    clear the bar by position (child z-index can't beat it from the z-1500 panel), so they ride on
@@ -447,7 +450,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satPrefetchCancel:hover { background: color-mix(in oklab, var(--danger) 30%, var(--panel)); color: var(--text); }
 
 /* Auto-Sync indicator, anchored in the MMR video panel, non-blocking */
-#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
 #syncingIndicator.show { opacity: 1; transform: translateY(0); }
 #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #syncingIndicator .sync-sub { color: var(--text-muted); font-weight: 500; }
@@ -512,6 +515,9 @@ html:has(#mapPanel.tdr-mode) label:has(#toggleRealScale), html:has(#mapPanel.tdr
 /* With those two hidden, the remaining filters (Cockpit PFD + its child, S.I Units) stack in
    one column so the bottom bar's filter block stays narrow while the workspace is up. */
 html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !important; }
+/* Stacked vertically, the PFD sub-option's reserved (visibility:hidden) row would wedge a gap
+   between Cockpit PFD and S.I Units; collapse it while it is off so they sit close together. */
+html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
 #mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; bottom: 440px; align-items: flex-end; transform-origin: bottom right; }
 #mapPanel.tdr-mode #fullscreenMapBtn { display: none; }
 /* While the workspace waits for its first volume, the HUD greys out with the skeleton. */
@@ -522,10 +528,23 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
 .tdr-hero-actions button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 3px 10px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-hero-actions button:hover { color: var(--accent); border-color: var(--accent); }
 .tdr-hero-note-top { font-size: 10px; color: var(--text-faint); margin: 6px 0 4px; line-height: 1.35; }
-.tdr-leg-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.tdr-leg-row button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; font-weight: 600; border-radius: 4px; padding: 2px 8px; cursor: pointer; transition: color .12s, border-color .12s; }
-.tdr-leg-row button:hover { color: var(--accent); border-color: var(--accent); }
-.tdr-leg-row button.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
+/* One row per leg: the leg button, then a connector line to any of its eye-pass buttons. Compact so
+   several legs (and their passes) fit without scrolling. */
+.tdr-leg-row { display: flex; flex-direction: column; gap: 3px; }
+.tdr-leg-group { display: flex; align-items: center; }
+.tdr-leg-btn { flex: none; background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 9.5px; font-weight: 600; border-radius: 4px; padding: 2px 8px; cursor: pointer; transition: color .12s, border-color .12s; }
+.tdr-leg-btn:hover { color: var(--accent); border-color: var(--accent); }
+.tdr-leg-btn.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
+.tdr-leg-conn { flex: none; width: 10px; height: 1px; background: var(--border-strong); }
+.tdr-eye-btn { flex: none; margin-left: 3px; background: color-mix(in oklab, var(--accent) 12%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 50%, transparent); color: var(--accent); font-size: 9px; font-weight: 600; border-radius: 4px; padding: 1px 7px; cursor: pointer; transition: filter .12s; }
+.tdr-eye-btn:hover { filter: brightness(1.15); }
+.tdr-eye-btn.on { background: color-mix(in oklab, var(--accent) 30%, transparent); border-color: var(--accent); color: var(--text); }
+
+/* Clear Marks: greyed while disabled (no points placed), a faint accent tint once points exist,
+   lighter than the solid-accent Mark Point button beside it. */
+#clearMarksBtn:disabled { opacity: 0.5; }
+#clearMarksBtn:not(:disabled) { background: color-mix(in oklab, var(--accent) 16%, var(--panel-strip)); border-color: color-mix(in oklab, var(--accent) 45%, transparent); color: var(--accent); }
+#clearMarksBtn:not(:disabled):hover { background: color-mix(in oklab, var(--accent) 26%, var(--panel-strip)); color: var(--accent); }
 .tdr-level-hero { display: flex; flex-direction: column; gap: 2px; max-height: 44vh; overflow-y: auto; }
 .tdr-level-row { display: flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel-strip); color: var(--text-muted); font-size: 10.5px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-level-row:hover { color: var(--text); border-color: var(--accent); }
@@ -704,6 +723,12 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
    skip cluster, riding the same live bar height. */
 #recenterPlaneBtn { bottom: 36px !important; }
 #mapPanel:is(:fullscreen, .fake-fs) #recenterPlaneBtn { bottom: calc(var(--bottom-bar-h, 96px) + 58px) !important; z-index: 2001; }
+
+/* Exit TDR button: a small control in the top-right of the pinned workspace, tucked just under the
+   header/Overlays row. Shown only while the workspace is up (.tdr-mode). */
+#tdrExitBtn { display: none; position: absolute; right: 16px; top: 60px; z-index: 2001; align-items: center; gap: 5px; padding: 4px 9px; background: color-mix(in oklab, var(--danger) 90%, transparent); color: #fff; border: 1px solid var(--danger); border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); transition: filter 0.12s; }
+#tdrExitBtn:hover { filter: brightness(1.1); }
+#mapPanel.tdr-mode #tdrExitBtn { display: inline-flex; }
 
 /* Light/dark theme switch: a sliding pill below Fullscreen in the fixed top-right corner. The knob
    position and which icon lights are driven off [data-theme] on <html>, so the switch reflects the

@@ -213,15 +213,10 @@
     });
     document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });
 
-    // Reset the 2D view = re-engage follow (zoom in and re-center on the aircraft). Inside the TDR
-    // workspace's 2D display it instead restores the radar-framing preset, so a reset does not blow
-    // away the workspace zoom.
-    function resetMapView() {
-        if (typeof tdrModeOn !== 'undefined' && tdrModeOn && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d' && typeof tdrApply2DViewPreset === 'function') {
-            tdrApply2DViewPreset(); return;
-        }
-        engageFollowAircraft();
-    }
+    // Reset the 2D view = re-engage follow (zoom in and re-center on the aircraft). The button is
+    // disabled inside the TDR workspace (it would fight the radar view's own framing), so this only
+    // runs on the normal tracker.
+    function resetMapView() { engageFollowAircraft(); }
     // The tracker's ⟲ button resets whichever view is active: 2D pan/zoom, or the 3D orbit
     // camera back to its home offset on the aircraft.
     document.getElementById('resetMapZoomBtn').addEventListener('click', () => {

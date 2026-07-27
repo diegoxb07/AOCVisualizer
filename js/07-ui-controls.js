@@ -1200,13 +1200,17 @@
     document.getElementById('trackAltSelect').addEventListener('change', () => { if (filteredData.length > 0 && threeDInitialized) { build3DScene(); updateVisualComponents(currentIdx); } });
     document.getElementById('toggle8Hz').addEventListener('change', () => { if (filteredData.length > 0) updateVisualComponents(currentIdx); });
 
+    // Clear is only usable once a point is marked: disabled (greyed) with no marks, faintly accented
+    // once there are some. Kept in sync wherever customMarkers changes.
+    function syncClearMarksBtn() { const b = document.getElementById('clearMarksBtn'); if (b) b.disabled = customMarkers.length === 0; }
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
             const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#7dd3fc', '#9aa1ad', '#7ad9ff', '#22d0ee']; const assignedColor = palette[customMarkers.length % palette.length];
             customMarkers.push({ idx: currentIdx, color: assignedColor }); if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx);
+            syncClearMarksBtn();
         }
     });
-    document.getElementById('clearMarksBtn').addEventListener('click', () => { customMarkers = []; if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx); });
+    document.getElementById('clearMarksBtn').addEventListener('click', () => { customMarkers = []; if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx); syncClearMarksBtn(); });
     document.getElementById('simpleTrackerIcon').addEventListener('change', () => { if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); });
 
     document.getElementById('togglePfd').addEventListener('change', (e) => {

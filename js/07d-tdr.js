@@ -57,6 +57,7 @@
     let tdrModeOn = false;            // the pinned radar workspace is up
     let tdrModeAutoAll = false;       // first workspace entry with nothing picked selects all bands
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
+    let tdrEyeActive = false;         // within the picked leg: true shows its eye pass, false its whole span
     let tdrIntroDone = false;         // one fast leg fly-through per mode entry, once data exists
     let tdrIntroRaf = 0;              // its animation frame handle, cancelled on exit/reset
     let tdrScanWall = null;           // vertical section wall riding the reveal frontier at the aircraft
@@ -102,7 +103,7 @@
         tdr2DOpacity = 0.85;
         const opSlReset = document.getElementById('tdr2dOpacitySlider'); if (opSlReset) opSlReset.value = 85;
         const opValReset = document.getElementById('tdr2dOpacityVal'); if (opValReset) opValReset.textContent = '85%';
-        tdrLevel2Missing = false; tdrLegPick = null;
+        tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
         tdrIntroDone = false;
         tdrAnyFetched = false;
@@ -462,9 +463,9 @@
                         // A later volume can carry data at levels the earlier analyses lacked
                         // (usually the very top of the column). While the selection still covers
                         // every data level seen so far, the new analysis's levels join it, so
-                        // "all layers" stays all layers instead of the top band silently reading
-                        // unselected once this analysis becomes current. A hand-trimmed
-                        // selection no longer covers everything, so it is left alone.
+                        // "all layers" stays all layers, keeping the top band selected once this
+                        // analysis becomes current. A hand-trimmed selection covers only some levels,
+                        // so it is left alone.
                         const others = tdrAnalyses.filter(x => x !== a && x.state === 'ready' && x.levels);
                         if (others.every(x => x.levels.every(l => !l.canvas || tdrSelectedKm.has(l.km))))
                             a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
@@ -840,42 +841,89 @@
         if (btn) { btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn); }
     }
 
+    // The eye pass on a leg: the single frame where the aircraft is closest to the storm center, and
+    // only when that leg actually crosses near it (not a distant transit leg). The center is the radar
+    // volume's storm-relative origin once the leg is loaded (precise), else the interpolated best-track
+    // position. Returns a 0-or-1 element array of { idx } (one leg, at most one pass).
+    function tdrLegEyePasses(a) {
+        if (!a || !filteredData.length) return [];
+        const staticC = (a.geo && isFinite(a.geo.originLat) && isFinite(a.geo.originLon)) ? { lat: a.geo.originLat, lon: a.geo.originLon } : null;
+        const haveTrack = typeof interpStormCenter === 'function' && typeof flightMetaData !== 'undefined' && flightMetaData.date !== 'Unknown';
+        if (!staticC && !haveTrack) return [];
+        const dayMs = staticC ? 0 : new Date(flightMetaData.date + 'T00:00:00Z').getTime();
+        let bestIdx = -1, bestKm = Infinity;
+        for (let i = 0; i < filteredData.length; i++) {
+            const r = filteredData[i];
+            if (r.absSeconds < a.startSec || r.absSeconds > a.stopSec) continue;
+            let cLat, cLon;
+            if (staticC) { cLat = staticC.lat; cLon = staticC.lon; }
+            else { const est = interpStormCenter(dayMs + r.absSeconds * 1000); if (!est) continue; cLat = est.lat; cLon = est.lon; }
+            const dN = (r.lat - cLat) * 111.32;
+            const dE = (r.lon - cLon) * 111.32 * Math.cos(cLat * Math.PI / 180);
+            const km = Math.sqrt(dN * dN + dE * dE);
+            if (km < bestKm) { bestKm = km; bestIdx = i; }
+        }
+        return (bestIdx >= 0 && bestKm <= 55) ? [{ idx: bestIdx }] : [];   // 55 km: a pass through the eye/eyewall
+    }
+
     // The panel's level column: the pressure bands laid out top-down (highest altitude first),
     // one clickable row per band, dimmed when the current analysis has no data anywhere in it.
     function buildTdrHero() {
-        // Leg picker: one button per analysis, known before any volume downloads; clicking one
-        // jumps the playhead just past that leg's end so its finished radar is on display.
+        // Leg picker: one row per analysis, each carrying any of its eye-pass buttons (jumps to where
+        // the aircraft crossed the storm center) linked to the leg by a connector line.
         const legRow = document.getElementById('tdrLegRow');
         if (legRow) {
             legRow.innerHTML = '';
-            // Drop legs the radar never covers: an analysis that errored out, or that finished loading
-            // with no drawable level, is not a real leg to pick. Legs still loading stay (their data is
-            // not known yet); the shown legs renumber contiguously so there are no gaps.
+            // Show only legs the radar covers: an analysis that errored out, or that finished loading
+            // with no drawable level, is dropped. Legs still loading stay (their coverage is still
+            // pending), and the shown legs renumber contiguously so they run in sequence.
             const shownLegs = tdrAnalyses.filter(a => a.state !== 'error' && !(a.state === 'ready' && !(a.levels && a.levels.some(l => l.canvas))));
+            // In the workspace's 2D display exactly one analysis is on screen, so its leg button
+            // highlights even without an explicit pick (tdrCurrent is what draws).
+            const in2dNow = tdrModeOn && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
             shownLegs.forEach((a, i) => {
-                const b = document.createElement('button');
-                b.textContent = 'Leg ' + (i + 1);
-                b.title = a.legLabel + (a.state === 'ready' ? '' : ' (loads on jump)') + (tdrLegPick === a ? ' · click again to show all legs' : '');
-                // In the workspace's 2D display exactly one analysis is on screen, so its leg
-                // button highlights even without an explicit pick (tdrCurrent is what draws).
-                const in2dNow = tdrModeOn && typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
-                if (tdrLegPick === a || (in2dNow && !tdrLegPick && tdrCurrent === a)) b.classList.add('on');
-                b.addEventListener('click', () => {
+                const group = document.createElement('div');
+                group.className = 'tdr-leg-group';
+                const passes = tdrLegEyePasses(a);
+                const legBtn = document.createElement('button');
+                legBtn.className = 'tdr-leg-btn';
+                legBtn.textContent = 'Leg ' + (i + 1);
+                legBtn.title = a.legLabel + (a.state === 'ready' ? '' : ' (loads on jump)') + (tdrLegPick === a ? ' · click again to show all legs' : '');
+                // The leg button lights while its whole span is shown; the eye-pass button lights while
+                // its pass is shown. In the 2D display the on-screen analysis lights even without a pick.
+                const legOn = (tdrLegPick === a && !tdrEyeActive) || (in2dNow && !tdrLegPick && tdrCurrent === a);
+                if (legOn) legBtn.classList.add('on');
+                legBtn.addEventListener('click', () => {
                     if (!filteredData.length) return;
-                    if (tdrLegPick === a) {   // toggle back to every crossed leg
-                        tdrLegPick = null;
-                        buildTdrHero();
-                        updateTdr3D();
-                        return;
-                    }
-                    tdrLegPick = a;   // this leg displays alone
-                    let idx = filteredData.findIndex(r => r.absSeconds >= a.stopSec);
+                    if (tdrLegPick === a && !tdrEyeActive) { tdrLegPick = null; buildTdrHero(); updateTdr3D(); return; }
+                    tdrLegPick = a; tdrEyeActive = false;   // show this leg's whole span
+                    let idx = filteredData.findIndex(r => r.absSeconds >= a.stopSec);   // its end, where its radar is complete
                     if (idx < 0) idx = filteredData.length - 1;
                     currentIdx = idx;
                     if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
                     buildTdrHero();
                 });
-                legRow.appendChild(b);
+                group.appendChild(legBtn);
+                if (passes.length) {
+                    const conn = document.createElement('span'); conn.className = 'tdr-leg-conn';
+                    group.appendChild(conn);
+                    passes.forEach((p) => {
+                        const eb = document.createElement('button');
+                        eb.className = 'tdr-eye-btn';
+                        eb.textContent = 'Eye Pass';
+                        eb.title = 'Jump to the aircraft’s pass through the storm center on this leg';
+                        if (tdrLegPick === a && tdrEyeActive) eb.classList.add('on');
+                        eb.addEventListener('click', () => {
+                            if (!filteredData.length) return;
+                            tdrLegPick = a; tdrEyeActive = true;   // show this leg, parked on its eye pass
+                            currentIdx = p.idx;
+                            if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
+                            buildTdrHero();
+                        });
+                        group.appendChild(eb);
+                    });
+                }
+                legRow.appendChild(group);
             });
         }
         const list = document.getElementById('tdrLevelHero');
@@ -941,7 +989,7 @@
         if (tdrModeOn || !tdrAnalyses.length) return;
         if (typeof closeSatPicker === 'function') closeSatPicker();   // the TDR button lives in the Overlays dropdown; close it behind us
         tdrModeOn = true;
-        tdrLegPick = null;   // each session starts on the progressive all-legs view, nothing preselected
+        tdrLegPick = null; tdrEyeActive = false;   // each session starts on the progressive all-legs view, nothing preselected
         tdrSliceDone = false;
         tdrUpdateSliceButtons();
         // An abandoned section pick must not follow the user into the workspace.
@@ -954,6 +1002,9 @@
         if (typeof setFakePanel === 'function' && typeof mapPanel !== 'undefined') setFakePanel(mapPanel);
         const panel = document.getElementById('mapPanel'); if (panel) panel.classList.add('tdr-mode');
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'flex';
+        // Reset Zoom is disabled in the workspace: it would fight the radar view's own framing (and
+        // wrecks the 3D TDR camera). exitTdrMode re-enables it.
+        const rzBtn = document.getElementById('resetMapZoomBtn'); if (rzBtn) rzBtn.disabled = true;
         if (typeof followAircraft3D !== 'undefined') followAircraft3D = false;
         if (typeof updateFollowButton === 'function') updateFollowButton();
         if (typeof resizeCanvasLayout === 'function') resizeCanvasLayout();
@@ -1041,6 +1092,7 @@
         if (typeof setFakePanel === 'function') setFakePanel(null);
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'none';
+        const rzBtn = document.getElementById('resetMapZoomBtn'); if (rzBtn) rzBtn.disabled = false;   // re-enable Reset Zoom outside the workspace
         tdrSelectedKm.clear();
         tdr2DImage = null; tdr2DBox = null; _tdr2DStamp = '';
         bgNeedsUpdate = true;
@@ -1097,8 +1149,8 @@
             cur.levels.forEach(l => { if (l.canvas && tdrMb(l.km) >= 500) tdrSelectedKm.add(l.km); });
         }
         buildTdrHero();
-        // Recenter on the aircraft (not the storm) at the workspace's fixed zoom, so entering TDR
-        // frames the plane where the radar scans.
+        // Recenter on the aircraft at the workspace's fixed zoom, so entering TDR frames the plane
+        // where the radar scans.
         tdrApply2DViewPreset();
         // The pick waits for the pill: nothing arms until the user clicks Do a Cross-Section.
         tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
@@ -1250,6 +1302,8 @@
         });
         const closeBtn = document.getElementById('tdrModeCloseBtn');
         if (closeBtn) closeBtn.addEventListener('click', exitTdrMode);
+        const exitBtn = document.getElementById('tdrExitBtn');
+        if (exitBtn) exitBtn.addEventListener('click', (e) => { e.stopPropagation(); exitTdrMode(); });
         // Esc collapses everything at once, matching the app-wide convention: a full TDR exit
         // from either display (modal, pick, overlay, pin all clear together).
         document.addEventListener('keydown', (e) => {

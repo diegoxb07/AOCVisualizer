@@ -62,13 +62,22 @@
     function syncMediaGridLayout() {
         const grid = document.getElementById('mediaGrid');
         if (!grid) return;
+        // An MMR appearing or leaving changes the 2D map's width (full width vs. sharing the row with
+        // the video). Preserving the geographic span across that would shrink or enlarge everything on
+        // screen, so the follow view reads as zooming out when a video loads and the user has to zoom
+        // back in. Scale the visible span by the width change instead, so on-screen feature size (and
+        // the follow zoom) stays put; an unpanned default frame still refits to the new aspect.
+        const track2D = filteredData.length > 0 && trackerModeSelect.value === '2d';
+        const preW = cssW;
+        const preView = (track2D && isMapPanned()) ? getMapViewportGeo() : null;
         grid.classList.toggle('no-video', !videoLoaded);
         resizeCanvasLayout();
         if (typeof syncVideoCrop === 'function') syncVideoCrop();
-        if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
-            const keepView = isMapPanned() ? getMapViewportGeo() : null;
+        if (track2D) {
             calculateMapScales();
-            if (keepView) applyMapViewportGeo(keepView);
+            if (preView && preW > 0 && cssW > 0) {
+                applyMapViewportGeo({ cLon: preView.cLon, cLat: preView.cLat, spanLon: preView.spanLon * (cssW / preW) });
+            }
             bgNeedsUpdate = true;
             renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
         }

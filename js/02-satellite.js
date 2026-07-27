@@ -1037,30 +1037,46 @@
         } catch (e) { return { error: String(e) }; }
     }
 
+    // A tile only counts for the bucket that requested it: the API serves the nearest archived
+    // scan to the requested time, so around archive gaps a response can carry a scan from a
+    // couple of buckets away. Showing or caching that scan under this bucket makes playback jump
+    // around in time, so a scan further than one cadence step from the request is treated as
+    // "no scan" and the previous image stays up. Entries without a reported scan time pass.
+    function reconScanMatchesRequest(entry, params) {
+        if (!entry || !entry.scanStartMs || !params || !params.timeIso) return true;
+        const wantMs = Date.parse(params.timeIso);
+        if (!isFinite(wantMs)) return true;
+        return Math.abs(entry.scanStartMs - wantMs) < (params.cadMin || 10) * 60000;
+    }
+
     // Cache-first, deduped fetch for one recon tile. Used by the live display, the background
     // preloader, AND the "Cache flight" pass so a given tile is only ever pulled from the server
     // ONCE even if all three want it at the same moment. Resolves to { canvas, box, scanStartMs }
-    // (cached on success) or { error }.
+    // (cached on success) or { error }. Every tier passes through the scan-time gate, so a cached
+    // entry holding another bucket's scan is dropped here and the bucket re-judged.
     function getOrFetchReconTile(fetchId, params) {
         const hot = satCacheGet(fetchId);
-        if (hot) return Promise.resolve(hot);                    // decoded already → instant
+        if (hot && reconScanMatchesRequest(hot, params)) return Promise.resolve(hot);   // decoded already → instant
+        if (hot) satTileCache.delete(fetchId);   // holds another bucket's scan: drop and refetch
         // In our local cold store (pre-cached / seen earlier this session)? Decode the PNG blob
         // (fast, no network) and promote it into the hot cache.
         const cold = satBlobGet(fetchId);
-        if (cold) return decodeBlobEntry(cold).then(dec => {
+        if (cold && reconScanMatchesRequest(cold, params)) return decodeBlobEntry(cold).then(dec => {
             if (dec) { satCacheSet(fetchId, dec); return dec; }
             return { error: 'decode failed' };
         });
+        if (cold) satBlobDrop(fetchId);   // holds another bucket's scan: drop and refetch
         if (satFetchInFlight.has(fetchId)) return satFetchInFlight.get(fetchId);
         const p = fetchReconApiTile(params).then(r => {
             satFetchInFlight.delete(fetchId);
-            if (r && r.canvas) {
+            if (r && r.canvas && reconScanMatchesRequest(r, params)) {
                 const entry = { canvas: r.canvas, box: r.box, scanStartMs: r.scanStartMs };
                 satCacheSet(fetchId, entry);                     // hot (decoded) for instant display
                 // Cold (compressed) copy, stored async so the display isn't blocked on PNG encoding.
                 canvasToPngBlob(r.canvas).then(b => { if (b) satBlobPut(fetchId, { blob: b, box: r.box, scanStartMs: r.scanStartMs }); });
                 return entry;
             }
+            if (r && r.canvas) return { error: 'nearest archived scan belongs to another time slot' };
             return { error: (r && r.error) || 'no scan' };
         }).catch(e => { satFetchInFlight.delete(fetchId); return { error: String(e) }; });
         satFetchInFlight.set(fetchId, p);
@@ -1322,12 +1338,13 @@
         lastSatFetchTime = fetchId;
 
         const fetchParams = { band: bandObj.band, cmap: bandObj.cmap, product: bandObj.product, timeIso,
-            center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite };
+            center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite, cadMin: layerDef.cadenceMin || 10 };
 
         // Already decoded in the HOT cache? Re-show it INSTANTLY, no network, no decode, no debounce.
-        // This is what makes sliding across preloaded buckets smooth.
+        // This is what makes sliding across preloaded buckets smooth. A cached entry that fails the
+        // scan-time gate falls through instead; getOrFetchReconTile below drops and re-judges it.
         const cached = satCacheGet(fetchId);
-        if (cached) { applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
+        if (cached && reconScanMatchesRequest(cached, fetchParams)) { applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
 
         // Not hot, but present in the local COLD blob store (pre-cached / seen earlier this session)?
         // Decode it (~ms, no network) and show, no debounce needed.
@@ -1404,7 +1421,8 @@
             if (seen.has(fetchId)) return; seen.add(fetchId);
             if (satTileCache.has(fetchId)) return;   // already decoded in the hot cache, nothing to warm
             q.push({ fetchId, params: { band: bandObj.band, cmap: bandObj.cmap, timeIso,
-                                        center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite } });
+                                        center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite,
+                                        cadMin: layerDef.cadenceMin || 10 } });
         });
         satPreloadQueue = q;   // replace: the worker always drains toward the newest neighborhood
         runSatPreloadWorker();
@@ -1602,7 +1620,7 @@
                     const timeIso = goesTimeStr(bk.ms);
                     const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
                     if (seen.has(fetchId)) return; seen.add(fetchId);
-                    const params = { band: bandObj.band, cmap: bandObj.cmap, timeIso, center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite };
+                    const params = { band: bandObj.band, cmap: bandObj.cmap, timeIso, center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite, cadMin: layerDef.cadenceMin || 10 };
                     out.push({ fetchId, run: () => getOrFetchReconTile(fetchId, params) });
                 });
             }

@@ -56,7 +56,7 @@
         if (mode === 'auto' && !isOcrRunning) {
             // Re-verify the lock periodically; while a disagreeing offset is pending confirmation,
             // re-check more often so a genuine correction still lands within seconds, not minutes.
-            const recheckGap = pendingSyncBase != null ? 8 : 60;
+            const recheckGap = pendingSyncBase != null ? 4 : 60;
             if (Math.abs(video.currentTime - lastOcrVideoTime) >= recheckGap) forceOcrSyncNextTick = true;
         }
 
@@ -67,12 +67,15 @@
             // sit anywhere depending on the export, and the drift-hunt below already keys on the
             // candidate that advances with the video clock.
             const cv = ocrCaptureFullFrame(false);
+            // The video clock is read at frame capture: recognize() can take seconds on a playing
+            // video, and a clock read after it would skew the derived offset by that latency.
+            const capturedVTime = video.currentTime;
             if (cv && ocrWorker) {
                 try {
                     const { data: { text } } = await ocrWorker.recognize(cv);
                     let cleanText = text.replace(/[Oo]/g, '0').replace(/[Il|]/g, '1').replace(/[Z]/g, '2').replace(/[S]/g, '5').replace(/[,;.]/g, ':');
                     const timeRegex = /([0-2]?\d):([0-5]\d):([0-5]\d)/g;
-                    let matches = [...cleanText.matchAll(timeRegex)], timeFoundAndVerified = false, currentVTime = video.currentTime;
+                    let matches = [...cleanText.matchAll(timeRegex)], timeFoundAndVerified = false, currentVTime = capturedVTime;
 
                     for (const match of matches) {
                         const h = parseInt(match[1], 10), m = parseInt(match[2], 10), s = parseInt(match[3], 10); let ocrSecs = h * 3600 + m * 60 + s;
@@ -95,26 +98,29 @@
                                     // Explicit user re-sync request: take the new offset immediately.
                                     applyAutoSyncBase(dynamicBase);
                                     forceOcrSyncNextTick = false; isManualSyncRequest = false;
-                                    pendingSyncBase = null; pendingSyncCount = 0;
-                                } else if (timeDiff > 120) {
+                                    pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false);
+                                } else if (timeDiff > 5) {
                                     if (!ocrEverLocked) {
                                         // No established sync yet: the first good lock takes the offset directly.
                                         applyAutoSyncBase(dynamicBase);
-                                        pendingSyncBase = null; pendingSyncCount = 0;
+                                        pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false);
                                     } else {
                                         // A good sync already exists and this scan disagrees. A single frame can
-                                        // misread, so require the SAME new offset to hold across several scans
+                                        // misread, so require the SAME new offset to hold across two scans
                                         // before switching; a scan that agrees with the current offset (below)
-                                        // clears the pending candidate, so a momentary mispick never yanks the lock.
+                                        // clears the pending candidate, so a momentary mispick never yanks the
+                                        // lock. The mismatch hold shows the pill and freezes the timeline while
+                                        // the correction is pending.
                                         if (pendingSyncBase != null && Math.abs(dynamicBase - pendingSyncBase) <= 3) pendingSyncCount++;
                                         else { pendingSyncBase = dynamicBase; pendingSyncCount = 1; }
-                                        if (pendingSyncCount >= 3) { applyAutoSyncBase(dynamicBase); pendingSyncBase = null; pendingSyncCount = 0; }
+                                        ocrSetMismatchHold(true);
+                                        if (pendingSyncCount >= 2) { applyAutoSyncBase(dynamicBase); pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false); }
                                     }
                                     forceOcrSyncNextTick = false;
                                 } else {
                                     // This scan agrees with the current sync: it is still good, so forget any
                                     // pending disagreement (it was momentary).
-                                    pendingSyncBase = null; pendingSyncCount = 0;
+                                    pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false);
                                     forceOcrSyncNextTick = false; isManualSyncRequest = false;
                                 }
 

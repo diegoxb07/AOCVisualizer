@@ -308,6 +308,11 @@
     const AIRPORT_ALL_SCALE = 4;
     const AIRPORT_HOME_CODE = 'LAL';   // Lakeland Linder, the AOC's home field
 
+    // City names come in by tier as the view tightens: majors from CITY_MAJOR_SCALE, the regional
+    // (main-airport-sized) tier from CITY_ALL_SCALE.
+    const CITY_MAJOR_SCALE = 0.7;
+    const CITY_ALL_SCALE = 2.5;
+
     // Geometry clipping kicks in past this zoom; below it the raw paths are small enough for the
     // rasterizer and the draw stays byte-identical to the unclipped output.
     const MAP_CLIP_MIN_SCALE = 6;
@@ -458,9 +463,38 @@
             bgCtx.imageSmoothingEnabled = true;
             bgCtx.globalAlpha = 1.0;
         };
+        // City names, a geographic reference under the airfield codes: majors from CITY_MAJOR_SCALE,
+        // the regional (main-airport-sized) tier from CITY_ALL_SCALE. Muted ink and a lighter weight
+        // than the airfield codes so the two layers read apart at a glance.
+        const drawCities = () => {
+            if (!cities.length || mapScale < CITY_MAJOR_SCALE) return;
+            const all = mapScale >= CITY_ALL_SCALE;
+            const v = getVisibleGeoBounds(); if (!v) return;
+            bgCtx.save();
+            bgCtx.textAlign = 'left'; bgCtx.textBaseline = 'middle';
+            bgCtx.lineWidth = 2.5 / mapScale; bgCtx.lineJoin = 'round';
+            const r = 1.6 / mapScale, pad = 3.5 / mapScale;
+            const col = lightMap ? '#475569' : '#94a3b8';
+            const keyline = lightMap ? 'rgba(255,255,255,0.9)' : 'rgba(5,12,20,0.85)';
+            for (let i = 0; i < cities.length; i++) {
+                const c = cities[i];
+                if (!all && !c.big) continue;
+                if (c.lon < v.minLon || c.lon > v.maxLon || c.lat < v.minLat || c.lat > v.maxLat) continue;
+                const x = getX(c.lon), y = getY(c.lat);
+                bgCtx.font = '500 ' + ((c.big ? 10 : 9) / mapScale) + 'px Inter, ui-sans-serif, sans-serif';
+                bgCtx.beginPath(); bgCtx.arc(x, y, r, 0, 2 * Math.PI);
+                bgCtx.fillStyle = col; bgCtx.fill();
+                bgCtx.strokeStyle = keyline;
+                bgCtx.stroke();
+                bgCtx.strokeText(c.name, x + pad, y);
+                bgCtx.fillStyle = col; bgCtx.fillText(c.name, x + pad, y);
+            }
+            bgCtx.restore();
+        };
         if (satHidesBasemap) { drawLandFeatures(); drawSatImage(); }
         else { if (hasSatImage) drawSatImage(); drawLandFeatures(); }
         drawTdr2D();
+        drawCities();
         drawAirports();
         bgCtx.restore(); bgNeedsUpdate = false;
     }

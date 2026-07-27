@@ -56,7 +56,7 @@
         satIdbPut(id, entry);
         satBlobEvict();
     }
-    function clearSatTileCache() { satTileCache.clear(); satBlobStore.clear(); satBlobBytes = 0; satFetchInFlight.clear(); satIdbClear(); }
+    function clearSatTileCache() { satTileCache.clear(); satBlobStore.clear(); satBlobBytes = 0; satFetchAborters.forEach(c => c.abort()); satFetchAborters.clear(); satFetchInFlight.clear(); satIdbClear(); }
 
     // --- Persistent cold store -----------------------------------------------------------
     // The blob store is mirrored into IndexedDB so cached tiles survive reloads and browser
@@ -560,7 +560,7 @@
         satSelect.style.display = in2dMode ? '' : 'none';
         bandSelect.style.display = (in2dMode && satSelect.value !== 'none') ? '' : 'none';
 
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload(); cancelStaleSatFetches();
 
         updateSatelliteDropdownTimes();
         maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected, build its full timeframe now
@@ -739,7 +739,7 @@
         satDayOffset = n;
         updateSatDayLabel();
         updateSatelliteDropdownTimes();
-        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
+        satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload(); cancelStaleSatFetches();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             fetchSatelliteImage(filteredData[currentIdx].absSeconds);
         }
@@ -1001,14 +1001,15 @@
     // `product` (e.g. 'sandwich'/'geocolor') is a composite, when given, band/cmap are ignored
     // server-side. Composites accept the same center/dims bbox as a single band, so send it
     // whenever one was computed (caller only computes it for bbox-capable products).
-    async function fetchReconApiTile({ band, cmap, product, timeIso, center, dims, unit, satellite }) {
+    async function fetchReconApiTile({ band, cmap, product, timeIso, center, dims, unit, satellite }, extSignal) {
         const params = new URLSearchParams({ time: timeIso });
         if (product) { params.set('product', product); } else { params.set('band', band); params.set('cmap', cmap); }
         if (satellite) params.set('satellite', satellite);
         if (center) { params.set('center', center); params.set('dims', dims); params.set('unit', unit || 'km'); }
-        // While a batch/precache pass is running, ride its AbortController so a Cancel click kills any
-        // in-flight request immediately instead of waiting out the current poll tick.
-        const signal = (batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined;
+        // The caller's per-fetch signal (aborted on band/layer switches, and chained to a batch
+        // pass's Cancel) kills any in-flight request immediately instead of waiting out the
+        // current poll tick.
+        const signal = extSignal || ((batchCaching && batchCacheAbortController) ? batchCacheAbortController.signal : undefined);
         if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
         try {
             let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal, headers: reconAuthHeaders() }).then(r => r.json());
@@ -1067,8 +1068,12 @@
         });
         if (cold) satBlobDrop(fetchId);   // holds another bucket's scan: drop and refetch
         if (satFetchInFlight.has(fetchId)) return satFetchInFlight.get(fetchId);
-        const p = fetchReconApiTile(params).then(r => {
-            satFetchInFlight.delete(fetchId);
+        const ctrl = new AbortController();
+        satFetchAborters.set(fetchId, ctrl);
+        // A batch Cancel click aborts every fetch the pass started, through this same controller.
+        if (batchCaching && batchCacheAbortController) batchCacheAbortController.signal.addEventListener('abort', () => ctrl.abort(), { once: true });
+        const p = fetchReconApiTile(params, ctrl.signal).then(r => {
+            satFetchInFlight.delete(fetchId); satFetchAborters.delete(fetchId);
             if (r && r.canvas && reconScanMatchesRequest(r, params)) {
                 const entry = { canvas: r.canvas, box: r.box, scanStartMs: r.scanStartMs };
                 satCacheSet(fetchId, entry);                     // hot (decoded) for instant display
@@ -1078,9 +1083,20 @@
             }
             if (r && r.canvas) return { error: 'nearest archived scan belongs to another time slot' };
             return { error: (r && r.error) || 'no scan' };
-        }).catch(e => { satFetchInFlight.delete(fetchId); return { error: String(e) }; });
+        }).catch(e => { satFetchInFlight.delete(fetchId); satFetchAborters.delete(fetchId); return { error: String(e) }; });
         satFetchInFlight.set(fetchId, p);
         return p;
+    }
+
+    // Aborts in-flight tile fetches that no longer match the selected layer and product, so a
+    // band or layer switch stops the old render's polling immediately and the network belongs to
+    // the new choice. A running batch pass is left alone; it owns its own AbortController.
+    function cancelStaleSatFetches() {
+        if (batchCaching) return;
+        const sat = document.getElementById('satelliteSelect');
+        const band = document.getElementById('satBandSelect');
+        const prefix = (sat && sat.value !== 'none' && band && band.value) ? (sat.value + '||' + band.value + '||') : null;
+        satFetchAborters.forEach((ctrl, id) => { if (!prefix || !id.startsWith(prefix)) ctrl.abort(); });
     }
 
     let _cmrCache = {};
@@ -1174,12 +1190,12 @@
 
         // Already decoded in the HOT cache? Re-show instantly.
         const cached = satCacheGet(fetchId);
-        if (cached) { applyPolarSatResult(cached.canvas, cached.box, layerDef, dateStr); return; }
+        if (cached) { hideSatLoader(); applyPolarSatResult(cached.canvas, cached.box, layerDef, dateStr); return; }
 
         // In the local COLD blob store (pre-cached / seen earlier this session)? Decode it, no network.
         if (satBlobStore.has(fetchId)) {
             getOrFetchPolarTile(fetchId, { wmsLayer, dateStr, box, pxW, pxH })
-                .then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) applyPolarSatResult(r.canvas, r.box, layerDef, dateStr); });
+                .then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) { hideSatLoader(); applyPolarSatResult(r.canvas, r.box, layerDef, dateStr); } });
             return;
         }
 
@@ -1190,8 +1206,9 @@
             if (!batchCaching && !satFetchInFlight.has(fetchId)) showSatLoader();
             try {
                 const r = await getOrFetchPolarTile(fetchId, { wmsLayer, dateStr, box, pxW, pxH });
-                hideSatLoader();
+                // A superseded fetch leaves the loader to the fetch that owns it now.
                 if (lastSatFetchTime !== fetchId) return;
+                hideSatLoader();
                 if (r && r.canvas) {
                     applyPolarSatResult(r.canvas, r.box, layerDef, dateStr);
                 } else {
@@ -1200,7 +1217,7 @@
                     showToast('Satellite: no imagery found for this day and area.', 6000);
                 }
             } catch(e) {
-                hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true;
+                if (lastSatFetchTime === fetchId) { hideSatLoader(); satImageLoaded = false; bgNeedsUpdate = true; }
             }
         }, 350);
     }
@@ -1344,13 +1361,13 @@
         // This is what makes sliding across preloaded buckets smooth. A cached entry that fails the
         // scan-time gate falls through instead; getOrFetchReconTile below drops and re-judges it.
         const cached = satCacheGet(fetchId);
-        if (cached && reconScanMatchesRequest(cached, fetchParams)) { applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
+        if (cached && reconScanMatchesRequest(cached, fetchParams)) { hideSatLoader(); applyReconSatResult(cached, layerDef, shortLabel, bandName, bucketMs); return; }
 
         // Not hot, but present in the local COLD blob store (pre-cached / seen earlier this session)?
         // Decode it (~ms, no network) and show, no debounce needed.
         if (satBlobStore.has(fetchId)) {
             getOrFetchReconTile(fetchId, fetchParams)
-                .then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs); });
+                .then(r => { if (lastSatFetchTime === fetchId && r && r.canvas) { hideSatLoader(); applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs); } });
             return;
         }
 
@@ -1363,11 +1380,16 @@
             if (!batchCaching && !satFetchInFlight.has(fetchId)) showSatLoader();
             try {
                 const r = await getOrFetchReconTile(fetchId, fetchParams);
-                hideSatLoader();
-                // User may have changed layer/band, or the clock crossed a new bucket, while we polled.
+                // User may have changed layer/band, or the clock crossed a new bucket, while we
+                // polled; a superseded fetch leaves the loader to the fetch that owns it now.
                 if (lastSatFetchTime !== fetchId) return;
+                hideSatLoader();
                 if (r && r.canvas) {
                     applyReconSatResult(r, layerDef, shortLabel, bandName, bucketMs);
+                } else if (r && /abort/i.test(String(r.error || ''))) {
+                    // Aborted by a switch while still current: let the bucket be requested again
+                    // (a quick switch back would otherwise inherit the dead attempt).
+                    lastSatFetchTime = '';
                 } else {
                     // Keep the last good tile on screen instead of blanking, so the user always sees
                     // imagery even when a bucket has no scan / errors. (attempt-once: lastSatFetchTime is
@@ -1377,7 +1399,7 @@
                     if (!batchCaching) showToast(`GOES Archive ${bandName}: no scan available near ${timeIso.slice(11,16)}Z, keeping the previous image.`, 5000);
                 }
             } catch(e) {
-                hideSatLoader();   // transient error, leave the previous tile up rather than blanking
+                if (lastSatFetchTime === fetchId) hideSatLoader();   // transient error, leave the previous tile up rather than blanking
             }
         }, 350);
     }

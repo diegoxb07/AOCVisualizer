@@ -983,6 +983,7 @@
 
     document.getElementById('satBandSelect').addEventListener('change', () => {
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
+        if (typeof cancelStaleSatFetches === 'function') cancelStaleSatFetches();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
             // Same handoff as the satellite change above: the auto pass for the product being left is
             // abandoned so the newly picked one can build.
@@ -1006,7 +1007,6 @@
     // coverage and scan time labels) keeps working unchanged. satPickerExpanded is the layer whose
     // product list is currently open in the panel.
     let satPickerExpanded = null;
-    let satLastActive = null;   // { sat, band } of the last chosen layer, restored when the on/off box is re-checked
 
     // The header button is the umbrella "Overlays" trigger now, so its label stays fixed; the accent
     // (sat-on) just signals that the satellite layer, at least, is currently drawing.
@@ -1018,12 +1018,6 @@
         lbl.textContent = 'Overlays';
         const on = sat.value !== 'none';
         btn.classList.toggle('sat-on', on);
-        // Keep the satellite section's on/off checkbox and its opacity row in step with the layer:
-        // opacity only means something with a layer drawing, so it appears with one.
-        const chk = document.getElementById('satToggleCheck');
-        if (chk) chk.checked = on;
-        const opRow = document.getElementById('satOpacityRow');
-        if (opRow) opRow.style.display = on ? 'flex' : 'none';
     }
 
     function renderSatPickerPanel() {
@@ -1032,8 +1026,8 @@
         const band = document.getElementById('satBandSelect');
         if (!list || !sat) return;
         const activeSat = sat.value, activeBand = band ? band.value : '';
-        // No Off row: the section's on/off checkbox is the "no satellite" control now.
-        let html = '';
+        // The Off row is the "no satellite" state.
+        let html = `<button type="button" class="sat-pick-off${activeSat === 'none' ? ' active' : ''}" data-off="1">Off (no overlay)</button>`;
         // Heading wherever the list crosses between the two kinds of satellite (GIBS_LAYERS is
         // ordered geostationary-first). They behave very differently, so the split is worth calling
         // out: GOES scans continuously, a polar orbiter gives one usable pass per day.
@@ -1130,7 +1124,6 @@
         if (!sat || !band) return;
         if (sat.value !== satValue) { sat.value = satValue; sat.dispatchEvent(new Event('change')); }
         if (band.value !== bandId) { band.value = bandId; band.dispatchEvent(new Event('change')); }
-        satLastActive = { sat: satValue, band: bandId };   // remembered so the on/off box can restore it
         // Stay open: this is one control in the shared Overlays dropdown, so picking a layer should
         // not dismiss the storm-track and TDR toggles above.
     }
@@ -1163,16 +1156,6 @@
             const open = !body.classList.toggle('hidden');
             satExpandBtn.setAttribute('aria-expanded', String(open));
             if (open) { renderSatPickerPanel(); positionSatPicker(); }
-        });
-        // The checkbox is the layer's on/off: unchecking turns it off; checking restores the last
-        // layer, or opens the picker to choose one when nothing has been selected yet.
-        const satChk = document.getElementById('satToggleCheck');
-        if (satChk) satChk.addEventListener('change', () => {
-            if (!satChk.checked) { satPickerChooseOff(); return; }
-            if (satLastActive) { satPickerChooseProduct(satLastActive.sat, satLastActive.band); return; }
-            satChk.checked = false;   // nothing to turn on yet; open the list so the user picks
-            const body = document.getElementById('satExpandBody');
-            if (body && body.classList.contains('hidden') && satExpandBtn) satExpandBtn.click();
         });
         // outside click or esc closes, like the measure popover.
         document.addEventListener('mousedown', (e) => {

@@ -172,7 +172,6 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* Satellite section: a toggle + expander header over a collapsible picker body. */
 #ovSatSection { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
 .ov-sat-row { gap: 7px; }
-.ov-sat-toggle { display: inline-flex; align-items: center; flex: none; margin: 0; padding: 2px 0; cursor: pointer; }
 .ov-sat-expand { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; background: transparent; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .ov-caret { margin-left: auto; color: var(--text-muted); font-size: 14px; line-height: 1; transition: transform 0.15s; }
 .ov-sat-expand[aria-expanded="true"] .ov-caret { transform: rotate(90deg); }

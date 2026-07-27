@@ -835,13 +835,9 @@
         // A plain mode button, not a dropdown: the label states the action it will take. The
         // pinned-2D section state counts as TDR mode here, so its top-right exit reads right.
         lbl.textContent = tdrModeOn ? 'Exit TDR Mode' : 'TDR Mode';
-        if (btn) {
-            btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn);
-            // Red while it reads Exit TDR Mode, so the way out is unmistakable; inline styles
-            // beat the utility classes in both themes (the danger var is theme-tuned).
-            if (tdrModeOn) { btn.style.background = 'var(--danger)'; btn.style.borderColor = 'var(--danger)'; btn.style.color = '#fff'; }
-            else { btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
-        }
+        // In the Overlays dropdown TDR wears a checkbox: .sat-on fills it while TDR mode is on, and
+        // the label flips to "Exit TDR Mode", so no separate colour treatment is needed.
+        if (btn) { btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn); }
     }
 
     // The panel's level column: the pressure bands laid out top-down (highest altitude first),
@@ -852,7 +848,11 @@
         const legRow = document.getElementById('tdrLegRow');
         if (legRow) {
             legRow.innerHTML = '';
-            tdrAnalyses.forEach((a, i) => {
+            // Drop legs the radar never covers: an analysis that errored out, or that finished loading
+            // with no drawable level, is not a real leg to pick. Legs still loading stay (their data is
+            // not known yet); the shown legs renumber contiguously so there are no gaps.
+            const shownLegs = tdrAnalyses.filter(a => a.state !== 'error' && !(a.state === 'ready' && !(a.levels && a.levels.some(l => l.canvas))));
+            shownLegs.forEach((a, i) => {
                 const b = document.createElement('button');
                 b.textContent = 'Leg ' + (i + 1);
                 b.title = a.legLabel + (a.state === 'ready' ? '' : ' (loads on jump)') + (tdrLegPick === a ? ' · click again to show all legs' : '');
@@ -939,6 +939,7 @@
     // section pick. The normal tracker never shows radar; exit resets both to default framing.
     function enterTdrMode() {
         if (tdrModeOn || !tdrAnalyses.length) return;
+        if (typeof closeSatPicker === 'function') closeSatPicker();   // the TDR button lives in the Overlays dropdown; close it behind us
         tdrModeOn = true;
         tdrLegPick = null;   // each session starts on the progressive all-legs view, nothing preselected
         tdrSliceDone = false;
@@ -1076,6 +1077,18 @@
     // selection parks aside and the LOWER half of the column shows (500-1000 mb; the sparse
     // upper bands hide), the view centers on the storm center expected at the playback time,
     // and the two-click pick arms. Switching back to 3D restores the parked selection.
+    // TDR's 2D view preset: the aircraft centered at a fixed ~6-degree span. Applied on entry and
+    // restored by Reset Zoom in the workspace, so a reset returns to this radar-framing zoom instead
+    // of the normal follow view.
+    function tdrApply2DViewPreset() {
+        if (!filteredData.length || typeof applyMapViewportGeo !== 'function') return;
+        const d = filteredData[Math.max(0, Math.min(currentIdx, filteredData.length - 1))];
+        if (!d) return;
+        if (typeof disengageFollowAircraft === 'function') disengageFollowAircraft();
+        applyMapViewportGeo({ cLon: d.lon, cLat: d.lat, spanLon: 6 });
+        bgNeedsUpdate = true;
+        if (typeof renderMapEngineFrame === 'function') renderMapEngineFrame(currentIdx, d);
+    }
     function tdrEnter2DSection() {
         tdr3DSelSaved = new Set(tdrSelectedKm);
         const cur = tdrCurrent;
@@ -1084,18 +1097,9 @@
             cur.levels.forEach(l => { if (l.canvas && tdrMb(l.km) >= 500) tdrSelectedKm.add(l.km); });
         }
         buildTdrHero();
-        let cLat = (cur && cur.geo) ? cur.geo.originLat : null;
-        let cLon = (cur && cur.geo) ? cur.geo.originLon : null;
-        if (typeof interpStormCenter === 'function' && typeof stormTrackPoints !== 'undefined' && stormTrackPoints.length && filteredData.length && flightMetaData.date !== 'Unknown') {
-            const row = filteredData[currentIdx];
-            const est = row ? interpStormCenter(new Date(flightMetaData.date + 'T00:00:00Z').getTime() + row.absSeconds * 1000) : null;
-            if (est) { cLat = est.lat; cLon = est.lon; }
-        }
-        if (cLat !== null && typeof applyMapViewportGeo === 'function') {
-            if (typeof disengageFollowAircraft === 'function') disengageFollowAircraft();
-            applyMapViewportGeo({ cLon, cLat, spanLon: 6 });
-            bgNeedsUpdate = true;
-        }
+        // Recenter on the aircraft (not the storm) at the workspace's fixed zoom, so entering TDR
+        // frames the plane where the radar scans.
+        tdrApply2DViewPreset();
         // The pick waits for the pill: nothing arms until the user clicks Do a Cross-Section.
         tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
         setTdrSliceHint('');

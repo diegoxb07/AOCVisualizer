@@ -1026,8 +1026,9 @@
         const band = document.getElementById('satBandSelect');
         if (!list || !sat) return;
         const activeSat = sat.value, activeBand = band ? band.value : '';
-        // The Off row is the "no satellite" state.
-        let html = `<button type="button" class="sat-pick-off${activeSat === 'none' ? ' active' : ''}" data-off="1">Off (no overlay)</button>`;
+        // The Off row turns the satellite layer off; with no layer on there is nothing to turn
+        // off, so it renders disabled (grayed, no data-off, so the click handler never matches).
+        let html = `<button type="button" class="sat-pick-off"${activeSat === 'none' ? ' disabled' : ' data-off="1"'}>Off (satellite overlay)</button>`;
         // Heading wherever the list crosses between the two kinds of satellite (GIBS_LAYERS is
         // ordered geostationary-first). They behave very differently, so the split is worth calling
         // out: GOES scans continuously, a polar orbiter gives one usable pass per day.

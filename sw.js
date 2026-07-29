@@ -5,7 +5,7 @@
 // CACHE_VERSION keeps the '?v=' shape so the same sed in .github/workflows/static.yml that
 // stamps index.html's cache-busters rewrites it to the deploy's commit SHA: every deploy
 // installs a fresh cache, and activate() deletes the previous one.
-const CACHE_VERSION = '?v=20260728a';
+const CACHE_VERSION = '?v=20260729o';
 const CACHE_NAME = 'aoc-viz-' + CACHE_VERSION.replace(/[^0-9A-Za-z._-]/g, '');
 
 // Every same-origin file the app needs at runtime. Fetches are matched with ignoreSearch, so the
@@ -32,6 +32,13 @@ const PRECACHE = [
     'lib/tesseract/tesseract-core-simd.wasm.js',
     'lib/tesseract/tesseract-core.wasm.js',
     'lib/tesseract/worker.min.js',
+
+    // The vendored ffmpeg.wasm engine (wrapper, its worker chunk, single-thread core) fetched
+    // lazily by js/22-avi-convert.js on the converter's first run; it stays available offline.
+    'lib/ffmpeg/ffmpeg.js',
+    'lib/ffmpeg/814.ffmpeg.js',
+    'lib/ffmpeg/ffmpeg-core.js',
+    'lib/ffmpeg/ffmpeg-core.wasm',
 
     'js/00-var-catalog.js',
     'js/01-state.js',
@@ -62,6 +69,7 @@ const PRECACHE = [
     'js/19-bootstrap.js',
     'js/20-ui-polish.js',
     'js/21-report.js',
+    'js/22-avi-convert.js',
     'js/parse-worker.js',
 
     'fonts/IBMPlexMono-400.woff2',

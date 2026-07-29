@@ -37,8 +37,8 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/fonts.css?v=20260728a">
-    <link rel="stylesheet" href="css/tailwind.css?v=20260728a">
+    <link rel="stylesheet" href="css/fonts.css?v=20260729o">
+    <link rel="stylesheet" href="css/tailwind.css?v=20260729o">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -46,7 +46,7 @@
     <script src="lib/netcdfjs.min.js"></script>
     <script src="lib/tesseract.min.js"></script>
 
-    <link rel="stylesheet" href="css/app.css?v=20260728a">
+    <link rel="stylesheet" href="css/app.css?v=20260729o">
 </head>
 <body class="font-sans antialiased">
 
@@ -192,6 +192,8 @@
                 </div>
 
                 <div class="lg:w-56 shrink-0 lg:border-l border-hairline-strong lg:pl-5 flex flex-col justify-center gap-1.5">
+                    <button id="aviConvertOpenBtn" title="Turn the raw archival AVI recordings into one .mp4 that you can upload as the MMR video" class="w-full bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors">AVI to MP4 Converter</button>
+                    <div class="w-full border-t border-hairline-strong"></div>
                     <div class="relative w-full">
                         <button id="reconPreloadBtn" disabled title="Download and parse missions from any season now; they are saved on this device and open instantly, including after a reload" class="w-full bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⤓ Batch Load Flight Data</button>
                         <div id="preloadBtnSpin" class="absolute inset-0 z-10 flex items-center justify-center bg-[color-mix(in_oklab,var(--panel)_40%,transparent)] rounded">
@@ -666,6 +668,41 @@
     </div>
 </div>
 
+<!-- AVI to MP4 converter (js/22-avi-convert.js): stitches the MMR recorder's segmented videos
+     into one .mp4 with the vendored ffmpeg.wasm. Closing the modal leaves the pass running;
+     the corner pill (below) keeps it reachable. -->
+<div id="aviConvertModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+        <button id="aviConvertCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
+        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">AVI to MP4 Converter</h2>
+        <p class="text-[11px] text-muted mt-2 leading-relaxed">Combines the many MMR recordings that are segmented (.avi, can be single files or zipped) into .mp4 so that a user can upload it for use in the Visualizer.<br>You can upload multiple files. Feel free to move around and navigate the visualizer while converting, just avoid refreshing or closing the tab as this will interrupt the conversion.</p>
+        <div class="flex flex-wrap items-center gap-2 mt-1">
+            <label id="aviAddLabel" class="flex items-center gap-1.5 bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1 text-[11px] font-semibold cursor-pointer transition-colors">
+                Add files (.zip / .avi / .ts)
+                <input type="file" id="aviFileInput" accept=".zip,.avi,.ts,.m2ts,.mts,.mov,.mp4,.mkv" multiple class="hidden" />
+            </label>
+            <button id="aviClearBtn" disabled class="px-2 py-1 bg-elevated hover:bg-elevated text-ink rounded text-[11px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Clear list</button>
+            <span id="aviListSummary" class="text-[11px] text-faint"></span>
+        </div>
+        <div id="aviFileList" class="avi-file-list" style="display:none;"></div>
+        <div class="mt-3 h-2 bg-panel-strip rounded overflow-hidden"><div id="aviConvertFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
+        <div id="aviConvertStatus" class="text-[11px] text-muted mt-1">No files added.</div>
+        <div id="aviResultRow" class="hidden flex-wrap gap-2 mt-1"></div>
+        <div class="flex gap-2 mt-4">
+            <button id="aviStartBtn" disabled class="px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Start converting</button>
+            <button id="aviStopBtn" class="hidden px-4 py-2 avi-stop-btn font-bold rounded text-xs transition-colors">Stop</button>
+            <button id="aviCloseBtn" class="px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Progress pill for a conversion running behind a closed modal; clicking reopens it. -->
+<div id="aviConvertPill" title="Open the AVI to MP4 converter">
+    <span class="avi-pill-spin"></span>
+    <span class="avi-pill-label">Converting MMR video</span>
+    <span class="avi-pill-pct">0%</span>
+</div>
+
 <div id="batchCacheModal" class="modal-overlay">
     <div class="modal-card" style="max-height: 90vh; overflow-y: auto;">
         <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
@@ -998,35 +1035,36 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20260728a"></script>
-    <script src="js/01-state.js?v=20260728a"></script>
-    <script src="js/02-satellite.js?v=20260728a"></script>
-    <script src="js/03-metrics.js?v=20260728a"></script>
-    <script src="js/04-geo-measure.js?v=20260728a"></script>
-    <script src="js/05-interpolation.js?v=20260728a"></script>
-    <script src="js/06-ocr.js?v=20260728a"></script>
-    <script src="js/07-ui-controls.js?v=20260728a"></script>
-    <script src="js/07b-plane-models.js?v=20260728a"></script>
-    <script src="js/07c-terrain.js?v=20260728a"></script>
-    <script src="js/07d-tdr.js?v=20260728a"></script>
-    <script src="js/08-ocr-lock-export.js?v=20260728a"></script>
-    <script src="js/09-interaction.js?v=20260728a"></script>
-    <script src="js/10-point-analysis.js?v=20260728a"></script>
-    <script src="js/11-layout.js?v=20260728a"></script>
-    <script src="js/11c-float-panels.js?v=20260728a"></script>
-    <script src="js/11b-parser-core.js?v=20260728a"></script>
-    <script src="js/12-file-parsing.js?v=20260728a"></script>
-    <script src="js/12b-recon-archive.js?v=20260728a"></script>
-    <script src="js/13-charts-master.js?v=20260728a"></script>
-    <script src="js/14-filters-sync.js?v=20260728a"></script>
-    <script src="js/15-map-render.js?v=20260728a"></script>
-    <script src="js/16-pfd-hud.js?v=20260728a"></script>
-    <script src="js/17-charts.js?v=20260728a"></script>
-    <script src="js/18-engine.js?v=20260728a"></script>
-    <script src="js/18b-flight-search.js?v=20260728a"></script>
-    <script src="js/19-bootstrap.js?v=20260728a"></script>
-    <script src="js/20-ui-polish.js?v=20260728a"></script>
-    <script src="js/21-report.js?v=20260728a"></script>
+    <script src="js/00-var-catalog.js?v=20260729o"></script>
+    <script src="js/01-state.js?v=20260729o"></script>
+    <script src="js/02-satellite.js?v=20260729o"></script>
+    <script src="js/03-metrics.js?v=20260729o"></script>
+    <script src="js/04-geo-measure.js?v=20260729o"></script>
+    <script src="js/05-interpolation.js?v=20260729o"></script>
+    <script src="js/06-ocr.js?v=20260729o"></script>
+    <script src="js/07-ui-controls.js?v=20260729o"></script>
+    <script src="js/07b-plane-models.js?v=20260729o"></script>
+    <script src="js/07c-terrain.js?v=20260729o"></script>
+    <script src="js/07d-tdr.js?v=20260729o"></script>
+    <script src="js/08-ocr-lock-export.js?v=20260729o"></script>
+    <script src="js/09-interaction.js?v=20260729o"></script>
+    <script src="js/10-point-analysis.js?v=20260729o"></script>
+    <script src="js/11-layout.js?v=20260729o"></script>
+    <script src="js/11c-float-panels.js?v=20260729o"></script>
+    <script src="js/11b-parser-core.js?v=20260729o"></script>
+    <script src="js/12-file-parsing.js?v=20260729o"></script>
+    <script src="js/12b-recon-archive.js?v=20260729o"></script>
+    <script src="js/13-charts-master.js?v=20260729o"></script>
+    <script src="js/14-filters-sync.js?v=20260729o"></script>
+    <script src="js/15-map-render.js?v=20260729o"></script>
+    <script src="js/16-pfd-hud.js?v=20260729o"></script>
+    <script src="js/17-charts.js?v=20260729o"></script>
+    <script src="js/18-engine.js?v=20260729o"></script>
+    <script src="js/18b-flight-search.js?v=20260729o"></script>
+    <script src="js/19-bootstrap.js?v=20260729o"></script>
+    <script src="js/20-ui-polish.js?v=20260729o"></script>
+    <script src="js/21-report.js?v=20260729o"></script>
+    <script src="js/22-avi-convert.js?v=20260729o"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

@@ -767,3 +767,21 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .report-btn { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: background .12s, border-color .12s; }
 .report-btn:hover { background: color-mix(in oklab, var(--accent) 16%, var(--panel-strip)); border-color: var(--accent); }
 .report-x { background: none; border: none; color: var(--text-muted); font-weight: 700; cursor: pointer; font-size: 13px; }
+
+/* AVI to MP4 converter (js/22-avi-convert.js): the modal's ordered segment list, the Stop
+   button, and the fixed corner pill that keeps a background conversion reachable. */
+.avi-file-list { max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.6; color: var(--text-muted); -webkit-user-select: text; user-select: text; }
+.avi-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; }
+/* full segment filenames wrap rather than truncate, so the join order stays checkable on the
+   long archival names (e.g. N43RF_20260721I1FD_2026_07Jul_21_09_07_24_AVI) */
+.avi-row .avi-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* size and source zip stay together on one line, beside the name when they fit and dropping
+   whole onto the next line when they do not; an extreme zip name ellipsizes at the tail */
+.avi-row .avi-meta { flex: 0 0 auto; margin-left: auto; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-faint); }
+.avi-row.avi-meta { color: var(--text-faint); }
+.avi-stop-btn { background: var(--danger); color: #fff; border: none; cursor: pointer; }
+.avi-stop-btn:hover { background: color-mix(in oklab, var(--danger) 85%, #fff); }
+#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
+#aviConvertPill.on { display: flex; }
+#aviConvertPill .avi-pill-spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
+#aviConvertPill .avi-pill-pct { color: var(--text-muted); font-weight: 500; }

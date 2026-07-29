@@ -275,12 +275,13 @@
             const group = new THREE.Group(); group.add(shaft, head); group.scale.set(scale, scale, scale);
             return group;
         };
-        // Ground track: blue, standing out ahead of the airframe so it never overlaps it.
-        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.17, 2.3, 1); scene3D.add(trackArrow3D);
+        // Ground track: blue, standing out ahead of the airframe so it never overlaps it (the
+        // standoff is pre-scale, so it rises as the scale shrinks to hold the same clearance).
+        trackArrow3D = buildDirectionArrow(0x3da5ff, 0.12, 3.3, 1); scene3D.add(trackArrow3D);
         // True heading: yellow and slightly smaller, nested inside the track arrow's world-space
         // span, so it hides within the blue when the two agree and appears only when they
         // diverge; scene-level (not planeGroup3D) so it stays a clean world-space compass pointer.
-        headingArrow3D = buildDirectionArrow(0xffd400, 0.145, 2.76, 0.8); scene3D.add(headingArrow3D);
+        headingArrow3D = buildDirectionArrow(0xffd400, 0.10, 4.0, 0.8); scene3D.add(headingArrow3D);
         scene3D.add(threeMapGroup); scene3D.add(threeMarkersGroup);
         function animate3D() {
             requestAnimationFrame(animate3D); if (controls3D) controls3D.update();
@@ -844,8 +845,8 @@
         // Size both scene-level arrows to the plane's current scale so they stay proportional in
         // real-scale mode (done here every frame so it holds regardless of arrow/plane build order).
         const arrowF = planeGroup3D.scale.x / 0.06;
-        trackArrow3D.scale.setScalar(0.17 * arrowF);
-        if (headingArrow3D) headingArrow3D.scale.setScalar(0.145 * arrowF);
+        trackArrow3D.scale.setScalar(0.12 * arrowF);
+        if (headingArrow3D) headingArrow3D.scale.setScalar(0.10 * arrowF);
         trackArrow3D.position.copy(pos); trackArrow3D.rotation.set(0, THREE.MathUtils.degToRad(-t_track), 0);
         // True-heading arrow: same scene-level convention as the ground-track arrow (world position,
         // Y-only rotation, not banked/pitched with the airframe), so it reads as a clean compass pointer.

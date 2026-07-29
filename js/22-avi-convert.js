@@ -703,6 +703,11 @@
 
     document.getElementById('aviConvertOpenBtn').addEventListener('click', aviOpenModal);
     document.getElementById('aviConvertCloseX').addEventListener('click', aviCloseModal);
+    // the generic backdrop close (js/19-bootstrap.js) hides the modal without going through
+    // aviCloseModal, so a backdrop click resurfaces the background-progress pill from here
+    document.getElementById('aviConvertModal').addEventListener('mousedown', function(e) {
+        if (e.target === this) aviCloseModal();
+    });
     document.getElementById('aviCloseBtn').addEventListener('click', aviCloseModal);
     document.getElementById('aviConvertPill').addEventListener('click', aviOpenModal);
     document.getElementById('aviStartBtn').addEventListener('click', aviStartRun);

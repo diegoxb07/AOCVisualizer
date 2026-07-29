@@ -154,6 +154,8 @@
         // stop any running satellite cache pass and clear the tile preloader queue. The bar hides at
         // once here rather than on cancelSatCachePass's fade delay, since a reset clears the screen.
         cancelSatCachePass('Stopped');
+        // end any running AVI to MP4 conversion and put the converter back to fresh.
+        if (typeof aviResetAll === 'function') aviResetAll();
         if (typeof hideSatPrefetchBar === 'function') hideSatPrefetchBar();
         if (typeof resetSatPreload === 'function') resetSatPreload();
 

@@ -608,13 +608,13 @@
                     ctx.save(); ctx.rotate((deg - 90) * Math.PI / 180); ctx.globalAlpha = 0.55;
                     ctx.beginPath(); ctx.moveTo(14 * zoomFactor, 0); ctx.lineTo(s1 * zoomFactor, 0);
                     ctx.strokeStyle = color; ctx.lineWidth = lw * zoomFactor; ctx.stroke();
-                    ctx.beginPath(); ctx.moveTo((s1 + 8) * zoomFactor, 0);
-                    ctx.lineTo(s1 * zoomFactor, -3.2 * zoomFactor); ctx.lineTo(s1 * zoomFactor, 3.2 * zoomFactor);
+                    ctx.beginPath(); ctx.moveTo((s1 + 6) * zoomFactor, 0);
+                    ctx.lineTo(s1 * zoomFactor, -2.4 * zoomFactor); ctx.lineTo(s1 * zoomFactor, 2.4 * zoomFactor);
                     ctx.closePath(); ctx.fillStyle = color; ctx.fill();
                     ctx.restore();
                 };
-                arrow2D(t_track, '#3da5ff', 30, 2.6);
-                arrow2D(t_th, '#ffd400', 26, 2);
+                arrow2D(t_track, '#3da5ff', 25, 2);
+                arrow2D(t_th, '#ffd400', 22, 1.6);
                 ctx.save(); ctx.rotate((t_th - 90) * Math.PI/180); ctx.scale(planeScale, planeScale); (isGulfstreamFlight() ? drawGulfstreamIV : drawP3Orion)(ctx); ctx.restore();
             }
             ctx.restore(); 

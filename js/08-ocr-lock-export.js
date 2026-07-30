@@ -174,12 +174,12 @@
 
     // Recheck once the players reach a stable state: half a second after the last playhead jump
     // settles, the frame is re-read and the lock re-derived when the burned-in clock disagrees
-    // with the current offset by 3 seconds or more (the motion check above confirms the reading
-    // before the lock moves).
+    // with the current offset by 15 seconds or more (the motion check above confirms the reading
+    // before the lock moves; anything closer is OCR jitter and the lock stands).
     function scheduleOcrRecheck() {
         if (!videoLoaded || videoSyncMode.value !== 'auto') return;
         clearTimeout(scrubSyncTimeout);
-        scrubSyncTimeout = setTimeout(() => { requestOcrLock({ silent: true, gateGapSeconds: 3 }); }, 500);
+        scrubSyncTimeout = setTimeout(() => { requestOcrLock({ silent: true, gateGapSeconds: 15 }); }, 500);
     }
 
     document.getElementById('forceSyncBtn').addEventListener('click', () => requestOcrLock({ silent: false }));

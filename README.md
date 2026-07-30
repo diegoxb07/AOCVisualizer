@@ -22,7 +22,7 @@ flowchart TD
     START(["Open the app"]) --> ARCHIVE{"Archive dropdowns available?<br>(Year / Storm / Flight)"}
     ARCHIVE -- "Yes" --> LOADARC["Pick <b>Year → Storm → Flight</b><br>click <b>⤓ Load Flight + Storm Track</b><br>(full-res NetCDF + storm best-track)"]
     ARCHIVE -- "No, API Offline banner" --> UPLOAD["Drop your <b>.nc</b> file<br>on the <b>or upload:</b> zone"]
-    LOADARC --> LOADED["Flight loaded: map, charts & PFD populate"]
+    LOADARC --> LOADED["Flight loaded: map, charts populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
     MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]

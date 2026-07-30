@@ -104,6 +104,11 @@
                                         // No established sync yet: the first good lock takes the offset directly.
                                         applyAutoSyncBase(dynamicBase);
                                         pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false);
+                                    } else if (timeDiff < 15) {
+                                        // An established sync within 15 s of the reading stands: that close a
+                                        // disagreement is OCR jitter, and the correction workflow would freeze
+                                        // the timeline over it for nothing.
+                                        pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(false);
                                     } else {
                                         // A good sync already exists and this scan disagrees. A single frame can
                                         // misread, so require the SAME new offset to hold across two scans

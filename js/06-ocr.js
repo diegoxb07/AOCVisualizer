@@ -79,7 +79,10 @@
         if (ocrMismatchHold && performance.now() - ocrMismatchHoldSince > 15000) ocrMismatchHold = false;   // never hold the timeline hostage
         if (ocrMismatchHold) return true;   // a detected mismatch is being corrected: no scrubbing until it lands
         if (ocrEverLocked || ocrCompiledWarned || syncLockTimedOut) return false;   // synced, gave up, or timed out
-        return ocrWarmingUp || ocrAvailable;   // warming the engine or still hunting; a dead engine never locks
+        // Locked only while a sync is actually in motion: warming the engine (a scan starts the
+        // moment it lands) or a scan running or queued. An idle hunt-less state hands the slider
+        // back at once; the 20 s timer below stays as the backstop.
+        return ocrWarmingUp || (ocrAvailable && (isOcrRunning || forceOcrSyncNextTick));
     }
     function updateTimelineSyncLock() {
         const slider = document.getElementById('timelineSlider');

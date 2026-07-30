@@ -530,10 +530,17 @@
         const fDate = flightMetaData.date;  
         
         GIBS_LAYERS.forEach(def => {
-            if (def.minDate && fDate !== 'Unknown' && fDate < def.minDate) return;
             const el = document.createElement('option');
             el.value = def.value;
             el.textContent = def.baseLabel;
+            // a layer whose archive starts after the flight's date still lists, disabled, so it
+            // reads as having no data for this date rather than not existing at all
+            if (def.minDate && fDate !== 'Unknown' && fDate < def.minDate) {
+                el.disabled = true;
+                el.textContent = `${def.baseLabel}, no data before ${def.minDate.slice(0, 4)}`;
+                satSelect.appendChild(el);
+                return;
+            }
             if (def.isGoes || def.isReconApi) {
                 setGoesOptionState(el, def);
             } else {
@@ -1758,7 +1765,8 @@
             const tb = satPassBytes - b0, td = satPassDlMs - d0;
             if (tb > 0 && td > 0) { recentDl.push({ bytes: tb, dlMs: td }); if (recentDl.length > 5) recentDl.shift(); }
             done++;
-            if (!ok) showToast(`Issue finding satellite image ${done}/${total}, skipping…`, 4000);
+            // a tile that failed because the user cancelled the pass is not an issue to report
+            if (!ok && !batchCacheCancel && myPass === batchCachePass) showToast(`Issue finding satellite image ${done}/${total}, skipping…`, 4000);
             const remain = targets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
             satEtaAnchor(done, total, remain, recentMs, recentDl);
         }

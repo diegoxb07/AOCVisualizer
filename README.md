@@ -8,7 +8,7 @@ cross-flight comparison, and clip recording.
 Built for the **Aircraft Operations Center**. Runs entirely in the browser; the archive API adds
 more automation (loads flight from archive) but is optional.
 
-- **Tool Link:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages)
+- **Tool Link:** https://diegoxb07.github.io/AOCVisualizer/ (GitHub Pages as of now)
 - **Repository:** https://github.com/diegoxb07/AOCVisualizer
 
 ---

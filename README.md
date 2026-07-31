@@ -78,21 +78,17 @@ flowchart TD
 
 Both loading paths feed the same parser, so the map, charts, PFD, and export behave identically either way.
 
-**Option 1: Archive browser (needs the API online).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns also works: paste a full mission id to load it directly, or type a storm name (no year needed) to find that storm across every season; clicking a result shows its flights. This streams the mission's full-resolution NetCDF with a byte-progress readout, parses every recorded variable, and loads the storm's whole-life best-track. The **⬇ .nc** link that appears opens the original source file for use in other tools. If the download fails, the tool falls back to a decimated (0.2 Hz) track, and the status text says which path ran. The address bar also updates to a shareable link (`?mission=20241007N1`); a colleague who opens that link gets the same mission loaded automatically. A shared link only auto-loads on first open. Refreshing the page, or clicking **↺ Reset** in the top right, clears everything back to a fresh session.
+**Option 1: Archive browser (needs API online, will usually be).** Pick **Year → Storm → Flight** in the top-left card, then click **⤓ Load Flight + Storm Track**. The search box above the dropdowns also works, you can type in a mission id to load it, or type a storm name to find the storm you're looking for across every season. This will process and parse the mission's NetCDF and load the storm's whole-life best-track. The **.nc** button will download the nc file pulled for the tool. Refreshing the page, or clicking **Reset All** in the top right, clears everything back to a fresh session.
 
-**Option 2: Manual upload (works offline).** Drop a **`.txt`** or **`.nc`** file (for example `20221028H1_A.nc`) on the **"or upload:"** zone. Manually loaded flights have no storm best-track; that only comes with an archive load. An upload also clears the archive Year/Storm/Flight pickers back to blank (it is not an archive mission) and joins **Previously Loaded Missions**, so it reopens instantly later, including after a reload.
+**Option 2: Manual upload (works with API offline).** Drop the **`.nc`** file (for example `20221028H1_A.nc`) in the **"or upload:"** zone. Manually loaded flights wont load with the storm best-track. 
 
-> When the archive dropdowns are greyed out with an **"API Offline"** banner, this means the archive service is unreachable. Use manual upload instead. The tool re-checks the service every 60 seconds and re-enables the archive when it recovers. Details: **[API & Connectivity](docs/CONNECTIVITY.md)**.
+Either option used will have the mission join **Previously Loaded Missions**, so a user can reopen and switch between flights seamlessly later, even if you reset or refresh.
+
+> When the archive dropdowns are greyed out with an **"API Offline"** banner, this means the archive loader service is unreachable. Use manual upload instead. The tool re-checks the service every 60 seconds and re-enables the archive when it recovers.
 
 ---
 
 ## 2. Time window & replay controls
-
-Set **Flight-Data Start / End Time** (`HHMMSS` UTC) to replay just a segment; the map, charts, PFD, and timeline then render only that window. Leave the detected range alone to replay the whole flight. **After changing the window, press Play. It applies the new window before starting playback.**
-
-With a synced MMR video loaded, the window follows the video's timeframe, so manual trimming mainly applies to data-only replay and Manual sync mode.
-
-All playback lives in the sticky bottom bar:
 
 | Control | What it does |
 | --- | --- |
@@ -104,18 +100,16 @@ All playback lives in the sticky bottom bar:
 
 Keyboard: **Space** plays and pauses, **← / →** slide through the timeline (hold to accelerate), and **Shift + ← / →** jump 10 flight-minutes. Display preferences (units, tracker mode, track and barb colors, PFD, smoothing) are remembered between sessions.
 
-If an MMR video is loaded, the video clock drives playback and the telemetry follows it. Otherwise the engine advances on its own clock.
-
 ---
 
 ## 3. The map tracker (2D & 3D)
 
 Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header.
 
-- **2D**: a whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom and drag to pan; zooming out shows the surrounding synoptic picture. Airfield codes appear as you zoom in, and the AOC's home field (LAL) is always marked.
-- **3D**: a Three.js scene over an elevation-shaded terrain basemap, with US state names laid on the ground, a detailed aircraft model, and the track drawn at altitude (GPS or pressure, selectable; defaults to GPS). Orbit and zoom with the mouse. **Real Scale (3D)** draws the aircraft at its true size and adds faint flight-level reference planes so climbs and descents read against them.
+- **2D**: a whole-world canvas map (coastlines, US states) with satellite imagery and **wind barbs**. Wheel to zoom and drag to pan; zooming out shows the surrounding synoptic picture. Airfield codes appear as you zoom in, and KLAL will always shown.
+    - **3D**: a Three.js scene over an elevation-shaded terrain basemap, with US state names laid on the ground, detailed aircraft models, and the track drawn at altitude (GPS or pressure, selectable; defaults to GPS). Pan and zoom with the mouse. **Real Scale (3D)** draws the aircraft at its true size and adds faint flight-level reference planes so climbs and descents read against them (may overexaggerate).
 
-Options (bottom bar): **Track Color** (wind speed, or warming/cooling), **Barb Color** (wind speed, or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height, independent of the PFD's altitude filter), and **Simple Icon (2D)**. Use **⛶** for fullscreen presentations.
+Options (bottom bar): **Track Color** (wind speed, or warming/cooling), **Barb Color** (wind speed, or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height), and **Simple Icon (2D)**. Use **⛶** for fullscreening on any block.
 
 > **Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay black until the flight-level data records hurricane-force winds. Color starts at **64 kt** and steps through the Saffir-Simpson categories from there. A fully black track means the aircraft never sampled hurricane-force winds.
 > **TDR Mode:** a **TDR Mode** button sits in the map header (it reads "TDR Loading…" until data is usable, and greys out as "TDR Unavailable" for missions without Tail Doppler Radar). Clicking it opens the radar workspace: the tracker pins over the page keeping whichever view is active (a 3D entry parks the camera overhead of the recorded coverage; a 2D entry goes straight to the map view with cross-sections), playback jumps ahead to the first radar leg, with a sidebar listing the levels grouped into pressure layers (millibars, 900-1000 mb up through under 100 mb) to display alone or combined, plus leg buttons that show a chosen leg alone at its end. The radar scans in around the aircraft as it flies each leg (every leg preloads, so transitions are seamless), re-scanned areas show the newest data wherever the new pass recorded any, and a tall white beam marks the aircraft. Switching the tracker to **2D** inside TDR Mode shows the radar layers over the map, centered where the storm is expected at the playback time, with the lower pressure layers (500-1000 mb) selected (the sparse upper bands hide; any band can be toggled back on), a **TDR opacity** slider so satellite imagery reads through the radar, and two-point vertical cross-sections drawn like the measure tool; **Do a Cross-Section** starts the pick (reading **Do Another Cross-Section** after the first), each section labels its two ends with compass directions, and switching back to 3D restores the volume view with the layer selection it had. Exiting TDR mode from either view clears the radar display (the regular tracker never shows radar) and returns both trackers to their default framing, following the aircraft. Cross-section points can only be picked where the radar has already scanned in. The visualizer only pulls post-season quality-controlled (level 2) TDR data, keeping data integrity and accuracy as high as possible; a mission carrying just the real-time product shows the TDR control as unavailable, and missions before 2021 use an older grid format the API cannot render.

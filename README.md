@@ -111,38 +111,43 @@ Switch with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map header
 
 Options (bottom bar): **Track Color** (wind speed, or warming/cooling), **Barb Color** (wind speed, or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D height), and **Simple Icon (2D)**. Use **⛶** for fullscreening on any block.
 
-> **Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay black until the flight-level data records hurricane-force winds. Color starts at **64 kt** and steps through the Saffir-Simpson categories from there. A fully black track means the aircraft never sampled hurricane-force winds.
-> **TDR Mode:** a **TDR Mode** button sits in the map header (it reads "TDR Loading…" until data is usable, and greys out as "TDR Unavailable" for missions without Tail Doppler Radar). Clicking it opens the radar workspace: the tracker pins over the page keeping whichever view is active (a 3D entry parks the camera overhead of the recorded coverage; a 2D entry goes straight to the map view with cross-sections), playback jumps ahead to the first radar leg, with a sidebar listing the levels grouped into pressure layers (millibars, 900-1000 mb up through under 100 mb) to display alone or combined, plus leg buttons that show a chosen leg alone at its end. The radar scans in around the aircraft as it flies each leg (every leg preloads, so transitions are seamless), re-scanned areas show the newest data wherever the new pass recorded any, and a tall white beam marks the aircraft. Switching the tracker to **2D** inside TDR Mode shows the radar layers over the map, centered where the storm is expected at the playback time, with the lower pressure layers (500-1000 mb) selected (the sparse upper bands hide; any band can be toggled back on), a **TDR opacity** slider so satellite imagery reads through the radar, and two-point vertical cross-sections drawn like the measure tool; **Do a Cross-Section** starts the pick (reading **Do Another Cross-Section** after the first), each section labels its two ends with compass directions, and switching back to 3D restores the volume view with the layer selection it had. Exiting TDR mode from either view clears the radar display (the regular tracker never shows radar) and returns both trackers to their default framing, following the aircraft. Cross-section points can only be picked where the radar has already scanned in. The visualizer only pulls post-season quality-controlled (level 2) TDR data, keeping data integrity and accuracy as high as possible; a mission carrying just the real-time product shows the TDR control as unavailable, and missions before 2021 use an older grid format the API cannot render.
-
-**Measure & mark:** **Measure** (map header) draws a polygon, circle, or rectangle for distance and area. **Mark Point** (bottom bar) drops a marker at the current position. Clicking a marked point opens **Point Data Analysis**, where its full report can be downloaded.
+> **Hurricane Wind Field coloring:** barbs (and the track, in that mode) stay black until the flight-level data records hurricane-force winds. Color starts at **64 kt** and step through the Saffir-Simpson categories from there. A fully black track means the aircraft never sampled hurricane-force winds.
+> **TDR Mode:** a **TDR Mode** button sits in the map header (it reads "TDR Loading…" until data is usable, and greys out as "TDR Unavailable" for missions without Tail Doppler Radar). Clicking it opens the radar workspace: the tracker pins over the page keeping whichever view is active (a 3D entry parks the camera overhead of the recorded coverage; a 2D entry goes straight to the map view with cross-sections), playback jumps ahead to the first radar leg, with a sidebar listing the levels grouped into pressure layers (millibars, 900-1000 mb up through under 100 mb) to display alone or combined, plus leg buttons that show a chosen leg alone at its end. The radar scans in around the aircraft as it flies each leg (every leg preloads, so transitions are seamless), re-scanned areas show the newest data wherever the new pass recorded any, and a tall white beam marks the aircraft.
+>
+> Switching the tracker to **2D** inside TDR Mode shows the radar layers over the map, centered where the storm is expected at the playback time, with the lower pressure layers (500-1000 mb) selected so the user can see where centers are easier. **TDR opacity** slider exists so that you can flip visions through to satellite imagery below it possibly, and users can do two-point vertical cross-sections drawn like the measure tool. Switching back to 3D restores the volumetric view with the layer selection the user had. The visualizer only pulls post-season quality-controlled (level 2) TDR data, keeping data integrity and accuracy as high as possible.
+> 
+**Measure** (in 2D map header) lets the user draw a polygon, circle, or rectangle for distance and area, similar to the tool FD's have on the MMR. 
+**Mark Point** (bottom bar) drops a marker at the current position, where users can click on the 2D point to see and download a point analysis. 
 
 ---
 
 ## 4. MMR video sync
 
-Load a cockpit or radar **`.mp4`** in the **Upload MMR** zone. Two sync modes:
+Load a MMR or Nose Radar **`.mp4`** in the **Upload MMR** zone. Two sync modes:
 
-- **Auto-Sync (default)**: OCR scans the whole video frame for the burned-in clock (usually bottom right, but exports vary) and locks onto the time that advances with the video, so a static number on screen cannot fool it. A green pulse means OCR is active, and a "Syncing" pill shows while it hunts. Click **Sync Now** to force a lock (a few clicks on a clear frame helps). Reads are sanity-checked against the flight's time range, so a misread cannot jump playback wildly. If no lock lands after 30 seconds, upload the plain MMR recording instead of the nose-radar compiled video; compiled videos place the clock somewhere unusual and often cannot sync.
-- **Manual Time Input**: picking it in the **MMR Sync Mode** dropdown (under the MMR upload zone) opens a window for the flight-data start/end times and the video's UTC start time (`HHMMSS`).
+- **Auto-Sync**: OCR scans the whole video frame for the burned-in clock (usually bottom right, but exports vary) and locks onto the time that advances with the video, so a static number on screen cannot fool it. A green pulse means OCR is active, and a "Syncing" pill shows while it hunts. Click **Sync Now** to force a lock (a few clicks on a clear frame helps). Reads checked against the flight's time range, so a misread won't jump playback wildly. If no lock lands after 30 seconds, upload a plain MMR recording instead of the nose-radar compiled video; compiled videos place the clock somewhere unusual and sometimes cannot sync.
+- **Manual Time Input**: picking it in the **MMR Sync Mode** dropdown (under the MMR upload zone) opens a window for the flight-data start/end times and the video's UTC start time (`HHMMSS`). Not recommended, tedious and confusing to need to manually sync.
+
+- New **AVI -> MP4** converter lets users create their MMR by simply uploading raw .avi files from the archive storm that they want to see the MMR of (if available). These .avi files can be found under MMR in the SEB OMAO archive from the most recent years.
 
 ---
 
 ## 5. Satellite overlays
 
-Open the **Sat:** picker in the map header and choose a satellite; its products then appear right below. Daylight-dependent products (visible bands and the IR/VIS sandwich) are disabled only when a flight is in night for most (about 70%) of its length. For those bands, frames that fall during night are skipped when caching, so a pass that begins before sunrise goes straight to the daytime imagery instead of loading dark frames first. A slider at the top of the picker adjusts the imagery's opacity over the basemap, and for GOES products a color-scale legend (brightness temperature or reflectance, with units) sits in the top left of the 2D player. The options fill in from the flight's date and location.
+Open the **Sat:** picker in the map header and choose a satellite:
 
 - **MODIS / VIIRS (polar orbiters, NASA GIBS)**: available for any date back to each mission's start. Imagery is organized by calendar day; the day-stepper moves between days, and overpass times are looked up automatically.
-- **GOES-East / GOES-West (archive, needs the API)**: rendered server-side from the GOES archive for the flight's date, advancing on the 10-minute scan interval as playback runs. Nothing shows until a product is chosen, and choosing one also pre-caches imagery for the whole flight so playback never waits on a download. A product the API cannot currently serve is shown as unavailable on its own; the rest stay usable.
-- **⤓ Pre-Cache Satellite Imagery** (top card) downloads imagery for several flights at once. Cached imagery is saved on this device and survives reloads.
+- **GOES-East / GOES-West (archive, needs API)**: rendered server-side from the GOES archive for the flight's date, and will advance in 10-minute intervals as playback runs. A product the API cannot currently serve is shown as unavailable on its own. (day bands will also be unavailable at night)
+- **⤓ Pre-Cache Satellite Imagery** (top card) can download imagery for several flights at once. Cached imagery is saved on this device and survives reloads.
 
 The picker discovers the product list from the API at startup, so new products appear without an app update. The full 16-band GOES ABI set is available for both GOES satellites, plus two composites:
 
-- **Bands 1-6** (visible and near-IR, daylight only; a warning shows if the flight point is in darkness): Band 2 (Red Visible, 0.64 µm) has the sharpest daytime cloud and convection detail, Band 3 (Veggie, 0.86 µm) shows land and vegetation, and Band 5 (Snow/Ice, 1.6 µm) separates ice cloud from water cloud.
-- **Band 7** (Shortwave IR, 3.9 µm): low cloud and fog at night.
+- **Bands 1-6** (visible and near-IR, daylight only): Band 2 (Red Visible, 0.64 µm) has the sharpest daytime cloud and convection detail, Band 3 (Veggie, 0.86 µm) shows land and vegetation better, and Band 5 (Snow/Ice, 1.6 µm) separates ice clouds from water clouds.
+- **Band 7** (Shortwave IR, 3.9 µm): low clouds and fog at night.
 - **Bands 8-10** (Water Vapor, 6.2 / 6.9 / 7.3 µm): upper, mid, and low-level moisture, dry slots, and shear.
-- **Bands 11-16** (IR windows and trace-gas channels): cloud-top temperature, day or night. Band 13 (Clean IR, 10.3 µm) is the usual pick, and is also offered as **IR Enhanced (ir4)** and **BD Curve (Dvorak)** variants.
+- **Bands 11-16** (IR windows and trace-gas channels): cloud-top temperature, day or night. Band 13 (Clean IR, 10.3 µm), is also offered as **IR Enhanced (ir4)** and **BD Curve (Dvorak)** variants.
 - **Sandwich** (composite): Band 13 IR color over visible texture, for daytime convection.
-- **GeoColor** (composite): true color by day, IR at night.
+- **GeoColor** (composite): true color in the day and IR at night.
 
 ---
 
@@ -154,11 +159,11 @@ Archive loads draw the storm's whole-life, intensity-colored, dashed best-track 
 
 ## 7. Charts, PFD & HUD
 
-Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accelerations, pressure, thermodynamics) follow the playback moment. **↺** resets zoom, **＋** adds or removes series, and scroll or drag zooms and pans. **Create Your Own Graph** (bottom) plots any variables the file contains against each other.
+Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accelerations, pressure, thermodynamics) that (like everything else) follow playback. **↺** resets zoom, **＋** adds or removes series, and scroll or drag zooms and pans. **Create Your Own Graph** (bottom) plots any variables the file contains against each other.
 
-Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display with an attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a slip/skid indicator, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **S.I Units** (readouts are imperial by default; checking it switches them to metric), and **GPS→Press Alt** (switches the PFD altitude tape from GPS to pressure altitude, when both exist). The HUD box on the map shows live telemetry text.
+Filters (bottom bar): **Cockpit PFD** (a primary flight display with an attitude ladder, airspeed/altitude/heading tapes, VSI, a bank scale with a slip/skid indicator, wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts), **S.I Units** (readouts are imperial by default; checking it switches them to metric), and **GPS→Press Alt** (switches the PFD altitude tape from GPS to pressure altitude, when both exist). The HUD box on the map shows live telemetry text.
 
-**8Hz Smoothing** (map header) interpolates between the 1-second samples for fluid playback. The small sub-second motion it adds scales with the recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air moves the airframe.
+**8Hz Smoothing** (map header) interpolates between the 1-second samples for a more fluid playback. The sub-second motion it adds scales with the recorded vertical wind, so calm legs will stay smooth and only genuinely bumpy air readings will shake the airframe.
 
 ---
 
@@ -170,9 +175,7 @@ Filters (bottom bar): **Cockpit PFD** (a G1000-style primary flight display with
 
 ## 9. Exporting
 
-**Record Clip**: pick a start and end time (both endpoints preview live, so the exact frames are visible before recording), a tracker mode, a satellite overlay, the MMR video if one is loaded, and up to four graphs. Custom graphs can also be built from any variables just for the clip. The tool plays the range and records it to a 1080p **`.webm`**, with a progress pill and a **■ Stop** button. Recorded graphs get value and bound annotations drawn over them.
-
----
+**Record Clip**: pick a start and end time (will give you a preview, so the exact frames are visible before you need to click record), add the tracker mode, a satellite overlay, the MMR video if one is loaded, and up to four graphs. Custom graphs can also be built from any variables just for the clip. The tool plays the range and records it to a 1080p **`.webm`**, with a progress pill and a **■ Stop** button.
 
 ## Troubleshooting
 

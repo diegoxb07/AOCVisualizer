@@ -1,5 +1,8 @@
 # Mission Visualizer
 
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](http://creativecommons.org/publicdomain/zero/1.0/)
+[![Live API](https://img.shields.io/badge/API-live-brightgreen)](https://joshmurdock.net/api/docs)
+
 This tool replays AOC flight-level instrument data together with optional synced radar
 (**MMR**) video. It adds a live 2D/3D map tracker, synced charts for any recorded variable, a
 cockpit Primary Flight Display, satellite imagery overlays, storm best-track overlays,

@@ -20,7 +20,7 @@ in each state**, so during a training or replay session you always know your opt
 
 | Service | Used for | Required? |
 | --- | --- | --- |
-| **noaa-recon-api** (currently `https://joshmurdock.net/api`, planned move to a NOAA-internal host, see [Changing the API host](#changing-the-api-host)) | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
+| **recon archive API** | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
 | **NASA GIBS** | MODIS / VIIRS polar satellite overlays | Only for MODIS/VIIRS overlays |
 | **GitHub-hosted GeoJSON** (Natural Earth plus US states) | Fallback for the map's coastline and state geometry if the repo's local copies fail | Fetched once at startup; map still runs if it fails |
 
@@ -36,8 +36,7 @@ The requests above are for imagery, geometry, and the archive catalog only.
 
 ## The noaa-recon-api
 
-The **noaa-recon-api** is a public, CORS-open service
-([github.com/jjmurdock19/noaa-recon-api](https://github.com/jjmurdock19/noaa-recon-api)) that
+The **recon archive API** is a public, CORS-open service that
 does two jobs for this tool. Its requests carry a bearer token that ships embedded in the page
 (`js/02-satellite.js`); like a publishable key it is meant to be visible, so nothing needs a
 sign-in. A user with their own token can override it by setting `reconApiToken` in localStorage.
@@ -144,7 +143,7 @@ If you can't wait, reloading the page also re-checks immediately.
 
 ## Endpoint reference
 
-All under `RECON_API_BASE` (defined in `js/02-satellite.js`, currently `https://joshmurdock.net/api`).
+All under `RECON_API_BASE` (defined in `js/02-satellite.js`).
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -158,22 +157,23 @@ All under `RECON_API_BASE` (defined in `js/02-satellite.js`, currently `https://
 
 > The API is the source of truth for available satellite products. New bands and composites need
 > **no** client change; they appear in the picker on the next `products` fetch. Check the API repo
-> or `API.md` (github.com/jjmurdock19/noaa-recon-api) before assuming a product is missing.
+> or its `API.md` before assuming a product is missing.
 
 ---
 
 ## Changing the API host
 
-The recon API is planned to move from `joshmurdock.net` to a NOAA-internal host. Every fetch in
-the app goes through the single `RECON_API_BASE` constant, so the swap is two edits:
+If the recon API host ever changes, every fetch in the app goes through the single
+`RECON_API_BASE` constant, so the swap is two edits:
 
 1. **`RECON_API_BASE`** in `js/02-satellite.js`: point it at the new base URL (keep the `/api` path
    segment if the new deployment uses one).
-2. **The CSP `<meta>` tag** in `index.html`: replace `https://joshmurdock.net` with the new origin
-   in **both** `connect-src` and `img-src` (the browser blocks the new host silently otherwise).
+2. **The CSP `<meta>` tag** in `index.html`: replace the current recon origin (the value of
+   `RECON_API_BASE`) with the new origin in **both** `connect-src` and `img-src` (the browser blocks
+   the new host silently otherwise).
 
-Then update the host shown in this file and in the doc comments at the top of
-`js/12b-recon-archive.js`, `js/01-state.js`, and `js/02-satellite.js`.
+Then update the doc comments at the top of `js/12b-recon-archive.js`, `js/01-state.js`, and
+`js/02-satellite.js`.
 
 ---
 

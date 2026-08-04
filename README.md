@@ -1,7 +1,6 @@
 # Mission Visualizer
 
 [![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](http://creativecommons.org/publicdomain/zero/1.0/)
-[![Live API](https://img.shields.io/badge/API-live-brightgreen)](https://joshmurdock.net/api/docs)
 
 This tool replays AOC flight-level instrument data together with optional synced radar
 (**MMR**) video. It adds a live 2D/3D map tracker, synced charts for any recorded variable, a
@@ -213,6 +212,39 @@ Filters (bottom bar): **Cockpit PFD** (a primary flight display with an attitude
 
 ---
 
+## Data sources
+
+Flight data, MMR video, storm best-track, TDR, and archive GOES all originate from the NOAA sources below. Flight, best-track, TDR, and GOES reach the app through the recon archive API, which relays and renders them. MMR video is pulled and converted separately, and MODIS/VIIRS plus the basemap and terrain files load directly.
+
+**Flight-level data (NetCDF)**
+- Source: NOAA SEB Archive, `https://seb.omao.noaa.gov/pub/acdata/{year}/MET/{missionid}/`.
+- The tool loads a mission by id through the recon archive API at full resolution, and the `.nc` button links the original file. A mission folder can hold more than one NetCDF; the API serves the highest-lettered revision, so `_B` is used over `_A`, since the higher letter is the quality-assured pass and a lower one is an earlier version that may still carry an error. Manual upload of a `.nc` (or `.txt`) works with no API.
+
+**MMR video**
+- Source: NOAA SEB Archive, `https://seb.omao.noaa.gov/pub/acdata/{year}/MMR/{missionid}/`, as zipped `.avi` segments.
+- The built-in **AVI to MP4 Converter** unzips and stitches the segments into one `.mp4` on your device (ffmpeg in the browser), which you then load as the MMR video. Compiling a full mission of video runs on the order of 30 minutes. The MMR player itself takes `.mp4`.
+
+**Storm best-track**
+- Source: NHC ATCF best-track, the b-decks at `https://ftp.nhc.noaa.gov/atcf/btk/` (current season) and `https://ftp.nhc.noaa.gov/atcf/archive/` (past years). Whole storm life at roughly 6-hourly fixes, relayed by the recon archive API and keyed on year, storm name, and basin. Per-fix fields: time, lat, lon, wind (kt), pressure (mb), category, status.
+
+**TDR (Tail Doppler Radar)**
+- Source: NOAA AOML / Hurricane Research Division airborne tail-Doppler radar (AOML HRD radar archive, `https://www.aoml.noaa.gov/ftp/pub/hrd/data/radar/`; the analyses are also held by the AOC SEB archive). Relayed by the recon archive API as level 2 (quality-controlled) reflectivity, in 3D volumes and two-point vertical cross-sections.
+
+**GOES (archive)**
+- Source: NOAA GOES ABI archive on AWS S3 (NOAA Open Data Dissemination, `https://registry.opendata.aws/noaa-goes/`, buckets `noaa-goes16` / `noaa-goes17` / `noaa-goes18` / `noaa-goes19`). Rendered server-side by the recon archive API for the flight's historical date. GOES-East (sub-point 75W, from 2017-07-10) and GOES-West (137W, from 2018-08-28). Bands and composites (Sandwich, GeoColor) come from the API's product list.
+
+**MODIS / VIIRS (polar), fetched directly from NASA**
+- Imagery (NASA GIBS): `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi` (WMS GetMap, EPSG:4326, layer `{platform}_{band}`).
+- Overpass time (NASA CMR): `https://cmr.earthdata.nasa.gov/search/granules.json` (short_name `MOD09` Terra, `MYD09` Aqua, `VNP09` Suomi-NPP, `VJ109` NOAA-20).
+
+**Basemap, terrain, airfields (bundled, remote fallback)**
+- Coastlines: Natural Earth, `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson`.
+- US states: `https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json`.
+- Terrain: ETOPO 0.5 degree grid, NOAA NCEI via CoastWatch ERDDAP (`etopo180`), pre-baked into `data/etopo-heightmap.png`.
+- Airfields: `data/airports.json` (1,486 fields).
+
+---
+
 ## Appendix: flight-level variables & sensors
 
 AOC flight-level files carry **hundreds** of columns, but this visualizer reads only the quality-controlled subset it needs to plot: position, GPS/pressure/radar altitude, D-value, pressures, temperature and dew point, true/indicated airspeed, wind speed/direction/vertical wind, drift, heading, ground track, pitch/roll, angle of attack and sideslip, vertical acceleration, mixing ratio, and equivalent potential temperature. Those are the fields shown in the charts, PFD, HUD, and "Create Your Own Graph."
@@ -234,4 +266,4 @@ Everything the app plots is taken from the file as loaded or derived from it in 
 **8 Hz smoothing (playback interpolation).** For fluid playback the map plane, PFD, and HUD are interpolated between the 1-second samples at 8 Hz with a uniform **Catmull-Rom** spline: position, heading and ground track, pitch and roll, and altitude, with longitude and headings unwrapped the short way so a dateline crossing or a 359°→1° turn interpolates correctly. A small **turbulence-aware micro-motion** is then added so the airframe is never perfectly still: its amplitude scales with the recorded vertical wind (`vtWnd`, the turbulence proxy) and its shape is smooth band-limited noise (a few sub-2 Hz sinusoids), so calm legs stay steady and only bumpy air rocks the plane. The drawn 2D and 3D flight tracks use the same Catmull-Rom curve (one cubic Bezier per 1-second segment in 2D), so the plane always rides on the line.
 **Satellite day/night check.** The warning that a daylight-only product (reflective GOES bands 1 to 6) is being viewed after dark comes from a low-precision solar-position calculation (solar declination plus the equation of time) that gives the sun's elevation angle at the flight point and time; below −6° (past civil twilight) it counts as night.
 
-> The app also carries an internal dictionary of the full raw-variable set (`js/00-var-catalog.js`) that it does **not** yet use for playback. It was groundwork for the **Quality-Check Tool** that lists every variable in a file, overlay and cross-compare a measurement's redundant sensors, and flag data gaps, spikes, or sensor disagreement. This tool is available as AOCQualityControl (in my profile).
+

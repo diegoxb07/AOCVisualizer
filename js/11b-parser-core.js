@@ -56,8 +56,15 @@
         if (nc.globalAttributes) { nc.globalAttributes.forEach(attr => { if (attr.name === 'TimeInterval' && typeof attr.value === 'string') { const m = attr.value.match(/(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/); if (m) { startSecs = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]); endSecs = parseInt(m[4])*3600 + parseInt(m[5])*60 + parseInt(m[6]); } } }); }
         if (startSecs === -1) { const decoder = new TextDecoder("utf-8"); const rawStr = decoder.decode(data.slice(0, Math.min(data.byteLength, 15000))); const tiMatch = rawStr.match(/TimeInterval.*?(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2})/i); if (tiMatch) { startSecs = parseInt(tiMatch[1])*3600 + parseInt(tiMatch[2])*60 + parseInt(tiMatch[3]); endSecs = parseInt(tiMatch[4])*3600 + parseInt(tiMatch[5])*60 + parseInt(tiMatch[6]); } }
 
+        // Set when the block below REPLACES the file's own time values with a clock reconstructed by
+        // spreading the TimeInterval span evenly over the rows. That assumes a perfectly uniform
+        // sample rate, which is an assumption and not a reading, so it is surfaced to the parse
+        // ledger through a header-only marker column (no per-row payload) that
+        // parseFlightTextToRows picks up below.
+        let timeReconstructed = false;
         let finalVarNames = varNames;
         if (startSecs !== -1 && endSecs !== -1 && numRows > 0) {
+            timeReconstructed = true;
             if (endSecs < startSecs) endSecs += 86400;
             let totalDuration = endSecs - startSecs;
             finalVarNames = varNames.filter(n => n.toLowerCase() !== 'time'); finalVarNames.unshift('time');
@@ -72,7 +79,11 @@
         }
 
         report({ phase: 'rows', numRows: numRows });
-        let tsvStr = finalVarNames.join('\t') + '\n';
+        // The marker rides the HEADER only; rows keep their original field count, so its column index
+        // simply has no value on every line (getVal reads that as null, exactly like a blank cell).
+        // That keeps the TSV contract and costs nothing per row on a 30k-sample flight.
+        const headerNames = timeReconstructed ? finalVarNames.concat(['TimeReconstructed']) : finalVarNames;
+        let tsvStr = headerNames.join('\t') + '\n';
         for (let i = 0; i < numRows; i++) { let row = []; for (let j = 0; j < finalVarNames.length; j++) { let val = varsData[finalVarNames[j]][i]; row.push(val !== undefined && val !== null ? val : ''); } tsvStr += row.join('\t') + '\n'; }
         return tsvStr;
     }
@@ -88,7 +99,7 @@
         const stats = {
             dataLines: 0, parsed: 0, rows: 0, timeSource: null,
             dropped: { shortLine: 0, noTime: 0, badPosition: 0, noSpeed: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0, belowMinAlt: 0 },
-            derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0 }
+            derived: { pAltFromPressure: 0, windFromMs: 0, tasFromMs: 0, iasFromMs: 0, radAltFromFeet: 0, timeReconstructed: 0 }
         };
         const lines = rawText.split('\n');
         if (lines.length < 2) return { rows: [], stats };
@@ -157,6 +168,14 @@
             } catch (err) { stats.dropped.error++; continue; }
         }
 
+        // A NetCDF whose clock ncArrayBufferToTsv rebuilt from the TimeInterval span: the timestamps are
+        // evenly spaced by construction, not read per sample. That outranks whatever shape the decoded
+        // column happened to take ('HHMMSS numbers'), so it owns timeSource and is counted as derived.
+        if (hMap['timereconstructed'] !== undefined) {
+            stats.timeSource = 'reconstructed: TimeInterval span spread evenly over the rows';
+            stats.derived.timeReconstructed = stats.parsed;
+        }
+
         if (tempParsedData.length === 0) return { rows: [], stats };
         tempParsedData.sort((a,b) => a.absSeconds - b.absSeconds);
         let cleaned = [];
@@ -217,6 +236,7 @@
         if (d.error) drops.push(fmt(d.error) + ' unreadable lines');
         if (drops.length) out.push('filtered out: ' + drops.join(', '));
         const v = stats.derived, der = [];
+        if (v.timeReconstructed) der.push('timestamps reconstructed by spreading the file\u2019s TimeInterval evenly over the rows (' + fmt(v.timeReconstructed) + ' rows)');
         if (v.pAltFromPressure) der.push('pressure altitude computed from static pressure (' + fmt(v.pAltFromPressure) + ' rows)');
         if (v.windFromMs) der.push('wind speed converted from m/s');
         if (v.tasFromMs) der.push('TAS converted from m/s');

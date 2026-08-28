@@ -212,6 +212,7 @@
         const satSelReset = document.getElementById('satelliteSelect'); if (satSelReset) satSelReset.value = 'none';
         const bandSelReset = document.getElementById('satBandSelect'); if (bandSelReset) bandSelReset.value = '';
         satLoadedInfo = null; satImageBox = null;
+        if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();
         // Clear any storm best-track / archive-mission metadata from the previous flight, it's
         // re-set after this returns by loadReconMission for an archive load.
         stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;

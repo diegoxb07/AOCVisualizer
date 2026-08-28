@@ -37,7 +37,11 @@
             if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
         };
 
-        const commitLock = (ocrSecs, atVTime) => {
+        // `verified` is false for the exhaustion fallback below: a single plausible-looking clock that
+        // was never confirmed to ADVANCE with the video. It still becomes the lock (better than no
+        // sync at all), but it must not be reported like a confirmed one, or a wrong alignment reads
+        // as a good one and every downstream time the user reads off the tracker is quietly off.
+        const commitLock = (ocrSecs, atVTime, verified = true) => {
             isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator();
             const currentGap = Math.abs(ocrSecs - (videoStartSeconds + atVTime));
             if (gateGapSeconds != null && currentGap < gateGapSeconds) { if (wasPlaying && isPlaying) video.play().catch(e => {}); return; }
@@ -57,7 +61,9 @@
                 }
             }
 
-            if (!silent) showToast("Sync Locked Successfully!", 2000);
+            if (!silent) showToast(verified
+                ? "Sync Locked Successfully!"
+                : "Synced on an UNVERIFIED clock reading: the timestamp never confirmed it was ticking with the video. Check the tracker time against the MMR, and use Sync Now on a clearer frame (or Manual Time Input) if it looks wrong.", verified ? 2000 : 9000);
             ocrNoteLock();
             ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
             refreshSyncingIndicator();  // lock settled, clear the badge even when paused
@@ -76,7 +82,7 @@
             if (attempts >= maxAttempts) {
                 // The unverified fallback serves only ungated requests (Sync Now, first lock); a
                 // gated recheck never moves an established lock on a single unconfirmed read.
-                if (fallback && gateGapSeconds == null) { commitLock(fallback.secs, fallback.vTime); return; }
+                if (fallback && gateGapSeconds == null) { commitLock(fallback.secs, fallback.vTime, false); return; }
                 finishFail(); return;
             }
 

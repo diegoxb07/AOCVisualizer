@@ -190,6 +190,7 @@
         followAircraft3D = true;
         if (typeof updateFollowButton === 'function') updateFollowButton();   // hides the recenter overlay
         satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; lastSatFetchTime = '';
+        if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();
         satTileOpacity = 0.92;
         const opSlider = document.getElementById('satOpacitySlider'); if (opSlider) opSlider.value = 92;
         const opVal = document.getElementById('satOpacityVal'); if (opVal) opVal.textContent = '92%';

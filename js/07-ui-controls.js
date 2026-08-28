@@ -956,12 +956,14 @@
         }
         if (typeof updateFollowButton === 'function') updateFollowButton();
         if (typeof updateSatColorLegend === 'function') updateSatColorLegend();   // hide in 3d, show in 2d
+        if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();    // same: the overlay only exists in 2d
     });
 
     document.getElementById('satelliteSelect').addEventListener('change', () => {
         updateBandOptions();
         satImageLoaded = false; lastSatFetchTime = ''; bgNeedsUpdate = true; resetSatPreload();
         satLoadedInfo = null; satImageBox = null;
+        if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();
         satDayOffset = 0;
         buildSatDayStepper();
         if (filteredData.length > 0 && trackerModeSelect.value === '2d') {
@@ -1019,6 +1021,13 @@
         lbl.textContent = 'Overlays';
         const on = sat.value !== 'none';
         btn.classList.toggle('sat-on', on);
+        // Nothing on the map says WHEN the satellite tile under the track was taken, and it is never
+        // the playback moment: archive GOES is bucketed to the scan cadence, and a polar pass is one
+        // overpass held across the whole flight. satImageTimeNote (js/02-satellite.js) puts that on
+        // this button's hover text, appended to its own description rather than replacing it.
+        if (!btn.dataset.defaultTitle) btn.dataset.defaultTitle = btn.title;
+        const note = (typeof satImageTimeNote === 'function') ? satImageTimeNote() : null;
+        btn.title = note ? btn.dataset.defaultTitle + '\n\nImagery shown: ' + note : btn.dataset.defaultTitle;
     }
 
     function renderSatPickerPanel() {

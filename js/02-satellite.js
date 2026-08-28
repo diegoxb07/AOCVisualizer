@@ -126,19 +126,6 @@
             .catch(() => null);
     }
 
-    // Solar elevation (deg) at a lat/lon and UTC instant, good to ~0.5deg, enough to tell day from
-    // night. Standard low-precision NOAA solar-position approximation (declination + equation of time).
-    function solarElevationDeg(latDeg, lonDeg, dateUtc) {
-        const rad = Math.PI / 180;
-        const N = (dateUtc.getTime() - Date.UTC(dateUtc.getUTCFullYear(), 0, 0)) / 86400000;   // fractional day of year
-        const utcH = dateUtc.getUTCHours() + dateUtc.getUTCMinutes() / 60 + dateUtc.getUTCSeconds() / 3600;
-        const decl = -23.44 * Math.cos(rad * (360 / 365) * (N + 10));
-        const B = rad * (360 / 365) * (N - 81);
-        const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B);   // minutes
-        const ha = 15 * ((utcH + lonDeg / 15 + eot / 60) - 12);   // hour angle, deg
-        return Math.asin(Math.sin(rad * latDeg) * Math.sin(rad * decl) + Math.cos(rad * latDeg) * Math.cos(rad * decl) * Math.cos(rad * ha)) / rad;
-    }
-
     // Order is the order the satellite picker lists them in (updateSatelliteOptions fills the native
     // select from this array, and the picker panel walks that select). Geostationary GOES first: it
     // is the everyday choice, with continuous 10-min scans through a whole mission. The polar
@@ -507,12 +494,14 @@
                         satLoadedInfo.imageTimeMs = midMs;
                         satLoadedInfo.modisTimePending = false;
                         satLoadedInfo.modisExact = true;
+                        refreshSatImageTimeNote();   // the overpass time just landed; the note said "pending"
                     }
                     if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 } else {
                     opt.textContent = `${layerDef.baseLabel} [Daily]`;
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
                         satLoadedInfo.modisTimePending = false;
+                        refreshSatImageTimeNote();   // lookup came back empty: the note falls back to day-only
                     }
                     if (typeof refreshSatPicker === 'function') refreshSatPicker();
                 }
@@ -573,6 +562,7 @@
         maybeAutoPrecacheSatellite();   // flight (re)loaded with a GOES-archive layer already selected, build its full timeframe now
         if (typeof refreshSatPicker === 'function') refreshSatPicker();
         if (typeof updateSatColorLegend === 'function') updateSatColorLegend();
+        refreshSatImageTimeNote();
     }
 
     // A no-op kept for its existing callers: the satellite selects sit behind the Overlays dropdown,
@@ -936,6 +926,52 @@
           + `<div class="leg-unit">${escapeHtml(unit)}</div>`;
     }
     let _satLegendReqId = 0;
+    // --- Imagery timestamp note ----------------------------------------------------------
+    // satLoadedInfo records WHICH moment the tile on the map is actually from. Nothing used to read
+    // it, so the overlay read as if it were current with the playback clock, which it never is:
+    // archive GOES is bucketed to the scan cadence (up to ~10 min off the playhead), and a polar
+    // pass is ONE overpass held across the whole flight, so it can be many hours from the moment
+    // being replayed. This turns that state into the Overlays button's hover text (built into the
+    // title by updateSatPickerButton in js/07-ui-controls.js), and says how the time was arrived at
+    // rather than implying more precision than there is:
+    //   a real scan/granule time from the API or CMR   -> stated as the scan/overpass time
+    //   no scan time came back                         -> stated as the requested cadence bucket
+    //   a polar overpass whose CMR lookup has not landed -> the day is known, the time is not
+    // Returns null when there is no imagery on the map to describe.
+    function satImageTimeNote() {
+        const satSel = document.getElementById('satelliteSelect');
+        const in2d = !trackerModeSelect || trackerModeSelect.value === '2d';
+        if (!in2d || !satSel || satSel.value === 'none' || !satImageLoaded || !satLoadedInfo) return null;
+        const info = satLoadedInfo;
+        const d = new Date(info.imageTimeMs);
+        if (!isFinite(d.getTime())) return null;
+        const day = d.toISOString().slice(0, 10);
+        const full = d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
+        const layer = info.layerLabel ? info.layerLabel + ' \u2014 ' : '';
+        if (info.isModis && info.modisTimePending) {
+            return layer + 'imagery for ' + day + '. The overpass time is still being looked up from NASA CMR.';
+        }
+        if (info.isModis && !info.modisExact) {
+            return layer + 'one polar-orbiter pass covering ' + day + ', shown for the whole flight. '
+                 + 'NASA CMR returned no granule time for this date and place, so only the day is known.';
+        }
+        if (info.isModis) {
+            return layer + 'one polar-orbiter overpass at ' + full + ', shown for the whole flight, '
+                 + 'not just the moment at the playhead.';
+        }
+        if (info.scanExact) {
+            return layer + 'scan start ' + full + ', as reported by the archive for the frame on the map.';
+        }
+        return layer + full + ' is the ' + (info.cadenceMin || 10) + '-minute cadence bucket requested for '
+             + 'the playback moment; the archive returned no scan time, so the real scan sits inside it.';
+    }
+
+    // Repaint whatever surfaces the note above. Called from every point that sets or clears
+    // satLoadedInfo, so the hover text can never describe imagery that is no longer on the map.
+    function refreshSatImageTimeNote() {
+        if (typeof updateSatPickerButton === 'function') updateSatPickerButton();
+    }
+
     async function updateSatColorLegend() {
         const legend = document.getElementById('satColorLegend');
         if (!legend) return;
@@ -1160,7 +1196,7 @@
         if (layerDef.isReconApi) {
             if (!isReconApiAvailable()) {
                 satImageLoaded = false; bgNeedsUpdate = true;
-                satLoadedInfo = null;
+                satLoadedInfo = null; refreshSatImageTimeNote();
                 return;
             }
             if (!bandId) return;
@@ -1220,7 +1256,7 @@
                     applyPolarSatResult(r.canvas, r.box, layerDef, dateStr);
                 } else {
                     satImageLoaded = false; bgNeedsUpdate = true;
-                    satLoadedInfo = null;
+                    satLoadedInfo = null; refreshSatImageTimeNote();
                     showToast('Satellite: no imagery found for this day and area.', 6000);
                 }
             } catch(e) {
@@ -1287,6 +1323,7 @@
             modisExact: exact,
             dayOffset: satDayOffset
         };
+        refreshSatImageTimeNote();
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }
 
@@ -1329,7 +1366,7 @@
 
         // Outside this satellite's Earth disk, bail with a clear note (the option is disabled too).
         if (!goesInCoverage(layerDef)) {
-            satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true;
+            satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; bgNeedsUpdate = true; refreshSatImageTimeNote();
             if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
             return;
         }
@@ -1477,10 +1514,14 @@
         satLoadedInfo = {
             layerLabel: shortLabel + ' · ' + bandName,
             imageTimeMs: r.scanStartMs || bucketMs,
+            // Distinguishes a real scan start from the cadence bucket we asked for, so the badge can
+            // say which it is showing instead of presenting the bucket as an observation time.
+            scanExact: !!r.scanStartMs,
             isModis: false,
             isReconApi: true,
             cadenceMin: layerDef.cadenceMin || 10
         };
+        refreshSatImageTimeNote();
         if (trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
     }
 

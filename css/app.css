@@ -549,7 +549,11 @@ html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
 .tdr-level-row:hover { color: var(--text); border-color: var(--accent); }
 .tdr-level-row.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
 .tdr-level-row.empty { opacity: 0.4; }
-.tdr-level-ft { min-width: 88px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; }
+.tdr-level-ft { min-width: 118px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; }
+/* The band's real selector: the geometric altitude span its radar levels sit at. The millibars beside
+   it are a standard-atmosphere label for that span (see tdrMb in js/07d-tdr.js), so the altitude is
+   shown alongside rather than letting the mb read as an analysed pressure surface. */
+.tdr-level-alt { display: block; font-size: 8.5px; font-weight: 500; color: var(--text-faint); letter-spacing: 0.01em; }
 .tdr-level-bar { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--accent) 30%, transparent); }
 .tdr-hero-note { font-size: 10.5px; color: var(--text-faint); padding: 6px 2px; }
 /* Skeleton cover while the TDR workspace waits for its first volume (a few seconds per leg). */

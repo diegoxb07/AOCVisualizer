@@ -40,6 +40,13 @@
         // Amplitude scales with vertical wind (the measured turbulence proxy); shape is smooth
         // band-limited noise (a few sub-2 Hz sinusoids) so it reads as gust response, not static.
         // In calm air (vtWnd ~ 0) the plane sits still.
+        //
+        // This motion is SYNTHESIZED, not recorded. It exists to animate the airframe, so it is
+        // added only to the fields that draw it (pitch/roll for the rocking, the altitudes for the
+        // ride) and the untouched interpolated values are carried alongside under *Raw keys. Anything
+        // that shows a NUMBER rather than a picture must read the *Raw key: renderPFD does for the
+        // altitude tape/box and the RA readout, and renderHUD is handed the raw 1 Hz row outright.
+        // Keep that rule if a new consumer is added.
         let turb = 0.10;   // faint baseline only for files with NO vertical-wind channel (never frozen-dead)
         if (d1.vtWnd !== null && d2.vtWnd !== null) turb = Math.min(1, Math.abs(d1.vtWnd + (d2.vtWnd - d1.vtWnd) * t) / 3.0);
         const bandNoise = (ph) => 0.6 * Math.sin(exactSec * 2.3 + ph) + 0.3 * Math.sin(exactSec * 5.9 + ph * 2.1) + 0.1 * Math.sin(exactSec * 11.7 + ph * 3.7);
@@ -68,6 +75,9 @@
             pitch: p_val !== null ? p_val + pitch_jitter : null, roll: r_val !== null ? r_val + roll_jitter : null,
             th: cubicAngle(d0.th, d1.th, d2.th, d3.th, t), gTrack: cubicAngle(d0.gTrack, d1.gTrack, d2.gTrack, d3.gTrack, t),
             pAlt: pa_val !== null ? pa_val + alt_jitter : null, gpsAlt: ga_val !== null ? ga_val + alt_jitter : null, radAlt: ra_val !== null ? ra_val + alt_jitter : null,
+            // Same instant, interpolated but WITHOUT the synthesized micro-motion above. Digit
+            // readouts use these so no displayed number is invented (see the note by the jitter).
+            pitchRaw: p_val, rollRaw: r_val, pAltRaw: pa_val, gpsAltRaw: ga_val, radAltRaw: ra_val,
             // Linear (not cubic, avoids inventing phantom gust overshoot) so the vertical-wind signal
             // that scales the 8Hz micro-motion is continuous, not a 1 Hz step.
             vtWnd: lerp(d1.vtWnd, d2.vtWnd, t)

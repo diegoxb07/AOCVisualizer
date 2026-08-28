@@ -39,6 +39,14 @@ jobs:
         # fresh, server-revalidated precache and drops the old one; the new build appears on the
         # second page load after a push (the first load installs it in the background).
         run: sed -i "s/?v=[0-9A-Za-z._-]\{1,\}/?v=${GITHUB_SHA}/g" index.html sw.js
+      - name: Parser QC checks
+        # tests/run-tests.js is flag-style and always exits 0, so this can never block a deploy; it
+        # runs so the PASS/FLAG lines land in the Actions log for every push. A FLAG means a parser
+        # judgment call stopped matching its independently computed expectation and wants a look, not
+        # that the app is down. `node` is not installed on the primary dev machine, so before this
+        # step the suite had no place it actually ran.
+        run: node tests/run-tests.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact

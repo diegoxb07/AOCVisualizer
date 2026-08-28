@@ -9,9 +9,10 @@
    0.5 km), anchored at that analysis's own storm-center origin, so the radar column reads in
    true 3D; past analyses stay visible like the flown track and the mosaic assembles itself
    under the aircraft, while sliding backward hides analyses the playhead has not reached. On
-   the 2D tracker the TDR picker (the satellite picker's sibling) lists every altitude level by
-   pressure altitude; picked levels composite over the basemap at a fixed opacity, and the
-   Cross-section tool turns two map clicks into a /v1/tdr/plane_slice vertical slice.
+   the 2D tracker the TDR picker (the satellite picker's sibling) lists every altitude level, grouped
+   into bands labelled by their STANDARD-ATMOSPHERE pressure (see tdrMb: the grid is geometric km, the
+   millibars are a label for it, not an analysed pressure); picked levels composite over the basemap at
+   a fixed opacity, and the Cross-section tool turns two map clicks into a /v1/tdr/plane_slice slice.
 
    Only post-season quality-controlled data is used (level=2 explicit on every request); a
    mission carrying just the aircraft's real-time 1b product shows the TDR control disabled as
@@ -800,24 +801,43 @@
 
     // Altitude labels for tooltips and the cross-section info line.
     function tdrFt(km) { return (Math.round(km * 3280.84 / 100) * 100).toLocaleString('en-US') + ' ft'; }
-    // Pressure at a level, via the inverse of the standard-atmosphere formula the parser uses
-    // for pressure altitude, so the band labels line up with the app's own altitude convention.
+    // NOMINAL pressure for a level, via the inverse of the standard-atmosphere formula the parser
+    // uses for pressure altitude, so the band labels line up with the app's own altitude convention.
+    //
+    // IMPORTANT: the radar levels are GEOMETRIC altitudes (km MSL) on the analysis grid, not pressure
+    // surfaces. This maps them through the ISA with a fixed 1013.25 mb sea level, which is exactly the
+    // atmosphere a tropical cyclone is not: a warm core and a depressed central pressure displace the
+    // real surfaces off this mapping, by more the deeper the storm. So the mb figures are a
+    // standard-atmosphere LABEL for a geometric level, never a measured or analysed pressure. Every
+    // place they are shown says so (the band rows carry the level's km span and a std-atm note), and
+    // tdrFt above stays the honest primary label.
     function tdrMb(km) { return 1013.25 * Math.pow(Math.max(0.0001, 1 - (km * 1000) / 44307.69), 1 / 0.190284); }
 
-    // The picker groups the half-km radar levels into standard pressure bands (top of the list
-    // is the top of the atmosphere); one row toggles every member level at once.
+    // The picker groups the half-km radar levels into standard-atmosphere pressure bands (top of the
+    // list is the top of the atmosphere); one row toggles every member level at once. `label` is the
+    // band's nominal pressure span, `alt` the geometric altitude span it actually selects, which is
+    // what the grid is really indexed by. The bottom band runs to 1060 so a level at or below sea
+    // level (1013.25 mb at 0 km) still lands in it; its label says so rather than reading 900-1000.
     const TDR_BANDS = [
-        { pMin: 0, pMax: 100, label: 'Under 100 mb' },
-        { pMin: 100, pMax: 200, label: '100-200 mb' },
-        { pMin: 200, pMax: 300, label: '200-300 mb' },
-        { pMin: 300, pMax: 400, label: '300-400 mb' },
-        { pMin: 400, pMax: 500, label: '400-500 mb' },
-        { pMin: 500, pMax: 600, label: '500-600 mb' },
-        { pMin: 600, pMax: 700, label: '600-700 mb' },
-        { pMin: 700, pMax: 800, label: '700-800 mb' },
-        { pMin: 800, pMax: 900, label: '800-900 mb' },
-        { pMin: 900, pMax: 1060, label: '900-1000 mb' }
+        { pMin: 0, pMax: 100, label: 'Under 100 mb', alt: 'above 15.8 km' },
+        { pMin: 100, pMax: 200, label: '100-200 mb', alt: '11.8-15.8 km' },
+        { pMin: 200, pMax: 300, label: '200-300 mb', alt: '9.2-11.8 km' },
+        { pMin: 300, pMax: 400, label: '300-400 mb', alt: '7.2-9.2 km' },
+        { pMin: 400, pMax: 500, label: '400-500 mb', alt: '5.6-7.2 km' },
+        { pMin: 500, pMax: 600, label: '500-600 mb', alt: '4.2-5.6 km' },
+        { pMin: 600, pMax: 700, label: '600-700 mb', alt: '3.0-4.2 km' },
+        { pMin: 700, pMax: 800, label: '700-800 mb', alt: '2.0-3.0 km' },
+        { pMin: 800, pMax: 900, label: '800-900 mb', alt: '1.0-2.0 km' },
+        { pMin: 900, pMax: 1060, label: '900 mb and below', alt: '0-1.0 km' }
     ];
+    // One row's hover text. Names what the band actually selects (geometric radar levels) and that the
+    // millibars are a standard-atmosphere label for them, not an analysed pressure.
+    function tdrBandTitle(b) {
+        return b.label + ': radar levels at ' + b.alt + ' geometric altitude. Millibar figures are a '
+             + 'standard-atmosphere (1013.25 mb sea level) label for those altitudes, not a measured or '
+             + 'analysed pressure; a storm' + '\u2019' + 's own pressure surfaces sit off them.';
+    }
+
     function tdrBandMembers(ref, band) {
         return ref.levels.filter(l => { const p = tdrMb(l.km); return p >= band.pMin && p < band.pMax; });
     }
@@ -841,8 +861,9 @@
         if (btn) { btn.classList.remove('opacity-60'); btn.classList.toggle('sat-on', tdrModeOn); }
     }
 
-    // The eye pass on a leg: the single frame where the aircraft is closest to the storm center, and
-    // only when that leg actually crosses near it (not a distant transit leg). The center is the radar
+    // The closest approach to the storm center on a leg: the single frame where the aircraft is nearest
+    // it, and only when that leg comes near at all (not a distant transit leg). Nearest is not
+    // necessarily an eye penetration; the 55 km gate below is an eye/eyewall-scale bound, not proof. The center is the radar
     // volume's storm-relative origin once the leg is loaded (precise), else the interpolated best-track
     // position. Returns a 0-or-1 element array of { idx } (one leg, at most one pass).
     function tdrLegEyePasses(a) {
@@ -911,7 +932,9 @@
                         const eb = document.createElement('button');
                         eb.className = 'tdr-eye-btn';
                         eb.textContent = 'Eye Pass';
-                        eb.title = 'Jump to the aircraft’s pass through the storm center on this leg';
+                        eb.title = 'Jump to this leg’s closest approach to the storm center (within 55 km). '
+                                 + 'The center is the radar volume’s own origin once the leg has loaded, otherwise a '
+                                 + 'position interpolated between the 6-hourly best-track fixes.';
                         if (tdrLegPick === a && tdrEyeActive) eb.classList.add('on');
                         eb.addEventListener('click', () => {
                             if (!filteredData.length) return;
@@ -952,7 +975,8 @@
                 const row = document.createElement('div');
                 row.className = 'tdr-level-row loading';
                 row.title = 'Loading radar data…';
-                row.innerHTML = '<span class="tdr-level-ft">' + b.label + '</span><span class="tdr-row-spin"></span>';
+                row.title = tdrBandTitle(b);
+                row.innerHTML = '<span class="tdr-level-ft">' + b.label + '<span class="tdr-level-alt">' + b.alt + '</span></span><span class="tdr-row-spin"></span>';
                 list.appendChild(row);
             });
             return;
@@ -967,7 +991,8 @@
             const kmLo = members[0].km, kmHi = members[members.length - 1].km;
             row.title = kmLo.toFixed(1) + ' to ' + kmHi.toFixed(1) + ' km (' + tdrFt(kmLo) + ' to ' + tdrFt(kmHi) + ')'
                 + (withData.length ? '' : ', no data in the current analysis');
-            row.innerHTML = '<span class="tdr-level-ft">' + b.label + '</span><span class="tdr-level-bar"></span>';
+            row.title = tdrBandTitle(b);
+            row.innerHTML = '<span class="tdr-level-ft">' + b.label + '<span class="tdr-level-alt">' + b.alt + '</span></span><span class="tdr-level-bar"></span>';
             row.addEventListener('click', () => {
                 if (!withData.length) return;
                 const turnOff = withData.every(m => tdrSelectedKm.has(m.km));

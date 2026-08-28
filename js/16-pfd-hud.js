@@ -3,10 +3,15 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     // Slip/skid ball deflection in [-1, 1] (full scale = the G1000 trapezoid's travel), or null.
-    // Prefers the gust probe's measured sideslip angle (beta); without it, estimates lateral
+    // Prefers the gust probe's measured sideslip angle (beta); without it, ESTIMATES lateral
     // balance from the coordinated-turn relation g*tan(roll) = V*(heading rate) using the
     // neighboring 1Hz samples, a skidding turn deflects the ball to the outside, a slipping
     // one to the low side, exactly like the real instrument.
+    // The estimate is a rigid-body inference from roll, heading rate and speed, NOT a measurement:
+    // it assumes a steady coordinated turn and ignores the actual side force, so it is indicative
+    // only. Callers cannot tell the two apart from the return value, so if a future change needs to
+    // mark the estimate on screen, branch here rather than at the draw site. The PFD's help text
+    // (index.html) and the README appendix both say which flights have the measured version.
     function pfdSlipDeflection(d) {
         if (availableMetrics.has('beta') && d.beta !== null && d.beta !== undefined) return Math.max(-1, Math.min(1, d.beta / 6));
         if (d.roll === null || !filteredData.length || filteredData.length < 3) return null;
@@ -22,7 +27,9 @@
         return Math.max(-1, Math.min(1, latG / 0.15));
     }
 
-    // Ground speed (kt) from the neighboring position samples, the log has no GS channel.
+    // Ground speed (kt) DERIVED from the neighboring position samples: the log has no GS channel, so
+    // this is a computed value, not a recorded one. Drawn in the muted colour on the data strip below
+    // to keep it visually apart from the recorded OAT/TAS/IAS beside it.
     function pfdGroundSpeedKt() {
         if (!filteredData.length || filteredData.length < 3) return null;
         const i = Math.max(1, Math.min(currentIdx, filteredData.length - 2));
@@ -43,9 +50,17 @@
         const isImperial = !document.getElementById('toggleSI').checked, useGps = !document.getElementById('toggleGpsAlt').checked;
         // The tape prefers IAS like a real G1000 (TAS gets its own data strip below); falls back to TAS.
         const hasAttitude = d.pitch !== null || d.roll !== null, pitch = d.pitch || 0, roll = d.roll || 0;
+        // Under 8Hz smoothing the row carries synthesized turbulence micro-motion in pitch/roll and the
+        // altitudes (getInterpolatedRow), with the un-jittered values alongside under *Raw. The horizon
+        // and bank pointer above keep the jittered pitch/roll: that rocking IS the point, and an
+        // attitude picture is not a digit. Everything with a NUMBER on it reads through meas() instead,
+        // so no altitude the PFD prints is invented. Falls back to the plain key when smoothing is off
+        // (the raw 1 Hz row has no *Raw fields).
+        const meas = (k) => (d[k + 'Raw'] !== undefined ? d[k + 'Raw'] : d[k]);
+        const mGpsAlt = meas('gpsAlt'), mPAlt = meas('pAlt'), mRadAlt = meas('radAlt');
         const iasVal = (availableMetrics.has('ias') && d.ias !== null) ? d.ias : null;
         const spd = iasVal !== null ? iasVal : (d.tas !== null ? d.tas : null);
-        let rawAlt = useGps ? (d.gpsAlt !== null ? d.gpsAlt : (d.pAlt !== null ? d.pAlt : (d.radAlt !== null ? d.radAlt : null))) : (d.pAlt !== null ? d.pAlt : (d.gpsAlt !== null ? d.gpsAlt : (d.radAlt !== null ? d.radAlt : null)));
+        let rawAlt = useGps ? (mGpsAlt !== null ? mGpsAlt : (mPAlt !== null ? mPAlt : (mRadAlt !== null ? mRadAlt : null))) : (mPAlt !== null ? mPAlt : (mGpsAlt !== null ? mGpsAlt : (mRadAlt !== null ? mRadAlt : null)));
         const alt = rawAlt !== null ? (isImperial ? rawAlt * 3.28084 : rawAlt) : null;
         let rawVsi = d.computedVsi !== null ? d.computedVsi : 0; const vsi = isImperial ? rawVsi * 2.23694 : rawVsi; 
         const hdg = d.th !== null ? d.th : (d.gTrack !== null ? d.gTrack : null);
@@ -142,15 +157,15 @@
         }
         ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.font = 'bold ' + (fSize) + 'px sans-serif'; ctx.fillText(altUnit, rightX + rightW / 2, 4);
         // small source tag under the unit, naming which altitude the tape is actually showing
-        const altSrc = useGps ? (d.gpsAlt !== null ? 'GPS' : (d.pAlt !== null ? 'PRESS' : (d.radAlt !== null ? 'RAD' : ''))) : (d.pAlt !== null ? 'PRESS' : (d.gpsAlt !== null ? 'GPS' : (d.radAlt !== null ? 'RAD' : '')));
+        const altSrc = useGps ? (mGpsAlt !== null ? 'GPS' : (mPAlt !== null ? 'PRESS' : (mRadAlt !== null ? 'RAD' : ''))) : (mPAlt !== null ? 'PRESS' : (mGpsAlt !== null ? 'GPS' : (mRadAlt !== null ? 'RAD' : '')));
         if (altSrc) { ctx.font = 'bold ' + Math.max(7, fSize - 4) + 'px sans-serif'; ctx.fillStyle = 'rgba(56,189,248,0.75)'; ctx.fillText(altSrc, rightX + rightW / 2, 5 + fSize); }
         ctx.restore();
         
         ctx.fillStyle = '#000'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.fillRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.strokeRect(rightX, cy - bugH/2, rightW - 4, bugH); ctx.fillStyle = alt !== null ? '#fff' : '#888'; ctx.textAlign = 'center'; ctx.font = 'bold ' + fSizeLg + 'px monospace'; ctx.fillText(alt !== null ? alt.toFixed(0) : '---', rightX + rightW / 2 - 2, cy + 1);
 
         // Radar-altimeter readout under the altitude box when low (like the G1000's RA on approach)
-        if (availableMetrics.has('radAlt') && d.radAlt !== null && d.radAlt * 3.28084 < 2500) {
-            const raVal = isImperial ? d.radAlt * 3.28084 : d.radAlt;
+        if (availableMetrics.has('radAlt') && mRadAlt !== null && mRadAlt * 3.28084 < 2500) {
+            const raVal = isImperial ? mRadAlt * 3.28084 : mRadAlt;
             ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(rightX, cy + bugH / 2 + 3, rightW - 4, 14 * k);
             ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = 'bold ' + Math.max(8, fSize - 2) + 'px monospace';
             ctx.fillText('RA ' + raVal.toFixed(0), rightX + (rightW - 4) / 2, cy + bugH / 2 + 3 + 7 * k);
@@ -218,9 +233,13 @@
         
         const isImperial = !document.getElementById('toggleSI').checked;
 
+        // Hemisphere from the sign, never assumed: an eastern-hemisphere or southern flight must not
+        // read as N/W. Matches js/17-charts.js and js/18b-flight-search.js.
+        const hemi = (v, pos, neg) => `${sf(Math.abs(v), 3)}°${v !== null && v !== undefined ? (v >= 0 ? pos : neg) : ''}`;
+
         let h = addHUD('TIME (UTC)', `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
-        h += addHUD('LATITUDE', `${sf(d.lat, 3)}°N`);
-        h += addHUD('LONGITUDE', `${sf(Math.abs(d.lon), 3)}°W`);
+        h += addHUD('LATITUDE', hemi(d.lat, 'N', 'S'));
+        h += addHUD('LONGITUDE', hemi(d.lon, 'E', 'W'));
         
         let pAltDisp = d.pAlt !== null ? sf(isImperial ? d.pAlt * 3.28084 : d.pAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
         let gAltDisp = d.gpsAlt !== null ? sf(isImperial ? d.gpsAlt * 3.28084 : d.gpsAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';

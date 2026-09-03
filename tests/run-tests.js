@@ -1,18 +1,24 @@
-/* Parser QC checks: node tests/run-tests.js
+/* QC checks: node tests/run-tests.js
    Flag-style, not fail-style: every check prints PASS or FLAG with the observed vs expected value,
-   and the process always exits 0. A FLAG means a scientific judgment call in the parser no longer
+   and the process always exits 0. A FLAG means a scientific judgment call in the code no longer
    matches its independently computed expectation and should be looked at, not that the app is down.
    All fixtures are synthetic and built in this file; expected values come from physics constants
-   and the format spec, never from a captured baseline. */
+   and the format spec, never from a captured baseline.
+
+   Covers the parser core, and the map projection and wind color ramps. Those are the parts that
+   decide what a number MEANS; the rest of the app is canvas and DOM, which this harness cannot
+   reach, so it is checked by opening the page. */
 
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// The parser core is a classic (non-module) script; evaluating it in this context turns its
-// function declarations into globals, exactly like a <script> tag or importScripts does.
+// Both are classic (non-module) scripts; evaluating them in this context turns their function
+// declarations into globals, exactly like a <script> tag or importScripts does. Neither touches the
+// DOM while loading, so the globals they read at call time can be stubbed per check below.
 vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', '11b-parser-core.js'), 'utf8'));
+vm.runInThisContext(fs.readFileSync(path.join(__dirname, '..', 'js', '15-map-render.js'), 'utf8'));
 try { globalThis.netcdfjs = require(path.join(__dirname, '..', 'lib', 'netcdfjs.min.js')); } catch (e) { globalThis.netcdfjs = null; }
 
 let passCount = 0; const flagged = [];
@@ -35,7 +41,6 @@ function tsv(headers, rows) {
 }
 const H = ['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'WSkt.d', 'WD.d', 'ALTPA.d', 'TA.d'];
 
-// ---------------------------------------------------------------------------------------------
 section('Units and physics (expected values computed independently)');
 {
     // Wind carried only as WS.d (m/s): the parser must convert with the exact m/s-to-knot factor.
@@ -89,7 +94,6 @@ section('Units and physics (expected values computed independently)');
     check('feet conversion is disclosed in stats', r.stats.derived.radAltFromFeet, 2);
 }
 
-// ---------------------------------------------------------------------------------------------
 section('Time handling');
 {
     check('timeToSeconds(120000) is 43200', timeToSeconds('120000'), 43200);
@@ -128,7 +132,6 @@ section('Time handling');
     check('epoch time source is disclosed', r.stats.timeSource, 'epoch seconds');
 }
 
-// ---------------------------------------------------------------------------------------------
 section('Row filters count what they drop');
 {
     // Rows below 20 kt airspeed (ramp idle) are filtered and counted; 20 kt and above is kept.
@@ -202,7 +205,6 @@ section('Row filters count what they drop');
     check('summary line names the problem', summarizeParseStats(r.stats).includes('no valid time'), true);
 }
 
-// ---------------------------------------------------------------------------------------------
 section('NetCDF path (minimal NetCDF-3 file built from the format spec)');
 if (!globalThis.netcdfjs) {
     console.log('  SKIP  vendored netcdfjs did not load under node');
@@ -270,7 +272,91 @@ if (!globalThis.netcdfjs) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
+section('Longitude domain (dateline-crossing flights)');
+{
+    // A normal flight leaves longitudes untouched.
+    globalThis.lonDomainCenter = 0;
+    check('lon domain 0 is the identity at the east edge', wrapLon(179.9), 179.9, 1e-9);
+    check('lon domain 0 is the identity at the west edge', wrapLon(-179.9), -179.9, 1e-9);
+
+    // Centered on the dateline, two points 0.2 degrees apart across it must stay 0.2 degrees apart
+    // after wrapping. Raw, they read 359.8 degrees apart and the track would sweep the whole map.
+    globalThis.lonDomainCenter = 180;
+    const east = wrapLon(179.9), west = wrapLon(-179.9);
+    check('dateline pair keeps its true separation', Math.abs(west - east), 0.2, 1e-9);
+    check('wrapped longitudes stay ordered west of east', west > east, true);
+    globalThis.lonDomainCenter = 0;
+}
+
+section('Wind color ramps');
+{
+    // The hurricane ramp's steps ARE the Saffir-Simpson thresholds (NHC): below 64 kt is not a
+    // hurricane, then 64-82, 83-95, 96-112, 113-136, and 137 up. A shifted step would mislabel a
+    // category on screen, so each boundary is checked from both sides.
+    const same = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 1e-9);
+    const hue = spd => getHurricaneColorRGB(spd);
+    const BLACK = [0, 0, 0];
+
+    check('below hurricane force reads black', same(hue(63), BLACK), true);
+    check('64 kt (cat 1) leaves black', same(hue(64), BLACK), false);
+    [[64, 82], [83, 95], [96, 112], [113, 136], [137, 200]].forEach(([lo, hi]) => {
+        check('one color across ' + lo + '-' + hi + ' kt', same(hue(lo), hue(hi)), true);
+    });
+    [[82, 83], [95, 96], [112, 113], [136, 137]].forEach(([lo, hi]) => {
+        check('color changes at the ' + lo + '/' + hi + ' kt boundary', same(hue(lo), hue(hi)), false);
+    });
+    check('a missing wind speed reads as calm, not as an error', same(hue(null), BLACK), true);
+
+    // The continuous ramp is piecewise linear; a mistyped breakpoint shows up as a visible seam,
+    // so each junction must agree from both sides.
+    [50, 80, 100, 130].forEach(bp => {
+        const below = getSpdColorRGB(bp - 1e-6), at = getSpdColorRGB(bp);
+        check('speed ramp is seamless at ' + bp + ' kt', below.every((v, i) => Math.abs(v - at[i]) < 1e-3), true);
+    });
+    check('speed ramp is clamped above 160 kt', same(getSpdColorRGB(160), getSpdColorRGB(500)), true);
+
+    // The barb picker chooses between the two ramps, and the track follows that choice unless it is
+    // coloring by temperature.
+    globalThis.barbColorSelect = { value: 'hurricane' };
+    check('hurricane mode follows the category ramp', same(getBarbColorRGB(100), getHurricaneColorRGB(100)), true);
+    globalThis.barbColorSelect = { value: 'wind' };
+    check('wind mode follows the speed ramp', same(getBarbColorRGB(100), getSpdColorRGB(100)), true);
+
+    globalThis.pathColorSelect = { value: 'wind' };
+    globalThis.tempBaseline = [10];
+    check('track color follows the barb ramp when not on temperature',
+        same(getPathColorRGB({ windSpd: 100, tempr: 10 }, 0), getSpdColorRGB(100)), true);
+
+    // Temperature mode reads each sample against the rolling baseline: warmer is red, cooler blue,
+    // and a missing reading on either side is white rather than a color that implies a measurement.
+    globalThis.pathColorSelect = { value: 'temp' };
+    const warm = getPathColorRGB({ tempr: 13, windSpd: 0 }, 0);
+    const cool = getPathColorRGB({ tempr: 7, windSpd: 0 }, 0);
+    check('warmer than baseline is red', warm[0] === 1 && warm[2] < 1, true);
+    check('cooler than baseline is blue', cool[2] === 1 && cool[0] < 1, true);
+    check('3 degrees off baseline saturates the ramp', same(warm, [1, 0, 0]), true);
+    check('a missing temperature is white, not a color', same(getPathColorRGB({ tempr: null }, 0), [1, 1, 1]), true);
+
+    check('rgb triple to css rounds to 0-255', rgbCss([0, 0.5, 1]), 'rgb(0,128,255)');
+}
+
+section('Map projection');
+{
+    // getX/getY are the one place a lat/lon becomes a pixel, and every layer (track, barbs,
+    // basemap, satellite, storm track) goes through them, so the frame's edges must land on the
+    // canvas edges exactly and north must be up.
+    Object.assign(globalThis, {
+        lonDomainCenter: 0, plotMinLon: -80, plotMinLat: 20,
+        deltaLon: 10, deltaLat: 5, cssW: 800, cssH: 400
+    });
+    check('west edge of the frame is x 0', getX(-80), 0, 1e-9);
+    check('east edge of the frame is the canvas width', getX(-70), 800, 1e-9);
+    check('frame center is mid-canvas', getX(-75), 400, 1e-9);
+    check('south edge of the frame is the canvas bottom', getY(20), 400, 1e-9);
+    check('north edge of the frame is y 0', getY(25), 0, 1e-9);
+    check('latitude increases upward on screen', getY(24) < getY(21), true);
+}
+
 console.log('\n' + (passCount + flagged.length) + ' checks: ' + passCount + ' passed, ' + flagged.length + ' flagged.');
 if (flagged.length) {
     console.log('Flagged (parser behavior no longer matches its documented expectation):');

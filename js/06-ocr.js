@@ -36,7 +36,7 @@
     }
 
     // A detected time mismatch between the MMR clock and the current offset. While it is being
-    // corrected the "Syncing…" pill shows and the timeline holds still (syncLockActive), so the
+    // corrected the "Syncing..." pill shows and the timeline holds still (syncLockActive), so the
     // user cannot slide against a wrong offset. Set by the scrub-release recheck and the playback
     // drift check when a reading disagrees, and by a manual Sync Now; cleared when a lock commits,
     // a hunt gives up, or a scan agrees with the current offset. Self-expires so a mismatch that
@@ -48,7 +48,7 @@
         refreshSyncingIndicator();
     }
 
-    // --- Non-blocking "Syncing…" badge, shown while Auto-Sync aligns the MMR timestamp ---
+    // non-blocking "Syncing..." badge, shown while Auto-Sync aligns the MMR timestamp
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
     // Visible while Auto-Sync has a video and is warming the engine up (ensureOCR), while it
     // hunts for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked),
@@ -62,7 +62,7 @@
         const warming = onAuto && ocrWarmingUp;
         const hunting = onAuto && ocrAvailable && ((!ocrEverLocked && (isOcrRunning || forceOcrSyncNextTick)) || ocrMismatchHold);
         const label = el.querySelector('.sync-label'), sub = el.querySelector('.sync-sub');
-        if (label) label.textContent = warming ? 'Preparing Auto-Sync…' : 'Syncing…';
+        if (label) label.textContent = warming ? 'Preparing Auto-Sync...' : 'Syncing...';
         if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : (ocrMismatchHold ? 'correcting a time mismatch' : 'aligning tracker');
         el.classList.toggle('show', !!(warming || hunting));
         updateTimelineSyncLock();
@@ -101,7 +101,7 @@
         }
     }
 
-    // --- Shared frame capture for both OCR paths ---------------------------------------------
+    // shared frame capture for both OCR paths
     // MMR exports differ: the burned-in clock is usually bottom-right, but compiled and cropped
     // videos move it (often near the center) and aspect ratios vary, so the WHOLE frame is
     // captured at native resolution and the sync logic picks the candidate time that advances
@@ -123,7 +123,7 @@
         return window.ocrCanvas;
     }
 
-    // --- 30-second no-lock watchdog ------------------------------------------------------------
+    // 30-second no-lock watchdog
     // Compiled nose-radar videos re-render the clock somewhere unusual (or too small) and
     // routinely defeat the scan. Once 30 s pass after the first scan with no lock ever landing,
     // say so once; a new video resets the clock.
@@ -151,7 +151,7 @@
         label.removeAttribute('title');
     }
 
-    // --- Mark a drop zone as "file loaded": turn it gray + show the filename small ---
+    // mark a drop zone as "file loaded": turn it gray and show the filename small
     function markDropZoneLoaded(zoneId, labelId, filename) {
         const zone = document.getElementById(zoneId);
         const label = document.getElementById(labelId);

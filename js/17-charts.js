@@ -23,7 +23,7 @@
     function getBaseChartOptions(titleText, config = {}) {
         const enforceIntegers = config.enforceIntegers || false; const minRange = config.minRange || 0;
         const limitCallback = (scale) => { if (minRange > 0) { const range = scale.max - scale.min; if (range < minRange) { const mid = (scale.max + scale.min) / 2; scale.max = mid + (minRange / 2); scale.min = mid - (minRange / 2); } } };
-        const tickConfig = { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: "'IBM Plex Mono', monospace", size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
+        const tickConfig = { color: '#94a3b8', font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
             // tooltips trigger for the nearest sample at the cursor's x, so hovering anywhere
@@ -37,14 +37,14 @@
                 if (Math.abs(xPixel - playheadPx) < 15) chart.canvas.style.cursor = 'ew-resize';
                 else chart.canvas.style.cursor = 'crosshair';
             },
-            scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: "'Manrope', sans-serif", size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
+            scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: CHART_FONT_SANS, size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
             plugins: { tooltip: { callbacks: { afterTitle: (items) => {
                 // the tooltip title is the sample's time; add its lat/lon underneath (same hover).
                 const d = items.length && filteredData[items[0].dataIndex];
                 if (!d || d.lat == null || d.lon == null) return '';
                 const ns = d.lat >= 0 ? 'N' : 'S', ew = d.lon >= 0 ? 'E' : 'W';
                 return `${Math.abs(d.lat).toFixed(2)}°${ns}, ${Math.abs(d.lon).toFixed(2)}°${ew}`;
-            } } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: "'IBM Plex Mono', monospace" }, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded',
+            } } }, zoom: { zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' }, pan: { enabled: true, mode: 'x' } }, legend: { display: !config.isMaster, labels: { color: '#e2e8f0', font: { size: 10, family: CHART_FONT_MONO }, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'rectRounded',
                 // Each variable gets a checkbox-style swatch: a filled square in its series color
                 // when plotted, an empty outlined square when not, so it reads as clickable either
                 // way. Never struck through; deselected text dims to a calm slate instead.
@@ -100,7 +100,7 @@
         const isImp = !document.getElementById('toggleSI').checked;
 
         masterChartInstance = new Chart(document.getElementById('parameterChart').getContext('2d'), { type: 'line', data: { labels: labelsTimeline, datasets: [] }, options: getBaseChartOptions('Master Scale Comparison', { enforceIntegers: false, minRange: 2, isMaster: true }), plugins: [markerPlugin] });
-        buildMasterMenu();
+        buildCustomGraphMenu(MASTER_GRAPH_ID);
 
         const buildSubChart = (id, keys, title, config) => { 
             const activeKeys = keys.filter(k => availableMetrics.has(k.key));
@@ -138,33 +138,18 @@
         buildSubChart('sfcChart', [{key:'sfcPr'}, {key:'pressure', hidden:true}], 'Pressure Profiles (mb)', { enforceIntegers: false, minRange: 1 });
         buildSubChart('thermoChart', [{key:'thetaE'}, {key:'mixRate', hidden:true}], 'Thermodynamics & Moisture', { enforceIntegers: false, minRange: 2 });
         buildDropdownMenus();
-        updateMasterGraphVisibility();
+        updateCustomGraphVisibility(MASTER_GRAPH_ID);
     }
 
     function buildDropdownMenus() {
-        const isImp = !document.getElementById('toggleSI').checked;
         Object.keys(customCharts).forEach(id => {
-            const menu = document.getElementById(`menu-${id}`); if(!menu) return; menu.innerHTML = ''; const chart = customCharts[id]; if(!chart) return;
-            const activeKeys = chart.data.datasets.map(ds => ds.metricKey);
-            
-            const unselectAllItem = document.createElement('div'); unselectAllItem.className = 'dropdown-item'; unselectAllItem.style.color = '#ef4444'; unselectAllItem.style.fontWeight = 'bold'; unselectAllItem.innerText = '✕ Unselect All';
-            unselectAllItem.onclick = (e) => { e.stopPropagation(); chart.data.datasets = []; chart.update('none'); buildDropdownMenus(); }; menu.appendChild(unselectAllItem);
-            const breakHr = document.createElement('div'); breakHr.style.borderTop = '1px solid #20262f'; breakHr.style.margin = '4px 0'; menu.appendChild(breakHr);
-            
-            Object.keys(METRIC_DEFS).forEach(key => { 
-                const isAvail = availableMetrics.has(key);
-                const div = document.createElement('div'); 
-                div.className = `dropdown-item ${activeKeys.includes(key) ? 'active' : ''}`; 
-                div.innerText = getMetricLabel(key, isImp); 
-                div.style.color = mutedMetricColor(METRIC_DEFS[key].color);
-                if (isAvail) {
-                    div.onclick = (e) => { e.stopPropagation(); toggleMetricInSubChart(id, key); }; 
-                } else {
-                    div.style.opacity = '0.3';
-                    div.style.cursor = 'not-allowed';
-                }
-                menu.appendChild(div); 
-            });
+            const menu = document.getElementById(`menu-${id}`);
+            const chart = customCharts[id];
+            if (!menu || !chart) return;
+
+            buildMetricMenu(menu, chart, '✕ Unselect All',
+                () => { chart.data.datasets = []; chart.update('none'); buildDropdownMenus(); },
+                (key) => toggleMetricInSubChart(id, key));
         });
     }
 

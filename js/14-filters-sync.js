@@ -22,7 +22,7 @@
         timelineSlider.min = 0; timelineSlider.max = filteredData.length - 1; timelineSlider.value = 0;
         resizeCanvasLayout(); calculateMapScales(); resetMapView(); buildChartLayout();
         
-        masterChartInstance.data.datasets = []; buildMasterMenu(); updateMasterGraphVisibility();
+        masterChartInstance.data.datasets = []; buildCustomGraphMenu(MASTER_GRAPH_ID); updateCustomGraphVisibility(MASTER_GRAPH_ID);
         if (trackerModeSelect.value === '3d') build3DScene();
         
         currentIdx = 0; masterChartInstance.update('none');
@@ -141,7 +141,7 @@
             } else { isOcrRunning = false; }
         }
 
-        // Keep the non-blocking "Syncing…" badge in step with the hunt state every frame.
+        // Keep the non-blocking "Syncing..." badge in step with the hunt state every frame.
         refreshSyncingIndicator();
 
         const targetSec = videoStartSeconds + video.currentTime;

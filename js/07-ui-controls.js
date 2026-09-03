@@ -2,7 +2,7 @@
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
-    // --- Fullscreen-Friendly Drag & Drop Logic ---
+    // drag and drop that keeps working while a panel is fullscreened
     ['dataDropZone', 'videoDropZone'].forEach(zoneId => {
         const zone = document.getElementById(zoneId);
         if (!zone) return;
@@ -103,18 +103,42 @@
         if (shareBtn) shareBtn.disabled = !reconArchiveMeta;
     }
     
-    function getConvertedVal(val, key, isImperial) {
-        if (val === null || val === undefined) return null; if (!isImperial) return val;
-        if (['vtWnd', 'accZ'].includes(key)) return val * 2.23694; 
-        if (['gpsAlt', 'radAlt', 'pAlt', 'dValue'].includes(key)) return val * 3.28084;
-        if (['tempr', 'dewpt'].includes(key)) return (val * 9/5) + 32; return val;
+    // the metric families that change unit under the imperial toggle. one entry carries both halves
+    // of the switch, the factor for the value and the substitution for the axis label, so a metric
+    // can never end up converted but still labelled metric. everything absent from this table is
+    // already unit-free or reported in the same unit either way (knots, millibars, degrees).
+    const IMPERIAL_UNITS = [
+        { keys: ['vtWnd', 'accZ'], convert: v => v * 2.23694, relabel: l => l.replace('(m/s)', '(mph)').replace('(m/s²)', '(mph/s)') },
+        { keys: ['gpsAlt', 'radAlt', 'pAlt', 'dValue'], convert: v => v * 3.28084, relabel: l => l.replace('(m)', '(ft)') },
+        { keys: ['tempr', 'dewpt'], convert: v => (v * 9 / 5) + 32, relabel: l => l.replace('(°C)', '(°F)') },
+    ];
+
+    function imperialUnitFor(key) {
+        return IMPERIAL_UNITS.find(u => u.keys.includes(key));
     }
-    
+
+    function getConvertedVal(val, key, isImperial) {
+        if (val === null || val === undefined) return null;
+        if (!isImperial) return val;
+
+        const unit = imperialUnitFor(key);
+        return unit ? unit.convert(val) : val;
+    }
+
     function getMetricLabel(key, isImperial) {
-        let label = METRIC_DEFS[key].label; if (!isImperial) return label;
-        if (['vtWnd', 'accZ'].includes(key)) return label.replace('(m/s)', '(mph)').replace('(m/s²)', '(mph/s)');
-        if (['gpsAlt', 'radAlt', 'pAlt', 'dValue'].includes(key)) return label.replace('(m)', '(ft)');
-        if (['tempr', 'dewpt'].includes(key)) return label.replace('(°C)', '(°F)'); return label;
+        const label = METRIC_DEFS[key].label;
+        if (!isImperial) return label;
+
+        const unit = imperialUnitFor(key);
+        return unit ? unit.relabel(label) : label;
+    }
+
+    // one reading written out for a readout: converted to the display unit and given the matching
+    // suffix from units, [metric, imperial]. a missing channel reads as a bare NaN with no unit, so
+    // a gap can never be mistaken for a measurement. used by the HUD and the point analysis report.
+    function formatReading(val, key, dec, isImperial, units) {
+        if (val === null || val === undefined) return 'NaN';
+        return getConvertedVal(val, key, isImperial).toFixed(dec) + (isImperial ? units[1] : units[0]);
     }
 
     function drawP3Orion(c) {
@@ -532,7 +556,7 @@
         if (!bbox) return true;
         const expandDeg = 15, viewMinLon = plotMinLon - expandDeg, viewMaxLon = plotMaxLon + expandDeg, viewMinLat = plotMinLat - expandDeg, viewMaxLat = plotMaxLat + expandDeg;
         if (bbox[1] > viewMaxLat || bbox[3] < viewMinLat) return false;
-        // Also test the bbox shifted ±360: a dateline-centered flight's plot window sits outside
+        // Also test the bbox shifted 360 degrees each way: a dateline-centered flight's plot window sits outside
         // [-180,180], where every raw feature bbox would otherwise miss it.
         return [0, -360, 360].some(s => !(bbox[0] + s > viewMaxLon || bbox[2] + s < viewMinLon));
     }

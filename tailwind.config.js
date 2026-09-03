@@ -21,7 +21,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Manrope','ui-sans-serif','system-ui','sans-serif'],
-        mono: ['IBM Plex Mono','ui-monospace','SFMono-Regular','monospace'],
+        mono: ['Roboto Mono','ui-monospace','SFMono-Regular','monospace'],
         serif: ['Manrope','sans-serif']
       }
     }

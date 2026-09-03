@@ -35,7 +35,7 @@
             const req = ++seasonReq;
             if (!checksBox) return;
             if (!year) { reconChecksNote(checksBox, 'Pick a season to list its flights, or upload files below.'); return; }
-            reconChecksNote(checksBox, 'Loading the ' + year + ' season…');
+            reconChecksNote(checksBox, 'Loading the ' + year + ' season...');
             try {
                 const groups = await reconFetchSeasonGroups(year);
                 if (req !== seasonReq) return;
@@ -163,7 +163,7 @@
         if (typeof clearLoadedMedia === 'function') clearLoadedMedia();
         if (typeof floatPanelsDockAll === 'function') floatPanelsDockAll();
         currentSpeedIdx = 0; if (typeof updateSpeedDisplay === 'function') updateSpeedDisplay();
-        vidZoom = 1; vidPanX = 0; vidPanY = 0; if (radarVid) radarVid.style.transform = '';
+        resetVideoZoom();
 
         // tear down every chart (master + per-metric sub-charts + any clip-preview charts).
         if (masterChartInstance) { try { masterChartInstance.destroy(); } catch (e) {} }
@@ -227,10 +227,10 @@
         timelineSlider.min = 0; timelineSlider.max = 100; timelineSlider.value = 0;
         if (timelineTimeDisplay) timelineTimeDisplay.textContent = '00:00:00 UTC';
         updateMissionHeader();            // blanks the header chips + resets document.title
-        updateMasterGraphVisibility();    // master chart gone -> show the "create a graph" prompt
+        updateCustomGraphVisibility(MASTER_GRAPH_ID);    // master chart gone, so the "create a graph" prompt comes back
 
         // put the dropdowns back to their default state (as a fresh reload would): the previously-loaded
-        // picker back to its "Previously Loaded Missions…" label (the saved list itself stays), the
+        // picker back to its "Previously Loaded Missions..." label (the saved list itself stays), the
         // archive Year->Storm->Mission cascade back to unpicked, and close any open popovers.
         if (typeof updatePreloadedSelect === 'function') updatePreloadedSelect('');
         if (typeof closeLoadedPicker === 'function') closeLoadedPicker();
@@ -365,7 +365,7 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0,0, canvas.width, canvas.height);
         [masterChartInstance, ...Object.values(customCharts), ...(typeof extraMasterCharts !== 'undefined' ? Object.values(extraMasterCharts) : [])].forEach(c => { if(c) { c.resetZoom(); c.draw(); } });
         
-        resetMapView(); if (trackerModeSelect.value === '3d') build3DScene(); updateMasterGraphVisibility();
+        resetMapView(); if (trackerModeSelect.value === '3d') build3DScene(); updateCustomGraphVisibility(MASTER_GRAPH_ID);
         
         const pfdC = document.getElementById('pfdCanvas'); if(pfdC) { const pfdCtx = pfdC.getContext('2d'); pfdCtx.clearRect(0,0, pfdC.width, pfdC.height); }
 
@@ -445,44 +445,40 @@
         loadCities();
     }).catch(e => {});
 
-    // --- MP4 Video Zoom & Pan Logic ---
-    let vidZoom = 1;
-    let vidPanX = 0;
-    let vidPanY = 0;
-    let isVidDragging = false;
-    let vidStartX = 0;
-    let vidStartY = 0;
+    // MP4 video zoom and pan. the transform rides on the <video> element and the wrapper clips it,
+    // so the panel keeps its size however far the frame is zoomed.
+    let vidZoom = 1, vidPanX = 0, vidPanY = 0;
+    let isVidDragging = false, vidStartX = 0, vidStartY = 0;
 
     const radarVid = document.getElementById('radarVideo');
     const vidWrapper = radarVid.parentElement;
 
-    // Set up CSS for bounds and smooth zooming
     radarVid.style.transformOrigin = 'center center';
     radarVid.style.transition = 'transform 0.1s ease-out';
     vidWrapper.style.overflow = 'hidden';
 
-    // The video panel's ⟲ button drops zoom and pan back to the native fit.
-    document.getElementById('resetVideoZoomBtn').addEventListener('click', () => {
-        vidZoom = 1; vidPanX = 0; vidPanY = 0;
-        radarVid.style.transform = '';
-    });
+    function applyVideoTransform() {
+        radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
+    }
 
-    // Mouse Wheel: Zoom in/out
+    // native fit again, reached from the panel's ⟲ button, a double click, and Reset All.
+    function resetVideoZoom() {
+        vidZoom = 1; vidPanX = 0; vidPanY = 0;
+        if (radarVid) radarVid.style.transform = '';
+    }
+
+    document.getElementById('resetVideoZoomBtn').addEventListener('click', resetVideoZoom);
+    vidWrapper.addEventListener('dblclick', resetVideoZoom);
+
     vidWrapper.addEventListener('wheel', (e) => {
         if (!videoLoaded) return;
         e.preventDefault();
         const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-        vidZoom = Math.max(1, Math.min(vidZoom * zoomDelta, 8)); // Limits zoom from 1x to 8x
-        
-        // Snap back to center if fully zoomed out
-        if (vidZoom === 1) { 
-            vidPanX = 0; 
-            vidPanY = 0; 
-        }
-        radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
+        vidZoom = Math.max(1, Math.min(vidZoom * zoomDelta, 8));
+        if (vidZoom === 1) { vidPanX = 0; vidPanY = 0; }   // back at native size the frame is centered
+        applyVideoTransform();
     });
 
-    // Mouse Down: Start Pan
     vidWrapper.addEventListener('mousedown', (e) => {
         if (!videoLoaded || vidZoom <= 1) return;
         isVidDragging = true;
@@ -491,35 +487,25 @@
         vidWrapper.style.cursor = 'grabbing';
     });
 
-    // Mouse Move: Drag Pan
     window.addEventListener('mousemove', (e) => {
         if (!isVidDragging) return;
-        
-        // Let the user pan, but keep it constrained inside the zoom area
-        let maxX = (radarVid.clientWidth * vidZoom - radarVid.clientWidth) / 2;
-        let maxY = (radarVid.clientHeight * vidZoom - radarVid.clientHeight) / 2;
+
+        // the drag can only travel as far as the zoom pushed the frame outside the wrapper, so the
+        // picture cannot be dragged off its own panel.
+        const maxX = (radarVid.clientWidth * vidZoom - radarVid.clientWidth) / 2;
+        const maxY = (radarVid.clientHeight * vidZoom - radarVid.clientHeight) / 2;
 
         vidPanX = Math.max(-maxX, Math.min(maxX, e.clientX - vidStartX));
         vidPanY = Math.max(-maxY, Math.min(maxY, e.clientY - vidStartY));
-
-        radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
+        applyVideoTransform();
     });
 
-    // Mouse Up: Stop Pan
     window.addEventListener('mouseup', () => {
         isVidDragging = false;
         vidWrapper.style.cursor = 'default';
     });
 
-    // Double Click: Reset View
-    vidWrapper.addEventListener('dblclick', () => {
-        vidZoom = 1; 
-        vidPanX = 0; 
-        vidPanY = 0;
-        radarVid.style.transform = `translate(0px, 0px) scale(1)`;
-    });
-
-    // --- Composite Clip Recorder ---------------------------------------------------------------
+    // composite clip recorder
     // Records a single 1080p WebM by compositing the live tracker (2D/3D + satellite) on the left and
     // the user-selected graphs stacked down the right onto an offscreen canvas, no screen sharing.
     // The recorder drives playback through the chosen segment; the user can keep adjusting the view.
@@ -681,7 +667,7 @@
         if (!def || !def.bands || !def.bands.length) { band.style.display = 'none'; return; }
         if (def.isReconApi) {
             const ph = document.createElement('option');
-            ph.value = ''; ph.textContent = 'Choose a product…';
+            ph.value = ''; ph.textContent = 'Choose a product...';
             band.appendChild(ph);
         }
         def.bands.forEach(b => {
@@ -766,7 +752,7 @@
         }
     });
 
-    // --- start/end time fields: colon-formatted while sliding, and typable as HH:MM:SS to jump ---
+    // start/end time fields: colon-formatted while sliding, and typable as HH:MM:SS to jump
     function clipColonTime(t) { t = String(t || '000000').padStart(6, '0'); return t.slice(0, 2) + ':' + t.slice(2, 4) + ':' + t.slice(4, 6); }
     function clipTimeToSec(t) { t = String(t || '000000').padStart(6, '0'); return (+t.slice(0, 2)) * 3600 + (+t.slice(2, 4)) * 60 + (+t.slice(4, 6)); }
     function clipParseHHMMSS(str) {
@@ -929,7 +915,7 @@
     document.getElementById('clipStartTime').addEventListener('change', () => onClipRangeInput('start'));
     document.getElementById('clipEndTime').addEventListener('change', () => onClipRangeInput('end'));
 
-    // --- compositor helpers ---
+    // compositor helpers
     function drawImageContain(rctx, img, x, y, w, h) {
         const iw = img.videoWidth || img.width, ih = img.videoHeight || img.height;
         if (!iw || !ih || w <= 0 || h <= 0) return;
@@ -1068,7 +1054,7 @@
     function setRecordProgress(frac) {
         frac = Math.max(0, Math.min(1, frac));
         document.getElementById('recordProgressFill').style.width = (frac * 100).toFixed(1) + '%';
-        document.getElementById('recordProgressLabel').innerText = `Recording… ${Math.round(frac * 100)}%`;
+        document.getElementById('recordProgressLabel').innerText = `Recording... ${Math.round(frac * 100)}%`;
     }
 
     function recordCompositeLoop() {
@@ -1165,7 +1151,7 @@
         (function tick() {
             if (!pill.classList.contains('show')) return;   // aborted
             if (n <= 0) { if (bar) bar.style.display = ''; stopBtn.style.display = ''; cb(); return; }
-            label.innerText = `Recording in ${n}…  frame the tracker`;
+            label.innerText = `Recording in ${n}...  frame the tracker`;
             n--;
             setTimeout(tick, 1000);
         })();
@@ -1333,7 +1319,7 @@
             // rebuild the dropdowns on toggle.
             try {
                 if (typeof buildDropdownMenus === 'function') buildDropdownMenus();
-                if (typeof buildMasterMenu === 'function') buildMasterMenu();
+                if (typeof buildCustomGraphMenu === 'function') buildCustomGraphMenu(MASTER_GRAPH_ID);
             } catch (e) { /* menus not built yet */ }
             if (!persist) return;
             try {

@@ -203,7 +203,7 @@
         const chosen = [...document.querySelectorAll('#fsFlightChecks .fs-check:checked')].map((cb) => cb.value);
         const st = $('fsStatus');
         if (!chosen.length) { if (st) st.textContent = 'Select at least one flight to search.'; return; }
-        if (st) st.textContent = `Scanning ${chosen.length} flight${chosen.length > 1 ? 's' : ''} for ${getMetricLabel(key, isImp)}…`;
+        if (st) st.textContent = `Scanning ${chosen.length} flight${chosen.length > 1 ? 's' : ''} for ${getMetricLabel(key, isImp)}...`;
         const runBtn = $('fsRunBtn'); if (runBtn) runBtn.disabled = true;
 
         const results = [];
@@ -324,11 +324,11 @@
                 responsive: true, maintainAspectRatio: false, animation: false, parsing: false,
                 interaction: { mode: 'nearest', intersect: false },
                 scales: {
-                    x: { type: 'linear', title: { display: true, text: 'Elapsed flight time (min)', color: axC, font: { size: 11, family: "'Manrope', sans-serif", weight: '600' } }, ticks: { color: axC, font: { family: "'IBM Plex Mono', monospace", size: 10 }, maxTicksLimit: 10 }, grid: { color: gridC } },
-                    y: { title: { display: true, text: label, color: axC, font: { size: 11, family: "'Manrope', sans-serif", weight: '600' } }, ticks: { color: axC, font: { family: "'IBM Plex Mono', monospace", size: 10 } }, grid: { color: gridC } }
+                    x: { type: 'linear', title: { display: true, text: 'Elapsed flight time (min)', color: axC, font: { size: 11, family: CHART_FONT_SANS, weight: '600' } }, ticks: { color: axC, font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 10 }, grid: { color: gridC } },
+                    y: { title: { display: true, text: label, color: axC, font: { size: 11, family: CHART_FONT_SANS, weight: '600' } }, ticks: { color: axC, font: { family: CHART_FONT_MONO, size: 10 } }, grid: { color: gridC } }
                 },
                 plugins: {
-                    legend: { display: true, labels: { color: axC, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'line', font: { size: 10, family: "'IBM Plex Mono', monospace" }, filter: (item) => item.text !== 'Peak' } },
+                    legend: { display: true, labels: { color: axC, boxWidth: 12, boxHeight: 12, usePointStyle: true, pointStyle: 'line', font: { size: 10, family: CHART_FONT_MONO }, filter: (item) => item.text !== 'Peak' } },
                     tooltip: { callbacks: { title: (items) => items.length ? `${items[0].parsed.x.toFixed(1)} min` : '', label: (it) => `${it.dataset.label}: ${it.parsed.y != null ? it.parsed.y.toFixed(1) : ''}` } }
                 }
             }

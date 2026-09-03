@@ -109,6 +109,8 @@
         return !(bbox[0] + lonShift > v.maxLon + m || bbox[2] + lonShift < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
     }
 
+    // saffir-simpson bands, with everything below hurricane force left black so the categories
+    // stand out on their own.
     function getHurricaneColorRGB(spd) {
         if (spd === null || spd === undefined || spd < 0) spd = 0;
         if (spd <= 63) return [0, 0, 0];
@@ -119,36 +121,44 @@
         return [1, 0.38, 0.38];
     }
 
-    function getBarbColorMode() {
-        return barbColorSelect.value === 'hurricane' ? 'hurricane' : 'wind';
-    }
-
-    function getPathColorRGB(d, idx) {
-        const mode = pathColorSelect.value;
-        if (mode === 'temp') {
-            let t = d.tempr; if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
-            let delta = t - tempBaseline[idx]; let f = Math.min(Math.abs(delta) / 3.0, 1);
-            if (delta > 0) return [1, 1 - f, 1 - f]; else return [1 - f, 1 - f, 1];
-        }
-        if (getBarbColorMode() === 'hurricane') return getHurricaneColorRGB(d.windSpd);
-        return getSpdColorRGB(d.windSpd);
-    }
-
+    // continuous ramp over the whole speed range: cyan, green, yellow, red.
     function getSpdColorRGB(spd) {
-        if (!spd || spd < 0) spd = 0; let r, g, b;
-        if (spd < 50) { let f = spd / 50; r = 0; g = 255 * f; b = 255; } 
-        else if (spd < 80) { let f = (spd - 50) / 30; r = 0; g = 255; b = 255 - (255 * f); } 
-        else if (spd < 100) { let f = (spd - 80) / 20; r = 255 * f; g = 255; b = 0; } 
-        else if (spd < 130) { let f = (spd - 100) / 30; r = 255; g = 255 - (127 * f); b = 0; } 
-        else { let f = Math.min((spd - 130) / 30, 1); r = 255; g = 128 - (128 * f); b = 0; }
-        return [r/255, g/255, b/255];
-    }
-    
-    function getBarbColorRGB(spd) {
-        return getBarbColorMode() === 'hurricane' ? getHurricaneColorRGB(spd) : getSpdColorRGB(spd);
+        if (!spd || spd < 0) spd = 0;
+        let r, g, b;
+        if (spd < 50) { const f = spd / 50; r = 0; g = 255 * f; b = 255; }
+        else if (spd < 80) { const f = (spd - 50) / 30; r = 0; g = 255; b = 255 - (255 * f); }
+        else if (spd < 100) { const f = (spd - 80) / 20; r = 255 * f; g = 255; b = 0; }
+        else if (spd < 130) { const f = (spd - 100) / 30; r = 255; g = 255 - (127 * f); b = 0; }
+        else { const f = Math.min((spd - 130) / 30, 1); r = 255; g = 128 - (128 * f); b = 0; }
+        return [r / 255, g / 255, b / 255];
     }
 
-    function getBarbColor(spd) { const [r, g, b] = getBarbColorRGB(spd); return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`; }
+    function getBarbColorRGB(spd) {
+        return barbColorSelect.value === 'hurricane' ? getHurricaneColorRGB(spd) : getSpdColorRGB(spd);
+    }
+
+    // 0-1 triple to the css color string the canvas context wants.
+    function rgbCss([r, g, b]) {
+        return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
+    }
+
+    // the track carries its own color choice. 'temp' reads each sample against the rolling baseline
+    // (warmer than baseline runs red, cooler runs blue, white where either reading is missing); the
+    // rest follow whichever wind ramp the barbs are using.
+    function getPathColorRGB(d, idx) {
+        if (pathColorSelect.value === 'temp') {
+            const t = d.tempr;
+            if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
+            const delta = t - tempBaseline[idx];
+            const f = Math.min(Math.abs(delta) / 3.0, 1);
+            return delta > 0 ? [1, 1 - f, 1 - f] : [1 - f, 1 - f, 1];
+        }
+        return getBarbColorRGB(d.windSpd);
+    }
+
+    function getPathColorHex(d, idx) {
+        return rgbCss(getPathColorRGB(d, idx));
+    }
 
     function getBarbSpacingPx() {
         // Screen-px gap between barbs along the track. The zoomed-out cap sets density at
@@ -181,6 +191,32 @@
         if (_stormSpinRaf === null && stormSpinWanted()) _stormSpinRaf = requestAnimationFrame(stormSpinTick);
     }
 
+    // one tropical-cyclone map symbol at the context's current origin: spiral arms from tropical
+    // storm strength up, a category-colored disc, and the category written inside (TD/TS/1-5).
+    // an intensity with no category label draws as a plain disc. spin turns the arms alone, so a
+    // rotating symbol does not tumble its letter, and the disc is symmetric anyway.
+    function drawCycloneSymbol(col, lbl, windKt, r, ringCol, ringWidth, spin) {
+        if (lbl && windKt >= 34) {
+            ctx.save();
+            if (spin) ctx.rotate(spin);
+            ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
+            ctx.restore();
+        }
+
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
+        ctx.strokeStyle = ringCol; ctx.lineWidth = ringWidth; ctx.stroke();
+
+        if (lbl) {
+            // every category color carries this dark label legibly, the lighter ones included.
+            ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#111827';
+            ctx.fillText(lbl, 0, 0.5);
+        }
+    }
+
     // Best-track overlay for the storm the loaded mission belongs to (js/12b-recon-archive.js), spanning
     // its whole life, not just the flight's window. Drawn UNDER the flight track/plane so the flight
     // stays the visually dominant element; getX/getY project it exactly like everything else on this
@@ -194,88 +230,64 @@
             ctx.beginPath(); ctx.strokeStyle = stormWindColor(b.windKt); ctx.moveTo(getX(a.lon), getY(a.lat)); ctx.lineTo(getX(b.lon), getY(b.lat)); ctx.stroke();
         }
         ctx.setLineDash([]); ctx.globalAlpha = 1.0;
-        // Each fix is a small tropical-cyclone map symbol: category-colored disc with the
-        // category written inside (TD/TS/1-5), spiral arms from TS strength up, drawn
-        // slightly translucent so the basemap/satellite stays readable underneath.
+
+        // the fixes, drawn slightly translucent so the basemap/satellite stays readable underneath.
         stormTrackPoints.forEach((p, i) => {
             const hovered = i === hoveredStormIdx;
-            const ringCol = hovered ? '#ffffff' : 'rgba(0,0,0,0.85)';
             const col = stormWindColor(p.windKt), lbl = stormCatLabel(p.windKt);
+            // an unknown intensity carries no arms and no letter, so it draws a size smaller.
+            const r = lbl ? (hovered ? 8 : 6) : (hovered ? 6 : 4);
             ctx.save(); ctx.translate(getX(p.lon), getY(p.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
             ctx.globalAlpha = hovered ? 1.0 : 0.9;
-            if (!lbl) {   // unknown intensity: keep a plain small fix marker
-                ctx.beginPath(); ctx.arc(0, 0, hovered ? 6 : 4, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-                ctx.strokeStyle = ringCol; ctx.lineWidth = 1.2; ctx.stroke();
-                ctx.restore(); return;
-            }
-            const r = hovered ? 8 : 6;
-            if (p.windKt >= 34) {
-                ctx.save();
-                ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
-                ctx.restore();
-            }
-            ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-            ctx.strokeStyle = ringCol; ctx.lineWidth = hovered ? 2 : 1.2; ctx.stroke();
-            // Every category color carries this dark label legibly, the lighter ones included.
-            ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#111827';
-            ctx.fillText(lbl, 0, 0.5);
+            drawCycloneSymbol(col, lbl, p.windKt, r, hovered ? '#ffffff' : 'rgba(0,0,0,0.85)', (lbl && hovered) ? 2 : 1.2, 0);
             ctx.restore();
         });
-        // Estimated storm center now (interpStormCenter, via updateStormNowMarker): a spinning
-        // cyclone symbol moved smoothly along the track to the playback time, drawn over the static
-        // fixes with a sky-blue keyline, the accent the UI uses for the live element.
+
+        // estimated storm center now (interpStormCenter, via updateStormNowMarker): the same symbol
+        // moved smoothly along the track to the playback time and spun, drawn over the static fixes
+        // with a sky-blue keyline, the accent the UI uses for the live element.
         if (typeof stormNow !== 'undefined' && stormNow) {
-            const col = stormWindColor(stormNow.windKt), lbl = stormCatLabel(stormNow.windKt), r = 8;
+            const col = stormWindColor(stormNow.windKt), lbl = stormCatLabel(stormNow.windKt);
+            // one revolution per 12s. canvas +y points down, so a negative angle reads
+            // counterclockwise, the northern-hemisphere sense.
+            const spin = (stormNow.lat < 0 ? 1 : -1) * (performance.now() / 12000) * 2 * Math.PI;
             ctx.save(); ctx.translate(getX(stormNow.lon), getY(stormNow.lat)); ctx.scale(1 / mapScale, 1 / mapScale);
-            if (lbl && stormNow.windKt >= 34) {
-                ctx.save();
-                // Arms turn cyclonically, one revolution per 12s. Canvas +y points down, so a negative
-                // angle reads counterclockwise, the northern-hemisphere sense. Only the arms turn: the
-                // category letter would tumble, and the disc is symmetric. Rotation holds the size.
-                ctx.rotate((stormNow.lat < 0 ? 1 : -1) * (performance.now() / 12000) * 2 * Math.PI);
-                ctx.strokeStyle = col; ctx.lineWidth = r * 0.5; ctx.lineCap = 'round';
-                ctx.beginPath(); ctx.moveTo(0, -r * 0.9); ctx.quadraticCurveTo(r * 1.9, -r * 1.35, r * 1.55, r * 0.45); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(0, r * 0.9); ctx.quadraticCurveTo(-r * 1.9, r * 1.35, -r * 1.55, -r * 0.45); ctx.stroke();
-                ctx.restore();
-            }
-            ctx.beginPath(); ctx.arc(0, 0, r, 0, 2 * Math.PI); ctx.fillStyle = col; ctx.fill();
-            ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2; ctx.stroke();
-            if (lbl) {
-                ctx.font = '700 ' + (lbl.length > 1 ? r : r * 1.25) + 'px Inter, ui-sans-serif, sans-serif';
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#111827';
-                ctx.fillText(lbl, 0, 0.5);
-            }
+            drawCycloneSymbol(col, lbl, stormNow.windKt, 8, '#38bdf8', 2, spin);
             ctx.restore();
         }
         ctx.restore();
     }
 
-    function getPathColorHex(d, idx) {
-        const [r, g, b] = getPathColorRGB(d, idx);
-        return `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;
-    }
-
+    // standard station-model barb: a shaft with 50 kt pennants, 10 kt full feathers and a 5 kt half
+    // feather, speed rounded to the nearest 5 kt. the live barb at the plane (isDynamic) is drawn
+    // larger and gets a heavy black underlay first, so it stays readable over any basemap.
     function drawWindBarbFrame(x, y, dir, spd, scale, isDynamic = false) {
-        const strokeColor = getBarbColor(spd);
-        ctx.save(); ctx.translate(x, y); let mult = isDynamic ? 1.4 : 1; ctx.scale(mult / scale, mult / scale); ctx.rotate((dir - 90) * Math.PI/180);
+        const strokeColor = rgbCss(getBarbColorRGB(spd));
+        const mult = isDynamic ? 1.4 : 1;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(mult / scale, mult / scale);
+        ctx.rotate((dir - 90) * Math.PI / 180);
+
         const drawShapes = () => {
-            const shaftLength = 18; const featherBase = 6; const featherSpread = 0.85;
-            ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(shaftLength, 0); ctx.stroke();
-            let k = Math.round(spd/5)*5; let hx = shaftLength; const xa = Math.cos(60*Math.PI/180)*featherBase; const ya = Math.sin(60*Math.PI/180)*featherBase;
-            while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.lineTo(hx-(3 * featherSpread),0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx-=4 * featherSpread; k-=50; }
-            while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa,ya); ctx.stroke(); hx-=3 * featherSpread; k-=10; }
-            if (k >= 5) { ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx-xa/2,ya/2); ctx.stroke(); }
+            const shaftLength = 18, featherBase = 6, featherSpread = 0.85;
+            ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(shaftLength, 0); ctx.stroke();
+
+            let k = Math.round(spd / 5) * 5, hx = shaftLength;
+            const xa = Math.cos(60 * Math.PI / 180) * featherBase, ya = Math.sin(60 * Math.PI / 180) * featherBase;
+            while (k >= 50) { ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx - xa, ya); ctx.lineTo(hx - (3 * featherSpread), 0); ctx.closePath(); ctx.fill(); ctx.stroke(); hx -= 4 * featherSpread; k -= 50; }
+            while (k >= 10) { ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx - xa, ya); ctx.stroke(); hx -= 3 * featherSpread; k -= 10; }
+            if (k >= 5) { ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx - xa / 2, ya / 2); ctx.stroke(); }
         };
-        const isBlackBarb = strokeColor === 'rgb(0, 0, 0)';
-        if (isBlackBarb) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes();
+
+        if (isDynamic) {
+            ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000';
+            ctx.lineWidth = 2.0; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            drawShapes();
         }
-        if (isDynamic) { ctx.strokeStyle = '#000000'; ctx.fillStyle = '#000000'; ctx.lineWidth = 2.0; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; drawShapes(); }
-        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor; ctx.lineWidth = 1.0; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; drawShapes();
+        ctx.strokeStyle = strokeColor; ctx.fillStyle = strokeColor;
+        ctx.lineWidth = 1.0; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+        drawShapes();
         ctx.restore();
     }
     
@@ -377,7 +389,7 @@
                                       : (lightMap ? 'rgba(94,111,124,0.50)' : 'rgba(126,168,191,0.40)');
             bgCtx.fillStyle = landFill;
             const strokeFor = isState => { bgCtx.strokeStyle = isState ? borderCol : coastCol; bgCtx.lineWidth = (isState ? 1.0 : 1.5) / mapScale; };
-            // Draw the whole world, cull off-screen, and repeat it shifted ±360 so a dateline-centered
+            // Draw the whole world, cull off-screen, and repeat it shifted 360 degrees each way so a dateline-centered
             // or zoomed-out view shows continuous land instead of an empty seam. Projects with the
             // raw (unwrapped) x, wrapping would cancel the shift.
             const getXShift = (lon, shift) => xOf(lon + shift);

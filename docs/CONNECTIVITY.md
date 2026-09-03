@@ -79,7 +79,7 @@ in `js/02-satellite.js`.)
   instead."**
 - The **manual upload zone** is highlighted (blue ring) to draw your eye to it.
 - In the satellite dropdown, **GOES-East/West** options are disabled and relabelled
-  **"…API Offline."**
+  **"...API Offline."**
 - The **Pre-Cache Satellite Imagery** modal disables GOES options the same way.
 
 ---
@@ -148,7 +148,7 @@ All under `RECON_API_BASE` (defined in `js/02-satellite.js`).
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /v1/satellite/products` | **Health check** plus discovery of available bands/composites and each spacecraft's active date range. |
-| `GET /v1/satellite/tile?…` | Request a GOES tile render (async job). |
+| `GET /v1/satellite/tile?...` | Request a GOES tile render (async job). |
 | `GET /v1/satellite/status/{key}` | Poll a tile job until `ready` (polled about every 3s, 30s cap). |
 | `GET /v1/recon/*`, `GET /v1/storms/*` | Archive catalog: years, storms, missions, and best-tracks. |
 | `GET /v1/recon/mission/{id}` | Mission metadata plus a 0.2 Hz-decimated track (the fallback path). |

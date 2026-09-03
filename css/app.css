@@ -61,7 +61,14 @@ body {
 ::selection { background: var(--accent-soft); color: var(--text); }
 :focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-.font-mono, [class*="font-mono"], #timelineTimeDisplay { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; }
+/* one mono stack for every readout that needs its digits to hold their column: the timeline
+   clock, the HUD, the time fields, the chart ticks. Roboto Mono ships here as a variable font,
+   so weight 700 is a drawn weight instead of an outline the browser thickens itself. */
+:root { --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, monospace; }
+
+/* Readouts sit in the interface font; only their digits are held to one width, so a ticking
+   clock or a counting percentage does not shuffle the text beside it. */
+.tabular-nums { font-variant-numeric: tabular-nums; }
 .uppercase.tracking-wider { letter-spacing: 0.12em; }
 
 button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
@@ -265,7 +272,7 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
    exit-fullscreen step. z-index stays below the sticky bottom bar (2000) so the playback
    controls remain usable on top. */
 #mapPanel.fake-fs, #videoPanel.fake-fs { position: fixed; inset: 0; width: 100vw; z-index: 1500; }
-/* Each panel is its own stacking context so one panel's overlays (the HUD, PFD, sat legend…)
+/* Each panel is its own stacking context so one panel's overlays (the HUD, PFD, sat legend...)
    can't bleed over the OTHER panel while it's pinned at z-1500. The map panel sits higher
    by default so its popups (measure group, day stepper) can still overflow onto the video panel. */
 #mapPanel { z-index: 1; }
@@ -345,7 +352,7 @@ input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
 .mini-pb-group .mini-pb-btn + .mini-pb-btn { margin-left: -1px; border-left: 1px solid rgba(0, 0, 0, 0.2); }
 .mini-pb-si { flex: none; display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; cursor: pointer; }
 .mini-timeline { flex: 1 1 auto; min-width: 100px; accent-color: var(--accent); cursor: pointer; }
-.mini-pb-time { flex: none; font-size: 12px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; color: var(--accent); min-width: 88px; text-align: right; }
+.mini-pb-time { flex: none; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); min-width: 88px; text-align: right; }
 .media-content-wrapper { overflow: hidden; }
 
 .media-resize-handle { position: absolute; bottom: 4px; left: 0; width: 100%; height: 16px; cursor: ns-resize; z-index: 1000; touch-action: none; }
@@ -386,6 +393,9 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .media-idle-sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-faint); margin-top: 6px; max-width: 380px; }
 
 /* The processing spinner morphs into a green checkmark once parsing succeeds (js/12 adds .done). */
+/* The loading overlay reads in the interface font rather than the mono one. Its numbers count up
+   while it is on screen, so they hold a fixed digit width and the line does not shimmer. */
+#loadingOverlaySubtext, #loadingProgressWrap { font-variant-numeric: tabular-nums; }
 #loadingCheck { opacity: 0; }
 #loadingCheck path { stroke-dasharray: 42; stroke-dashoffset: 42; }
 #loadingSpinner.done #loadingRing { animation: none; border-color: #10b981; transition: border-color 0.25s ease; }
@@ -395,7 +405,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* In-map overlays: HUD, PFD, pills, badges - flat hairline borders, no accent-tinted glow */
 .overlays-wrapper { position: absolute; top: 44px; bottom: 18px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
-#hudOverlay { background-color: color-mix(in oklab, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; line-height: 1.4; color: var(--text); display: none; min-width: 200px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
+#hudOverlay { background-color: color-mix(in oklab, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: var(--font-mono); font-size: 10px; line-height: 1.4; color: var(--text); display: none; min-width: 200px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
 #hudOverlay::-webkit-scrollbar { width: 6px; }
 #hudOverlay::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
 #hudOverlay::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
@@ -408,7 +418,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #pfdCanvas { width: 100%; height: 100%; display: block; }
 
 /* Non-invasive satellite fetch status, a small pill, not a full-screen cover */
-#satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
+#satLoadingOverlay { display: none; position: absolute; top: 10px; right: 12px; z-index: 50; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; letter-spacing: 0.03em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); pointer-events: none; }
 /* The polar-orbiter day stepper overhangs the map's top-right corner, and this pill covers it: the
    pill's z-50 escapes #mapContainer (which sets no z-index, so opens no stacking context) and beats
    the header's z-20. Move the pill to the top-left while the stepper is up, clear of the stepper and
@@ -417,7 +427,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* satellite product color-scale legend: compact vertical bar tucked into the top-right corner of the
    2d player, below the fetch pill, clear of the pfd (bottom right) and hud (bottom left). */
-#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 45%, transparent); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
 #satColorLegend.hidden { display: none; }
 #satColorLegend .leg-title { font-size: 8px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 3px; text-align: center; }
 #satColorLegend .leg-body { position: relative; display: flex; gap: 4px; height: 124px; }
@@ -435,7 +445,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satLoadingOverlay.show { display: flex; }
 #satLoadingOverlay .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 
-#satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
+#satPrefetchBar { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 10px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); }
 #satPrefetchBar.hidden { display: none; }
 #mapPanel:is(:fullscreen, .fake-fs) #satPrefetchBar { z-index: 2002; }
 #satPrefetchLabel { white-space: nowrap; }
@@ -449,7 +459,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satPrefetchCancel:hover { background: color-mix(in oklab, var(--danger) 30%, var(--panel)); color: var(--text); }
 
 /* Auto-Sync indicator, anchored in the MMR video panel, non-blocking */
-#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
 #syncingIndicator.show { opacity: 1; transform: translateY(0); }
 #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #syncingIndicator .sync-sub { color: var(--text-muted); font-weight: 500; }
@@ -457,7 +467,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 @media (max-width: 900px) { #syncingIndicator .sync-sub { display: none; } }
 
 /* Recording progress pill - the recording/error reserved hue (--danger), not the accent */
-#recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: color-mix(in oklab, var(--panel) 95%, transparent); border: 1px solid var(--danger); color: var(--text); padding: 8px 14px; border-radius: 3px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 12px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+#recordProgress { display: none; position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 9998; align-items: center; gap: 10px; background: color-mix(in oklab, var(--panel) 95%, transparent); border: 1px solid var(--danger); color: var(--text); padding: 8px 14px; border-radius: 3px; font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
 #recordProgress.show { display: flex; }
 #recordProgress .rec-dot { width: 11px; height: 11px; flex: none; border-radius: 50%; background: var(--danger); animation: recPulse 1s ease-in-out infinite; }
 @keyframes recPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -498,7 +508,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .help-body li { margin: 3px 0; color: var(--text-muted); }
 .help-body b, .help-body strong { color: var(--text); font-weight: 600; }
 .help-body a { color: var(--accent); text-decoration: underline; }
-.help-body kbd { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text); white-space: nowrap; }
+.help-body kbd { font-family: var(--font-mono); font-size: 11px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text); white-space: nowrap; }
 /* TDR workspace sidebar: docked over the pinned tracker's left edge while TDR mode is up.
    Below the sticky bottom bar (z-2000) and above the canvas overlays. */
 .tdr-mode-bar { position: absolute; left: 14px; top: 64px; width: 244px; max-height: calc(100vh - 200px); z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: color-mix(in oklab, var(--panel) 96%, transparent); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
@@ -549,7 +559,7 @@ html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
 .tdr-level-row:hover { color: var(--text); border-color: var(--accent); }
 .tdr-level-row.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
 .tdr-level-row.empty { opacity: 0.4; }
-.tdr-level-ft { min-width: 118px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; }
+.tdr-level-ft { min-width: 118px; font-family: var(--font-mono); font-size: 10px; }
 /* The band's real selector: the geometric altitude span its radar levels sit at. The millibars beside
    it are a standard-atmosphere label for that span (see tdrMb in js/07d-tdr.js), so the altitude is
    shown alongside rather than letting the mb read as an analysed pressure surface. */
@@ -617,7 +627,7 @@ body.media-collapsed .float-panel { display: none !important; }
 /* clip record start and end frame previews, driven by js/19-bootstrap.js. */
 .clip-preview-card { background: color-mix(in oklab, var(--bg) 45%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; min-width: 0; }
 .clip-preview-head { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 5px; }
-.clip-preview-time { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-weight: 600; color: var(--accent); text-transform: none; letter-spacing: 0; }
+.clip-preview-time { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); text-transform: none; letter-spacing: 0; }
 .clip-preview-frames { display: flex; gap: 6px; }
 .clip-preview-frames > .clip-preview-track, .clip-preview-frames > .clip-preview-video { flex: 1 1 0; min-width: 0; width: 100%; height: 88px; border-radius: 4px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); display: block; object-fit: contain; }
 #clipPreviewRow.no-video .clip-preview-video { display: none; }
@@ -626,47 +636,44 @@ body.media-collapsed .float-panel { display: none !important; }
 .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
 /* Bottom command bar */
-.sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: color-mix(in oklab, var(--panel-strip) 94%, transparent); border-top: 1px solid var(--border); padding: 10px 18px; z-index: 2000; backdrop-filter: blur(6px); display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; row-gap: 10px; }
+.sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: color-mix(in oklab, var(--panel-strip) 94%, transparent); border-top: 1px solid var(--border); padding: 12px 18px; z-index: 2000; backdrop-filter: blur(6px); display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; row-gap: 12px; }
 
-.cmd-group { display: flex; flex-direction: column; gap: 5px; }
-.cmd-group + .cmd-group { border-left: 1px solid var(--border); padding-left: 8px; }
-.cmd-group > .cmd-label { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text-muted); padding-left: 1px; }
+.cmd-group { display: flex; flex-direction: column; justify-content: flex-end; gap: 7px; }
+/* Playback and Markers carry no header, so they reserve the height one would take: without it
+   their controls and their divider line would come up short against the labelled groups. */
+.sticky-bottom-bar > .cmd-group:not(#cmdTimelineGroup) { min-height: 51px; }
+#cmdTimelineGroup .cmd-row > button { flex: none; height: 28px; padding: 0 0.85rem; font-size: 10.5px; }
+.cmd-group + .cmd-group { border-left: 1px solid var(--border); padding-left: 14px; }
+.cmd-group > .cmd-label { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); padding-left: 1px; }
 .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
 #cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
-#cmdTimelineGroup > .cmd-row { gap: 16px; position: relative; }
-#cmdTimelineGroup > .cmd-label { font-size: 10.5px; color: var(--accent); }
+#cmdTimelineGroup > .cmd-row { gap: 16px; }
+.timeline-track { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 /* Loader over the timeline while the MMR runs its first sync (js/06-ocr.js updateTimelineSyncLock):
    it blocks scrub clicks on the greyed slider beneath and reads as a busy state, not a dead control. */
-#timelineSyncLoader { display: none; position: absolute; left: 0; top: 0; bottom: 0; right: 200px; align-items: center; justify-content: center; gap: 8px; background: color-mix(in oklab, var(--panel-strip) 95%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 55%, transparent); border-radius: 6px; z-index: 6; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
+#timelineSyncLoader { display: none; position: absolute; left: 0; top: 0; bottom: 0; right: 0; align-items: center; justify-content: center; gap: 8px; background: color-mix(in oklab, var(--panel-strip) 95%, transparent); border: 1px solid var(--border); border-radius: 6px; z-index: 6; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
 #timelineSyncLoader.show { display: flex; }
 #timelineSyncLoader .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #timelineSlider:disabled { opacity: 0.45; cursor: not-allowed; }
 #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
 #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
-#timelineTimeDisplay { font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+#timelineTimeDisplay { font-size: 0.85rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .sticky-bottom-bar > .cmd-group:not(#cmdTimelineGroup) { order: 1; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) button,
-.sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { height: 30px !important; padding-top: 0.2rem !important; padding-bottom: 0.2rem !important; padding-left: 0.55rem !important; padding-right: 0.55rem !important; font-size: 10.5px !important; }
-.sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) .cmd-row { gap: 5px; }
+.sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { height: 32px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; padding-left: 0.7rem !important; padding-right: 0.7rem !important; font-size: 10.5px !important; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { max-width: 150px; text-overflow: ellipsis; }
 /* Filters live on the far right of the top row (order:1), packed 2x2 so the bar height is unchanged.
    Separator drawn as a pseudo-element spanning only the content box, the inherited border-left
    would also span the 4px vertical padding and protrude past the checkbox grid. */
-#cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 8px; padding: 4px 0 4px 10px; border-left: none !important; position: relative; }
+#cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 8px; padding: 4px 0 4px 16px; border-left: none !important; position: relative; }
 #cmdFiltersGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
-/* Record Clip / Share Link: stacked pair to the right of the filters, same separator treatment,
-   both buttons sized so the pair matches the filter block's height. */
-#cmdClipShareGroup { order: 1; padding: 4px 0 4px 10px; border-left: none !important; position: relative; }
-#cmdClipShareGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
-#cmdClipShareGroup > .cmd-row { flex-direction: column; align-items: stretch; gap: 4px !important; }
-.sticky-bottom-bar #cmdClipShareGroup button { height: 21px !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: 10px !important; }
 /* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
    in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
    reflowing the other filters. */
 #filtersGrid { display: flex !important; gap: 20px !important; align-items: flex-start; }
-.filter-col { display: flex; flex-direction: column; gap: 4px; }
+.filter-col { display: flex; flex-direction: column; gap: 6px; }
 .filter-lbl { display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--accent); cursor: pointer; user-select: none; white-space: nowrap; }
 .filter-cb { accent-color: var(--accent); width: 12px; height: 12px; cursor: pointer; flex-shrink: 0; }
 .filter-child { margin-left: 18px; position: relative; }
@@ -785,7 +792,7 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .avi-row.avi-meta { color: var(--text-faint); }
 .avi-stop-btn { background: var(--danger); color: #fff; border: none; cursor: pointer; }
 .avi-stop-btn:hover { background: color-mix(in oklab, var(--danger) 85%, #fff); }
-#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--accent); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
+#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
 #aviConvertPill.on { display: flex; }
 #aviConvertPill .avi-pill-spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #aviConvertPill .avi-pill-pct { color: var(--text-muted); font-weight: 500; }

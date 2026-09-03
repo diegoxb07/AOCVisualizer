@@ -82,7 +82,7 @@
         sel.disabled = true;
     }
 
-    // The select starts disabled with a "Loading…" placeholder in the markup, so a refresh never
+    // The select starts disabled with a "Loading..." placeholder in the markup, so a refresh never
     // offers a clickable empty list; it opens up only once the year list has actually arrived.
     async function populateReconYears() {
         try {
@@ -92,7 +92,7 @@
                 const opt = document.createElement('option'); opt.value = y; opt.textContent = y; reconYearSelect.appendChild(opt);
             });
         } catch (e) { setReconStatus('Could not reach the recon archive (' + e.message + ').'); }
-        reconYearSelect.options[0].textContent = 'Year…';
+        reconYearSelect.options[0].textContent = 'Year...';
         reconYearSelect.disabled = false;
         reconYearSelect.style.cursor = '';
         reconYearsLanded = true;
@@ -144,7 +144,7 @@
             // storm-track fetch, so the shared moment is on screen from the first playable frame.
             applySharedPlaybackParams(sharedT, sharedView);
             // Let the storm-track fetch land its final status message BEFORE the selector
-            // reflection suppresses status writes, otherwise "Loaded … + N obs best-track"
+            // reflection suppresses status writes, otherwise "Loaded ... + N obs best-track"
             // arrives mid-reflection and gets swallowed.
             try { await stormTrackFetchPromise; } catch (e) { }
             reflectLoadedMissionInSelectors();
@@ -203,7 +203,7 @@
     // Cosmetic only: failures are swallowed and the loaded flight is unaffected.
     async function reflectLoadedMissionInSelectors() {
         if (!reconArchiveMeta) return;
-        suppressReconStatus = true;   // the drive-by change handlers must not clobber "Loaded …"
+        suppressReconStatus = true;   // the drive-by change handlers must not clobber "Loaded ..."
         try {
             await reconYearsReady;
             const year = String(reconArchiveMeta.missionId).slice(0, 4);
@@ -224,16 +224,16 @@
     }
 
     const onReconYearChange = async () => {
-        resetReconSelect(reconStormSelect, 'Storm…');
-        resetReconSelect(reconMissionSelect, 'Flight…');
+        resetReconSelect(reconStormSelect, 'Storm...');
+        resetReconSelect(reconMissionSelect, 'Flight...');
         syncReconLoadButtonState();
         reconStormsForYear = []; reconMissionsForStorm = []; reconMissionListCache = {};
         const year = reconYearSelect.value;
         if (!year) return;
         const req = ++stormListReqId;
-        reconStormSelect.options[0].textContent = 'Loading…';   // stays disabled until the list lands
+        reconStormSelect.options[0].textContent = 'Loading...';   // stays disabled until the list lands
         reconStormSelect.style.cursor = 'progress';
-        setReconStatus('Loading storms for ' + year + '…');
+        setReconStatus('Loading storms for ' + year + '...');
         try {
             const data = await reconApiJson('/v1/recon/' + year);
             if (req !== stormListReqId) return;
@@ -268,14 +268,14 @@
                 reconStormSelect.appendChild(opt);
                 shownStorms++;
             });
-            reconStormSelect.options[0].textContent = 'Storm…';
+            reconStormSelect.options[0].textContent = 'Storm...';
             reconStormSelect.disabled = false;
             reconStormSelect.style.cursor = '';
             syncReconLoadButtonState();   // mission lists just landed, the preload modal is usable now
             setReconStatus(reconStormsForYear.length ? (shownStorms ? '' : 'Every archived flight for ' + year + ' is already loaded.') : 'No archived recon flights found for ' + year + '.');
         } catch (e) {
             if (req === stormListReqId) {
-                reconStormSelect.options[0].textContent = 'Storm…';
+                reconStormSelect.options[0].textContent = 'Storm...';
                 reconStormSelect.style.cursor = '';
                 setReconStatus('Could not load storms for ' + year + ' (' + e.message + ').');
             }
@@ -284,14 +284,14 @@
     reconYearSelect.addEventListener('change', onReconYearChange);
 
     const onReconStormChange = async () => {
-        resetReconSelect(reconMissionSelect, 'Flight…');
+        resetReconSelect(reconMissionSelect, 'Flight...');
         syncReconLoadButtonState();
         reconMissionsForStorm = [];
         const year = reconYearSelect.value, stormName = reconStormSelect.value;
         if (!year || !stormName) return;
-        reconMissionSelect.options[0].textContent = 'Loading…';   // invisible on the (usual) prefetched path, no await before the restore
+        reconMissionSelect.options[0].textContent = 'Loading...';   // invisible on the (usual) prefetched path, no await before the restore
         reconMissionSelect.style.cursor = 'progress';
-        setReconStatus('Loading flights for ' + stormName + '…');
+        setReconStatus('Loading flights for ' + stormName + '...');
         try {
             // Usually already prefetched (and sorted newest first) by the year handler above.
             let missions = reconMissionListCache[stormName];
@@ -310,13 +310,13 @@
                 opt.title = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
                 reconMissionSelect.appendChild(opt);
             });
-            reconMissionSelect.options[0].textContent = 'Flight…';
+            reconMissionSelect.options[0].textContent = 'Flight...';
             reconMissionSelect.disabled = false;
             reconMissionSelect.style.cursor = '';
             reconLoadBtn.disabled = availMissions.length === 0;
             setReconStatus(availMissions.length ? '' : (reconMissionsForStorm.length ? 'Every flight for ' + stormName + ' is already loaded.' : 'No archived flights found for ' + stormName + '.'));
         } catch (e) {
-            reconMissionSelect.options[0].textContent = 'Flight…';
+            reconMissionSelect.options[0].textContent = 'Flight...';
             reconMissionSelect.style.cursor = '';
             setReconStatus('Could not load flights for ' + stormName + ' (' + e.message + ').');
         }
@@ -330,7 +330,7 @@
         if (missionId) loadReconMission(missionId);
     });
 
-    // --- Free-text mission search ------------------------------------------------------------
+    // free-text mission search
     // The Year -> Storm -> Flight cascade is exact but unforgiving: a flight filed under the wrong
     // storm, or one of the dozens in "Unknown / Training", is easy to lose. This searches a whole
     // season's missions by any of id / storm / date / aircraft, loads any full mission id
@@ -416,7 +416,7 @@
         async function expandStorm(year, stormName) {
             const seq = ++searchSeq;
             const frag = rowFrag();
-            frag.appendChild(noteRow('Loading ' + stormName + ' · ' + year + '…'));
+            frag.appendChild(noteRow('Loading ' + stormName + ' · ' + year + '...'));
             renderRows(frag);
             let missions = [];
             try {
@@ -479,12 +479,12 @@
                 // no year in the text and none picked in the cascade: treat the query as a storm
                 // name and search every season
                 if (idHit) { renderRows(frag); return; }
-                frag.appendChild(noteRow('Searching all years…'));
+                frag.appendChild(noteRow('Searching all years...'));
                 renderRows(frag);
                 await renderStormHits(raw, seq, '');
                 return;
             }
-            frag.appendChild(noteRow('Searching ' + years.join(', ') + '…'));
+            frag.appendChild(noteRow('Searching ' + years.join(', ') + '...'));
             renderRows(frag);
             let pool = [];
             try {
@@ -506,7 +506,7 @@
                 // may just be a stale year: look for the name across the other seasons before
                 // giving up (typing IAN with 2024 still selected should find IAN 2022)
                 if (!/(?:19|20)\d{2}/.test(raw)) {
-                    out.appendChild(noteRow('No missions match in ' + years.join(', ') + '. Checking other years…'));
+                    out.appendChild(noteRow('No missions match in ' + years.join(', ') + '. Checking other years...'));
                     renderRows(out);
                     await renderStormHits(raw, seq, 'No missions match in ' + years.join(', ') + '.');
                     return;
@@ -575,7 +575,7 @@
         const loader = document.getElementById('loadingOverlay');
         const subtext = document.getElementById('loadingOverlaySubtext');
         syncReconLoadButtonState();
-        setReconStatus('Fetching mission ' + missionId + '…');
+        setReconStatus('Fetching mission ' + missionId + '...');
 
         let mission;
         try {
@@ -603,7 +603,7 @@
         const progSpeed = document.getElementById('loadingProgressSpeed');
         const hideProgress = () => { if (progWrap) progWrap.classList.add('hidden'); if (progBar) progBar.style.width = '0%'; };
         try {
-            if (subtext) subtext.textContent = `Downloading flight data for ${mission.mission_id}…`;
+            if (subtext) subtext.textContent = `Downloading flight data for ${mission.mission_id}...`;
             if (progWrap) progWrap.classList.remove('hidden');
             const dlStart = performance.now();
             const buf = await fetchArrayBufferWithProgress(
@@ -616,8 +616,8 @@
                     if (progBar) progBar.style.width = pct + '%';
                     if (progPct) progPct.textContent = `${pct}% · ${mb(received)} / ${mb(total)} MB`;
                     if (progSpeed) progSpeed.textContent = `${speed} MB/s`;
-                    if (subtext) subtext.textContent = `Downloading flight data… ${pct}%`;
-                    setReconStatus(`Downloading ${mission.mission_id}… ${pct}% (${mb(received)} / ${mb(total)} MB, ${speed} MB/s)`);
+                    if (subtext) subtext.textContent = `Downloading flight data... ${pct}%`;
+                    setReconStatus(`Downloading ${mission.mission_id}... ${pct}% (${mb(received)} / ${mb(total)} MB, ${speed} MB/s)`);
                     // Backgrounded tabs stop repainting, so this text can look frozen while the download
                     // keeps progressing underneath. The document title still updates while hidden, so
                     // mirror the percent there; updateMissionHeader() overwrites it once loading finishes.
@@ -625,7 +625,7 @@
                 }
             );
             if (progBar) progBar.style.width = '100%';
-            if (subtext) subtext.textContent = 'Parsing flight variables…';
+            if (subtext) subtext.textContent = 'Parsing flight variables...';
             hideProgress();
             await parseEntireFile(buf);
             usedFullRes = true;
@@ -656,8 +656,8 @@
             reconSourceLink.title = 'Open the original NetCDF directly (same file this loaded automatically)';
         } else { reconSourceLink.classList.add('hidden'); }
 
-        if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track…`);
-        else setReconStatus(`Loaded ${mission.obs_count} decimated obs for ${mission.mission_id}. Fetching storm track…`);
+        if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track...`);
+        else setReconStatus(`Loaded ${mission.obs_count} decimated obs for ${mission.mission_id}. Fetching storm track...`);
         // Every archive mission loaded this session joins the preloaded list too, so it can be
         // reopened instantly without an explicit preload. Rows are captured by reference now
         // (another load may replace allParsedData before the storm fetch settles).
@@ -862,7 +862,7 @@
         });
     })();
 
-    // --- Mission preloader: download + parse flights in the background (like the satellite tile
+    // mission preloader: download + parse flights in the background (like the satellite tile
     // pre-cache, but for flight data). Records live in a session Map mirrored write-through into
     // IndexedDB (db aocPreloadedMissions), so preloaded flights survive reloads and open with no
     // download or parse on any later visit. The preloaded list is its own dropdown; the Preload
@@ -986,7 +986,7 @@
         if (lbl) {
             const rec = loadedPickerSelectedId ? preloadedMissions.get(loadedPickerSelectedId) : null;
             lbl.textContent = rec ? loadedPickerRowLabel(loadedPickerSelectedId, rec)
-                : (preloadedMissions.size === 0 ? '(no already loaded missions)' : 'Previously Loaded Missions…');
+                : (preloadedMissions.size === 0 ? '(no already loaded missions)' : 'Previously Loaded Missions...');
         }
         renderLoadedPickerPanel();
     }
@@ -1047,7 +1047,7 @@
     async function preloadReconMission(missionId, statusFn) {
         const status = statusFn || setReconStatus;
         if (preloadedMissions.has(missionId)) { status(missionId + ' is already loaded.'); return true; }
-        status('Batch loading ' + missionId + ' in the background…');
+        status('Batch loading ' + missionId + ' in the background...');
         try {
             const mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
@@ -1055,7 +1055,7 @@
             // or parse failure propagates to the outer catch, so the mission is not saved as a preview.
             const buf = await fetchArrayBufferWithProgress(
                 RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
-                (r, t) => status('Batch loading ' + missionId + '… ' + Math.round(r / t * 100) + '%'));
+                (r, t) => status('Batch loading ' + missionId + '... ' + Math.round(r / t * 100) + '%'));
             const parsed = await parseFlightSource(buf);
             if (!parsed.rows.length) throw new Error('no usable rows');
             const isNc = true;
@@ -1080,7 +1080,7 @@
         if (document.readyState !== 'complete') await new Promise(r => window.addEventListener('load', r, { once: true }));
         let rec = preloadedMissions.get(missionId); if (!rec) return;
         if (!rec.parsed) {
-            setReconStatus('Opening ' + missionId + ' from the on-device store…');
+            setReconStatus('Opening ' + missionId + ' from the on-device store...');
             const stored = await missionIdbGet(missionId);
             if (!stored || !stored.parsed) {
                 setReconStatus('The stored copy of ' + missionId + ' is gone. Preload it again.');
@@ -1123,7 +1123,7 @@
         setReconStatus('Opened ' + mission.mission_id + ' (' + allParsedData.length + ' samples).');
     }
 
-    // ---- Shared archive season picker -------------------------------------------------------
+    // shared archive season picker
     // The Batch Load modal and the Pre-Cache Satellite Imagery modal both need the same
     // Year -> Storm -> Flight tree over the archive, so it lives out here rather than inside
     // either wire-up. They differ only in what an already-loaded mission means: Batch Load has
@@ -1219,7 +1219,7 @@
         if (!sel) return;
         await reconYearsReady;
         if (sel.options.length <= 1) {
-            sel.innerHTML = '<option value="">Year…</option>';
+            sel.innerHTML = '<option value="">Year...</option>';
             [...reconYearSelect.options].slice(1).forEach(o => {
                 const opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.value;
                 sel.appendChild(opt);
@@ -1251,7 +1251,7 @@
         try {
             const buf = await fetchArrayBufferWithProgress(
                 RECON_API_BASE + '/v1/recon/mission/' + encodeURIComponent(missionId) + '/download',
-                (r, t) => note(`Reading ${missionId}… ${Math.round(r / t * 100)}%`));
+                (r, t) => note(`Reading ${missionId}... ${Math.round(r / t * 100)}%`));
             parsed = await parseFlightSource(buf);
             if (!parsed.rows.length) throw new Error('no usable rows');
         } catch (e) {
@@ -1276,7 +1276,7 @@
         async function loadSeasonIntoModal(year) {
             const req = ++preloadListReq;
             if (!year) { checksNote('Pick a season above; its storms and missions appear here.'); return; }
-            checksNote('Loading the ' + year + ' season…');
+            checksNote('Loading the ' + year + ' season...');
             try {
                 const groups = await reconFetchSeasonGroups(year);
                 if (req !== preloadListReq) return;
@@ -1294,7 +1294,7 @@
         async function openPreloadModal() {
             if (!modal || !checksBox) return;
             if (fill) fill.style.width = '0%';
-            setModalStatus(preloadRunning ? 'A batch load is running…' : 'Check the missions to load.');
+            setModalStatus(preloadRunning ? 'A batch load is running...' : 'Check the missions to load.');
             modal.style.display = 'flex';
             await reconFillSeasonYears(yearSel);
             if (isReconApiDown()) {
@@ -1317,7 +1317,7 @@
             for (let i = 0; i < list.length; i++) {
                 const f = list[i];
                 const id = f.name.replace(/\.(txt|nc)$/i, '');
-                setModalStatus(`(${i + 1}/${list.length}) Parsing ${f.name}…`);
+                setModalStatus(`(${i + 1}/${list.length}) Parsing ${f.name}...`);
                 try {
                     const isNc = /\.nc$/i.test(f.name);
                     // fold each file's own parse fraction into the bar so it advances smoothly within a

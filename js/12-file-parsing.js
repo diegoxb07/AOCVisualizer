@@ -129,9 +129,9 @@
         // the worker decodes NetCDF variables one at a time, so index/total is a true fraction; fill the
         // bar with it so a manual upload shows real parse progress.
         let frac = null;
-        if (p.phase === 'open') { if (st) st.textContent = `Reading ${p.total} NetCDF variables…`; frac = 0; }
-        else if (p.phase === 'var') { if (st) st.textContent = `Processing variable ${p.index}/${p.total}: ${p.name}`; frac = p.total ? p.index / p.total : 0; }
-        else if (p.phase === 'rows') { if (st) st.textContent = `Assembling ${Number(p.numRows).toLocaleString()} data rows…`; frac = 1; }
+        if (p.phase === 'open') { if (st) st.textContent = `Reading ${p.total} NetCDF variables...`; frac = 0; }
+        else if (p.phase === 'var') { if (st) st.textContent = `Loading variable ${p.index}/${p.total}: ${p.name}`; frac = p.total ? p.index / p.total : 0; }
+        else if (p.phase === 'rows') { if (st) st.textContent = `Assembling ${Number(p.numRows).toLocaleString()} data rows...`; frac = 1; }
         if (frac === null) return;
         const percent = Math.round(Math.max(0, Math.min(1, frac)) * 100);
         if (wrap) wrap.classList.remove('hidden');

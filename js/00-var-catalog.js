@@ -41,7 +41,7 @@
     //   usedKey  = METRIC_DEFS key derived from this family, or '' if unused
     // A family collapses all its sensor indices (TTM covers TTM.1/.3/.4) into one comparison unit.
     const RAW_VAR_ROWS = [
-        // --- time ---
+        // time
         ['Time', 'Seconds since file start / time base', 's', 'time', ''],
         ['HH', 'UTC hour', 'h', 'time', ''],
         ['MM', 'UTC minute', 'min', 'time', ''],
@@ -50,7 +50,7 @@
         ['MDSMINUTE', 'Mission Data System UTC minute', 'min', 'time', ''],
         ['MDSSECOND', 'Mission Data System UTC second', 's', 'time', ''],
 
-        // --- position (lat/lon + the chosen references) ---
+        // position (lat/lon + the chosen references)
         ['LATref', 'Latitude, reference sensor (links to best LatGPS.x)', 'deg', 'position', ''],
         ['LONref', 'Longitude, reference sensor (links to best LonGPS.x)', 'deg', 'position', ''],
         ['ALTref', 'GPS altitude MSL, reference sensor (links to best AltGPS.x)', 'm', 'position', 'gpsAlt'],
@@ -63,7 +63,7 @@
         ['LonI', 'INE longitude', 'deg', 'position', ''],
         ['AltI', 'INE inertial altitude', 'm', 'altitude', ''],
 
-        // --- attitude & heading (+ their references) ---
+        // attitude & heading (+ their references)
         ['THDGref', 'True heading, reference sensor', 'deg', 'attitude', 'th'],
         ['THdgI', 'INE true heading', 'deg', 'attitude', 'th'],
         ['ROLLref', 'Roll angle, reference sensor', 'deg', 'attitude', 'roll'],
@@ -78,14 +78,14 @@
         ['DAI', 'INE drift angle', 'deg', 'attitude', 'driftAngle'],
         ['DA', 'Drift angle (derived)', 'deg', 'attitude', 'driftAngle'],
 
-        // --- angular rates ---
+        // angular rates
         ['YawRateI', 'INE yaw rate', 'deg/s', 'rates', ''],
         ['YAWRATEref', 'Yaw rate, reference sensor', 'deg/s', 'rates', ''],
         ['RollRateI', 'INE roll rate', 'deg/s', 'rates', ''],
         ['PitchRateI', 'INE pitch rate', 'deg/s', 'rates', ''],
         ['TrkRateI', 'INE track rate', 'deg/s', 'rates', ''],
 
-        // --- ground speed / velocity components (+ references) ---
+        // ground speed / velocity components (+ references)
         ['GsI', 'INE ground speed', 'm/s', 'velocity', ''],
         ['GsGPS', 'GPS ground speed', 'm/s', 'velocity', ''],
         ['GsGPSkt', 'GPS ground speed', 'kt', 'velocity', ''],
@@ -107,14 +107,14 @@
         ['GSZref', 'Z ground velocity, reference', 'm/s', 'velocity', ''],
         ['UIZ', 'Vertical ground speed (derived)', 'm/s', 'velocity', ''],
 
-        // --- acceleration (+ reference) ---
+        // acceleration (+ reference)
         ['AccAXI', 'Aircraft longitudinal acceleration', 'm/s2', 'accel', ''],
         ['AccAYI', 'Aircraft lateral acceleration', 'm/s2', 'accel', ''],
         ['AccAZI', 'Aircraft normal (vertical) acceleration', 'm/s2', 'accel', ''],
         ['AccZI', 'INE Z acceleration', 'm/s2', 'accel', 'accZ'],
         ['ACCZref', 'Vertical acceleration, reference sensor', 'm/s2', 'accel', 'accZ'],
 
-        // --- airspeed & Mach ---
+        // airspeed & Mach
         ['TAS', 'True airspeed (derived)', 'm/s', 'airspeed', 'tas'],
         ['TASkt', 'True airspeed', 'kt', 'airspeed', 'tas'],
         ['TASref', 'True airspeed, reference', 'm/s', 'airspeed', 'tas'],
@@ -130,7 +130,7 @@
         ['MachADDU', 'Mach number (air-data unit)', 'Mach', 'airspeed', ''],
         ['AltRateADDU', 'Altitude rate (air-data unit)', 'm/s', 'velocity', ''],
 
-        // --- pressure & pressure-altitude (+ references) ---
+        // pressure & pressure-altitude (+ references)
         ['PS', 'Corrected static pressure', 'mb', 'pressure', 'pressure'],
         ['PSM', 'Static pressure transducer', 'mb', 'pressure', 'pressure'],
         ['PSMref', 'Static pressure, reference sensor', 'mb', 'pressure', 'pressure'],
@@ -153,13 +153,13 @@
         ['GS', 'Height of standard surface pressure (derived)', 'm', 'altitude', ''],
         ['ALTGA', 'Geopotential altitude', 'm', 'altitude', ''],
 
-        // --- radar altimeter ---
+        // radar altimeter
         ['AltRa', 'Radar altimeter altitude', 'm', 'altitude', 'radAlt'],
         ['AltRa1', 'Corrected radar altimeter', 'm', 'altitude', 'radAlt'],
         ['AltRaft', 'Radar altimeter altitude', 'ft', 'altitude', 'radAlt'],
         ['AltRaValid', 'Radar altimeter validity flag', 'flag', 'sensor', ''],
 
-        // --- temperature & thermodynamics ---
+        // temperature & thermodynamics
         ['TA', 'Ambient (static) air temperature', 'degC', 'temp', 'tempr'],
         ['TAkelvin', 'Ambient air temperature', 'K', 'temp', ''],
         ['TaADDU', 'Static air temperature (air-data unit)', 'degC', 'temp', 'tempr'],
@@ -177,7 +177,7 @@
         ['THETAE', 'Equivalent potential temperature', 'K', 'temp', 'thetaE'],
         ['SST', 'Sea surface temperature', 'degC', 'ocean', ''],
 
-        // --- moisture ---
+        // moisture
         ['EW', 'Saturation vapor pressure', 'mb', 'moisture', ''],
         ['EE', 'Vapor pressure', 'mb', 'moisture', ''],
         ['HUM_REL', 'Relative humidity', '%', 'moisture', ''],
@@ -186,13 +186,13 @@
         ['MR', 'Mixing ratio', 'g/kg', 'moisture', 'mixRate'],
         ['MRkg', 'Mixing ratio', 'kg/kg', 'moisture', 'mixRate'],
 
-        // --- gas properties (derived constants) ---
+        // gas properties (derived constants)
         ['RGAS', 'Gas constant for mixed air', 'J/(kg K)', 'derived', ''],
         ['SPHEATCP', 'Specific heat of mixed air (const pressure)', 'J/(kg K)', 'derived', ''],
         ['GM', 'Ratio of specific heats', '', 'derived', ''],
         ['GO', 'Ratio of specific heats minus 1', '', 'derived', ''],
 
-        // --- wind ---
+        // wind
         ['WS', 'Horizontal wind speed (derived)', 'm/s', 'wind', 'windSpd'],
         ['WSkt', 'Horizontal wind speed', 'kt', 'wind', 'windSpd'],
         ['WsI', 'INE horizontal wind speed', 'm/s', 'wind', 'windSpd'],
@@ -205,7 +205,7 @@
         ['UTAN', 'Tangential wind', 'm/s', 'wind', ''],
         ['URAD', 'Radial wind', 'm/s', 'wind', ''],
 
-        // --- flow angles & radome/fuselage air-data sensors ---
+        // flow angles & radome/fuselage air-data sensors
         ['AA', 'Attack angle (angle of attack)', 'deg', 'flowangle', 'alpha'],
         ['AAref', 'Angle of attack, reference sensor', 'deg', 'flowangle', 'alpha'],
         ['AaADDU', 'Angle of attack (air-data unit)', 'deg', 'flowangle', 'alpha'],
@@ -220,7 +220,7 @@
         ['PQBETA', 'Fuselage differential sideslip pressure', 'mb', 'flowangle', ''],
         ['PQBETAref', 'Fuselage differential sideslip pressure, reference', 'mb', 'flowangle', ''],
 
-        // --- air-data sensor housekeeping (AAD*) & transducer volts (QC-only) ---
+        // air-data sensor housekeeping (AAD*) & transducer volts (QC-only)
         ['AADChecksum', 'Air-data sensor checksum', '', 'sensor', ''],
         ['AADQC1Volt', 'Air-data QC voltage 1', 'V', 'sensor', ''],
         ['AADQC2Volt', 'Air-data QC voltage 2', 'V', 'sensor', ''],
@@ -236,7 +236,7 @@
         ['PQALPHAVolt', 'Fuselage attack transducer voltage', 'V', 'sensor', ''],
         ['PQBETAVolt', 'Fuselage sideslip transducer voltage', 'V', 'sensor', ''],
 
-        // --- SFMR (surface wind & rain) ---
+        // SFMR (surface wind & rain)
         ['SfmrWS', 'SFMR surface wind speed', 'kt', 'sfmr', ''],
         ['SFMRWSref', 'SFMR surface wind speed, reference', 'kt', 'sfmr', ''],
         ['SfmrRainRate', 'SFMR rain rate', 'mm/h', 'sfmr', ''],
@@ -257,7 +257,7 @@
         ['ASfmrWS', 'Advanced-SFMR surface wind speed', 'kt', 'sfmr', ''],
         ['ASfmrRainRate', 'Advanced-SFMR rain rate', 'mm/h', 'sfmr', ''],
 
-        // --- dropsondes (DS_, indices = successive drops) ---
+        // dropsondes (DS_, indices = successive drops)
         ['DS_Ws', 'Dropsonde wind speed', 'm/s', 'dropsonde', ''],
         ['DS_Wd', 'Dropsonde wind direction', 'deg', 'dropsonde', ''],
         ['DS_WndErr', 'Dropsonde wind error', 'm/s', 'dropsonde', ''],
@@ -278,7 +278,7 @@
         ['DS_SndSats', 'Dropsonde sounding satellites', 'count', 'dropsonde', ''],
         ['DS_WndSats', 'Dropsonde wind satellites', 'count', 'dropsonde', ''],
 
-        // --- GPS receiver housekeeping ---
+        // GPS receiver housekeeping
         ['GPS_Vfom', 'GPS vertical figure of merit', 'm', 'gps', ''],
         ['GPS_Hfom', 'GPS horizontal figure of merit', 'm', 'gps', ''],
         ['GPS_Vdop', 'GPS vertical dilution of precision', '', 'gps', ''],
@@ -296,7 +296,7 @@
         ['GPS_GSAcnt', 'GPS GSA sentence burst count', 'count', 'gps', ''],
         ['GPS_GSTcnt', 'GPS GST sentence burst count', 'count', 'gps', ''],
 
-        // --- ocean / misc ---
+        // ocean / misc
         ['Salinity', 'Sea surface salinity', 'PSU', 'ocean', '']
     ];
 

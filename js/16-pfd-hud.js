@@ -91,7 +91,7 @@
         }
         ctx.restore();
 
-        // --- Fixed bank scale + roll pointer riding the horizon + slip/skid trapezoid (G1000 style) ---
+        // fixed bank scale, roll pointer riding the horizon, slip/skid trapezoid (G1000 style)
         const ww = w - leftW - rightW - vsiW;
         const bankR = Math.min(ww * 0.42, botY * 0.42), k = Math.max(0.7, Math.min(1.5, w / 250));
         ctx.save(); ctx.rect(leftW, 0, ww, botY); ctx.clip(); ctx.translate(cx, cy);
@@ -230,57 +230,57 @@
     function renderHUD(d) {
         const sf = (val, dec) => val !== null && val !== undefined ? val.toFixed(dec) : 'NaN';
         const addHUD = (label, valStr, isTemp=false) => `<d>${label.padEnd(13, ' ')}: <span${isTemp?' class="temp-val"':''}>${valStr}</span></d>`;
-        
+
+        // a value that reads in the same unit either way. the ones that follow the imperial toggle
+        // go through formatReading (js/07-ui-controls.js) instead.
+        const reading = (v, dec, unit) => v !== null && v !== undefined ? sf(v, dec) + unit : 'NaN';
+
         const isImperial = !document.getElementById('toggleSI').checked;
 
-        // Hemisphere from the sign, never assumed: an eastern-hemisphere or southern flight must not
-        // read as N/W. Matches js/17-charts.js and js/18b-flight-search.js.
+        // hemisphere from the sign, never assumed: an eastern-hemisphere or southern flight must not
+        // read as N/W. matches js/17-charts.js and js/18b-flight-search.js.
         const hemi = (v, pos, neg) => `${sf(Math.abs(v), 3)}°${v !== null && v !== undefined ? (v >= 0 ? pos : neg) : ''}`;
 
         let h = addHUD('TIME (UTC)', `${d.time.slice(0,2)}:${d.time.slice(2,4)}:${d.time.slice(4)}`);
         h += addHUD('LATITUDE', hemi(d.lat, 'N', 'S'));
         h += addHUD('LONGITUDE', hemi(d.lon, 'E', 'W'));
-        
-        let pAltDisp = d.pAlt !== null ? sf(isImperial ? d.pAlt * 3.28084 : d.pAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
-        let gAltDisp = d.gpsAlt !== null ? sf(isImperial ? d.gpsAlt * 3.28084 : d.gpsAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
-        let rAltDisp = d.radAlt !== null ? sf(isImperial ? d.radAlt * 3.28084 : d.radAlt, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
-        let dValueDisp = d.dValue !== null ? sf(isImperial ? d.dValue * 3.28084 : d.dValue, 0) + (isImperial ? ' ft' : ' m') : 'NaN';
-        
-        let tDisp = d.tempr !== null ? sf(isImperial ? (d.tempr * 9/5 + 32) : d.tempr, 1) + (isImperial ? ' °F' : ' °C') : 'NaN';
-        let tdDisp = d.dewpt !== null ? sf(isImperial ? (d.dewpt * 9/5 + 32) : d.dewpt, 1) + (isImperial ? ' °F' : ' °C') : 'NaN';
-        
-        // Core altitude lines: GPS altitude first, pressure altitude beneath it.
+
+        const gAltDisp = formatReading(d.gpsAlt, 'gpsAlt', 0, isImperial, [' m', ' ft']);
+        const pAltDisp = formatReading(d.pAlt, 'pAlt', 0, isImperial, [' m', ' ft']);
+        const rAltDisp = formatReading(d.radAlt, 'radAlt', 0, isImperial, [' m', ' ft']);
+        const dValueDisp = formatReading(d.dValue, 'dValue', 0, isImperial, [' m', ' ft']);
+
+        // core altitude lines: GPS altitude first, pressure altitude beneath it.
         if (availableMetrics.has('gpsAlt')) h += addHUD('GPS ALT', gAltDisp);
         if (availableMetrics.has('pAlt')) h += addHUD('PRESS ALT', pAltDisp);
-        
-        if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', `${d.sfcPr !== null ? sf(d.sfcPr, 1) + ' mb' : 'NaN'}`);
-        if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', `${d.windSpd !== null ? sf(d.windSpd, 1) + ' kt' : 'NaN'}`);
-        if (availableMetrics.has('tempr')) h += addHUD('AMBIENT TEMP', tDisp, true);
-        if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', tdDisp, true);
-        
-        // Core metrics end here. Extra metrics live below the fold and scroll into view, so the
+
+        if (availableMetrics.has('sfcPr')) h += addHUD('SFC PRESS', reading(d.sfcPr, 1, ' mb'));
+        if (availableMetrics.has('windSpd')) h += addHUD('WIND SPEED', reading(d.windSpd, 1, ' kt'));
+        if (availableMetrics.has('tempr')) h += addHUD('AMBIENT TEMP', formatReading(d.tempr, 'tempr', 1, isImperial, [' °C', ' °F']), true);
+        if (availableMetrics.has('dewpt')) h += addHUD('DEW POINT', formatReading(d.dewpt, 'dewpt', 1, isImperial, [' °C', ' °F']), true);
+
+        // core metrics end here. extra metrics live below the fold and scroll into view, so the
         // HUD stays pinned to its core size and never covers content above.
-        let coreHtml = h;
+        const coreHtml = h;
         let extraHtml = `<div style="border-top:1px solid #38bdf8; margin:6px 0; padding-top:4px; opacity:0.6; font-size:9px;">EXTRA EXTRACTED METRICS</div>`;
         const addExtra = (label, valStr, isTemp=false) => { extraHtml += addHUD(label, valStr, isTemp); };
 
-
-        if (availableMetrics.has('pitch')) addExtra('PITCH', `${d.pitch !== null ? sf(d.pitch, 1) + '°' : 'NaN'}`);
-        if (availableMetrics.has('roll')) addExtra('ROLL', `${d.roll !== null ? sf(d.roll, 1) + '°' : 'NaN'}`);
-        if (availableMetrics.has('driftAngle')) addExtra('DRIFT ANGLE', `${d.driftAngle !== null ? sf(d.driftAngle, 1) + '°' : 'NaN'}`);
-        if (availableMetrics.has('alpha')) addExtra('ALPHA (AOA)', `${d.alpha !== null ? sf(d.alpha, 2) + '°' : 'NaN'}`);
-        if (availableMetrics.has('beta')) addExtra('BETA (SLIP)', `${d.beta !== null ? sf(d.beta, 2) + '°' : 'NaN'}`);
-        if (availableMetrics.has('accZ')) addExtra('VERT ACCEL', `${d.accZ !== null ? sf(d.accZ, 2) + ' m/s²' : 'NaN'}`);
+        if (availableMetrics.has('pitch')) addExtra('PITCH', reading(d.pitch, 1, '°'));
+        if (availableMetrics.has('roll')) addExtra('ROLL', reading(d.roll, 1, '°'));
+        if (availableMetrics.has('driftAngle')) addExtra('DRIFT ANGLE', reading(d.driftAngle, 1, '°'));
+        if (availableMetrics.has('alpha')) addExtra('ALPHA (AOA)', reading(d.alpha, 2, '°'));
+        if (availableMetrics.has('beta')) addExtra('BETA (SLIP)', reading(d.beta, 2, '°'));
+        if (availableMetrics.has('accZ')) addExtra('VERT ACCEL', reading(d.accZ, 2, ' m/s²'));
         if (availableMetrics.has('radAlt')) addExtra('RADAR ALT', rAltDisp);
         if (availableMetrics.has('dValue')) addExtra('D-VALUE', dValueDisp);
-        if (availableMetrics.has('tas')) addExtra('TRUE AIRSPD', `${d.tas !== null ? sf(d.tas, 1) + ' kt' : 'NaN'}`);
-        if (availableMetrics.has('ias')) addExtra('IND AIRSPD', `${d.ias !== null ? sf(d.ias, 1) + ' kt' : 'NaN'}`);
-        if (availableMetrics.has('th')) addExtra('TRUE HEADING', `${d.th !== null ? sf(d.th, 1) + '°' : 'NaN'}`);
-        if (availableMetrics.has('gTrack')) addExtra('GROUND TRACK', `${d.gTrack !== null ? sf(d.gTrack, 1) + '°' : 'NaN'}`);
-        if (availableMetrics.has('vtWnd')) addExtra('VERT WIND', `${d.vtWnd !== null ? sf(isImperial ? d.vtWnd * 2.23694 : d.vtWnd, 1) + (isImperial ? ' mph' : ' m/s') : 'NaN'}`);
-        if (availableMetrics.has('mixRate')) addExtra('MIXING RATIO', `${d.mixRate !== null ? sf(d.mixRate, 2) + ' g/kg' : 'NaN'}`);
-        if (availableMetrics.has('thetaE')) addExtra('THETA E', `${d.thetaE !== null ? sf(d.thetaE, 1) + ' K' : 'NaN'}`, true);
-        if (availableMetrics.has('pressure')) addExtra('FL PRESS', `${d.pressure !== null ? sf(d.pressure, 1) + ' mb' : 'NaN'}`);
+        if (availableMetrics.has('tas')) addExtra('TRUE AIRSPD', reading(d.tas, 1, ' kt'));
+        if (availableMetrics.has('ias')) addExtra('IND AIRSPD', reading(d.ias, 1, ' kt'));
+        if (availableMetrics.has('th')) addExtra('TRUE HEADING', reading(d.th, 1, '°'));
+        if (availableMetrics.has('gTrack')) addExtra('GROUND TRACK', reading(d.gTrack, 1, '°'));
+        if (availableMetrics.has('vtWnd')) addExtra('VERT WIND', formatReading(d.vtWnd, 'vtWnd', 1, isImperial, [' m/s', ' mph']));
+        if (availableMetrics.has('mixRate')) addExtra('MIXING RATIO', reading(d.mixRate, 2, ' g/kg'));
+        if (availableMetrics.has('thetaE')) addExtra('THETA E', reading(d.thetaE, 1, ' K'), true);
+        if (availableMetrics.has('pressure')) addExtra('FL PRESS', reading(d.pressure, 1, ' mb'));
 
         const prevScroll = hud.scrollTop;
         hud.innerHTML = `<div id="hudCore">${coreHtml}</div><div id="hudExtra">${extraHtml}</div>`;

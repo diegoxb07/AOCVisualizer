@@ -8,6 +8,11 @@
     let threeMarkersGroup = new THREE.Group();
     let threeDInitialized = false;
 
+    // chart typography. the same two families the page uses, named here because Chart.js wants a
+    // font stack as a plain string and cannot read the css token in css/app.css.
+    const CHART_FONT_MONO = "'Roboto Mono', ui-monospace, monospace";
+    const CHART_FONT_SANS = "'Manrope', sans-serif";
+
     // Neon data palette for the charts: equal-weight lines, no gradient fills.
     const METRIC_DEFS = {
         'pAlt': { label: 'Press Altitude (m)', color: '#c2beb5', yAxisID: 'y' },

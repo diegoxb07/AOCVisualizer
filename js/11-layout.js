@@ -90,7 +90,7 @@
         const MIN_H = 240, MAX_H = 900;  // keep the players usable when dragging; use the collapse button to fully hide them
         // The hard ceiling: the panels must never grow under the sticky bottom bar, or the
         // drag handle ends up unreachable and the layout is stuck big with no way to shrink.
-        // 60px ≈ media-bar padding + the handle itself + a small breathing gap above the bar.
+        // 60px is about the media-bar padding + the handle itself + a small breathing gap above the bar.
         const maxMediaH = () => {
             const bb = document.getElementById('stickyBottomBar');
             const bbH = bb ? bb.getBoundingClientRect().height : 90;

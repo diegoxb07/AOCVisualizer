@@ -48,7 +48,7 @@
     const TDR_BEAM_H = 26000 / 690;   // the aircraft beam rises well past the 18 km stack top
     const TDR_ZOOM_OUT_DIST = 110;    // camera distance that frames the ~500 km radar box
     let tdrPlaneBeam = null;          // tall white beam marking the aircraft inside the radar volume
-    let tdrScratch = null;            // work canvas: ribbon ∩ footprint for the rescan erase
+    let tdrScratch = null;            // work canvas: ribbon intersected with footprint for the rescan erase
     let tdrAnyFetched = false;        // once TDR is in use, every remaining leg keeps preloading
     let tdrCamFixed = false;          // camera parked over the radar's center while layers display
     let tdrCamReadyCount = 0;         // ready analyses the fixed camera's center was computed from
@@ -667,7 +667,7 @@
             skel.style.display = tdrLoading ? 'flex' : 'none';
             if (tdrLoading) {
                 const txt = skel.querySelector('.tdr-skel-text');
-                if (txt) txt.textContent = 'Loading radar volumes… (' + (tdrAnalyses.length - pending) + '/' + tdrAnalyses.length + ')';
+                if (txt) txt.textContent = 'Loading radar volumes... (' + (tdrAnalyses.length - pending) + '/' + tdrAnalyses.length + ')';
             }
         }
         const mpl = document.getElementById('mapPanel');
@@ -757,7 +757,7 @@
         }
     }
 
-    // ---- 2D picker overlay -------------------------------------------------------------------
+    // 2D picker overlay
     // The current analysis is the newest one the playhead has crossed (falling back to the first
     // fetched one so the panel works before the radar section); the picked altitude levels
     // composite bottom-up onto one canvas that renderBackground (js/15-map-render.js) draws over
@@ -849,7 +849,7 @@
         // While the first volume downloads, the button itself says so, so the dropdown never
         // reads as ready-to-use before any layer can actually display.
         if (!tdrAnalyses.some(x => x.state === 'ready') && (tdrFetchActive || tdrAnyFetched)) {
-            lbl.textContent = 'TDR Loading…';
+            lbl.textContent = 'TDR Loading...';
             if (btn) { btn.classList.add('opacity-60'); btn.classList.remove('sat-on'); }
             return;
         }
@@ -932,8 +932,8 @@
                         const eb = document.createElement('button');
                         eb.className = 'tdr-eye-btn';
                         eb.textContent = 'Eye Pass';
-                        eb.title = 'Jump to this leg’s closest approach to the storm center (within 55 km). '
-                                 + 'The center is the radar volume’s own origin once the leg has loaded, otherwise a '
+                        eb.title = "Jump to this leg's closest approach to the storm center (within 55 km). "
+                                 + "The center is the radar volume's own origin once the leg has loaded, otherwise a "
                                  + 'position interpolated between the 6-hourly best-track fixes.';
                         if (tdrLegPick === a && tdrEyeActive) eb.classList.add('on');
                         eb.addEventListener('click', () => {
@@ -974,7 +974,7 @@
             TDR_BANDS.forEach(b => {
                 const row = document.createElement('div');
                 row.className = 'tdr-level-row loading';
-                row.title = 'Loading radar data…';
+                row.title = 'Loading radar data...';
                 row.title = tdrBandTitle(b);
                 row.innerHTML = '<span class="tdr-level-ft">' + b.label + '<span class="tdr-level-alt">' + b.alt + '</span></span><span class="tdr-row-spin"></span>';
                 list.appendChild(row);
@@ -1005,7 +1005,7 @@
         });
     }
 
-    // ---- TDR mode: the dedicated radar workspace ----------------------------------------------
+    // TDR mode: the dedicated radar workspace
     // Clicking the TDR button pins the tracker (the same .fake-fs mechanism the panel ⛶ buttons
     // use) and docks the band sidebar, KEEPING whichever tracker display is up: a 3D entry gets
     // the parked overhead radar volume, a 2D entry goes straight to the map display with the
@@ -1128,7 +1128,7 @@
         updateTdr3D();
     }
 
-    // ---- cross-section (top-down pick on the 2D map, rendered by /v1/tdr/plane_slice) --------
+    // cross-section (top-down pick on the 2D map, rendered by /v1/tdr/plane_slice)
     function setTdrSliceHint(t) {
         const el = document.getElementById('tdrSliceHint');
         if (el) { el.textContent = t; el.style.display = t ? 'block' : 'none'; }
@@ -1271,7 +1271,7 @@
         const url = `${RECON_API_BASE}/v1/tdr/plane_slice?mission_id=${encodeURIComponent(tdrMissionId)}` +
             `&level=2&product=${TDR_PRODUCT}&field=${TDR_FIELD}&analysis_time=${encodeURIComponent(cur.hhmm)}` +
             `&x0=${a.x.toFixed(1)}&y0=${a.y.toFixed(1)}&x1=${b.x.toFixed(1)}&y1=${b.y.toFixed(1)}&n=220`;
-        setTdrSliceHint('Building cross-section…');
+        setTdrSliceHint('Building cross-section...');
         const gen = tdrGeneration;
         fetch(url, { headers: reconAuthHeaders() })
             .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })

@@ -22,7 +22,7 @@
     const satTileCache = new Map();          // HOT: fetchId -> { canvas, box, scanStartMs }
     const SAT_CACHE_MAX = 24;                // just the playback neighborhood (decoded = RAM-heavy)
     const satBlobStore = new Map();          // COLD: fetchId -> { blob, box, scanStartMs }
-    const SAT_BLOB_MAX = 1500;               // ≈ 30 storm-bands of 10-min tiles (LRU-evicted)
+    const SAT_BLOB_MAX = 1500;               // about 30 storm-bands of 10-min tiles (LRU-evicted)
     // Second, independent cap. A tile is a full-res PNG (hundreds of KB up to several MB), so the
     // count cap above alone allows multiple GB and lets the browser's quota kill writes instead.
     // Whichever cap trips first evicts. Lowered at runtime if the quota is hit anyway (see 02).
@@ -52,7 +52,7 @@
     let customMarkers = [];
     let flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
 
-    // --- NOAA Recon Archive (noaa-recon-api: https://joshmurdock.net/api) -----------------------
+    // NOAA Recon Archive (noaa-recon-api: https://joshmurdock.net/api)
     // Year/storm/mission browser + best-track overlay, so a flight can be loaded straight from the
     // archive instead of a manual file upload. See js/12b-recon-archive.js.
     let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null

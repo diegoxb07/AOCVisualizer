@@ -37,7 +37,7 @@
     let aviResults = [];            // finished outputs: { name, blob, url }
     let aviSkipped = [];            // segments left out: { name, reason }
 
-    // ---------- zip reading (central directory + per-entry extraction, off Blob slices) ----------
+    // zip reading (central directory + per-entry extraction, off Blob slices)
 
     // List a zip's entries from its central directory without decompressing anything.
     // Handles zip64 sizes/offsets; an encrypted or oddly compressed entry is surfaced by flags/method.
@@ -107,8 +107,6 @@
         if (seg.entry.method === 0) return comp;
         return await new Response(comp.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
     }
-
-    // ---------- picking + ordering ----------
 
     function aviPushSeg(seg) {
         const key = seg.name.toLowerCase() + '|' + seg.size;
@@ -203,8 +201,6 @@
         document.getElementById('aviStartBtn').disabled = !aviSegs.length || aviRunning;
         document.getElementById('aviClearBtn').disabled = !aviSegs.length || aviRunning;
     }
-
-    // ---------- engine ----------
 
     function aviLoadEngineScript() {
         return new Promise((resolve, reject) => {
@@ -379,8 +375,6 @@
         }
     }
 
-    // ---------- the run ----------
-
     // AOC mission id (e.g. 20250817H1) found inside a filename, uppercased for the output name.
     function aviMissionIdFrom(text) {
         const m = (text || '').match(/\d{8}[A-Za-z]\d{1,2}/);
@@ -434,12 +428,12 @@
             // engine pool: the first spawn downloads the engine once, later spawns start from
             // the local cache, and every engine converts its own segment at the same time
             if (!aviEngines.length) {
-                aviSetStatus('Loading the converter engine, a one-time download of about 32 MB…');
+                aviSetStatus('Loading the converter engine, a one-time download of about 32 MB...');
                 aviEngines.push(await aviSpawnEngine());
             }
             const target = Math.min(AVI_MAX_WORKERS, aviSegs.length);
             if (aviEngines.length < target && !aviStopFlag) {
-                aviSetStatus('Getting the converter ready…');
+                aviSetStatus('Getting the converter ready...');
                 const extra = await Promise.all(Array.from({ length: target - aviEngines.length }, () => aviSpawnEngine().catch(() => null)));
                 extra.filter(Boolean).forEach(e => aviEngines.push(e));
             }
@@ -491,7 +485,7 @@
             frags.forEach((f, i) => { if (!f) missing.push(i); });
             if (missing.length) {
                 aviEngines = aviEngines.filter(eng => { if (eng.dead) { try { eng.ff.terminate(); } catch (e) {} } return !eng.dead; });
-                aviSetStatus('Retrying ' + missing.length + ' segment' + (missing.length === 1 ? '' : 's') + '…');
+                aviSetStatus('Retrying ' + missing.length + ' segment' + (missing.length === 1 ? '' : 's') + '...');
                 while (aviEngines.length < Math.min(target, missing.length) && !aviStopFlag) {
                     try { aviEngines.push(await aviSpawnEngine()); } catch (e) { break; }
                 }
@@ -526,8 +520,8 @@
             for (let p = 0; p < parts.length; p++) {
                 if (aviStopFlag) return;
                 aviSetStatus(parts.length > 1
-                    ? 'Combining part ' + (p + 1) + ' of ' + parts.length + ' (' + parts[p].length + ' segments)…'
-                    : 'Combining ' + good.length + ' segments…');
+                    ? 'Combining part ' + (p + 1) + ' of ' + parts.length + ' (' + parts[p].length + ' segments)...'
+                    : 'Combining ' + good.length + ' segments...');
                 const partDur = parts[p].reduce((s, x) => s + x.dur, 0);
                 eng0.onProgress = (e) => {
                     const f = partDur ? Math.min((e.time || 0) / 1e6 / partDur, 1) : 0;
@@ -598,8 +592,6 @@
 
     function aviBeforeUnload(e) { e.preventDefault(); e.returnValue = ''; }
 
-    // ---------- results ----------
-
     function aviClearResults() {
         aviResults.forEach(r => { try { URL.revokeObjectURL(r.url); } catch (e) {} });
         aviResults = [];
@@ -637,8 +629,6 @@
         vi.dispatchEvent(new Event('change', { bubbles: true }));
         aviCloseModal();
     }
-
-    // ---------- UI plumbing ----------
 
     function aviSetStatus(text) { document.getElementById('aviConvertStatus').textContent = text; }
 
@@ -715,7 +705,7 @@
     document.getElementById('aviClearBtn').addEventListener('click', aviClearAll);
     document.getElementById('aviFileInput').addEventListener('change', async function(e) {
         const picked = e.target.files;
-        aviSetStatus('Reading the picked files…');
+        aviSetStatus('Reading the picked files...');
         try { await aviAddPicked(picked); } catch (err) { aviSetStatus('Could not read the picked files: ' + err.message + '.'); }
         e.target.value = '';
     });

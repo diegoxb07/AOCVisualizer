@@ -36,7 +36,7 @@
             let res = cubic(a0_u, a1, a2_u, a3_u, t); return ((res % 360) + 360) % 360;
         };
 
-        // --- Micro-motion between the 1 Hz keyframes ---
+        // micro-motion between the 1 Hz keyframes
         // Amplitude scales with vertical wind (the measured turbulence proxy); shape is smooth
         // band-limited noise (a few sub-2 Hz sinusoids) so it reads as gust response, not static.
         // In calm air (vtWnd ~ 0) the plane sits still.

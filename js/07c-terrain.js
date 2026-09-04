@@ -27,10 +27,12 @@
         return (e00 * (1 - tx) + e10 * tx) * (1 - ty) + (e01 * (1 - tx) + e11 * tx) * ty;
     }
 
-    // The padded box the terrain covers. Kept close to the flight: relief far from it carries no
-    // information about the mission and competes with the track for the eye. Shared, so build3DScene
-    // can prime the land mask from it before it drapes anything on the surface.
-    const TERRAIN_PAD = 0.4;
+    // The padded box the terrain covers, as a multiple of the plot span on each side. It reaches
+    // well past the flight because the camera sits close to the aircraft: at that range the edge of
+    // a tight box lands inside the view, and beyond it there is nothing to draw but the scene
+    // background. The texture sizes below are scaled with it so ground detail holds. Shared, so
+    // build3DScene can prime the land mask from it before it drapes anything on the surface.
+    const TERRAIN_PAD = 1.2;
     function terrainExtent() {
         if (typeof plotMinLon === 'undefined' || plotMinLon == null) return null;
         const spanLon = (plotMaxLon - plotMinLon) || 1, spanLat = (plotMaxLat - plotMinLat) || 1;
@@ -56,7 +58,7 @@
         // is rebuilt once it has.
         if (_landMask && _landMask.lon0 === lon0 && _landMask.lon1 === lon1
             && _landMask.lat0 === lat0 && _landMask.lat1 === lat1 && _landMask.n === mapFeatures.length) return _landMask;
-        const W = 512, H = 512;
+        const W = 768, H = 768;   // scaled with TERRAIN_PAD, so a wider box is no coarser per degree
         const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
         const c = cv.getContext('2d', { willReadFrequently: true });
         c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
@@ -115,8 +117,9 @@
     // The surface's colour, painted rather than taken per-vertex, so the coastline comes from the
     // vector outlines at texture resolution instead of the mesh's ~23 km vertex spacing. Shading is
     // rasterised at TERRAIN_SHADE and scaled up, the elevation source being half-degree; only the
-    // coastline needs TERRAIN_TEX.
-    const TERRAIN_TEX = 2048, TERRAIN_SHADE = 256;
+    // coastline needs TERRAIN_TEX. Both carry TERRAIN_PAD: widening the box without them would
+    // spread the same pixels over more ground and soften every coastline near the aircraft.
+    const TERRAIN_TEX = 3072, TERRAIN_SHADE = 384;
 
     // Held across rebuilds and keyed on everything it draws from. build3DScene runs on a dozen
     // events and drops the old mesh without disposing it, so raising a fresh 2048 texture each time

@@ -7,8 +7,8 @@ a 2D or 3D map tracker, charts for any recorded variable, a cockpit Primary Flig
 satellite imagery, storm best-track, tail Doppler radar, cross-flight comparison, and clip
 recording.
 
-Built for the Aircraft Operations Center. Everything runs client side. The archive API adds
-automation on top (browsing seasons, loading a mission by id, rendering archive GOES imagery), but
+Meant/built for the Aircraft Operations Center. Everything runs client side with the option of the archive API which adds
+automation on top (browsing seasons, loading a mission by id, archive GOES imagery), but
 the tool will still work without it.
 
 Tool: https://diegoxb07.github.io/AOCVisualizer/ (subject to change)
@@ -120,7 +120,7 @@ between sessions.
 
 ## The map tracker
 
-Switch between the two views with the **2D Map Tracker / 3D WebGL Tracker** dropdown in the map
+Switch between the two views with the **2D Map Tracker / 3D Tracker** dropdown in the map
 header.
 
 The 2D view is a whole-world canvas map, coastlines and US states, carrying the satellite imagery

@@ -49,7 +49,7 @@
 }
 
 /* Base */
-html, body { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+html, body { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
 body {
     background-color: var(--bg);
     color: var(--text);
@@ -61,10 +61,9 @@ body {
 ::selection { background: var(--accent-soft); color: var(--text); }
 :focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-/* one mono stack for every readout that needs its digits to hold their column: the timeline
-   clock, the HUD, the time fields, the chart ticks. Roboto Mono ships here as a variable font,
-   so weight 700 is a drawn weight instead of an outline the browser thickens itself. */
-:root { --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, monospace; }
+/* one font stack for every readout that needs its digits to hold their column: the timeline
+   clock, the HUD, the time fields, the chart ticks. */
+:root { --font-mono: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
 
 /* Readouts sit in the interface font; only their digits are held to one width, so a ticking
    clock or a counting percentage does not shuffle the text beside it. */
@@ -134,9 +133,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #dataDropZone, #videoDropZone, #reconSourceLink { border-radius: 3px; }
 .status-chip { border-radius: 4px; }
 
-/* Both media-panel subheaders: Manrope, title-case (not uppercase), slightly larger + brighter.
+/* Both media-panel subheaders: title-case (not uppercase), slightly larger + brighter.
    text-transform/letter-spacing override the parent's uppercase styling. */
-.panel-subhead { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--text); }
+.panel-subhead { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--text); }
 
 /* #satelliteSelect / #satBandSelect are the hidden source-of-truth selects behind the Overlays
    dropdown (never shown), so they need no header sizing. */
@@ -301,8 +300,8 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
    once a mission is loaded (JS toggles .lit + .chip-v.on). This is the one place an
    accent-colored border is intentional, a genuine state change, not decoration. */
 .status-chip { display: flex; flex-direction: column; gap: 3px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; min-width: 0; transition: border-color 0.2s, background 0.2s; }
-.status-chip .chip-k { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
-.status-chip .chip-v { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.status-chip .chip-k { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
+.status-chip .chip-v { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .status-chip .chip-v.on { color: var(--text); }
 .status-chip.lit { background: var(--accent-soft); border: 1px solid var(--accent); }
 .status-chip.lit .chip-v.on { color: var(--text); font-weight: 700; }
@@ -389,7 +388,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* Idle placeholders (hidden wholesale once data loads, via style.display on the placeholder div) */
 .radar-blip { position: absolute; top: 34%; left: 62%; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blipPulse 3.4s ease-out infinite; }
 @keyframes blipPulse { 0%, 12% { opacity: 1; } 60%, 100% { opacity: 0.12; } }
-.media-idle-title { display: block; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
+.media-idle-title { display: block; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
 .media-idle-sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-faint); margin-top: 6px; max-width: 380px; }
 
 /* The processing spinner morphs into a green checkmark once parsing succeeds (js/12 adds .done). */
@@ -427,7 +426,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* satellite product color-scale legend: compact vertical bar tucked into the top-right corner of the
    2d player, below the fetch pill, clear of the pfd (bottom right) and hud (bottom left). */
-#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
 #satColorLegend.hidden { display: none; }
 #satColorLegend .leg-title { font-size: 8px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 3px; text-align: center; }
 #satColorLegend .leg-body { position: relative; display: flex; gap: 4px; height: 124px; }
@@ -459,7 +458,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satPrefetchCancel:hover { background: color-mix(in oklab, var(--danger) 30%, var(--panel)); color: var(--text); }
 
 /* Auto-Sync indicator, anchored in the MMR video panel, non-blocking */
-#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
 #syncingIndicator.show { opacity: 1; transform: translateY(0); }
 #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #syncingIndicator .sync-sub { color: var(--text-muted); font-weight: 500; }
@@ -476,9 +475,9 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #recordProgress #recordStopBtn { background: var(--danger); color: var(--accent-ink); border: none; border-radius: 3px; padding: 4px 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: filter 0.15s; }
 #recordProgress #recordStopBtn:hover { filter: brightness(1.15); }
 
-/* HUD + sat day label read in Inter with tabular digits for cleaner numbers */
+/* HUD + sat day label read with tabular digits for cleaner numbers */
 #hudOverlay, #satDayLabel {
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+    font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif !important;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
 }
@@ -781,7 +780,7 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 
 /* AVI to MP4 converter (js/22-avi-convert.js): the modal's ordered segment list, the Stop
    button, and the fixed corner pill that keeps a background conversion reachable. */
-.avi-file-list { max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.6; color: var(--text-muted); -webkit-user-select: text; user-select: text; }
+.avi-file-list { max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.6; color: var(--text-muted); -webkit-user-select: text; user-select: text; }
 .avi-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; }
 /* full segment filenames wrap rather than truncate, so the join order stays checkable on the
    long archival names (e.g. N43RF_20260721I1FD_2026_07Jul_21_09_07_24_AVI) */
@@ -792,7 +791,7 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .avi-row.avi-meta { color: var(--text-faint); }
 .avi-stop-btn { background: var(--danger); color: #fff; border: none; cursor: pointer; }
 .avi-stop-btn:hover { background: color-mix(in oklab, var(--danger) 85%, #fff); }
-#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
+#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
 #aviConvertPill.on { display: flex; }
 #aviConvertPill .avi-pill-spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #aviConvertPill .avi-pill-pct { color: var(--text-muted); font-weight: 500; }

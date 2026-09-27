@@ -14,6 +14,9 @@
         ? `${pointFixed(Math.abs(v), 3)}${degreeMark} ${v >= 0 ? pos : neg}`
         : 'NaN';
 
+    // label column held to a fixed width so rows line up without a monospace font.
+    const paRow = (label, valueHtml) => `<p style="display:flex;"><span style="display:inline-block; min-width:100px;">${label}</span><span>: ${valueHtml}</span></p>`;
+
     function processPointAnalysisPlotting(dataRow) {
         document.getElementById('pointAnalysisModal').style.display = 'flex';
         currentPointAnalysisData = dataRow;
@@ -35,35 +38,35 @@
         document.getElementById('pointAnalysisMeta').innerHTML = `<strong>Flight ID:</strong> ${flightMetaData.id} | <strong>Aircraft:</strong> ${flightMetaData.aircraft} | <strong>Date:</strong> ${flightMetaData.date} | <strong>Request Time:</strong> ${reqTime}`;
 
         let statsHTML = `
-            <div style="color:var(--accent); font-weight:bold; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:14px; font-family:monospace; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
-            <div style="font-family:monospace; font-size:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; line-height: 1.5;">
-                <p>COORD LAT   : <span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lat, 'N', 'S', '°')}</span></p>
-                <p>COORD LON   : <span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lon, 'E', 'W', '°')}</span></p>`;
+            <div style="color:var(--accent); font-weight:bold; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:14px; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
+            <div style="font-size:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; line-height: 1.5;">
+                ${paRow('COORD LAT', `<span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lat, 'N', 'S', '°')}</span>`)}
+                ${paRow('COORD LON', `<span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lon, 'E', 'W', '°')}</span>`)}`;
 
-        if (targetPr !== null) statsHTML += `<p>BARO LEVEL  : <span style="color:var(--val-cool); font-weight:bold;">${pointFixed(targetPr, 1)} mb</span></p>`;
+        if (targetPr !== null) statsHTML += paRow('BARO LEVEL', `<span style="color:var(--val-cool); font-weight:bold;">${pointFixed(targetPr, 1)} mb</span>`);
 
         const gAltDisp = formatReading(dataRow.gpsAlt, 'gpsAlt', 0, isImperial, [' m', ' ft']);
         const pAltDisp = formatReading(dataRow.pAlt, 'pAlt', 0, isImperial, [' m', ' ft']);
         const dValueDisp = formatReading(dataRow.dValue, 'dValue', 0, isImperial, [' m', ' ft']);
 
-        if (useGps) { if (availableMetrics.has('gpsAlt')) statsHTML += `<p>GPS ALTITUDE: <span style="color:var(--accent); font-weight:bold;">${gAltDisp}</span></p>`; }
-        else { if (availableMetrics.has('pAlt')) statsHTML += `<p>PRESS ALT   : <span style="color:var(--val-alt); font-weight:bold;">${pAltDisp}</span></p>`; }
+        if (useGps) { if (availableMetrics.has('gpsAlt')) statsHTML += paRow('GPS ALTITUDE', `<span style="color:var(--accent); font-weight:bold;">${gAltDisp}</span>`); }
+        else { if (availableMetrics.has('pAlt')) statsHTML += paRow('PRESS ALT', `<span style="color:var(--val-alt); font-weight:bold;">${pAltDisp}</span>`); }
 
         if (availableMetrics.has('tempr') || availableMetrics.has('dewpt')) {
             const tDisp = formatReading(dataRow.tempr, 'tempr', 1, isImperial, ['°C', '°F']);
             const tdDisp = formatReading(dataRow.dewpt, 'dewpt', 1, isImperial, ['°C', '°F']);
-            statsHTML += `<p>ENVIRONMENT : <span style="color:#ef4444; font-weight:bold;">${tDisp}</span> / <span style="color:var(--val-cool); font-weight:bold;">${tdDisp}</span></p>`;
+            statsHTML += paRow('ENVIRONMENT', `<span style="color:#ef4444; font-weight:bold;">${tDisp}</span> / <span style="color:var(--val-cool); font-weight:bold;">${tdDisp}</span>`);
         }
 
-        if (rhCalc !== null) statsHTML += `<p>COMPUTED RH : <span style="color:var(--text-muted); font-weight:bold;">${pointFixed(rhCalc, 1)}%</span></p>`;
-        if (availableMetrics.has('windSpd')) statsHTML += `<p>WIND VECTOR : <span style="color:var(--val-warm); font-weight:bold;">${pointFixed(dataRow.windDir, 0)}° @ ${pointFixed(dataRow.windSpd, 1)} kt</span></p>`;
-        if (availableMetrics.has('accZ')) statsHTML += `<p>VERT ACCEL  : <span style="color:var(--text-muted); font-weight:bold;">${pointFixed(dataRow.accZ, 2)} m/s²</span></p>`;
-        if (availableMetrics.has('pitch') || availableMetrics.has('roll')) statsHTML += `<p>PITCH / ROLL: <span style="color:var(--accent); font-weight:bold;">${pointFixed(dataRow.pitch, 1)}° / ${pointFixed(dataRow.roll, 1)}°</span></p>`;
-        if (availableMetrics.has('driftAngle')) statsHTML += `<p>DRIFT ANGLE : <span style="color:var(--val-cool); font-weight:bold;">${pointFixed(dataRow.driftAngle, 1)}°</span></p>`;
-        if (availableMetrics.has('tas')) statsHTML += `<p>TRUE AIRSPD : <span style="color:var(--val-warm); font-weight:bold;">${pointFixed(dataRow.tas, 1)} kt</span></p>`;
-        if (availableMetrics.has('ias')) statsHTML += `<p>IND AIRSPD  : <span style="color:var(--val-cool); font-weight:bold;">${pointFixed(dataRow.ias, 1)} kt</span></p>`;
-        if (availableMetrics.has('vtWnd')) statsHTML += `<p>VERT WIND   : <span style="color:#ff3d71; font-weight:bold;">${formatReading(dataRow.vtWnd, 'vtWnd', 1, isImperial, [' m/s', ' mph'])}</span></p>`;
-        if (availableMetrics.has('dValue')) statsHTML += `<p>D-VALUE     : <span style="color:var(--val-alt); font-weight:bold;">${dValueDisp}</span></p>`;
+        if (rhCalc !== null) statsHTML += paRow('COMPUTED RH', `<span style="color:var(--text-muted); font-weight:bold;">${pointFixed(rhCalc, 1)}%</span>`);
+        if (availableMetrics.has('windSpd')) statsHTML += paRow('WIND VECTOR', `<span style="color:var(--val-warm); font-weight:bold;">${pointFixed(dataRow.windDir, 0)}° @ ${pointFixed(dataRow.windSpd, 1)} kt</span>`);
+        if (availableMetrics.has('accZ')) statsHTML += paRow('VERT ACCEL', `<span style="color:var(--text-muted); font-weight:bold;">${pointFixed(dataRow.accZ, 2)} m/s²</span>`);
+        if (availableMetrics.has('pitch') || availableMetrics.has('roll')) statsHTML += paRow('PITCH / ROLL', `<span style="color:var(--accent); font-weight:bold;">${pointFixed(dataRow.pitch, 1)}° / ${pointFixed(dataRow.roll, 1)}°</span>`);
+        if (availableMetrics.has('driftAngle')) statsHTML += paRow('DRIFT ANGLE', `<span style="color:var(--val-cool); font-weight:bold;">${pointFixed(dataRow.driftAngle, 1)}°</span>`);
+        if (availableMetrics.has('tas')) statsHTML += paRow('TRUE AIRSPD', `<span style="color:var(--val-warm); font-weight:bold;">${pointFixed(dataRow.tas, 1)} kt</span>`);
+        if (availableMetrics.has('ias')) statsHTML += paRow('IND AIRSPD', `<span style="color:var(--val-cool); font-weight:bold;">${pointFixed(dataRow.ias, 1)} kt</span>`);
+        if (availableMetrics.has('vtWnd')) statsHTML += paRow('VERT WIND', `<span style="color:#ff3d71; font-weight:bold;">${formatReading(dataRow.vtWnd, 'vtWnd', 1, isImperial, [' m/s', ' mph'])}</span>`);
+        if (availableMetrics.has('dValue')) statsHTML += paRow('D-VALUE', `<span style="color:var(--val-alt); font-weight:bold;">${dValueDisp}</span>`);
 
         statsHTML += `</div>`;
         document.getElementById('pointAnalysisStats').innerHTML = statsHTML;

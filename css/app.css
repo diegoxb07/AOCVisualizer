@@ -225,9 +225,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* Real page fullscreen (the ⛶ Fullscreen button fullscreens <html>, not one panel): the fixed
    reset/theme/help cluster (#topRightControls, top-right, z-9999) would sit on top of the sticky
    media bar once it sticks to the top. Stick the bar below the cluster's height instead, so the
-   buttons keep their own clear space above the players. 88px clears the cluster: the button row
-   (top-4 = 16px in) plus the theme switch (26px) beneath it. */
-:root:fullscreen .sticky-media-bar { top: 88px; }
+   buttons keep their own clear space above the players. 54px clears the cluster: the one button
+   row (top-4 = 16px in, ~38px tall including the theme switch riding beside it). */
+:root:fullscreen .sticky-media-bar { top: 54px; }
 /* Fullscreen a single graph, like the media panels: fill the viewport (the JS also hides the top-right
    sticky cluster). Toggle off with the ⛶ button again or Esc. */
 .chart-fs { position: fixed; inset: 0; z-index: 4000; margin: 0; border: none; border-radius: 0; background: var(--bg); padding: 18px 18px 24px; }

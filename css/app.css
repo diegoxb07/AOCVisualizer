@@ -222,12 +222,6 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 
 /* Fullscreen behavior (functional, do not simplify) */
 :fullscreen { background-color: var(--bg); overflow-y: auto; padding: 24px; padding-bottom: 140px; }
-/* Real page fullscreen (the ⛶ Fullscreen button fullscreens <html>, not one panel): the fixed
-   reset/theme/help cluster (#topRightControls, top-right, z-9999) would sit on top of the sticky
-   media bar once it sticks to the top. Stick the bar below the cluster's height instead, so the
-   buttons keep their own clear space above the players. 54px clears the cluster: the one button
-   row (top-4 = 16px in, ~38px tall including the theme switch riding beside it). */
-:root:fullscreen .sticky-media-bar { top: 54px; }
 /* Fullscreen a single graph, like the media panels: fill the viewport (the JS also hides the top-right
    sticky cluster). Toggle off with the ⛶ button again or Esc. */
 .chart-fs { position: fixed; inset: 0; z-index: 4000; margin: 0; border: none; border-radius: 0; background: var(--bg); padding: 18px 18px 24px; }
@@ -322,7 +316,10 @@ input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
 .status-chip, #dataReportLine, #missionSubline, #reconArchiveStatus, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
 .status-chip { cursor: copy; }   /* a plain click copies the chip's value (js/09-interaction.js) */
 
-.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+/* top clears the fixed top-right cluster (#topRightControls, top-4 in, one row ~38px tall, z-9999):
+   that cluster is pinned to the viewport in both normal and real (:fullscreen) page fullscreen, so
+   once this bar sticks to the top its own panel buttons would otherwise land right under it. */
+.sticky-media-bar { position: sticky; top: 54px; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
 /* collapser: on the drag grip's line at the bottom left (grip stays centered), so it adds no extra
    row. z-index above the resize handle so its clicks collapse instead of starting a drag.
    Left in both states, so the button holds one lateral position and stays where the eye left it.
@@ -395,6 +392,9 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* The loading overlay reads in the interface font rather than the mono one. Its numbers count up
    while it is on screen, so they hold a fixed digit width and the line does not shimmer. */
 #loadingOverlaySubtext, #loadingProgressWrap { font-variant-numeric: tabular-nums; }
+/* 10% down from the old text-xl/md:text-2xl pair (20px/24px). */
+.loading-title { font-size: 18px; }
+@media (min-width: 768px) { .loading-title { font-size: 21.6px; } }
 #loadingCheck { opacity: 0; }
 #loadingCheck path { stroke-dasharray: 42; stroke-dashoffset: 42; }
 #loadingSpinner.done #loadingRing { animation: none; border-color: #10b981; transition: border-color 0.25s ease; }

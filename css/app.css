@@ -4,8 +4,9 @@
    before renaming or removing a selector. */
 
 /* Tokens: near-zero-chroma neutrals (light & dark) + one accent hue (NOAA navy) and one
-   reserved danger hue (recording/error states). Gated on documentElement[data-theme],
-   defaults to dark; js/19-bootstrap.js flips this and persists the choice. */
+   reserved danger hue (recording/error states). Gated on documentElement[data-theme], which the
+   index.html head script sets before first paint (light unless dark was saved); js/19-bootstrap.js
+   flips it and persists the choice. The bare :root dark set is only the no-script fallback. */
 :root, :root[data-theme="dark"] {
     color-scheme: dark;
     --bg: oklch(17% 0.002 90);
@@ -26,7 +27,10 @@
     --val-cool: #7dd3fc;
     --val-alt: #7c93ff;
     --val-warm: #fbbf24;
-    --media-h: clamp(460px, 54vh, 600px); /* JS-resizable via the media drag handle */
+    /* first-paint estimate of the screen fit in js/11-layout.js (which then takes over, and the media
+       drag handle after it): 54vh up to 600px, shrinking on short screens so most of a graph row still
+       shows under the stuck bar. 363px = sticky top 54 + bar padding and border 39 + bottom bar ~90 + 180 graph room. */
+    --media-h: clamp(240px, min(54vh, 100vh - 363px), 600px);
 }
 :root[data-theme="light"] {
     color-scheme: light;
@@ -234,8 +238,10 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #mapPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; }
 #mapPanel:is(:fullscreen, .fake-fs) .panel-title, #videoPanel:is(:fullscreen, .fake-fs) .panel-title { padding: 16px; background-color: color-mix(in oklab, var(--panel) 90%, transparent); margin-bottom: 0; position: absolute; width: 100%; z-index: 100; top: 0; border-bottom: 1px solid var(--border); }
 #mapPanel:is(:fullscreen, .fake-fs) .media-container, #videoPanel:is(:fullscreen, .fake-fs) .media-container { height: 100vh; border-radius: 0; flex-grow: 1; }
-#mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: 170px; transform: scale(1) !important; transform-origin: bottom left; }
-#mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: 170px; width: 210px; height: 210px; }
+/* the pinned HUD and PFD clear the bottom bar by its live height (--bottom-bar-h, js/11-layout.js) plus
+   room for the 10-minute stepper, so a bar that wraps taller on a narrow window never covers them. */
+#mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: calc(var(--bottom-bar-h, 96px) + 74px); transform: scale(1) !important; transform-origin: bottom left; }
+#mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: calc(var(--bottom-bar-h, 96px) + 74px); width: 210px; height: 210px; }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
 /* Pre-hide the measure cluster on a 3D-preference refresh (class set by the inline head script
    in index.html) so it doesn't flash before persistDisplayPrefs restores the 3D tracker mode. */
@@ -331,7 +337,8 @@ input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
 .sticky-media-bar.collapsed #mediaBarContent, .sticky-media-bar.collapsed .media-resize-handle { display: none; }
 /* mini playback bar: only in the collapsed media strip, so scrubbing/marking survive the collapse
    (the full playback bar is hidden by the JS then). the strip is full-width, so its slider is wide
-   and therefore less sensitive than a tiny one. right padding clears the absolute collapse button. */
+   and therefore less sensitive than a tiny one. left padding clears the absolute collapse button, right
+   padding the fixed top-right cluster. */
 .mini-playback-bar { display: none; align-items: center; gap: 8px; padding: 5px 240px 5px 118px; flex-wrap: nowrap; }
 .clip-remove-graph { color: var(--danger); font-weight: 700; transition: color 0.12s; }
 .clip-remove-graph:hover { color: color-mix(in oklab, var(--danger) 78%, #fff); }
@@ -412,6 +419,8 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #hudOverlay d { display: block; white-space: pre; }
 #hudOverlay span { color: var(--accent); font-weight: bold; float: right; margin-left: 12px; }
 #hudOverlay span.temp-val { color: #ff9933; }
+/* the HUD sits on --panel, near-white in light mode, so the temperature orange darkens there to stay readable */
+:root[data-theme="light"] #hudOverlay span.temp-val { color: #c2410c; }
 
 #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 140px; height: 140px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; transform: scale(var(--hud-scale, 1)); transform-origin: bottom right; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
@@ -434,6 +443,11 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satColorLegend .leg-ticks { position: relative; flex: 1 1 auto; }
 #satColorLegend .leg-ticks span { position: absolute; left: 0; transform: translateY(-50%); font-size: 8px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
 #satColorLegend .leg-unit { text-align: center; font-size: 8px; font-weight: 700; color: var(--text-muted); margin-top: 6px; }
+/* shrinks with the media height like the hud (--hud-scale, js/11-layout.js), anchored to its top-right
+   corner; a pinned map shows it at full size, as it does the hud. --sat-leg-fit is set by
+   fitSatColorLegend (js/02-satellite.js) only when the map box is too short for the whole legend. */
+#satColorLegend { transform: scale(calc(var(--hud-scale, 1) * var(--sat-leg-fit, 1))); transform-origin: top right; }
+#mapPanel:is(:fullscreen, .fake-fs) #satColorLegend { transform: scale(var(--sat-leg-fit, 1)); }
 /* mmr uploaded means a narrower two-column map, so tuck the legend further into the corner and shrink it */
 #mediaGrid:not(.no-video) #satColorLegend { top: 48px; right: 5px; width: 50px; padding: 3px 4px; }
 #mediaGrid:not(.no-video) #satColorLegend .leg-title { font-size: 7.5px; margin-bottom: 2px; }

@@ -23,7 +23,11 @@
     function getBaseChartOptions(titleText, config = {}) {
         const enforceIntegers = config.enforceIntegers || false; const minRange = config.minRange || 0;
         const limitCallback = (scale) => { if (minRange > 0) { const range = scale.max - scale.min; if (range < minRange) { const mid = (scale.max + scale.min) / 2; scale.max = mid + (minRange / 2); scale.min = mid - (minRange / 2); } } };
-        const tickConfig = { color: '#94a3b8', font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#7ad9ff', font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
+        // axis and grid inks are scriptable, so chart.js reads the theme each time it resolves options and
+        // the theme toggle's update('none') recolors them. the dark set stays light on the dark panel.
+        const themed = (light, dark) => () => document.documentElement.dataset.theme === 'light' ? light : dark;
+        const axisInk = themed('#475569', '#94a3b8');
+        const tickConfig = { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: themed('#0369a1', '#7ad9ff'), font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
             // tooltips trigger for the nearest sample at the cursor's x, so hovering anywhere
@@ -37,7 +41,7 @@
                 if (Math.abs(xPixel - playheadPx) < 15) chart.canvas.style.cursor = 'ew-resize';
                 else chart.canvas.style.cursor = 'crosshair';
             },
-            scales: { x: { grid: { color: 'rgba(226,232,240,0.05)' }, ticks: { color: '#94a3b8', font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(226,232,240,0.07)' }, ticks: tickConfig, title: { display: true, text: titleText, color: '#94a3b8', font: { family: CHART_FONT_SANS, size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
+            scales: { x: { grid: { color: themed('rgba(15,23,42,0.06)', 'rgba(226,232,240,0.05)') }, ticks: { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: themed('rgba(15,23,42,0.08)', 'rgba(226,232,240,0.07)') }, ticks: tickConfig, title: { display: true, text: titleText, color: axisInk, font: { family: CHART_FONT_SANS, size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
             plugins: { tooltip: { callbacks: { afterTitle: (items) => {
                 // the tooltip title is the sample's time; add its lat/lon underneath (same hover).
                 const d = items.length && filteredData[items[0].dataIndex];
@@ -72,23 +76,27 @@
         id: 'markerPlugin', 
         afterDraw: (chart) => { 
             if (filteredData.length === 0) return; 
-            const ctx = chart.ctx; const xAxis = chart.scales.x; 
-            ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); 
-            customMarkers.forEach(marker => { 
-                const x = xAxis.getPixelForValue(marker.idx); 
-                if (x >= xAxis.left && x <= xAxis.right) { 
-                    ctx.strokeStyle = marker.color; ctx.beginPath(); ctx.moveTo(x, chart.chartArea.top); ctx.lineTo(x, chart.chartArea.bottom); ctx.stroke(); 
-                } 
-            }); 
+            const ctx = chart.ctx; const xAxis = chart.scales.x;
+            ctx.save();
+            // playhead first, so a mark on the same sample is layered over it instead of hidden under it
             if (currentIdx >= 0 && currentIdx < filteredData.length) {
                 const px = xAxis.getPixelForValue(currentIdx);
                 if (px >= xAxis.left && px <= xAxis.right) {
-                    ctx.strokeStyle = '#ffffff'; 
+                    // white washes out on the near-white light panel, so the playhead goes black there.
+                    // read per draw, so the theme toggle's chart update('none') recolors it.
+                    ctx.strokeStyle = document.documentElement.dataset.theme === 'light' ? '#000000' : '#ffffff';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([]);
                     ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();
                 }
             }
+            ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+            customMarkers.forEach(marker => {
+                const x = xAxis.getPixelForValue(marker.idx);
+                if (x >= xAxis.left && x <= xAxis.right) {
+                    ctx.strokeStyle = marker.color; ctx.beginPath(); ctx.moveTo(x, chart.chartArea.top); ctx.lineTo(x, chart.chartArea.bottom); ctx.stroke();
+                }
+            });
             ctx.restore();
         }
     };

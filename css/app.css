@@ -410,7 +410,10 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 @keyframes loadCheckDraw { to { stroke-dashoffset: 0; } }
 
 /* In-map overlays: HUD, PFD, pills, badges - flat hairline borders, no accent-tinted glow */
-.overlays-wrapper { position: absolute; top: 44px; bottom: 18px; left: 16px; display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
+/* the metric hud's corner and the pitch/roll box's spot, shared with fitAttitudeHud (js/11-layout.js).
+   --att-h is the box's fixed height: 4 lines of 15px, 7px padding top and bottom, a 1px border. */
+#mapContainer { --hud-left: 16px; --hud-bottom: 18px; --att-top: 75px; --att-h: 76px; }
+.overlays-wrapper { position: absolute; top: 44px; bottom: var(--hud-bottom); left: var(--hud-left); display: flex; gap: 16px; align-items: flex-end; z-index: 2500; pointer-events: none; transition: bottom 0.2s; transform: scale(var(--hud-scale, 1)); transform-origin: bottom left; }
 #hudOverlay { background-color: color-mix(in oklab, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 4px; padding: 10px; font-family: var(--font-mono); font-size: 10px; line-height: 1.4; color: var(--text); display: none; min-width: 200px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); position: relative; pointer-events: auto; max-height: 100%; overflow-y: auto; }
 #hudOverlay::-webkit-scrollbar { width: 6px; }
 #hudOverlay::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
@@ -697,7 +700,11 @@ body.media-collapsed .float-panel { display: none !important; }
 .filter-note { margin-left: 17px; margin-top: -2px; font-size: 8.5px; font-weight: 600; font-style: italic; letter-spacing: 0.3px; color: var(--text-faint); text-transform: uppercase; user-select: none; }
 /* Pitch/roll HUD scales with --hud-scale (set by the media resize handle in js/11-layout.js),
    staying in step with the metric HUD/PFD. It scales from its anchored corner. */
-#attitudeHud { transform: scale(var(--hud-scale, 1)); transform-origin: top left; font-size: 10px; padding: 7px; }
+#attitudeHud { top: var(--att-top); left: var(--hud-left); height: var(--att-h); box-sizing: border-box; overflow: hidden; line-height: 15px; transform: scale(var(--hud-scale, 1)); transform-origin: top left; font-size: 10px; padding: 7px; }
+/* a player too short for the box and the metric hud to stack on the left edge: fitAttitudeHud sets
+   .att-beside and the box moves to the right of the metric hud, bottom-aligned with it and scaled from
+   the same corner, so the two never overlap. --hud-w is the metric hud's measured width. */
+#mapPanel.att-beside:not(:fullscreen):not(.fake-fs) #attitudeHud { top: auto; bottom: var(--hud-bottom); left: calc(var(--hud-left) + (var(--hud-w, 200px) + 16px) * var(--hud-scale, 1)); transform-origin: bottom left; }
 /* In 3D fullscreen the pitch/roll HUD moves to the top-right. */
 #mapPanel:is(:fullscreen, .fake-fs) #attitudeHud { top: 92px; left: auto; right: 16px; transform-origin: top right; }
 /* Hide the pitch/roll box until it actually has telemetry, otherwise it's an odd empty bordered

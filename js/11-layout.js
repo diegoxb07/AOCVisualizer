@@ -48,7 +48,29 @@
         }
         // the satellite legend fits itself to the map box's new height
         if (typeof fitSatColorLegend === 'function') fitSatColorLegend();
+        fitAttitudeHud();
     }
+
+    // the 3D pitch/roll box (top left) and the metric hud (bottom left) scale together but grow from
+    // opposite ends of the left edge, so a short player would stack one on the other. when the box in its
+    // top-left spot would come within 8px of the metric hud, .att-beside moves it beside the hud
+    // (css/app.css). measured against the top-left spot, never the current one, so the move cannot
+    // flip the result. --hud-w carries the hud's width for the beside position.
+    function fitAttitudeHud() {
+        const box = document.getElementById('mapContainer'), panel = document.getElementById('mapPanel'), hudEl = document.getElementById('hudOverlay');
+        if (!box || !panel || !hudEl) return;
+        box.style.setProperty('--hud-w', hudEl.offsetWidth + 'px');
+        const cs = getComputedStyle(box);
+        const s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hud-scale')) || 1;
+        const attBottom = (parseFloat(cs.getPropertyValue('--att-top')) || 0) + (parseFloat(cs.getPropertyValue('--att-h')) || 0) * s;
+        const hr = hudEl.getBoundingClientRect();
+        panel.classList.toggle('att-beside', hr.height > 0 && attBottom + 8 > hr.top - box.getBoundingClientRect().top);
+    }
+    // the metric hud grows and shrinks with its rows (units toggle, a new flight), with no map resize
+    (function watchMetricHud() {
+        const hudEl = document.getElementById('hudOverlay');
+        if (hudEl && typeof ResizeObserver !== 'undefined') { try { new ResizeObserver(fitAttitudeHud).observe(hudEl); } catch (e) {} }
+    })();
     window.addEventListener('resize', () => {
         if (filteredData.length > 0) {
             resizeCanvasLayout();

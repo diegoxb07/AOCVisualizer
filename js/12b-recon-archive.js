@@ -25,6 +25,24 @@
     const reconSourceLink = document.getElementById('reconSourceLink');
     const reconArchiveStatus = document.getElementById('reconArchiveStatus');
 
+    // aircraft for an archive mission. the api labels some missions "Unknown Aircraft" with an empty tail
+    // number, while the letter in the mission id always names the aircraft (H Kermit, I Miss Piggy,
+    // N Gonzo), so that letter fills the gap, written in the api's own label format.
+    const MISSION_LETTER_AIRCRAFT = {
+        H: { aircraft: 'NOAA 42 (Kermit)', tail: 'N42' },
+        I: { aircraft: 'NOAA 43 (Miss Piggy)', tail: 'N43' },
+        N: { aircraft: 'NOAA 49 (Gonzo)', tail: 'N49' }
+    };
+    function missionAircraftInfo(m) {
+        const known = v => !!v && !/unknown/i.test(v);
+        const k = /^\d{8}([HIN])\d/i.exec((m && m.mission_id) || '');
+        const fromId = k ? MISSION_LETTER_AIRCRAFT[k[1].toUpperCase()] : null;
+        return {
+            aircraft: known(m.aircraft) ? m.aircraft : (fromId ? fromId.aircraft : (known(m.tail_num) ? m.tail_num : '')),
+            tail: known(m.tail_num) ? m.tail_num : (fromId ? fromId.tail : '')
+        };
+    }
+
     let reconYearsLanded = false;   // flips when the archive year list arrives; gates the pre-cache buttons
     function syncReconLoadButtonState() {
         if (!reconLoadBtn) return;
@@ -193,7 +211,7 @@
                 await navigator.clipboard.writeText(url);
                 showToast('Share link copied. It opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
             } catch (e) {
-                showToast('Could not access the clipboard, but the address bar holds the share link.', 6000);
+                showToast('Could not access the clipboard. The share link is in the address bar.', 6000);
             }
         });
     })();
@@ -306,8 +324,9 @@
                 const opt = document.createElement('option'); opt.value = m.mission_id;
                 // Mission id leads (its first 8 digits are the date, so a separate date column
                 // would just repeat it in this narrow select).
-                opt.textContent = `${boldUnicode(m.mission_id)} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
-                opt.title = `${m.flight_date} · ${m.aircraft || m.tail_num} · ${m.obs_count} obs`;
+                const ac = missionAircraftInfo(m).aircraft || 'Unknown';
+                opt.textContent = `${boldUnicode(m.mission_id)} · ${ac} · ${m.obs_count} obs`;
+                opt.title = `${m.flight_date} · ${ac} · ${m.obs_count} obs`;
                 reconMissionSelect.appendChild(opt);
             });
             reconMissionSelect.options[0].textContent = 'Flight...';
@@ -396,7 +415,7 @@
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'block w-full text-left px-2.5 py-1.5 border-b border-hairline last:border-b-0 hover:bg-[color-mix(in_oklab,var(--accent)_50%,transparent)] hover:text-ink transition-colors ' + (primary ? 'bg-accent-soft text-accent font-semibold' : 'text-ink bg-panel');
-            const meta = [m.storm_name, m.flight_date, m.aircraft || m.tail_num].filter(Boolean).join(' · ');
+            const meta = [m.storm_name, m.flight_date, missionAircraftInfo(m).aircraft].filter(Boolean).join(' · ');
             b.innerHTML = `<span class="font-semibold">${primary ? '↵ Load ' : ''}${escapeHtml(m.mission_id)}</span>${meta ? ' <span class="text-muted font-normal">· ' + escapeHtml(meta) + '</span>' : ''}`;
             b.addEventListener('mousedown', (e) => { e.preventDefault(); hideResults(); input.blur(); loadReconMission(m.mission_id); });
             return b;
@@ -494,7 +513,8 @@
             if (seq !== searchSeq) return;   // a newer keystroke already superseded this
             const tokens = raw.toLowerCase().split(/\s+/).filter(Boolean);
             const matches = pool.filter(m => {
-                const hay = `${m.mission_id} ${m.storm_name} ${m.flight_date} ${m.aircraft || ''} ${m.tail_num || ''}`.toLowerCase();
+                const ai = missionAircraftInfo(m);
+                const hay = `${m.mission_id} ${m.storm_name} ${m.flight_date} ${ai.aircraft} ${ai.tail}`.toLowerCase();
                 return tokens.every(t => hay.includes(t));
             }).sort((a, b) => (b.start_unix || 0) - (a.start_unix || 0));
             const out = rowFrag();
@@ -589,7 +609,7 @@
         }
 
         clearLoadedMedia();
-        flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
+        flightMetaData = { id: `${mission.mission_id} (${mission.storm_name})`, date: mission.flight_date, aircraft: missionAircraftInfo(mission).aircraft || 'Unknown' };
 
         // Primary path: stream the mission's original full-resolution NetCDF through the API's
         // CORS-open download endpoint into the same parseEntireFile() pipeline a manual .nc upload
@@ -1096,7 +1116,7 @@
         if (!rec.uploaded && !rec.isNc) { return loadReconMission(missionId); }
         const mission = rec.mission;
         clearLoadedMedia();
-        flightMetaData = { id: mission.storm_name ? `${mission.mission_id} (${mission.storm_name})` : mission.mission_id, date: mission.flight_date || 'Unknown', aircraft: mission.aircraft || mission.tail_num || 'Unknown' };
+        flightMetaData = { id: mission.storm_name ? `${mission.mission_id} (${mission.storm_name})` : mission.mission_id, date: mission.flight_date || 'Unknown', aircraft: missionAircraftInfo(mission).aircraft || 'Unknown' };
         try {
             applyParsedFlight(rec.parsed);
         } catch (e) {
@@ -1200,8 +1220,9 @@
                 const span = document.createElement('span');
                 span.className = 'truncate';
                 const tag = onDevice ? (o.loadedTag || ' (loaded)') : '';
-                span.textContent = `${m.mission_id} · ${m.tail_num || m.aircraft || ''} · ${m.obs_count} obs${tag}`;
-                span.title = `${m.flight_date} · ${m.aircraft || m.tail_num || ''} · ${m.obs_count} obs`;
+                const ai = missionAircraftInfo(m);
+                span.textContent = `${m.mission_id} · ${ai.tail || ai.aircraft} · ${m.obs_count} obs${tag}`;
+                span.title = `${m.flight_date} · ${ai.aircraft || ai.tail} · ${m.obs_count} obs`;
                 lbl.appendChild(cb); lbl.appendChild(span);
                 grid.appendChild(lbl);
             });

@@ -38,7 +38,7 @@
         document.getElementById('pointAnalysisMeta').innerHTML = `<strong>Flight ID:</strong> ${flightMetaData.id} | <strong>Aircraft:</strong> ${flightMetaData.aircraft} | <strong>Date:</strong> ${flightMetaData.date} | <strong>Request Time:</strong> ${reqTime}`;
 
         let statsHTML = `
-            <div style="color:var(--accent); font-weight:bold; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:14px; margin-top:12px;">STATION REPORT [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
+            <div style="color:var(--accent); font-weight:bold; font-size:15px; border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:14px; margin-top:12px;">Point Report [${dataRow.time.slice(0,2)}:${dataRow.time.slice(2,4)}:${dataRow.time.slice(4)} UTC]</div>
             <div style="font-size:14px; display:grid; grid-template-columns: 1fr 1fr; gap:12px; line-height: 1.5;">
                 ${paRow('COORD LAT', `<span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lat, 'N', 'S', '°')}</span>`)}
                 ${paRow('COORD LON', `<span style="color:var(--text); font-weight:bold;">${pointHemi(dataRow.lon, 'E', 'W', '°')}</span>`)}`;

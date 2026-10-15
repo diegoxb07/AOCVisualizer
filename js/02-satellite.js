@@ -927,9 +927,8 @@
     }
     let _satLegendReqId = 0;
     // imagery timestamp note
-    // satLoadedInfo records WHICH moment the tile on the map is actually from. Nothing used to read
-    // it, so the overlay read as if it were current with the playback clock, which it never is:
-    // archive GOES is bucketed to the scan cadence (up to ~10 min off the playhead), and a polar
+    // satLoadedInfo records WHICH moment the tile on the map is actually from, which differs from the
+    // playback clock: archive GOES is bucketed to the scan cadence (up to ~10 min off the playhead), and a polar
     // pass is ONE overpass held across the whole flight, so it can be many hours from the moment
     // being replayed. This turns that state into the Overlays button's hover text (built into the
     // title by updateSatPickerButton in js/07-ui-controls.js), and says how the time was arrived at
@@ -947,7 +946,7 @@
         if (!isFinite(d.getTime())) return null;
         const day = d.toISOString().slice(0, 10);
         const full = d.toISOString().slice(0, 16).replace('T', ' ') + 'Z';
-        const layer = info.layerLabel ? info.layerLabel + ' \u2014 ' : '';
+        const layer = info.layerLabel ? info.layerLabel + ': ' : '';
         if (info.isModis && info.modisTimePending) {
             return layer + 'imagery for ' + day + '. The overpass time is still being looked up from NASA CMR.';
         }
@@ -963,7 +962,7 @@
             return layer + 'scan start ' + full + ', as reported by the archive for the frame on the map.';
         }
         return layer + full + ' is the ' + (info.cadenceMin || 10) + '-minute cadence bucket requested for '
-             + 'the playback moment; the archive returned no scan time, so the real scan sits inside it.';
+             + 'the playback moment; the archive returned no scan time, so the actual scan time falls within that bucket.';
     }
 
     // Repaint whatever surfaces the note above. Called from every point that sets or clears
@@ -988,6 +987,29 @@
         if (!ct || !ct.stops.length || (trackerModeSelect && trackerModeSelect.value !== '2d')) { legend.classList.add('hidden'); return; }
         renderSatColorLegend(legend, bandObj, ct);
         legend.classList.remove('hidden');
+        fitSatColorLegend();
+    }
+
+    // keeps the whole legend inside the map box at any player height. the color bar gives up length
+    // first, down to the 40px its five tick labels need, with the text left at the overlay scale; only a
+    // box too short even for that scales the legend down further (--sat-leg-fit in css/app.css). called
+    // on every show and from resizeCanvasLayout (js/11-layout.js), which runs on every map size change.
+    function fitSatColorLegend() {
+        const legend = document.getElementById('satColorLegend');
+        if (!legend || legend.classList.contains('hidden') || !legend.parentElement) return;
+        const body = legend.querySelector('.leg-body');
+        if (!body) return;
+        body.style.height = '';
+        legend.style.removeProperty('--sat-leg-fit');
+        // the scale css applies right now (the overlay scale, or 1 on a pinned map); offsetHeight and
+        // offsetTop are layout sizes, which the transform leaves untouched
+        const t = getComputedStyle(legend).transform;
+        const s = (t && t !== 'none') ? (new DOMMatrixReadOnly(t).a || 1) : 1;
+        const room = (legend.parentElement.clientHeight - legend.offsetTop - 8) / s;
+        const extra = legend.offsetHeight - room;
+        if (extra <= 0 || room <= 0) return;
+        body.style.height = Math.max(40, body.offsetHeight - extra) + 'px';
+        if (legend.offsetHeight > room) legend.style.setProperty('--sat-leg-fit', (room / legend.offsetHeight).toFixed(3));
     }
 
     // Load a (CORS-enabled) image URL into a fresh canvas at its natural size. Resolves null on error.

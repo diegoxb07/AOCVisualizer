@@ -109,6 +109,10 @@
         return !(bbox[0] + lonShift > v.maxLon + m || bbox[2] + lonShift < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
     }
 
+    // true on the light theme, where map inks drawn over the light basemap need darker shades.
+    // guarded so the node tests (no document) get the dark set.
+    function mapInkIsLight() { return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'; }
+
     // saffir-simpson bands, with everything below hurricane force left black so the categories
     // stand out on their own.
     function getHurricaneColorRGB(spd) {
@@ -143,11 +147,23 @@
     }
 
     // the track carries its own color choice. 'temp' reads each sample against the rolling baseline
-    // (warmer than baseline runs red, cooler runs blue, white where either reading is missing); the
-    // rest follow whichever wind ramp the barbs are using.
+    // (warmer than baseline runs red, cooler runs blue, the neutral color where either reading is
+    // missing); the rest follow whichever wind ramp the barbs are using.
     function getPathColorRGB(d, idx) {
         if (pathColorSelect.value === 'temp') {
+            // the neutral end has to contrast with the basemap: white on the dark map, a true gray on the
+            // light one (white there would hide most of the track, which sits near its baseline). on the
+            // light map cooling runs to a violet-blue, a hue well away from the light blue water, and the
+            // square-root ease makes a mild change of a fraction of a degree already read as a color.
+            // full color still lands at a 3 degree difference.
             const t = d.tempr;
+            if (mapInkIsLight()) {
+                const n = [0.42, 0.42, 0.42], mix = (to, f) => n.map((c, i) => c + (to[i] - c) * f);
+                if (t === null || tempBaseline[idx] === null) return n;
+                const delta = t - tempBaseline[idx];
+                const f = Math.sqrt(Math.min(Math.abs(delta) / 3.0, 1));
+                return delta > 0 ? mix([0.86, 0.1, 0.1], f) : mix([0.42, 0.12, 0.9], f);
+            }
             if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
             const delta = t - tempBaseline[idx];
             const f = Math.min(Math.abs(delta) / 3.0, 1);
@@ -609,7 +625,8 @@
             const d = dPlane; ctx.save(); ctx.translate(getX(d.lon), getY(d.lat)); ctx.scale(1/mapScale, 1/mapScale); 
             const zoomFactor = Math.max(1, Math.pow(mapScale, 0.6));
             if (document.getElementById('simpleTrackerIcon').checked) {
-                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#e2e4e8'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
+                // light dot on the dark map, dark dot on the light map; the white rim reads on both
+                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = mapInkIsLight() ? '#1f2937' : '#e2e4e8'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
                 const planeScale = 0.15 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
                 // ground-track (blue) and true-heading (yellow) arrows ahead of the plane, the

@@ -14,10 +14,17 @@
         if (canvas.width !== bw || canvas.height !== bh) {
             // A panned/zoomed 2D view is stored in pixels against the old canvas size; capture it as
             // geography first so the same place stays centered after the resize instead of jumping.
-            const keepView = (filteredData.length > 0 && trackerModeSelect.value === '2d' && isMapPanned()) ? getMapViewportGeo() : null;
+            // captured in 3D too, so a resize while 3D is up still hands 2D back its view.
+            const keepView = (filteredData.length > 0 && isMapPanned()) ? getMapViewportGeo() : null;
             DPR = dpr; cssW = wCss; cssH = hCss;
             canvas.width = bgCanvas.width = bw;
             canvas.height = bgCanvas.height = bh;
+            // the base frame's lon and lat spans are fitted to the canvas aspect, so a new canvas shape
+            // must refit it or the map stretches. done here, the one place the size changes, since a pin
+            // with no window resize (tdr mode, a pin inside real fullscreen) or a resize while 3D is up
+            // has no other caller to refit. calculateMapScales only reads the size and the flight, so
+            // the callers that refit again after this get the same frame.
+            if (filteredData.length > 0) calculateMapScales();
             if (keepView) applyMapViewportGeo(keepView);
             bgNeedsUpdate = true;
             if (threeDInitialized && camera3D) {
@@ -39,6 +46,8 @@
                 if(filteredData.length > 0) renderPFD(filteredData[currentIdx]);
             }
         }
+        // the satellite legend fits itself to the map box's new height
+        if (typeof fitSatColorLegend === 'function') fitSatColorLegend();
     }
     window.addEventListener('resize', () => {
         if (filteredData.length > 0) {
@@ -88,26 +97,58 @@
         const handle = document.getElementById('mediaResizeHandle'), bar = document.getElementById('stickyMediaBar');
         if (!handle || !bar) return;
         const MIN_H = 240, MAX_H = 900;  // keep the players usable when dragging; use the collapse button to fully hide them
-        // The hard ceiling: the panels must never grow under the sticky bottom bar, or the
-        // drag handle ends up unreachable and the layout is stuck big with no way to shrink.
-        // 60px is about the media-bar padding + the handle itself + a small breathing gap above the bar.
-        const maxMediaH = () => {
+        // until the handle is first dragged the height follows the screen: 54vh up to 600px, but on a
+        // short screen it gives way so most of a graph row still shows under the stuck bar. 180px keeps
+        // a 13 inch laptop window (about 790 to 830px tall) on the plain 54vh height; only shorter
+        // windows shrink. css/app.css carries the same rule as the --media-h default, so first paint lands close.
+        const AUTO_VH = 0.54, AUTO_MAX = 600, GRAPH_ROOM = 180;
+        // the hard ceiling keeps this much clear above the sticky bottom bar, so the drag handle (in the
+        // bar's bottom padding) never slips under it and the layout is never stuck big with no way to shrink.
+        const HANDLE_GAP = 20;
+        const lgQuery = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
+        let userH = null;      // the dragged height; null while the height still follows the screen
+        let appliedH = null;   // the --media-h currently set, the one source for the docked panel height
+
+        // below tailwind's lg breakpoint the grid is one column, so a loaded mmr stacks under the map
+        // and the bar holds two panels of --media-h. a floating panel leaves the other one alone in it.
+        const panelRows = (grid) => {
+            if (!grid || (lgQuery && lgQuery.matches)) return 1;
+            return ['no-video', 'map-floating', 'video-floating'].some(c => grid.classList.contains(c)) ? 1 : 2;
+        };
+        // height each docked panel can take once the bar sticks: the viewport minus the bar's sticky top
+        // (it clears the fixed top-right cluster), its padding and border, the sticky bottom bar, the gap
+        // between stacked panels, and `reserve` kept free under the bar.
+        const roomPerPanel = (reserve) => {
+            const cs = getComputedStyle(bar);
+            const chrome = (parseFloat(cs.top) || 0) + (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
             const bb = document.getElementById('stickyBottomBar');
             const bbH = bb ? bb.getBoundingClientRect().height : 90;
-            return Math.max(MIN_H, Math.min(MAX_H, window.innerHeight - bbH - 60));
+            const grid = document.getElementById('mediaGrid'), rows = panelRows(grid);
+            const gap = rows > 1 ? (parseFloat(getComputedStyle(grid).rowGap) || 0) : 0;
+            return (window.innerHeight - chrome - bbH - reserve - gap * (rows - 1)) / rows;
         };
-        let dragging = false, startY = 0, startH = 0, rafPending = false;
+        const maxMediaH = () => Math.max(MIN_H, Math.min(MAX_H, roomPerPanel(HANDLE_GAP)));
+        const autoMediaH = () => Math.max(MIN_H, Math.min(AUTO_MAX, window.innerHeight * AUTO_VH, roomPerPanel(GRAPH_ROOM)));
+        let dragging = false, startY = 0, startH = 0, dragMax = MAX_H, rafPending = false;
         const pointerY = (e) => (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+        // returns false when the height is already set, so callers skip a redundant relayout
         const applyMediaH = (h) => {
+            h = Math.round(h);
+            if (h === appliedH) return false;
+            appliedH = h;
             document.documentElement.style.setProperty('--media-h', h + 'px');
-            document.documentElement.style.setProperty('--hud-scale', Math.max(0.55, Math.min(1, h / 480)).toFixed(3));
+            // overlay scale (hud, attitude, pfd, satellite legend): full size from 420px, down to 0.8 at
+            // the shortest player so the readouts stay legible.
+            document.documentElement.style.setProperty('--hud-scale', Math.max(0.8, Math.min(1, h / 420)).toFixed(3));
+            return true;
         };
 
-        function onDown(e) { dragging = true; isResizingMedia = true; startY = pointerY(e); startH = document.getElementById('mapPanel').getBoundingClientRect().height; bar.classList.add('resizing'); e.preventDefault(); }
+        // the drag starts from the set height, not a panel rect: a floating map's rect is its own window size.
+        function onDown(e) { dragging = true; isResizingMedia = true; startY = pointerY(e); startH = appliedH !== null ? appliedH : document.getElementById('mapPanel').getBoundingClientRect().height; dragMax = maxMediaH(); bar.classList.add('resizing'); e.preventDefault(); }
         function onMove(e) {
             if (!dragging) return;
-            const h = Math.max(MIN_H, Math.min(maxMediaH(), startH + (pointerY(e) - startY)));
-            applyMediaH(h);
+            userH = Math.max(MIN_H, Math.min(dragMax, startH + (pointerY(e) - startY)));
+            applyMediaH(userH);
             if (!rafPending) {
                 rafPending = true;
                 requestAnimationFrame(() => {
@@ -122,34 +163,44 @@
         handle.addEventListener('mousedown', onDown); handle.addEventListener('touchstart', onDown, { passive: false });
         window.addEventListener('mousemove', onMove); window.addEventListener('touchmove', onMove, { passive: false }); window.addEventListener('mouseup', onUp); window.addEventListener('touchend', onUp);
 
-        // Re-clamp if the window shrinks around an already-tall layout (and once at startup,
-        // for short screens where even the default height would bury the handle). Pinned
-        // (.fake-fs) panels are viewport-sized by design and skip this.
-        function clampMediaToViewport() {
+        // re-fit whenever the room changes: the window, the bottom bar's height (its observer below also
+        // fires when a collapsed bar expands and the bottom bar comes back), the mmr loading or clearing,
+        // a panel floating or docking. a dragged height is kept and only clamped to the ceiling. pinned
+        // (.fake-fs) panels are viewport-sized by design and skip this; a collapsed bar has nothing to fit.
+        function fitMediaToViewport() {
             const mapPanelEl = document.getElementById('mapPanel'), videoPanelEl = document.getElementById('videoPanel');
             if (mapPanelEl.classList.contains('fake-fs') || (videoPanelEl && videoPanelEl.classList.contains('fake-fs'))) return;
-            // A floating map panel sizes itself; its rect must not drive the docked height var.
-            if (mapPanelEl.classList.contains('float-panel')) return;
-            const mx = maxMediaH();
-            if (mapPanelEl.getBoundingClientRect().height > mx + 1) {
-                applyMediaH(mx);
-                resizeCanvasLayout();
-                if (filteredData.length > 0 && trackerModeSelect.value === '2d') { calculateMapScales(); bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
+            if (bar.classList.contains('collapsed')) return;
+            if (!applyMediaH(userH === null ? autoMediaH() : Math.min(userH, maxMediaH()))) return;
+            resizeCanvasLayout();
+            if (filteredData.length > 0) {
+                if (trackerModeSelect.value === '2d') {
+                    // same as the window resize handler: keep a user-panned view across the reframe
+                    const keepView = isMapPanned() ? getMapViewportGeo() : null;
+                    calculateMapScales();
+                    if (keepView) applyMapViewportGeo(keepView);
+                    bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                }
+                if (document.getElementById('togglePfd').checked) renderPFD(filteredData[currentIdx]);
             }
+            if (typeof syncVideoCrop === 'function') syncVideoCrop();
         }
-        window.addEventListener('resize', clampMediaToViewport);
-        clampMediaToViewport();
+        window.addEventListener('resize', fitMediaToViewport);
+        // no-video and the floating classes on the grid decide whether the panels stack
+        const mediaGridEl = document.getElementById('mediaGrid');
+        if (mediaGridEl && typeof MutationObserver !== 'undefined') new MutationObserver(fitMediaToViewport).observe(mediaGridEl, { attributes: true, attributeFilter: ['class'] });
+        fitMediaToViewport();
 
         // The sticky bottom bar's height varies: it wraps to more rows on narrow widths and grows
         // once a loaded mission enables the Share/Record controls. Publish the live height as
         // --bottom-bar-h so the fullscreen recenter/skip overlays sit just above it via calc(),
-        // and re-clamp the docked media height on every change so the map never slips under a bar
+        // and re-fit the docked media height on every change so the map never slips under a bar
         // that just grew taller.
         const bottomBar = document.getElementById('stickyBottomBar');
         if (bottomBar) {
             const publishBarH = () => {
                 document.documentElement.style.setProperty('--bottom-bar-h', bottomBar.getBoundingClientRect().height + 'px');
-                clampMediaToViewport();
+                fitMediaToViewport();
             };
             publishBarH();
             if (typeof ResizeObserver !== 'undefined') { try { new ResizeObserver(publishBarH).observe(bottomBar); } catch (e) {} }

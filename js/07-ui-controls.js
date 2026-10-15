@@ -919,6 +919,9 @@
     });
     const togglePanelFullscreen = (panel) => {
         if (panel.classList.contains('fake-fs')) { setFakePanel(null); return; }
+        // a floating player docks back into the media bar first, so the pin and its release only
+        // ever run on the docked layout (floatDock is a no-op for a docked panel).
+        if (typeof floatDock === 'function') floatDock(panel.id);
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(err => { });
         setFakePanel(panel);
     };
@@ -1221,9 +1224,14 @@
     // Clear is only usable once a point is marked: disabled (greyed) with no marks, faintly accented
     // once there are some. Kept in sync wherever customMarkers changes.
     function syncClearMarksBtn() { const b = document.getElementById('clearMarksBtn'); if (b) b.disabled = customMarkers.length === 0; }
+    // okabe-ito colors, which stay distinct for the common color vision deficiencies, ordered so each mark
+    // differs strongly from the one before it, the wrap back to vermillion included: vermillion, blue,
+    // orange, sky blue, reddish purple, bluish green. the set's yellow and black are left out, since they
+    // vanish on the light and dark panels.
+    const MARK_PALETTE = ['#D55E00', '#0072B2', '#E69F00', '#56B4E9', '#CC79A7', '#009E73'];
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
-            const palette = ['#fbbf24', '#ef4444', '#38bdf8', '#7dd3fc', '#9aa1ad', '#7ad9ff', '#22d0ee']; const assignedColor = palette[customMarkers.length % palette.length];
+            const assignedColor = MARK_PALETTE[customMarkers.length % MARK_PALETTE.length];
             customMarkers.push({ idx: currentIdx, color: assignedColor }); if (threeDInitialized) sync3DMarkers(); updateVisualComponents(currentIdx);
             syncClearMarksBtn();
         }

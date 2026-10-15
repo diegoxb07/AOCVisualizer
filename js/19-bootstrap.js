@@ -1289,9 +1289,8 @@
         const syncAria = () => btn.setAttribute('aria-checked', document.documentElement.dataset.theme === 'light' ? 'true' : 'false');
         syncAria();
         let themeAnimTimer = null;
-        // One switch path for the button AND the OS listener below; persist only for the button,
-        // so an unsaved session keeps following the computer's theme.
-        const applyTheme = (next, persist) => {
+        // light is the default (the head script); the toggle saves each choice, so a switch to dark sticks.
+        const applyTheme = (next) => {
             const root = document.documentElement;
             // Fade the token-driven colors across the switch (see css/app.css .theme-anim), then drop
             // the class so it never affects ordinary hover/focus color changes.
@@ -1321,26 +1320,11 @@
                 if (typeof buildDropdownMenus === 'function') buildDropdownMenus();
                 if (typeof buildCustomGraphMenu === 'function') buildCustomGraphMenu(MASTER_GRAPH_ID);
             } catch (e) { /* menus not built yet */ }
-            if (!persist) return;
             try {
                 const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
                 saved.theme = next;
                 localStorage.setItem(KEY, JSON.stringify(saved));
             } catch (e) { /* localStorage unavailable (private mode) */ }
         };
-        btn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true));
-        // The head script starts an unsaved session on the OS theme; this keeps it tracking the
-        // OS live until the toggle records an explicit choice.
-        try {
-            if (window.matchMedia) {
-                const mq = window.matchMedia('(prefers-color-scheme: light)');
-                const followSystem = ev => {
-                    let saved = {};
-                    try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e2) {}
-                    if (!saved.theme) applyTheme(ev.matches ? 'light' : 'dark', false);
-                };
-                if (mq.addEventListener) mq.addEventListener('change', followSystem);
-                else if (mq.addListener) mq.addListener(followSystem);
-            }
-        } catch (e) { /* matchMedia unavailable */ }
+        btn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
     })();

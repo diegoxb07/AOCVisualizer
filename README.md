@@ -133,8 +133,8 @@ selectable, GPS by default). Pan and zoom with the mouse. **Real Scale (3D)** dr
 its true size and adds faint flight-level reference planes so climbs and descents read against them,
 which can overexaggerate.
 
-The bottom bar carries **Track Color** (wind speed, or warming and cooling), **Wind Barb Preset**
-(wind speed, or hurricane wind field), **3D Track Altitude** (GPS or pressure altitude for the 3D
+The bottom bar has **Track Color** (wind speed, or warming and cooling), **Wind Barb Preset**
+(wind speed, or hurricane wind field), **3D Altitude Track** (GPS or pressure altitude for the 3D
 height), and **Simple Icon (2D)**. The â›¶ button fullscreens any block.
 
 Under hurricane wind field coloring, barbs (and the track, in that mode) stay black until the
@@ -148,25 +148,25 @@ current position; clicking that point on the 2D map opens a point analysis you c
 
 ### TDR mode
 
-A **TDR Mode** button sits in the map header. It reads "TDR Loading..." until the data is usable,
+The **TDR Mode** button is in the **Overlays** dropdown in the map header. It reads "TDR Loading..." until the data is usable,
 and greys out as "TDR Unavailable" for missions flown without tail Doppler radar.
 
 Clicking it opens the radar workspace. The tracker pins over the page keeping whichever view was
-active: entering from 3D parks the camera overhead of the recorded coverage, entering from 2D goes
+active: entering from 3D moves the camera above the recorded coverage, entering from 2D goes
 straight to the map view with cross-sections. Playback jumps ahead to the first radar leg.
 
 The sidebar lists the levels grouped into bands, to display alone or combined, plus leg buttons that
 show one chosen leg on its own at its end. Each band row shows the geometric altitude span it
 selects, labelled with the millibar level that altitude corresponds to in the *standard* atmosphere.
 The radar grid is geometric km, so that millibar figure is a name for the height rather than an
-analysed pressure surface, and a storm's real surfaces sit further off it the deeper the storm.
+analysed pressure surface, and a storm's actual pressure surfaces are further from it the deeper the storm.
 
 The radar scans in around the aircraft as it flies each leg, and every leg preloads so transitions
-are seamless. Re-scanned areas show the newest data wherever the new pass recorded any, and a tall
-white beam marks the aircraft.
+are seamless. Re-scanned areas show the newest data wherever the new pass recorded any, and the
+white beam is the aircraft's position at that point.
 
-Switching the tracker to 2D inside TDR Mode lays the radar layers over the map, centered where the
-storm is expected at the playback time, with the lower layers (500 mb and below, roughly 0 to
+Switching the tracker to 2D inside TDR Mode lays the radar layers over the map, centered on the
+aircraft, with the lower layers (500 mb and below, roughly 0 to
 5.6 km) selected so centers are easier to spot. The **TDR opacity** slider fades the composite so
 satellite imagery can read through it, and two-point vertical cross-sections are drawn the same way
 as the measure tool. Switching back to 3D restores the volumetric view with the layer selection you
@@ -183,13 +183,13 @@ the flight data.
 
 **Auto-Sync** runs OCR over the whole video frame looking for the burned-in clock (usually bottom
 right, though exports vary) and locks onto the time that advances with the video, so a static number
-on screen cannot fool it. A green pulse means OCR is active, and a "Syncing" pill shows while it
-hunts. **Sync Now** forces a lock, and a few clicks on a clear frame helps. Readings are checked
+elsewhere on screen is ignored. A green pulse means OCR is active, and a "Syncing" pill shows while it
+searches. **Sync Now** forces a lock, and a few clicks on a clear frame helps. Readings are checked
 against the flight's own time range, so a misread will not throw playback wildly off.
 
 If several scans find a plausible timestamp but none of them confirms it is ticking with the video,
-the last resort is to lock on that reading anyway and say so: the toast calls the sync
-**unverified** and asks you to check the tracker time against the MMR. If no lock lands at all after
+the last resort is to lock onto that reading anyway; the message marks the sync as
+**unverified**, so check the tracker time against the MMR. If Auto-Sync has not locked within
 30 seconds, try a plain MMR recording instead of the nose-radar compiled video, which places the
 clock somewhere unusual and sometimes cannot sync at all.
 
@@ -198,13 +198,13 @@ window for the flight-data start and end times plus the video's UTC start time (
 tedious and easy to get wrong, so it is a fallback rather than a first choice.
 
 If you have no MMR yet, the **AVI to MP4** converter builds one: upload the raw `.avi` files for the
-storm you want and it stitches them together. Those files live under MMR in the SEB OMAO archive for
+storm you want and it joins them into one file. Those files are under MMR in the SEB OMAO archive for
 the most recent years.
 
 
 ## Satellite overlays
 
-Open the **Sat:** picker in the map header and choose a satellite.
+Open **Overlays** in the map header and choose a satellite.
 
 MODIS and VIIRS, the polar orbiters served by NASA GIBS, are available for any date back to each
 mission's start. Their imagery is organized by calendar day: the day-stepper moves between days, and
@@ -242,7 +242,7 @@ update. The full 16-band GOES ABI set is available for both GOES satellites, plu
 Archive loads draw the storm's whole-life, intensity-colored, dashed best-track on both trackers. It
 starts on, and the **Storm Track** checkbox in the map controls hides it.
 
-A spinning cyclone marker rides the track at the storm's estimated position for the current playback
+A spinning cyclone marker shows the storm's estimated position for the current playback
 moment, interpolated between the best-track fixes so it moves smoothly as playback advances.
 Hovering a track point on the 2D map shows its category, wind, pressure, and time.
 
@@ -254,7 +254,7 @@ accelerations, pressure, thermodynamics) follow playback like everything else. â
 or removes series, and scroll or drag zooms and pans. **Create Your Own Graph** at the bottom plots
 any variables the file contains against each other.
 
-Three filters live in the bottom bar. **Cockpit PFD** brings up a primary flight display with an
+Three filters are in the bottom bar. **Cockpit PFD** brings up a primary flight display with an
 attitude ladder, airspeed, altitude and heading tapes, VSI, a bank scale with a slip/skid indicator,
 wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts; the VSI, GS and the slip/skid ball are
 computed rather than recorded, which the derivations appendix covers. **S.I Units** switches the
@@ -298,7 +298,7 @@ button.
 | --- | --- |
 | The archive dropdowns are greyed out with an "API Offline" banner. | The archive service is unreachable. Load flights by manual upload; the tool re-checks every 60 seconds and re-enables the archive when the service returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
 | A GOES option is greyed out. | Either the API is offline, or the flight is outside that satellite's view of the Earth. An Atlantic flight greys out GOES-West, and an east-Pacific flight greys out GOES-East. Use the other GOES or MODIS/VIIRS. |
-| A GOES satellite is picked but nothing shows. | Products are not auto-selected. Pick a product in the **Sat:** picker first. |
+| A GOES satellite is picked but nothing shows. | Products are not auto-selected. Pick a product under **Overlays** first. |
 | Auto-Sync lands on the wrong time. | Click **Sync Now** on a frame where the burned-in timestamp is clear, hide any other on-screen timestamps, or switch to Manual mode. |
 | The charts and map do not update after changing the time window. | Press `Play`. It applies the current window before starting. |
 | Nothing plays. | Load a flight file first, then press `Play`. |
@@ -318,7 +318,7 @@ needs (libraries, fonts, basemap data, the Auto-Sync OCR engine) ships in the re
 same-origin, so nothing loads from a CDN and manual uploads replay with no internet.
 
 **Architecture.** Plain HTML, CSS, and classic scripts, with no build step. [index.html](index.html)
-carries the markup, and the numbered files in `js/`, split by subsystem, share one global scope and
+contains the markup, and the numbered files in `js/`, split by subsystem, share one global scope and
 load in order. File parsing runs in a web worker (`js/parse-worker.js`), so a large flight file
 never freezes the page; the worker, the page, and the tests all share the one parser core in
 `js/11b-parser-core.js`, so every path produces identical rows. Batch-loaded missions and satellite
@@ -381,7 +381,7 @@ full mission of video runs on the order of 30 minutes. The MMR player itself tak
 **Storm best-track.** NHC ATCF best-track, the b-decks at `https://ftp.nhc.noaa.gov/atcf/btk/` for
 the current season and `https://ftp.nhc.noaa.gov/atcf/archive/` for past years. Whole storm life at
 roughly 6-hourly fixes, relayed by the recon archive API and keyed on year, storm name, and basin.
-Each fix carries time, lat, lon, wind (kt), pressure (mb), category, and status.
+Each fix has time, lat, lon, wind (kt), pressure (mb), category, and status.
 
 **TDR (tail Doppler radar).** NOAA AOML / Hurricane Research Division airborne tail-Doppler radar
 (AOML HRD radar archive, `https://www.aoml.noaa.gov/ftp/pub/hrd/data/radar/`; the analyses are also
@@ -391,7 +391,7 @@ reflectivity, in 3D volumes and two-point vertical cross-sections.
 **GOES (archive).** NOAA GOES ABI archive on AWS S3 (NOAA Open Data Dissemination,
 `https://registry.opendata.aws/noaa-goes/`, buckets `noaa-goes16` / `noaa-goes17` / `noaa-goes18` /
 `noaa-goes19`). Rendered server-side by the recon archive API for the flight's historical date.
-GOES-East sits at sub-point 75W from 2017-07-10, GOES-West at 137W from 2018-08-28. Bands and
+GOES-East is at sub-point 75W from 2017-07-10, GOES-West at 137W from 2018-08-28. Bands and
 composites (Sandwich, GeoColor) come from the API's product list.
 
 **MODIS / VIIRS (polar), fetched directly from NASA.** Imagery from NASA GIBS at
@@ -444,7 +444,7 @@ in feet is converted to metres (x 0.3048). The S.I Units checkbox changes the di
 pressure `P` (mb) with the standard-atmosphere formula
 `alt_m = (1 - (P / 1013.25)^0.190284) x 44307.69`.
 
-**NetCDF timestamps.** A mission NetCDF carries a `TimeInterval` global attribute giving the file's
+**NetCDF timestamps.** A mission NetCDF contains a `TimeInterval` global attribute giving the file's
 start and stop clock. When it is present the loader rebuilds the time column from it, spreading that
 span evenly across the rows rather than reading a per-sample time, which assumes a perfectly uniform
 sample rate. That is an assumption rather than a reading, so the parse summary reports it in the
@@ -489,7 +489,7 @@ turbulence-aware micro-motion is then added so the airframe is never perfectly s
 scales with the recorded vertical wind (`vtWnd`, the turbulence proxy) and its shape is smooth
 band-limited noise, a few sub-2 Hz sinusoids, so calm legs stay steady and only bumpy air rocks the
 plane. The drawn 2D and 3D flight tracks use the same Catmull-Rom curve (one cubic Bezier per
-1-second segment in 2D), so the plane always rides on the line.
+1-second segment in 2D), so the plane is always drawn on the line.
 
 **Satellite day/night check.** The warning that a daylight-only product (reflective GOES bands 1 to
 6) is being viewed after dark comes from the sun's elevation angle at the flight point and time

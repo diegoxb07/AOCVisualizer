@@ -835,7 +835,7 @@
     function tdrBandTitle(b) {
         return b.label + ': radar levels at ' + b.alt + ' geometric altitude. Millibar figures are a '
              + 'standard-atmosphere (1013.25 mb sea level) label for those altitudes, not a measured or '
-             + 'analysed pressure; a storm' + '\u2019' + 's own pressure surfaces sit off them.';
+             + 'analysed pressure; a storm' + '\u2019' + 's actual pressure surfaces are at different heights.';
     }
 
     function tdrBandMembers(ref, band) {
@@ -1023,7 +1023,9 @@
             setTdrSliceHint('');
         }
         // Pin through the app's own mechanism so the top-right cluster hides exactly like the
-        // other pinned panels; .tdr-mode carries the workspace-only layout rules.
+        // other pinned panels; .tdr-mode carries the workspace-only layout rules. a floating map
+        // docks first, as for the panel fullscreen button, so leaving returns to the docked layout.
+        if (typeof floatDock === 'function') floatDock('mapPanel');
         if (typeof setFakePanel === 'function' && typeof mapPanel !== 'undefined') setFakePanel(mapPanel);
         const panel = document.getElementById('mapPanel'); if (panel) panel.classList.add('tdr-mode');
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'flex';
@@ -1250,7 +1252,8 @@
         ctx.save();
         ctx.setLineDash([6 / mapScale, 4 / mapScale]);
         ctx.lineWidth = 2 / mapScale;
-        ctx.strokeStyle = '#ffffff';
+        // dark on the light basemap, white on the dark one
+        ctx.strokeStyle = document.documentElement.dataset.theme === 'light' ? '#0b0e13' : '#ffffff';
         if (line) {
             ctx.beginPath(); ctx.moveTo(getX(line.A.lon), getY(line.A.lat)); ctx.lineTo(getX(line.B.lon), getY(line.B.lat)); ctx.stroke();
             dot(line.A); dot(line.B);

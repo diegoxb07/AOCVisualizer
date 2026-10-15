@@ -40,7 +40,7 @@ flowchart TD
     TDRMODE --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
     EXPORT -- "Briefing video" --> CLIP["Record Clip (.webm)"]
-    EXPORT -- "No, just analyzing" --> DONE(["Done: measure, mark & compare freely"])
+    EXPORT -- "No, just analyzing" --> DONE(["Have fun!"])
 
     classDef decision fill:#fef3c7,stroke:#d97706,color:#78350f
     classDef data fill:#d1fae5,stroke:#059669,color:#064e3b

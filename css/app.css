@@ -101,6 +101,7 @@ button { transition: background-color 0.15s, border-color 0.15s, color 0.15s, op
 .text-danger { color: var(--danger); }
 .hover\:text-accent:hover { color: var(--accent); }
 .hover\:text-ink:hover { color: var(--text); }
+.hover\:text-accent-ink:hover { color: var(--accent-ink); }
 
 .border-hairline { border-color: var(--border); }
 .border-hairline-strong { border-color: var(--border-strong); }

@@ -1031,7 +1031,7 @@
         const yearSel = document.getElementById('reconYearSelect');
         if (yearSel && yearSel.value) { yearSel.value = ''; yearSel.dispatchEvent(new Event('change')); }
         const search = document.getElementById('missionSearchInput'); if (search) search.value = '';
-        setReconStatus('Pick a year to browse every archived hurricane-hunter mission.');
+        setReconStatus('Search for a flight or upload manually.');
     }
 
     function positionLoadedPicker() {

@@ -11,7 +11,7 @@ self.onmessage = (e) => {
         // processed. the main thread is free during this worker phase, so the spinner keeps animating.
         const onProgress = (p) => self.postMessage({ progress: p });
         const tsv = e.data.nc ? ncArrayBufferToTsv(e.data.nc, onProgress) : e.data.tsv;
-        self.postMessage(parseFlightTextToRows(tsv));
+        self.postMessage(parseFlightTextToRows(tsv, onProgress));
     } catch (err) {
         self.postMessage({ error: String((err && err.message) || err) });
     }

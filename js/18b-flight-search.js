@@ -288,9 +288,8 @@
         const canvas = $('fsChart');
         if (fsChartInstance) { fsChartInstance.destroy(); fsChartInstance = null; }
         if (!canvas || typeof Chart === 'undefined' || !ranked.length) return;
-        const light = document.documentElement.dataset.theme === 'light';
-        const axC = light ? '#334155' : '#94a3b8';
-        const gridC = light ? 'rgba(15,23,42,0.08)' : 'rgba(226,232,240,0.07)';
+        const axC = '#334155';
+        const gridC = 'rgba(15,23,42,0.08)';
 
         const datasets = ranked.map((r, i) => ({
             label: r.label,

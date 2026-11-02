@@ -23,11 +23,8 @@
     function getBaseChartOptions(titleText, config = {}) {
         const enforceIntegers = config.enforceIntegers || false; const minRange = config.minRange || 0;
         const limitCallback = (scale) => { if (minRange > 0) { const range = scale.max - scale.min; if (range < minRange) { const mid = (scale.max + scale.min) / 2; scale.max = mid + (minRange / 2); scale.min = mid - (minRange / 2); } } };
-        // axis and grid inks are scriptable, so chart.js reads the theme each time it resolves options and
-        // the theme toggle's update('none') recolors them. the dark set stays light on the dark panel.
-        const themed = (light, dark) => () => document.documentElement.dataset.theme === 'light' ? light : dark;
-        const axisInk = themed('#475569', '#94a3b8');
-        const tickConfig = { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: themed('#0369a1', '#7ad9ff'), font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
+        const axisInk = '#475569';
+        const tickConfig = { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfig.precision = 0; const tickConfigY1 = { color: '#0369a1', font: { family: CHART_FONT_MONO, size: 10 } }; if (enforceIntegers) tickConfigY1.precision = 0;
         return {
             responsive: true, maintainAspectRatio: false, animation: false,
             // tooltips trigger for the nearest sample at the cursor's x, so hovering anywhere
@@ -41,7 +38,7 @@
                 if (Math.abs(xPixel - playheadPx) < 15) chart.canvas.style.cursor = 'ew-resize';
                 else chart.canvas.style.cursor = 'crosshair';
             },
-            scales: { x: { grid: { color: themed('rgba(15,23,42,0.06)', 'rgba(226,232,240,0.05)') }, ticks: { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: themed('rgba(15,23,42,0.08)', 'rgba(226,232,240,0.07)') }, ticks: tickConfig, title: { display: true, text: titleText, color: axisInk, font: { family: CHART_FONT_SANS, size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
+            scales: { x: { grid: { color: 'rgba(15,23,42,0.06)' }, ticks: { color: axisInk, font: { family: CHART_FONT_MONO, size: 10 }, maxTicksLimit: 8 } }, y: { type: 'linear', position: 'left', display: 'auto', grid: { color: 'rgba(15,23,42,0.08)' }, ticks: tickConfig, title: { display: true, text: titleText, color: axisInk, font: { family: CHART_FONT_SANS, size: 11, weight: '600' } }, afterDataLimits: limitCallback }, y1: { type: 'linear', position: 'right', display: 'auto', grid: { drawOnChartArea: false }, ticks: tickConfigY1, afterDataLimits: limitCallback } },
             plugins: { tooltip: { callbacks: { afterTitle: (items) => {
                 // the tooltip title is the sample's time; add its lat/lon underneath (same hover).
                 const d = items.length && filteredData[items[0].dataIndex];
@@ -54,10 +51,9 @@
                 // way. Never struck through; deselected text dims to a calm slate instead.
                 generateLabels: (chart) => {
                     const items = Chart.defaults.plugins.legend.labels.generateLabels(chart);
-                    // Selected labels sit near-white for the dark panel; in light mode that washes
-                    // out on the near-white chart panel, so flip them to a dark ink. Deselected stay
-                    // a calm slate in both themes (readable on either panel).
-                    const selColor = document.documentElement.dataset.theme === 'light' ? '#1e293b' : '#e2e8f0';
+                    // Selected labels take a dark ink on the near-white chart panel; deselected ones
+                    // dim to a calm slate.
+                    const selColor = '#1e293b';
                     items.forEach(it => {
                         const off = it.hidden;
                         it.hidden = false;
@@ -82,9 +78,8 @@
             if (currentIdx >= 0 && currentIdx < filteredData.length) {
                 const px = xAxis.getPixelForValue(currentIdx);
                 if (px >= xAxis.left && px <= xAxis.right) {
-                    // white washes out on the near-white light panel, so the playhead goes black there.
-                    // read per draw, so the theme toggle's chart update('none') recolors it.
-                    ctx.strokeStyle = document.documentElement.dataset.theme === 'light' ? '#000000' : '#ffffff';
+                    // a black playhead, which reads on the near-white panel
+                    ctx.strokeStyle = '#000000';
                     ctx.lineWidth = 2;
                     ctx.setLineDash([]);
                     ctx.beginPath(); ctx.moveTo(px, chart.chartArea.top); ctx.lineTo(px, chart.chartArea.bottom); ctx.stroke();

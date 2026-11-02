@@ -46,16 +46,19 @@
     let reconYearsLanded = false;   // flips when the archive year list arrives; gates the pre-cache buttons
     function syncReconLoadButtonState() {
         if (!reconLoadBtn) return;
-        const apiDown = reconApiHealthChecked && !reconApiHealthOk;
+        const apiDown = isReconApiDown();
         reconLoadBtn.disabled = apiDown || !reconMissionSelect.value;
-        // Both pre-cache buttons open modals with their own pickers, so they only need the
-        // archive bootstrap attempt done (reconYearsLanded flips even when the fetch fails).
-        // The preload modal also takes direct file uploads, so it stays usable with the API down;
-        // batch satellite caching is API-only and closes with it.
+        // The batch flight load and the satellite pre-cache both work from the archive, so they
+        // open once the archive bootstrap attempt is done (reconYearsLanded flips even when the
+        // fetch fails) and grey out while the API is offline, with a tooltip saying why.
         const preBtn = document.getElementById('reconPreloadBtn');
-        if (preBtn) preBtn.disabled = !reconYearsLanded;
         const batchBtn = document.getElementById('batchCacheBtn');
-        if (batchBtn) batchBtn.disabled = !(reconYearsLanded && !apiDown);
+        [preBtn, batchBtn].forEach(b => {
+            if (!b) return;
+            if (!b.dataset.defaultTitle) b.dataset.defaultTitle = b.title;
+            b.disabled = !(reconYearsLanded && !apiDown);
+            b.title = apiDown ? 'Unavailable while the API is offline' : b.dataset.defaultTitle;
+        });
         // Mission search needs the API (it fetches season indexes and loads by id).
         const searchInput = document.getElementById('missionSearchInput');
         if (searchInput) searchInput.disabled = !(reconYearsLanded && !apiDown);
@@ -408,7 +411,7 @@
             d.className = 'px-2.5 py-1.5 bg-panel';
             d.style.cssText = 'color:var(--warn);display:flex;align-items:center;gap:6px;font-size:10.5px;line-height:1.35;';
             d.innerHTML = '<span aria-hidden="true" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border:1.5px solid var(--warn);border-radius:50%;font-size:9px;font-weight:700;">?</span>' +
-                '<span>Can\'t find the mission you\'re looking for? Check if the flight has been put onto the SEB Archive (may take up to a day to populate; remember you can always manually upload it above).</span>';
+                '<span>Can\'t find the mission you\'re looking for? Check if the flight has been put onto the SEB Archive (may take up to a day to populate; remember you can always manually upload it below).</span>';
             return d;
         }
         function missionRow(m, primary) {
@@ -592,7 +595,6 @@
 
     async function loadReconMission(missionId) {
         showLoadingOverlay();   // resets the spinner (no stale checkmark), subtext, and any leftover progress bar
-        const loader = document.getElementById('loadingOverlay');
         const subtext = document.getElementById('loadingOverlaySubtext');
         syncReconLoadButtonState();
         setReconStatus('Fetching mission ' + missionId + '...');
@@ -602,8 +604,8 @@
             mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
         } catch (e) {
-            setReconStatus('Could not load mission ' + missionId + ' (' + e.message + ').');
-            loader.classList.add('hidden'); loader.classList.remove('flex');
+            setReconStatus('Could not load mission ' + missionId + ' (' + e.message + '). Try again, or upload it manually.');
+            hideLoadingOverlay();
             syncReconLoadButtonState();
             return;
         }
@@ -618,10 +620,9 @@
         // fails or yields no usable rows.
         let usedFullRes = false;
         const progWrap = document.getElementById('loadingProgressWrap');
-        const progBar = document.getElementById('loadingProgressBar');
         const progPct = document.getElementById('loadingProgressPct');
         const progSpeed = document.getElementById('loadingProgressSpeed');
-        const hideProgress = () => { if (progWrap) progWrap.classList.add('hidden'); if (progBar) progBar.style.width = '0%'; };
+        const hideProgress = () => { if (progWrap) progWrap.classList.add('hidden'); };
         try {
             if (subtext) subtext.textContent = `Downloading flight data for ${mission.mission_id}...`;
             if (progWrap) progWrap.classList.remove('hidden');
@@ -633,7 +634,6 @@
                     const mb = n => (n / 1048576).toFixed(1);
                     const secs = Math.max(0.05, (performance.now() - dlStart) / 1000);
                     const speed = (received / 1048576 / secs).toFixed(1);   // MB/s, running average
-                    if (progBar) progBar.style.width = pct + '%';
                     if (progPct) progPct.textContent = `${pct}% · ${mb(received)} / ${mb(total)} MB`;
                     if (progSpeed) progSpeed.textContent = `${speed} MB/s`;
                     if (subtext) subtext.textContent = `Downloading flight data... ${pct}%`;
@@ -644,7 +644,6 @@
                     document.title = `${pct}% ↓ ${mission.mission_id} · AOC Mission Visualizer`;
                 }
             );
-            if (progBar) progBar.style.width = '100%';
             if (subtext) subtext.textContent = 'Parsing flight variables...';
             hideProgress();
             await parseEntireFile(buf);
@@ -654,7 +653,7 @@
             // Full resolution only: no decimated-preview fallback, so a loaded flight always carries
             // every recorded variable rather than the sparse ~7-field copy. A failed download/parse
             // reports and aborts instead of opening a preview.
-            setReconStatus(`Could not load the full-resolution flight for ${missionId} (${e.message}). Try loading it again.`);
+            setReconStatus(`Could not load the full-resolution flight for ${missionId} (${e.message}). Try again, or upload it manually.`);
             hideLoadingOverlay();
             syncReconLoadButtonState();
             return;
@@ -1099,12 +1098,14 @@
         // (js/18-engine.js and beyond) has executed; wait out the page load first.
         if (document.readyState !== 'complete') await new Promise(r => window.addEventListener('load', r, { once: true }));
         let rec = preloadedMissions.get(missionId); if (!rec) return;
+        setFlightLoading(true);   // skeletons until the stored flight is applied
         if (!rec.parsed) {
-            setReconStatus('Opening ' + missionId + ' from the on-device store...');
+            setReconStatus('Opening ' + missionId + ' from the browser cache...');
             const stored = await missionIdbGet(missionId);
             if (!stored || !stored.parsed) {
                 setReconStatus('The stored copy of ' + missionId + ' is gone. Preload it again.');
                 preloadedMissions.delete(missionId); missionIdbDelete(missionId); updatePreloadedSelect();
+                setFlightLoading(false);
                 return;
             }
             rec = stored; preloadedMissions.set(missionId, rec);
@@ -1121,6 +1122,7 @@
             applyParsedFlight(rec.parsed);
         } catch (e) {
             setReconStatus('Could not open ' + missionId + ' (' + e.message + ').');
+            setFlightLoading(false);
             return;
         }
         isNcFile = rec.isNc;
@@ -1342,12 +1344,9 @@
                 try {
                     const isNc = /\.nc$/i.test(f.name);
                     // fold each file's own parse fraction into the bar so it advances smoothly within a
-                    // file (the .nc worker reports variable index/total; a .txt parses instantly so it
-                    // just steps).
-                    const parsed = await parseFlightSource(isNc ? await f.arrayBuffer() : await f.text(), (p) => {
-                        let frac = 0;
-                        if (p.phase === 'var' && p.total) frac = p.index / p.total;
-                        else if (p.phase === 'rows') frac = 1;
+                    // file (the worker reports how far it is through the decode, row building, and parse).
+                    const parsed = await parseFlightSource(isNc ? await f.arrayBuffer() : await f.text(), (p, fromNc) => {
+                        const frac = parseProgressFraction(p, fromNc);
                         if (fill) fill.style.width = Math.round((i + frac) / list.length * 100) + '%';
                     });
                     if (!parsed.rows.length) throw new Error('no usable rows');

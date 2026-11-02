@@ -12,7 +12,7 @@
    H.264, a veryfast x264 re-encode otherwise), and the fragments are stitched with ffmpeg's
    concat demuxer. Several engine workers convert segments in parallel (AVI_MAX_WORKERS,
    scaled to the machine's cores), and the work continues while the tab is hidden; closing
-   the tab, Stop, or Reset All ends it. */
+   the tab or Stop ends it. */
 
     // Per-part output cap: the concat step's output .mp4 lives in ffmpeg's in-memory FS, and
     // the core's wasm memory tops out at 2 GB (declared in ffmpeg-core.wasm), so a flight whose
@@ -571,23 +571,6 @@
         aviEngines = [];
         aviSetBar(0);
         aviSetStatus('Stopped. Your file list is still here, and starting again will run the conversion from the beginning.');
-    }
-
-    // Full teardown for Reset All (js/19-bootstrap.js): ends any running conversion and puts the
-    // converter back to its fresh state, list and results included.
-    function aviResetAll() {
-        aviStopFlag = true;
-        aviEngines.forEach(eng => { try { eng.ff.terminate(); } catch (e) {} });
-        aviEngines = [];
-        aviSegs = [];
-        aviSegKeys = new Set();
-        aviSkipped = [];
-        aviDone = false; aviDoneSeen = false;
-        aviClearResults();
-        aviRenderList();
-        aviSetBar(0);
-        aviSetStatus('No files added.');
-        aviCloseModal();
     }
 
     function aviBeforeUnload(e) { e.preventDefault(); e.returnValue = ''; }

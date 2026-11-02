@@ -997,9 +997,7 @@
                 if (!withData.length) return;
                 const turnOff = withData.every(m => tdrSelectedKm.has(m.km));
                 withData.forEach(m => { if (turnOff) tdrSelectedKm.delete(m.km); else tdrSelectedKm.add(m.km); });
-                buildTdrHero();
-                updateTdr3D();
-                if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+                tdrSelectionChanged();
             });
             list.appendChild(row);
         });
@@ -1010,6 +1008,24 @@
     // use) and docks the band sidebar, KEEPING whichever tracker display is up: a 3D entry gets
     // the parked overhead radar volume, a 2D entry goes straight to the map display with the
     // section pick. The normal tracker never shows radar; exit resets both to default framing.
+    // after any change to the picked layers (a row, All, None): rebuild the sidebar rows, the radar
+    // (3D stack and 2D composite), and repaint the 2D map, which otherwise waits for the next frame
+    // and shows nothing new while playback is paused
+    function tdrSelectionChanged() {
+        buildTdrHero();
+        updateTdr3D();
+        if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+
+    // the sidebar's 2D / 3D switch drives the tracker dropdown, so the view change runs through the
+    // dropdown's own change handler (js/07-ui-controls.js), the same as picking it in the map header
+    function tdrSetView(mode) {
+        const sel = document.getElementById('trackerModeSelect');
+        if (!sel || sel.value === mode) return;
+        sel.value = mode;
+        sel.dispatchEvent(new Event('change'));
+    }
+
     function enterTdrMode() {
         if (tdrModeOn || !tdrAnalyses.length) return;
         if (typeof closeSatPicker === 'function') closeSatPicker();   // the TDR button lives in the Overlays dropdown; close it behind us
@@ -1029,9 +1045,6 @@
         if (typeof setFakePanel === 'function' && typeof mapPanel !== 'undefined') setFakePanel(mapPanel);
         const panel = document.getElementById('mapPanel'); if (panel) panel.classList.add('tdr-mode');
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'flex';
-        // Reset Zoom is disabled in the workspace: it would fight the radar view's own framing (and
-        // wrecks the 3D TDR camera). exitTdrMode re-enables it.
-        const rzBtn = document.getElementById('resetMapZoomBtn'); if (rzBtn) rzBtn.disabled = true;
         if (typeof followAircraft3D !== 'undefined') followAircraft3D = false;
         if (typeof updateFollowButton === 'function') updateFollowButton();
         if (typeof resizeCanvasLayout === 'function') resizeCanvasLayout();
@@ -1119,7 +1132,6 @@
         if (typeof setFakePanel === 'function') setFakePanel(null);
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         const bar = document.getElementById('tdrModeBar'); if (bar) bar.style.display = 'none';
-        const rzBtn = document.getElementById('resetMapZoomBtn'); if (rzBtn) rzBtn.disabled = false;   // re-enable Reset Zoom outside the workspace
         tdrSelectedKm.clear();
         tdr2DImage = null; tdr2DBox = null; _tdr2DStamp = '';
         bgNeedsUpdate = true;
@@ -1252,8 +1264,8 @@
         ctx.save();
         ctx.setLineDash([6 / mapScale, 4 / mapScale]);
         ctx.lineWidth = 2 / mapScale;
-        // dark on the light basemap, white on the dark one
-        ctx.strokeStyle = document.documentElement.dataset.theme === 'light' ? '#0b0e13' : '#ffffff';
+        // dark on the light basemap
+        ctx.strokeStyle = '#0b0e13';
         if (line) {
             ctx.beginPath(); ctx.moveTo(getX(line.A.lon), getY(line.A.lat)); ctx.lineTo(getX(line.B.lon), getY(line.B.lat)); ctx.stroke();
             dot(line.A); dot(line.B);
@@ -1353,12 +1365,11 @@
             const ref = tdrCurrent || tdrAnalyses.find(a => a.state === 'ready');
             if (!ref || !ref.levels) return;
             ref.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
-            buildTdrHero(); updateTdr3D();
+            tdrSelectionChanged();
         });
         if (noneBtn) noneBtn.addEventListener('click', () => {
             tdrSelectedKm.clear();
-            buildTdrHero(); updateTdr3D();
-            if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+            tdrSelectionChanged();
         });
         // 2D-only radar opacity: fades the composite so satellite imagery reads through it.
         const opSl = document.getElementById('tdr2dOpacitySlider');

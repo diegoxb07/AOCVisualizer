@@ -3,61 +3,51 @@
    toggled from js/*.js) live alongside the visual styling, check for JS references
    before renaming or removing a selector. */
 
-/* Tokens: near-zero-chroma neutrals (light & dark) + one accent hue (NOAA navy) and one
-   reserved danger hue (recording/error states). Gated on documentElement[data-theme], which the
-   index.html head script sets before first paint (light unless dark was saved); js/19-bootstrap.js
-   flips it and persists the choice. The bare :root dark set is only the no-script fallback. */
-:root, :root[data-theme="dark"] {
-    color-scheme: dark;
-    --bg: oklch(17% 0.002 90);
-    --panel: oklch(21% 0.003 90);
-    --panel-strip: oklch(24.5% 0.003 90);
-    --border: oklch(33% 0.003 90);
-    --border-strong: oklch(44% 0.003 90);
-    --text: oklch(93% 0.002 90);
-    --text-muted: oklch(68% 0.003 90);
-    --text-faint: oklch(52% 0.003 90);
-    --accent: oklch(58% 0.14 258);
-    --accent-ink: oklch(97% 0.01 258);
-    --accent-soft: oklch(30% 0.06 258);
-    --danger: oklch(58% 0.17 25);
-    --warn: oklch(80% 0.13 82);
-    /* Readout value hues (point analysis). The panel sits on --panel, so each hue carries a light
-       variant below dark enough to hold against it while keeping the same identity. */
-    --val-cool: #7dd3fc;
-    --val-alt: #7c93ff;
-    --val-warm: #fbbf24;
-    /* first-paint estimate of the screen fit in js/11-layout.js (which then takes over, and the media
-       drag handle after it): 54vh up to 600px, shrinking on short screens so most of a graph row still
-       shows under the stuck bar. 363px = sticky top 54 + bar padding and border 39 + bottom bar ~90 + 180 graph room. */
-    --media-h: clamp(240px, min(54vh, 100vh - 363px), 600px);
-}
-:root[data-theme="light"] {
+/* tokens: one softened light palette after noaa.gov, framed by dark bands. near-black ink and mid-gray
+   rules on a dimmed gray sheet over a slightly darker page, gray strips, and noaa navy for links. the bands
+   are a near-black title band and playback bar (--band, with --band-ink and --band-muted on it) and a
+   charcoal menu bar (--bar, with --bar-ink on it). the accent is the ink color itself; red is reserved for recording and
+   errors. --elevated is the hover and raised-surface fill, separate from --border so a fill never
+   takes the rule color. */
+:root {
     color-scheme: light;
-    --bg: oklch(97% 0.002 90);
-    --panel: oklch(99% 0.001 90);
-    --panel-strip: oklch(94% 0.003 90);
-    --border: oklch(85% 0.003 90);
-    --border-strong: oklch(73% 0.004 90);
-    --text: oklch(24% 0.003 90);
-    --text-muted: oklch(44% 0.004 90);
-    --text-faint: oklch(56% 0.004 90);
-    --accent: oklch(36% 0.15 258);
-    --accent-ink: oklch(99% 0.001 90);
-    --accent-soft: oklch(88% 0.045 258);
+    --page: #d5d5d5;
+    --bg: #dedede;
+    --panel: #dedede;
+    --panel-strip: #d1d1d1;
+    --elevated: #bfbfbf;
+    --border: #858585;
+    --border-strong: #6b6b6b;
+    --text: #1b1b1b;
+    --text-muted: #474747;
+    --text-faint: #5a5a5a;
+    --accent: #1b1b1b;
+    --accent-ink: #ffffff;
+    --accent-soft: #c9c9c9;
+    --band: #161616;
+    --band-ink: #ececec;
+    --band-muted: #bdbdbd;
+    --bar: #333333;
+    --bar-ink: #ececec;
+    --link: #003087;
     --danger: oklch(48% 0.15 25);
-    --warn: oklch(56% 0.12 74);
+    --warn: oklch(50% 0.11 74);
+    /* readout value hues (point analysis), dark enough to hold against the light panel */
     --val-cool: #0369a1;
     --val-alt: #4338ca;
     --val-warm: #b45309;
+    /* first-paint estimate of the screen fit in js/11-layout.js, which then takes over: 54vh up to
+       600px, shrinking on short screens so most of a graph row still shows under the stuck bar.
+       271px = sticky top 0 + bar padding and border 39 + bottom bar ~52 + 180 graph room. */
+    --media-h: clamp(240px, min(54vh, 100vh - 271px), 600px);
 }
 
 /* Base */
-html, body { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
+html, body { font-family: var(--font-ui); }
 body {
-    background-color: var(--bg);
+    background-color: var(--page);
     color: var(--text);
-    padding-bottom: 140px;
+    padding-bottom: calc(var(--bottom-bar-h, 96px) + 24px);
     -webkit-font-smoothing: antialiased;
 }
 ::backdrop { background-color: var(--bg); }
@@ -65,9 +55,20 @@ body {
 ::selection { background: var(--accent-soft); color: var(--text); }
 :focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-/* one font stack for every readout that needs its digits to hold their column: the timeline
-   clock, the HUD, the time fields, the chart ticks. */
-:root { --font-mono: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
+/* the page's one typeface, Nunito Sans (the noaa.gov face), vendored as one variable woff2 covering
+   every weight so it works offline; system sans faces stand in until it loads. --font-mono names the
+   same face for every readout that needs its digits to hold their column: the timeline clock, the HUD,
+   the time fields, the chart ticks. the tailwind font utilities resolve to it too. */
+@font-face {
+    font-family: "Nunito Sans";
+    font-style: normal;
+    font-weight: 200 1000;
+    font-display: swap;
+    src: url("../lib/fonts/nunito-sans/nunito-sans-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+:root { --font-ui: "Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; --font-mono: var(--font-ui); }
+.font-sans, .font-mono, .font-serif { font-family: var(--font-ui); }
 
 /* Readouts sit in the interface font; only their digits are held to one width, so a ticking
    clock or a counting percentage does not shuffle the text beside it. */
@@ -77,15 +78,17 @@ body {
 button:disabled, select:disabled, input:disabled { opacity: 0.35; cursor: not-allowed; }
 button { transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s; }
 
-/* Theme-aware utility classes: small, hand-written color utilities bound to CSS variables, so
-   the whole app follows [data-theme] with no colors baked at build time. Used both directly in
+/* Color utility classes: small, hand-written utilities bound to the color tokens above, so no
+   color is baked in at build time. Used both directly in
    index.html and via classList add/toggle in js/*.js (see tailwind.config.js safelist). */
 .bg-app { background-color: var(--bg); }
 .bg-panel { background-color: var(--panel); }
 .bg-panel-strip { background-color: var(--panel-strip); }
-.bg-elevated { background-color: var(--border); }
+.bg-elevated { background-color: var(--elevated); }
 .hover\:bg-panel-strip:hover { background-color: var(--panel-strip); }
-.hover\:bg-elevated:hover { background-color: var(--border); }
+.hover\:bg-elevated:hover { background-color: var(--elevated); }
+/* file picker buttons use the raised fill, so the label keeps its contrast */
+input[type="file"]::file-selector-button { background-color: var(--elevated); color: var(--text); }
 .bg-accent { background-color: var(--accent); }
 .hover\:bg-accent:hover { background-color: var(--accent); filter: brightness(1.12); }
 .bg-accent-soft { background-color: var(--accent-soft); }
@@ -136,11 +139,7 @@ select:not(:disabled):focus { border-color: var(--accent); }
 /* Sharp edges: flat 3px radius on all controls. */
 button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):not([type="checkbox"]) { border-radius: 3px; }
 #dataDropZone, #videoDropZone, #reconSourceLink { border-radius: 3px; }
-.status-chip { border-radius: 4px; }
 
-/* Both media-panel subheaders: title-case (not uppercase), slightly larger + brighter.
-   text-transform/letter-spacing override the parent's uppercase styling. */
-.panel-subhead { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif !important; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; text-transform: none; color: var(--text); }
 
 /* #satelliteSelect / #satBandSelect are the hidden source-of-truth selects behind the Overlays
    dropdown (never shown), so they need no header sizing. */
@@ -177,9 +176,6 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .ov-check { flex: none; width: 15px; height: 15px; border: 1.5px solid color-mix(in oklab, var(--text-faint) 85%, transparent); border-radius: 3px; background: transparent; position: relative; transition: background 0.12s, border-color 0.12s; }
 .ov-native-check:checked ~ .ov-check, #tdrPickerBtn.sat-on .ov-check { background: var(--accent); border-color: var(--accent); }
 .ov-native-check:checked ~ .ov-check::after, #tdrPickerBtn.sat-on .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
-/* Tile opacity sits at the foot of the satellite section, so it reads with a top divider (not the
-   shared bottom one) separating it from the product list above. */
-#satOpacityRow { border-bottom: none; border-top: 1px solid var(--border); margin: 6px 0 0; padding: 8px 4px 2px; }
 /* Satellite section: a toggle + expander header over a collapsible picker body. */
 #ovSatSection { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
 .ov-sat-row { gap: 7px; }
@@ -191,12 +187,11 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .sat-opacity-row input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); height: 3px; cursor: pointer; }
 .sat-opacity-val { font-size: 10px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 30px; text-align: right; }
 .sat-picker-list { display: flex; flex-direction: column; gap: 2px; }
-.sat-pick-off, .sat-pick-sat-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
-.sat-pick-off { font-weight: 600; }
-.sat-pick-off:hover, .sat-pick-sat-row:hover { background: var(--panel-strip); }
+.sat-pick-sat-row { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 11.5px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
+.sat-pick-sat-row:hover { background: var(--panel-strip); }
 .sat-pick-sat.active > .sat-pick-sat-row { color: var(--accent); font-weight: 700; }
-.sat-pick-off:disabled, .sat-pick-sat.disabled > .sat-pick-sat-row { color: var(--text-faint); cursor: not-allowed; opacity: 0.75; }
-.sat-pick-off:disabled:hover, .sat-pick-sat.disabled > .sat-pick-sat-row:hover { background: transparent; }
+.sat-pick-sat.disabled > .sat-pick-sat-row { color: var(--text-faint); cursor: not-allowed; opacity: 0.75; }
+.sat-pick-sat.disabled > .sat-pick-sat-row:hover { background: transparent; }
 .sat-pick-caret { width: 10px; flex: none; font-size: 9px; color: var(--text-muted); }
 .sat-pick-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sat-pick-products { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 4px 8px; padding-left: 8px; border-left: 1px solid var(--border); }
@@ -226,7 +221,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .loaded-pick-empty { color: var(--text-faint); font-size: 11px; padding: 8px; }
 
 /* Fullscreen behavior (functional, do not simplify) */
-:fullscreen { background-color: var(--bg); overflow-y: auto; padding: 24px; padding-bottom: 140px; }
+/* page fullscreen keeps the layout edge to edge like the window does; the body's own bottom
+   padding clears the playback bar */
+:fullscreen { background-color: var(--page); overflow-y: auto; }
 /* Fullscreen a single graph, like the media panels: fill the viewport (the JS also hides the top-right
    sticky cluster). Toggle off with the ⛶ button again or Esc. */
 .chart-fs { position: fixed; inset: 0; z-index: 4000; margin: 0; border: none; border-radius: 0; background: var(--bg); padding: 18px 18px 24px; }
@@ -242,7 +239,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* the pinned HUD and PFD clear the bottom bar by its live height (--bottom-bar-h, js/11-layout.js) plus
    room for the 10-minute stepper, so a bar that wraps taller on a narrow window never covers them. */
 #mapPanel:is(:fullscreen, .fake-fs) .overlays-wrapper { top: 80px; bottom: calc(var(--bottom-bar-h, 96px) + 74px); transform: scale(1) !important; transform-origin: bottom left; }
-#mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: calc(var(--bottom-bar-h, 96px) + 74px); width: 210px; height: 210px; }
+/* the pinned PFD's spot, shared with the TDR readout stack placed above it */
+#mapPanel:is(:fullscreen, .fake-fs) { --pfd-pin-bottom: calc(var(--bottom-bar-h, 96px) + 74px); --pfd-pin-size: 210px; }
+#mapPanel:is(:fullscreen, .fake-fs) #pfdOverlay { bottom: var(--pfd-pin-bottom); width: var(--pfd-pin-size); height: var(--pfd-pin-size); }
 /* 10-min satellite/playhead stepper: floats at the bottom-center of the map, above the timeline bar */
 /* Pre-hide the measure cluster on a 3D-preference refresh (class set by the inline head script
    in index.html) so it doesn't flash before persistDisplayPrefs restores the 3D tracker mode. */
@@ -250,9 +249,6 @@ html.pref-tracker-3d #measureCluster { display: none; }
 /* Satellite overlay is 2D only. The Overlays dropdown stays usable in 3D for storm track and TDR;
    only its satellite section greys out and stops taking clicks, so it reads as present-but-N/A. */
 html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
-/* Reset Zoom is disabled inside the TDR workspace (js/07d-tdr.js enter/exitTdrMode), where it would
-   fight the radar view's framing; grey it so it reads as unavailable rather than dead. */
-#resetMapZoomBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
 /* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
    clear the bar by position (child z-index can't beat it from the z-1500 panel), so they ride on
@@ -278,13 +274,13 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 #mapPanel { z-index: 1; }
 #videoPanel { z-index: 0; }
 
-/* Header, flat brand bar (NOAA logo + divider + title) */
-#mainContainer > header {
-    padding: 2px 2px 10px;
-    position: relative;
-}
-#mainContainer > header h1 { font-weight: 800; letter-spacing: -0.02em; }
-#brandSub { font-size: 12px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* page title: a near-black band across the sheet with the logo, the name, and the section line under
+   it, above the charcoal menu bar */
+.site-header { display: flex; align-items: center; gap: 14px; margin: 0 -20px; padding: 14px 20px; background: var(--band); }
+.site-header > .min-w-0 { display: flex; flex-direction: column; row-gap: 2px; }
+.site-logo { height: 44px; width: auto; flex: none; }
+.site-title { font-size: 24px; font-weight: 700; line-height: 1.15; margin: 0; color: var(--band-ink); }
+#brandSub { font-size: 14px; color: var(--band-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Panels / cards */
 #mainContainer .bg-panel {
@@ -294,18 +290,11 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 }
 #mainContainer .bg-panel:hover { border-color: var(--border-strong); }
 
-/* Chart / panel title bars */
-[id^="title-"] { position: relative; padding: 4px 0 9px 13px; margin-bottom: 12px !important; border-bottom: 1px solid var(--border); color: var(--text-muted) !important; }
+/* chart title rows read as compact table headers: a thin gray strip ruled off from the plot below,
+   with small icon buttons so the row stays short */
+[id^="title-"] { position: relative; padding: 3px 8px; margin-bottom: 0 !important; background: var(--panel-strip); border-bottom: 1px solid var(--border); color: var(--text) !important; font-size: 11px; line-height: 1.3; }
+[id^="title-"] > .flex > button, [id^="title-"] > .flex > .relative > button { font-size: 13px; line-height: 1; }
 
-/* Mission status chips: flat/neutral by default, switch to a real lit/active accent state
-   once a mission is loaded (JS toggles .lit + .chip-v.on). This is the one place an
-   accent-colored border is intentional, a genuine state change, not decoration. */
-.status-chip { display: flex; flex-direction: column; gap: 3px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; min-width: 0; transition: border-color 0.2s, background 0.2s; }
-.status-chip .chip-k { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-muted); }
-.status-chip .chip-v { font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 13px; font-weight: 700; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-.status-chip .chip-v.on { color: var(--text); }
-.status-chip.lit { background: var(--accent-soft); border: 1px solid var(--accent); }
-.status-chip.lit .chip-v.on { color: var(--text); font-weight: 700; }
 
 /* Hover feedback on the primary interactive zones (flat border-color shifts, no glow) */
 #playPauseBtn:not(:disabled):hover, #replayBtn:not(:disabled):hover { border-color: var(--border-strong); }
@@ -317,30 +306,22 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
    the point-analysis report, cross-section info, and the help guide). */
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
-/* Copyable data stays selectable for sharing: the status chips (flight data window, mission id,
-   aircraft, date), the parser ledger (samples and what was filtered), the mission subline, the
-   archive status line, and the playback clock. */
-.status-chip, #dataReportLine, #missionSubline, #reconArchiveStatus, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
-.status-chip { cursor: copy; }   /* a plain click copies the chip's value (js/09-interaction.js) */
+/* Copyable data stays selectable for sharing: the mission subline, the archive status line, and the
+   playback clock. */
+#missionSubline, #reconArchiveStatus, #timelineTimeDisplay { -webkit-user-select: text; user-select: text; }
 
-/* top clears the fixed top-right cluster (#topRightControls, top-4 in, one row ~38px tall, z-9999):
-   that cluster is pinned to the viewport in both normal and real (:fullscreen) page fullscreen, so
-   once this bar sticks to the top its own panel buttons would otherwise land right under it. */
-.sticky-media-bar { position: sticky; top: 54px; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-/* collapser: on the drag grip's line at the bottom left (grip stays centered), so it adds no extra
-   row. z-index above the resize handle so its clicks collapse instead of starting a drag.
-   Left in both states, so the button holds one lateral position and stays where the eye left it.
-   The left is clear either way, while the collapsed strip stops under the fixed top-right cluster
-   (#topRightControls), which rules the right out once collapsed; the mini bar pads left to clear it. */
+/* sticks to the top of the viewport while the charts scroll under it */
+.sticky-media-bar { position: sticky; top: 0; z-index: 1000; background-color: var(--bg); padding: 10px 0 28px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+/* collapser: in the bar's bottom padding at the left, so it adds no extra row, and in the same spot
+   in both states so it stays where the eye left it; the mini bar pads left to clear it. */
 .media-collapse-btn { position: absolute; bottom: 6px; left: 10px; z-index: 1001; border-color: color-mix(in oklab, var(--accent) 55%, var(--border)); color: var(--accent); font-weight: 700; }
 .sticky-media-bar.collapsed .media-collapse-btn { bottom: 8px; }
 .sticky-media-bar.collapsed { min-height: 40px; padding-bottom: 6px; margin-bottom: 16px; }
 .sticky-media-bar.collapsed #mediaBarContent, .sticky-media-bar.collapsed .media-resize-handle { display: none; }
 /* mini playback bar: only in the collapsed media strip, so scrubbing/marking survive the collapse
    (the full playback bar is hidden by the JS then). the strip is full-width, so its slider is wide
-   and therefore less sensitive than a tiny one. left padding clears the absolute collapse button, right
-   padding the fixed top-right cluster. */
-.mini-playback-bar { display: none; align-items: center; gap: 8px; padding: 5px 240px 5px 118px; flex-wrap: nowrap; }
+   and therefore less sensitive than a tiny one. left padding clears the absolute collapse button. */
+.mini-playback-bar { display: none; align-items: center; gap: 8px; padding: 5px 12px 5px 118px; flex-wrap: nowrap; }
 .clip-remove-graph { color: var(--danger); font-weight: 700; transition: color 0.12s; }
 .clip-remove-graph:hover { color: color-mix(in oklab, var(--danger) 78%, #fff); }
 .sticky-media-bar.collapsed .mini-playback-bar { display: flex; }
@@ -393,22 +374,17 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* Idle placeholders (hidden wholesale once data loads, via style.display on the placeholder div) */
 .radar-blip { position: absolute; top: 34%; left: 62%; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blipPulse 3.4s ease-out infinite; }
 @keyframes blipPulse { 0%, 12% { opacity: 1; } 60%, 100% { opacity: 0.12; } }
-.media-idle-title { display: block; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
+.media-idle-title { display: block; font-family: var(--font-ui); font-size: 11px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-muted); }
 .media-idle-sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-faint); margin-top: 6px; max-width: 380px; }
 
-/* The processing spinner morphs into a green checkmark once parsing succeeds (js/12 adds .done). */
 /* The loading overlay reads in the interface font rather than the mono one. Its numbers count up
    while it is on screen, so they hold a fixed digit width and the line does not shimmer. */
 #loadingOverlaySubtext, #loadingProgressWrap { font-variant-numeric: tabular-nums; }
-/* 10% down from the old text-xl/md:text-2xl pair (20px/24px). */
-.loading-title { font-size: 18px; }
-@media (min-width: 768px) { .loading-title { font-size: 21.6px; } }
-#loadingCheck { opacity: 0; }
-#loadingCheck path { stroke-dasharray: 42; stroke-dashoffset: 42; }
-#loadingSpinner.done #loadingRing { animation: none; border-color: #10b981; transition: border-color 0.25s ease; }
-#loadingSpinner.done #loadingCheck { opacity: 1; transition: opacity 0.2s ease; }
-#loadingSpinner.done #loadingCheck path { animation: loadCheckDraw 0.42s ease 0.05s forwards; }
-@keyframes loadCheckDraw { to { stroke-dashoffset: 0; } }
+/* the loading overlay: an opaque blurred veil over the page (it still takes clicks, so nothing starts
+   mid-load) with the spinner, the title, and the current step centered on it */
+#loadingOverlay { background: color-mix(in oklab, var(--bg) 85%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+#loadingSpinner { width: 40px; height: 40px; margin-bottom: 14px; }
+.loading-title { font-size: 15px; }
 
 /* In-map overlays: HUD, PFD, pills, badges - flat hairline borders, no accent-tinted glow */
 /* the metric hud's corner and the pitch/roll box's spot, shared with fitAttitudeHud (js/11-layout.js).
@@ -422,9 +398,8 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #hudOverlay::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 #hudOverlay d { display: block; white-space: pre; }
 #hudOverlay span { color: var(--accent); font-weight: bold; float: right; margin-left: 12px; }
-#hudOverlay span.temp-val { color: #ff9933; }
-/* the HUD sits on --panel, near-white in light mode, so the temperature orange darkens there to stay readable */
-:root[data-theme="light"] #hudOverlay span.temp-val { color: #c2410c; }
+/* temperature readouts in a dark orange that reads on the light HUD panel */
+#hudOverlay span.temp-val { color: #c2410c; }
 
 #pfdOverlay { position: absolute; bottom: 30px; right: 16px; background-color: rgba(0, 0, 0, 0.9); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); display: none; pointer-events: auto; overflow: hidden; width: 140px; height: 140px; flex-shrink: 0; transition: width 0.2s, height 0.2s, bottom 0.2s; z-index: 2500; transform: scale(var(--hud-scale, 1)); transform-origin: bottom right; }
 #pfdCanvas { width: 100%; height: 100%; display: block; }
@@ -439,7 +414,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* satellite product color-scale legend: compact vertical bar tucked into the top-right corner of the
    2d player, below the fetch pill, clear of the pfd (bottom right) and hud (bottom left). */
-#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; }
+#satColorLegend { position: absolute; right: 12px; top: 56px; z-index: 45; width: 58px; background: color-mix(in oklab, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 5px; padding: 4px 5px 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); pointer-events: none; font-family: var(--font-ui); }
 #satColorLegend.hidden { display: none; }
 #satColorLegend .leg-title { font-size: 8px; font-weight: 700; color: var(--text); line-height: 1.2; margin-bottom: 3px; text-align: center; }
 #satColorLegend .leg-body { position: relative; display: flex; gap: 4px; height: 124px; }
@@ -476,7 +451,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 #satPrefetchCancel:hover { background: color-mix(in oklab, var(--danger) 30%, var(--panel)); color: var(--text); }
 
 /* Auto-Sync indicator, anchored in the MMR video panel, non-blocking */
-#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+#syncingIndicator { position: absolute; top: 10px; left: 12px; display: flex; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 90%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 6px 12px; border-radius: 3px; font-family: var(--font-ui); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); z-index: 30; opacity: 0; transform: translateY(-6px); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
 #syncingIndicator.show { opacity: 1; transform: translateY(0); }
 #syncingIndicator .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #syncingIndicator .sync-sub { color: var(--text-muted); font-weight: 500; }
@@ -495,7 +470,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 
 /* HUD + sat day label read with tabular digits for cleaner numbers */
 #hudOverlay, #satDayLabel {
-    font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif !important;
+    font-family: var(--font-ui) !important;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.02em;
 }
@@ -507,7 +482,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .dropdown-menu.show { display: block; animation: menuIn 0.16s ease; }
 @keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } }
 .dropdown-item { font-size: 13px; color: var(--text-muted); padding: 8px 12px; cursor: pointer; border-radius: 3px; text-transform: none; font-weight: 500; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; transition: background-color 0.1s, color 0.1s; }
-.dropdown-item:hover { background-color: var(--border); color: var(--text); }
+.dropdown-item:hover { background-color: var(--elevated); color: var(--text); }
 .dropdown-item.active { background-color: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .dropdown-item.active::after { content: '✓'; font-size: 12px; }
 
@@ -524,7 +499,7 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .help-body ul { margin: 0 0 10px; padding-left: 18px; list-style: disc; }
 .help-body li { margin: 3px 0; color: var(--text-muted); }
 .help-body b, .help-body strong { color: var(--text); font-weight: 600; }
-.help-body a { color: var(--accent); text-decoration: underline; }
+.help-body a { color: var(--link); text-decoration: underline; }
 .help-body kbd { font-family: var(--font-mono); font-size: 11px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text); white-space: nowrap; }
 /* TDR workspace sidebar: docked over the pinned tracker's left edge while TDR mode is up.
    Below the sticky bottom bar (z-2000) and above the canvas overlays. */
@@ -544,7 +519,11 @@ html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !im
 /* Stacked vertically, the PFD sub-option's reserved (visibility:hidden) row would wedge a gap
    between Cockpit PFD and S.I Units; collapse it while it is off so they sit close together. */
 html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
-#mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; bottom: 440px; align-items: flex-end; transform-origin: bottom right; }
+/* the readout stack sits on the bottom row, level with the pinned PFD and just left of it while the
+   PFD shows, clear of the top-right items (the satellite color bar in 2D, the pitch/roll box in 3D):
+   its top never rises above 250px */
+#mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; top: 250px; bottom: var(--pfd-pin-bottom, 170px); align-items: flex-end; transform-origin: bottom right; }
+html:has(#togglePfd:checked) #mapPanel.tdr-mode .overlays-wrapper { right: calc(32px + var(--pfd-pin-size, 210px)); }
 #mapPanel.tdr-mode #fullscreenMapBtn { display: none; }
 /* While the workspace waits for its first volume, the HUD greys out with the skeleton. */
 #mapPanel.tdr-loading .overlays-wrapper { filter: grayscale(1) opacity(0.45); transition: filter 0.2s; }
@@ -553,7 +532,6 @@ html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
 .tdr-hero-actions { display: flex; gap: 6px; margin: 8px 0 2px; }
 .tdr-hero-actions button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 3px 10px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-hero-actions button:hover { color: var(--accent); border-color: var(--accent); }
-.tdr-hero-note-top { font-size: 10px; color: var(--text-faint); margin: 6px 0 4px; line-height: 1.35; }
 /* One row per leg: the leg button, then a connector line to any of its eye-pass buttons. Compact so
    several legs (and their passes) fit without scrolling. */
 .tdr-leg-row { display: flex; flex-direction: column; gap: 3px; }
@@ -649,22 +627,21 @@ body.media-collapsed .float-panel { display: none !important; }
 .clip-preview-frames > .clip-preview-track, .clip-preview-frames > .clip-preview-video { flex: 1 1 0; min-width: 0; width: 100%; height: 88px; border-radius: 4px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--border); display: block; object-fit: contain; }
 #clipPreviewRow.no-video .clip-preview-video { display: none; }
 
-.toast-notification { position: fixed; top: 20px; right: 20px; background-color: color-mix(in oklab, var(--panel) 96%, transparent); border: 1px solid var(--border); border-left: 4px solid var(--accent); color: var(--text); padding: 16px 20px; border-radius: 4px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); z-index: 9999; font-size: 13px; max-width: 350px; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
+.toast-notification { position: fixed; top: 20px; right: 20px; background-color: color-mix(in oklab, var(--panel) 96%, transparent); border: 1px solid var(--border); border-left: 3px solid var(--accent); color: var(--text); padding: 8px 14px; border-radius: 4px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); z-index: 9999; font-size: 13px; max-width: 320px; font-weight: 600; opacity: 0; transform: translateX(50px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; }
 .toast-notification.show { opacity: 1; transform: translateX(0); pointer-events: auto; }
 
 /* Bottom command bar */
 .sticky-bottom-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: color-mix(in oklab, var(--panel-strip) 94%, transparent); border-top: 1px solid var(--border); padding: 12px 18px; z-index: 2000; backdrop-filter: blur(6px); display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; row-gap: 12px; }
 
-.cmd-group { display: flex; flex-direction: column; justify-content: flex-end; gap: 7px; }
-/* Playback and Markers carry no header, so they reserve the height one would take: without it
-   their controls and their divider line would come up short against the labelled groups. */
-.sticky-bottom-bar > .cmd-group:not(#cmdTimelineGroup) { min-height: 51px; }
-#cmdTimelineGroup .cmd-row > button { flex: none; height: 28px; padding: 0 0.85rem; font-size: 10.5px; }
+/* one row: playback, sync, markers, the timeline with record and share, then Settings */
+.cmd-group { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+#cmdTimelineGroup .cmd-row > button { flex: none; height: 32px; padding: 0 0.85rem; font-size: 12px; }
 .cmd-group + .cmd-group { border-left: 1px solid var(--border); padding-left: 14px; }
-.cmd-group > .cmd-label { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); padding-left: 1px; }
+.cmd-group > .cmd-label { font-size: 12px; font-weight: 700; color: var(--text-muted); padding-left: 1px; }
 .cmd-group > .cmd-row { display: flex; align-items: center; gap: 8px; }
 
-#cmdTimelineGroup { flex: 1 1 100%; min-width: 100%; order: 2; border-left: none !important; padding-left: 0 !important; }
+#cmdTimelineGroup { flex: 1 1 360px; min-width: 260px; }
+#cmdTimelineGroup > .cmd-row { flex: 1 1 auto; min-width: 0; }
 #cmdTimelineGroup > .cmd-row { gap: 16px; }
 .timeline-track { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 /* Loader over the timeline while the MMR runs its first sync (js/06-ocr.js updateTimelineSyncLock):
@@ -676,16 +653,12 @@ body.media-collapsed .float-panel { display: none !important; }
 #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
 #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
-#timelineTimeDisplay { font-size: 0.85rem; line-height: 1; font-variant-numeric: tabular-nums; }
-.sticky-bottom-bar > .cmd-group:not(#cmdTimelineGroup) { order: 1; }
+#timelineTimeDisplay { min-width: 104px; font-size: 15px; line-height: 1; font-variant-numeric: tabular-nums; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) button,
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { height: 32px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; padding-left: 0.7rem !important; padding-right: 0.7rem !important; font-size: 10.5px !important; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { max-width: 150px; text-overflow: ellipsis; }
-/* Filters live on the far right of the top row (order:1), packed 2x2 so the bar height is unchanged.
-   Separator drawn as a pseudo-element spanning only the content box, the inherited border-left
-   would also span the 4px vertical padding and protrude past the checkbox grid. */
-#cmdFiltersGroup { order: 1; margin-left: auto; margin-right: 8px; padding: 4px 0 4px 16px; border-left: none !important; position: relative; }
-#cmdFiltersGroup::before { content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
+/* filters come last in Settings, ruled off from the three selects above them */
+#cmdFiltersGroup { padding-top: 10px; border-top: 1px solid var(--border); }
 /* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
    in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
    reflowing the other filters. */
@@ -716,7 +689,7 @@ body.media-collapsed .float-panel { display: none !important; }
 
 /* Range inputs */
 input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; background: var(--panel-strip); height: 8px; border-radius: 4px; outline: none; border: 1px solid var(--border); }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; transition: 0.2s; border: 2px solid var(--bg); }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; transition: 0.2s; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--border); }
 input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
 /* Elapsed-portion fill, --fill is painted by js/20-ui-polish.js. Flat single-hue fill. */
@@ -732,7 +705,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 /* Scrollbars */
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-track { background: var(--bg); }
-*::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; border: 2px solid var(--bg); }
+*::-webkit-scrollbar-thumb { background: var(--text-faint); border-radius: 6px; border: 2px solid var(--bg); }
 *::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 /* Primary Play button: the app's one signature accent, sized up slightly from the other
@@ -761,33 +734,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 #tdrExitBtn:hover { filter: brightness(1.1); }
 #mapPanel.tdr-mode #tdrExitBtn { display: inline-flex; }
 
-/* Light/dark theme switch: a sliding pill below Fullscreen in the fixed top-right corner. The knob
-   position and which icon lights are driven off [data-theme] on <html>, so the switch reflects the
-   theme set pre-paint by the head script and slides on every toggle. */
-.theme-switch { -webkit-appearance: none; appearance: none; position: relative; width: 56px; height: 26px; flex: none; padding: 0; border: 1px solid var(--border); border-radius: 13px; background: var(--panel-strip); cursor: pointer; transition: background 0.2s, border-color 0.2s; }
-.theme-switch:hover { border-color: var(--border-strong); }
-/* Each icon is centered inside a knob-sized (20px) box parked at that state's knob position, so the
-   glyph always sits dead-center under the circle regardless of its own width. */
-.theme-switch .ts-ico { position: absolute; top: 0; height: 100%; width: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; color: var(--text-faint); pointer-events: none; z-index: 2; transition: color 0.2s; }
-.theme-switch .ts-moon { left: 3px; }
-.theme-switch .ts-sun { right: 3px; }
-/* calc() keeps the knob centered on the icon boxes (left:3px / right:3px, each 20px wide) regardless
-   of box-sizing, so the circle sits dead-center over the moon (dark) and the sun (light). */
-.theme-switch .ts-knob { position: absolute; top: calc(50% - 10px); left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,0.35); z-index: 1; transition: left 0.2s ease; }
-/* Dark (default): knob left, moon rides it. Light: knob right, sun rides it. */
-.theme-switch .ts-moon { color: var(--accent-ink); }
-:root[data-theme="light"] .theme-switch .ts-knob { left: calc(100% - 23px); }
-:root[data-theme="light"] .theme-switch .ts-moon { color: var(--text-faint); }
-:root[data-theme="light"] .theme-switch .ts-sun { color: var(--accent-ink); }
-
-/* Smooth the whole-page brightness change when toggling light/dark, in step with the knob slide.
-   Scoped to a transient class the toggle adds for ~0.4s, so it never lags hover/focus color changes
-   during normal use. */
-html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
-    transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, fill 0.35s ease, left 0.35s ease !important;
-}
-
-/* report a problem form (the ! button next to help): subject + details handed to a prefilled
+/* report a problem form (Report a Problem in the menu bar): subject + details handed to a prefilled
    gmail compose, same feature as in AOCQualityCheck */
 .report-form { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .report-form label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
@@ -802,7 +749,7 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 
 /* AVI to MP4 converter (js/22-avi-convert.js): the modal's ordered segment list, the Stop
    button, and the fixed corner pill that keeps a background conversion reachable. */
-.avi-file-list { max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.6; color: var(--text-muted); -webkit-user-select: text; user-select: text; }
+.avi-file-list { max-height: 34vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px; padding: 6px 10px; font-family: var(--font-ui); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.6; color: var(--text-muted); -webkit-user-select: text; user-select: text; }
 .avi-row { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 14px; }
 /* full segment filenames wrap rather than truncate, so the join order stays checkable on the
    long archival names (e.g. N43RF_20260721I1FD_2026_07Jul_21_09_07_24_AVI) */
@@ -813,7 +760,137 @@ html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *
 .avi-row.avi-meta { color: var(--text-faint); }
 .avi-stop-btn { background: var(--danger); color: #fff; border: none; cursor: pointer; }
 .avi-stop-btn:hover { background: color-mix(in oklab, var(--danger) 85%, #fff); }
-#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: "Helvetica Neue", Helvetica, Arial, Arimo, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
+#aviConvertPill { position: fixed; bottom: calc(var(--bottom-bar-h, 96px) + 14px); left: 14px; z-index: 3000; display: none; align-items: center; gap: 8px; background: color-mix(in oklab, var(--panel) 94%, transparent); border: 1px solid var(--border); color: var(--accent); padding: 7px 12px; border-radius: 4px; font-family: var(--font-ui); font-size: 11px; font-weight: 600; letter-spacing: 0.04em; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55); cursor: pointer; }
 #aviConvertPill.on { display: flex; }
 #aviConvertPill .avi-pill-spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #aviConvertPill .avi-pill-pct { color: var(--text-muted); font-weight: 500; }
+
+/* flat skin: small rounded corners, no drop shadows or blur, and uppercase labels with light tracking */
+.shadow, .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none; }
+#hudOverlay, #pfdOverlay, #satLoadingOverlay, #satColorLegend, #satPrefetchBar, #syncingIndicator, #recordProgress,
+.dropdown-menu, .tdr-mode-bar, .float-panel, .float-panel .float-dock-btn, .toast-notification, #tdrExitBtn,
+#aviConvertPill { box-shadow: none; }
+.modal-overlay, .sticky-bottom-bar, .backdrop-blur-md { -webkit-backdrop-filter: none; backdrop-filter: none; }
+.sticky-bottom-bar { background: var(--band); border-top: none; padding: 8px 16px; align-items: center; gap: 8px 14px; }
+.uppercase, .uppercase.tracking-wider, .cmd-group > .cmd-label, .sat-picker-head, .sat-pick-group,
+.sat-pick-tag, .help-body h3, .report-form label, .clip-preview-head, .media-idle-title, .filter-note {
+    letter-spacing: 0.05em;
+}
+button:disabled, select:disabled, input:disabled { filter: grayscale(1); }
+.media-resize-handle::before, #hudOverlay::-webkit-scrollbar-thumb { background: var(--text-faint); }
+/* the media resize grip: a slim bar that widens on hover and while dragging */
+.media-resize-handle::before { height: 5px; left: 42%; right: 42%; background: var(--border); }
+/* no decorative motion: menus, modals, and toasts appear in place and nothing grows on hover.
+   spinners, progress fills, and the recording pulse keep moving because they show progress or state. */
+.dropdown-menu.show, .modal-card { animation: none; }
+.toast-notification, .toast-notification.show { transform: none; transition: none; }
+.hover\:scale-110:hover, .group:hover .group-hover\:scale-110 { --tw-scale-x: 1; --tw-scale-y: 1; }
+input[type="range"]::-webkit-slider-thumb:hover { transform: none; }
+
+/* page layout: one sheet holding the title, the menu bar, the labelled loading form, the media
+   players, and the charts as a ruled table. */
+#mainContainer { background: var(--bg); padding: 0 20px 24px; min-height: 100vh; }
+#mainContainer > * + * { margin-top: 16px; }
+#mainContainer > .menu-bar, #mainContainer > .load-section { margin-top: 0; }
+
+/* menu bar: a charcoal strip of plain links split by thin pipes */
+.menu-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 2px 24px; margin: 0 -20px; padding: 6px 12px; background: var(--bar); }
+.menu-group { display: flex; flex-wrap: wrap; align-items: center; }
+.menu-bar .menu-group > * + * { border-left: 1px solid color-mix(in oklab, var(--bar-ink) 70%, transparent); }
+.menu-item-wrap { position: relative; display: flex; }
+/* square ends, so the pipe dividers stay straight */
+.menu-bar .menu-item, .menu-bar .menu-item-wrap { border-radius: 0; }
+.menu-item { background: none; border: none; padding: 2px 14px; font: inherit; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--bar-ink); white-space: nowrap; cursor: pointer; }
+.menu-item:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
+
+/* loading form: a label column and a controls column, one ruled row each for loading a mission and
+   the MMR video */
+.load-section { display: grid; grid-template-columns: 120px minmax(0, 1fr); border-bottom: 1px solid var(--border); }
+.load-section > :nth-child(n+3) { border-top: 1px solid var(--border); }
+.lf-label { padding: 15px 12px 10px 0; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+.lf-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 10px 0; }
+.lf-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.lf-body.lf-row { flex-direction: row; }
+#loadedPickerWrap { flex: 0 1 320px; }
+.load-section select, .load-section input[type="text"], .load-section button, .load-section a { font-size: 13px; }
+.load-section #dataDropZone span, #sebArchiveHint, #reconArchiveStatus { font-size: 12px; }
+#videoDropZone { width: 300px; height: 32px; border-width: 1px; }
+#videoSyncMode { width: auto; }
+
+/* media players: a thin padding ring, which is also the grab area for floating them */
+#mapPanel, #videoPanel { padding: 8px; }
+#mapHeader, #videoHeader { margin-bottom: 6px; }
+
+/* charts as a ruled table: shared borders, a title row per chart, no gaps between cells */
+#chartGrid { gap: 0; }
+#chartGrid > .bg-panel { margin: 0 -1px -1px 0; }
+#mainContainer .bg-panel:has(> [id^="title-"]) { padding: 0; border: 1px solid var(--border); border-radius: 0; }
+#mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="title-"]) { margin: 6px 8px 8px; width: auto; }
+#mainContainer .bg-panel.chart-fs { border: none; margin: 0; }
+
+/* Settings: a disclosure at the end of the bottom bar that opens upward over the page */
+.sticky-bottom-bar .display-menu { display: block; position: relative; }
+.display-summary { display: flex; align-items: center; height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--panel); font-size: 13px; font-weight: 700; cursor: pointer; list-style: none; }
+.display-summary::-webkit-details-marker { display: none; }
+.display-summary::after { content: "\25B4"; margin-left: 6px; font-size: 10px; }
+.display-menu[open] .display-summary { background: var(--elevated); }
+.display-menu[open] .display-summary::after { content: "\25BE"; }
+.display-panel { position: absolute; right: 0; bottom: calc(100% + 10px); z-index: 10; display: flex; flex-direction: column; gap: 10px; width: max-content; padding: 12px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; }
+.display-panel .cmd-group { flex-direction: column; align-items: flex-start; gap: 4px; border-left: none; padding-left: 0; }
+.sticky-bottom-bar .display-panel .cmd-group:not(#cmdTimelineGroup) select { max-width: none; min-width: 200px; }
+
+/* the playback bar is a dark band: it re-scopes the color tokens, so every control in it, and the
+   Settings menu it opens, takes light ink on dark fills */
+.sticky-bottom-bar {
+    --bg: #1f1f1f; --panel: #262626; --panel-strip: #303030; --elevated: #454545;
+    --border: #5e5e5e; --border-strong: #7a7a7a;
+    --text: #e6e6e6; --text-muted: #bdbdbd; --text-faint: #959595;
+    --accent: #dcdcdc; --accent-ink: #111111; --accent-soft: #3a3a3a;
+    color: var(--text);
+}
+
+/* skeleton placeholders while a flight loads (body.flight-loading, from setFlightLoading in
+   js/12-file-parsing.js): the map, the video, and each chart's plot area are hidden under a solid gray
+   block whose shade pulses until the flight is in */
+body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="title-"]) { position: relative; }
+body.flight-loading #mapContainer::after,
+body.flight-loading #videoPanel .media-container::after,
+body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="title-"])::after {
+    content: ""; position: absolute; inset: 0; z-index: 2700; pointer-events: none;
+    background-color: var(--panel-strip); border-radius: inherit; animation: skeletonPulse 1.3s ease-in-out infinite;
+}
+@keyframes skeletonPulse { 0%, 100% { background-color: var(--panel-strip); } 50% { background-color: var(--elevated); } }
+
+/* the batch load and pre-cache menu items wait for the archive's year list: each shows a slim pulsing
+   pill over its label until js/12b-recon-archive.js removes the cover, in place of a spinner block */
+#preloadBtnSpin, #batchBtnSpin { inset: 4px 10px; border-radius: 3px; background: none; animation: menuSkeleton 1.3s ease-in-out infinite; }
+#preloadBtnSpin > div, #batchBtnSpin > div { display: none; }
+@keyframes menuSkeleton {
+    0%, 100% { background-color: color-mix(in oklab, var(--bar-ink) 8%, transparent); }
+    50% { background-color: color-mix(in oklab, var(--bar-ink) 20%, transparent); }
+}
+
+/* an empty custom graph shows only its dashed Create Graph box under the charts: the card's border,
+   fill, and title row drop away until variables are picked (js/13-charts-master.js hides the box
+   then), and the title row's + menu, zoom reset, and fullscreen come back with it. the title row
+   collapses rather than disappearing, since the variable menu the box opens is inside it. */
+#mainContainer .bg-panel:has(> .create-graph-box:not(.hidden)) { border: none; background: none; padding: 0; min-height: 0; }
+#mainContainer .bg-panel:has(> .create-graph-box:not(.hidden)) > [id^="title-"] { height: 0; padding: 0; border: 0; background: none; overflow: visible; visibility: hidden; }
+#mainContainer .bg-panel:has(> .create-graph-box:not(.hidden)) > [id^="title-"] .dropdown-menu.show { visibility: visible; }
+#mainContainer .bg-panel:has(> .create-graph-box:not(.hidden)) > .create-graph-box { margin: 0; min-height: 130px; }
+
+/* manual time fields beside the MMR sync dropdown, shown only in Manual Time Input mode */
+.manual-time-fields { display: none; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.manual-time-fields.show { display: flex; }
+.mt-field { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
+#manualTimeFields input { width: 84px; padding: 5px 6px; font-size: 13px; }
+.mt-note { font-size: 11px; color: var(--text-faint); }
+
+/* TDR sidebar: a 2D / 3D switch for the tracker view, and short labels over the leg and layer lists */
+.tdr-view-switch { display: flex; margin: 2px 0 4px; }
+.tdr-view-btn { flex: 1 1 0; padding: 4px 0; font-size: 12px; font-weight: 700; background: var(--panel-strip); color: var(--text-muted); border: 1px solid var(--border); cursor: pointer; }
+.tdr-view-btn + .tdr-view-btn { margin-left: -1px; }
+.tdr-view-2d { border-radius: 3px 0 0 3px; }
+.tdr-view-3d { border-radius: 0 3px 3px 0; }
+html:not(.pref-tracker-3d) .tdr-view-2d, html.pref-tracker-3d .tdr-view-3d { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tdr-section-label { margin-top: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }

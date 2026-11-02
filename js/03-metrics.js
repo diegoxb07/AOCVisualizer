@@ -10,13 +10,13 @@
 
     // chart typography. the same family the page uses, named here because Chart.js wants a
     // font stack as a plain string and cannot read the css token in css/app.css.
-    const CHART_FONT_MONO = '"Helvetica Neue", Helvetica, Arial, Arimo, sans-serif';
-    const CHART_FONT_SANS = '"Helvetica Neue", Helvetica, Arial, Arimo, sans-serif';
+    const CHART_FONT_MONO = '"Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+    const CHART_FONT_SANS = '"Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
     // chart series colors: equal-weight lines, no gradient fills. okabe-ito colors, which stay distinct
     // for the common color vision deficiencies, assigned so the series sharing one fixed chart all differ
-    // (vermillion, blue, orange, sky blue, reddish purple, bluish green; the set's yellow and black vanish
-    // on the light and dark panels). one color per metric, so a custom graph can still pair two metrics
+    // (vermillion, blue, orange, sky blue, reddish purple, bluish green; the set's yellow vanishes on the
+    // light panels and its black would read as the page ink). one color per metric, so a custom graph can still pair two metrics
     // that share a color.
     const METRIC_DEFS = {
         'pAlt': { label: 'Press Altitude (m)', color: '#0072B2', yAxisID: 'y' },

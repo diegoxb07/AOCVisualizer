@@ -328,14 +328,15 @@ section('Wind color ramps');
         same(getPathColorRGB({ windSpd: 100, tempr: 10 }, 0), getSpdColorRGB(100)), true);
 
     // Temperature mode reads each sample against the rolling baseline: warmer is red, cooler blue,
-    // and a missing reading on either side is white rather than a color that implies a measurement.
+    // and a missing reading on either side is the neutral gray rather than a color that implies a
+    // measurement.
     globalThis.pathColorSelect = { value: 'temp' };
     const warm = getPathColorRGB({ tempr: 13, windSpd: 0 }, 0);
     const cool = getPathColorRGB({ tempr: 7, windSpd: 0 }, 0);
-    check('warmer than baseline is red', warm[0] === 1 && warm[2] < 1, true);
-    check('cooler than baseline is blue', cool[2] === 1 && cool[0] < 1, true);
-    check('3 degrees off baseline saturates the ramp', same(warm, [1, 0, 0]), true);
-    check('a missing temperature is white, not a color', same(getPathColorRGB({ tempr: null }, 0), [1, 1, 1]), true);
+    check('warmer than baseline is red', warm[0] > warm[1] && warm[0] > warm[2], true);
+    check('cooler than baseline is blue', cool[2] > cool[0] && cool[2] > cool[1], true);
+    check('3 degrees off baseline saturates the ramp', same(warm, [0.86, 0.1, 0.1]), true);
+    check('a missing temperature is the neutral gray, not a color', same(getPathColorRGB({ tempr: null }, 0), [0.42, 0.42, 0.42]), true);
 
     check('rgb triple to css rounds to 0-255', rgbCss([0, 0.5, 1]), 'rgb(0,128,255)');
 }

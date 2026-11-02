@@ -10,7 +10,7 @@
 
     // creating a graph always leaves a fresh Create Graph box below it, so custom comparisons stack
     // downward without a cap. each card owns its own Chart here, frame-drawn beside the master
-    // (js/17-charts.js) and torn down by layout rebuilds and Reset All.
+    // (js/17-charts.js) and torn down by layout rebuilds.
     let extraMasterCharts = {};
     let extraGraphSeq = 0;
 
@@ -49,18 +49,14 @@
     }
 
     function mutedMetricColor(hex) {
-        const light = document.documentElement.dataset.theme === 'light';
         const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
-        if (!m) return light ? '#5b6472' : '#aab4be';
+        if (!m) return '#5b6472';
 
         const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16), mix = 0.42;
         const t = (c, target) => Math.round(c * (1 - mix) + target * mix);
 
-        // blend each metric hue toward the menu background's tone: a pale slate for the dark menu,
-        // a dark slate for the near-white light menu, so the label keeps contrast either way.
-        return light
-            ? `rgb(${t(r, 0x33)}, ${t(g, 0x3a)}, ${t(b, 0x45)})`
-            : `rgb(${t(r, 0xc9)}, ${t(g, 0xd2)}, ${t(b, 0xdc)})`;
+        // blend each metric hue toward a dark slate, so the label keeps contrast on the light menu.
+        return `rgb(${t(r, 0x33)}, ${t(g, 0x3a)}, ${t(b, 0x45)})`;
     }
 
     // the variable picker behind every chart's + button, shared by the custom graphs here and the
@@ -115,7 +111,7 @@
         if (!titleEl) return;
 
         const labels = chart ? chart.data.datasets.map(ds => (ds.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()).filter(Boolean) : [];
-        if (!labels.length) titleEl.innerHTML = 'Create Your Own Graph <span class="text-faint font-normal normal-case">: You can use this to compare any variables you\'d like!</span>';
+        if (!labels.length) titleEl.textContent = 'Create Your Own Graph';
         else titleEl.textContent = labels.length <= 3 ? labels.join(' vs ') : labels.slice(0, 3).join(', ') + ' +' + (labels.length - 3) + ' more';
     }
 
@@ -180,7 +176,7 @@
         card.dataset.extraChart = id;
         card.innerHTML =
             `<div class="flex justify-between items-center text-xs font-semibold text-muted uppercase tracking-wider mb-2 z-20" id="title-${id}">`
-            + '<span class="extra-graph-title">Create Your Own Graph <span class="text-faint font-normal normal-case">: You can use this to compare any variables you\'d like!</span></span>'
+            + '<span class="extra-graph-title">Create Your Own Graph</span>'
             + '<div class="flex items-center gap-2">'
             + `<button class="reset-scale-btn text-muted text-base hover:text-accent hover:scale-110 transition-all focus:outline-none" onclick="resetChartScale('${id}')" title="Reset Zoom / scale">↺</button>`
             + '<div class="relative">'
@@ -192,7 +188,6 @@
             + `<button id="prompt-${id}" type="button" onclick="toggleMenu(event, 'menu-${id}')" class="group w-full flex-grow create-graph-box flex flex-col items-center justify-center gap-1.5 rounded border-2 border-dashed border-hairline hover:border-[color-mix(in_oklab,var(--accent)_70%,transparent)] hover:bg-panel-strip/40 transition-colors cursor-pointer">`
             + '<span class="text-accent cg-plus font-light leading-none group-hover:scale-110 transition-transform">＋</span>'
             + '<span class="text-ink text-sm font-bold tracking-[0.25em] uppercase">Create Graph</span>'
-            + '<span class="text-faint text-[11px] normal-case font-normal">Click to choose the variables you want to plot</span>'
             + '</button>'
             + `<div id="wrapper-${id}" class="w-full flex-grow relative hidden h-full max-h-[300px] mt-1"><canvas id="${id}"></canvas></div>`;
         host.appendChild(card);
@@ -223,7 +218,7 @@
         ensureExtraCreateBox();
     }
 
-    // layout rebuilds and Reset All: the extra cards go with their charts; the trailing box
+    // layout rebuilds: the extra cards go with their charts; the trailing box
     // reappears once the master graph has data again (ensureExtraCreateBox judges that).
     function resetExtraGraphs() {
         Object.keys(extraMasterCharts).forEach(removeExtraGraph);

@@ -84,15 +84,15 @@
         return m.data[y * m.w + x] === 1;
     }
 
-    // One flat tone per theme for water. Depth is not shaded, the sea floor's shape being no part of
+    // One flat tone for water. Depth is not shaded, the sea floor's shape being no part of
     // what this map is read for. Pitched to hold against the 3D scene background (scene3DBgColor in
     // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which it would sink into.
     function waterColorCss() {
-        return (document.documentElement.dataset.theme === 'light') ? 'rgb(148,184,217)' : 'rgb(18,51,82)';
+        return 'rgb(148,184,217)';
     }
 
-    // Land color (0..1 rgb) by height: green->tan->snow. One ramp across themes, its mid-tones
-    // holding against both, and it starts at green, so ground below sea level inside a coastline
+    // Land color (0..1 rgb) by height: green->tan->snow. Its mid-tones hold against the water and
+    // the scene background, and it starts at green, so ground below sea level inside a coastline
     // still reads as land.
     function landColorRGB(e) {
         const t = Math.max(0, Math.min(1, e / 4000));
@@ -126,7 +126,7 @@
     // would hand the GPU a new one per rebuild and never give the last back.
     let _terrainTex = null;
     function terrainTexture(lon0, lon1, lat0, lat1) {
-        const key = [lon0, lon1, lat0, lat1, document.documentElement.dataset.theme,
+        const key = [lon0, lon1, lat0, lat1,
                      (typeof mapFeatures !== 'undefined' ? mapFeatures.length : 0)].join('|');
         if (_terrainTex && _terrainTex.key === key) return _terrainTex.tex;
         if (_terrainTex) _terrainTex.tex.dispose();

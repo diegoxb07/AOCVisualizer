@@ -39,9 +39,8 @@
         const endEl = document.getElementById('endTimeInput');
         if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
         if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
-        // The time inputs live in the Manual Time Input modal (#manualSyncModal); the dropdown's
-        // change handler pops it open, and leaving manual mode closes it.
-        if (isAuto) { const m = document.getElementById('manualSyncModal'); if (m) m.style.display = 'none'; }
+        // the time fields open beside the sync dropdown in manual mode and fold away in Auto-Sync
+        const fields = document.getElementById('manualTimeFields'); if (fields) fields.classList.toggle('show', !isAuto);
     }
 
     function evaluateAutoSyncDefault() {
@@ -61,23 +60,9 @@
         const label = document.getElementById('autosyncLabel'); label.classList.add('show'); setTimeout(() => { label.classList.remove('show'); }, 4000);
     }
 
+    // the mission line under the map header (id, storm, aircraft), the tab title, and the share
+    // button, which needs an archive mission id.
     function updateMissionHeader() {
-        const set = (id, val) => {
-            const el = document.getElementById(id); if (!el) return;
-            const ok = val && val !== 'Unknown' && val !== ''; el.textContent = ok ? val : '-'; el.classList.toggle('on', !!ok);
-            const chip = el.closest('.status-chip'); if (chip) chip.classList.toggle('lit', !!ok);
-        };
-        set('hdrFlightId', flightMetaData.id);
-        let ac = flightMetaData.aircraft; const acEl = document.getElementById('hdrAircraft');
-        if (acEl) acEl.title = (ac && ac !== 'Unknown') ? ac : '';
-        if (ac && ac !== 'Unknown') { const m = ac.match(/^(NOAA\d+)/); ac = m ? m[1] : ac; }
-        // append the aircraft's NOAA nickname so the chip reads e.g. "NOAA42 (Kermit)"
-        const acNickname = { NOAA42: 'Kermit', NOAA43: 'Miss Piggy', NOAA49: 'Gonzo' }[ac];
-        if (acNickname) ac = ac + ' (' + acNickname + ')';
-        set('hdrAircraft', ac); set('hdrDate', flightMetaData.date);
-        let range = '';
-        if (allParsedData && allParsedData.length) { const a = allParsedData[0].time, b = allParsedData[allParsedData.length-1].time; range = `${a.slice(0,2)}:${a.slice(2,4)} → ${b.slice(0,2)}:${b.slice(2,4)}Z`; }
-        set('hdrRange', range);
         const sub = document.getElementById('missionSubline');
         if (sub) {
             const rawId = (flightMetaData.id && flightMetaData.id !== 'Unknown') ? flightMetaData.id : '';
@@ -579,17 +564,9 @@
         return { sprite: spr, mat, aspect: w / 58, pts: [] };
     }
 
-    // The 3D scene's void behind the map, tracking the theme like the rest of the basemap.
+    // The 3D scene's void behind the map, a pale blue-gray that matches the basemap.
     function scene3DBgColor() {
-        return (document.documentElement.dataset.theme === 'light') ? 0xdfe6ec : 0x171122;
-    }
-    // Re-colors the 3D basemap for the current theme. The terrain's water and land colours and the border line
-    // colours are baked at build time, so a theme change needs a rebuild; the scene background is
-    // live and set here either way, since it also applies with no flight loaded.
-    function applyTheme3D() {
-        if (typeof scene3D === 'undefined' || !scene3D) return;
-        scene3D.background = new THREE.Color(scene3DBgColor());
-        if (threeDInitialized && filteredData.length > 0) build3DScene();
+        return 0xdfe6ec;
     }
 
     // A state name on the basemap. A mesh, not a sprite, so animate3D can lay it onto the map from
@@ -667,13 +644,12 @@
         _stateLabels = []; _stateLabelIdx = -1;
         // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
         _stormSyms = []; _stormStrips = [];
-        const light3D = document.documentElement.dataset.theme === 'light';
-        const landMat = new THREE.MeshBasicMaterial({ color: light3D ? 0xe4ebdd : 0x0d4a22, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        const landMat = new THREE.MeshBasicMaterial({ color: 0xe4ebdd, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
         // coastlines carry, internal (state) borders sit back, so countries read against the terrain
-        // shading. Both take the 2D basemap's per-theme line colours, since light water needs dark
+        // shading. Both take the 2D basemap's line colours, since the light water needs dark
         // lines to show at all. depthWrite off keeps them from occluding the streaks and each other.
-        const coastMat = new THREE.LineBasicMaterial({ color: light3D ? 0x5e6f7c : 0xf0f6fc, transparent: true, opacity: 0.9, depthWrite: false });
-        const stateMat = new THREE.LineBasicMaterial({ color: light3D ? 0x94a3b0 : 0xaac2d6, transparent: true, opacity: 0.55, depthWrite: false });
+        const coastMat = new THREE.LineBasicMaterial({ color: 0x5e6f7c, transparent: true, opacity: 0.9, depthWrite: false });
+        const stateMat = new THREE.LineBasicMaterial({ color: 0x94a3b0, transparent: true, opacity: 0.55, depthWrite: false });
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
         // [lon, lat], so terrainSurfaceMeters takes (c[1], c[0]). It reads the drawn surface, not the
@@ -850,9 +826,6 @@
         const d = visualRow || filteredData[idx];
         const pos = get3DCoord(d.lon, d.lat, track3DAltMeters(d));
         planeGroup3D.position.copy(pos);
-        // Reset All hides the plane and arrows; a placed frame means a flight is loaded again,
-        // so un-hide here rather than relying on every load path to remember to.
-        if (!planeGroup3D.visible) { planeGroup3D.visible = true; if (trackArrow3D) trackArrow3D.visible = true; }
         // fade coastline/border lines by the plane's distance to each, so only nearby ones show.
         if (_borderLines.length) {
             const px = pos.x, pz = pos.z, R0 = 26, R1 = 74;   // full within R0 units (~1.3deg), gone by R1
@@ -906,9 +879,8 @@
         if (typeof floatPanelsOnPinChange === 'function') floatPanelsOnPinChange(panel);
         mapPanel.classList.toggle('fake-fs', panel === mapPanel);
         videoPanel.classList.toggle('fake-fs', panel === videoPanel);
-        // the whole top-right sticky cluster (help, reset, theme, fullscreen) sits over the pinned
-        // panel's own header buttons and would steal their clicks, so hide the cluster while a panel
-        // is pinned; the panel's own header buttons and esc still work.
+        // the menu bar's app controls (help, report, fullscreen) hide while a panel is pinned;
+        // the panel's own header buttons and esc still work.
         const topRight = document.getElementById('topRightControls');
         if (topRight) topRight.style.display = panel ? 'none' : '';
         refreshAfterViewChange();
@@ -961,7 +933,7 @@
                 resizeCanvasLayout();
                 // Rebuild on every entry, not only the first. The scene bakes its layers in, while 2D
                 // reads them live on each repaint, so anything that arrived while 3D was away (a storm
-                // best-track, a new flight, a theme change) is only in the scene once it is rebuilt.
+                // best-track, a new flight) is only in the scene once it is rebuilt.
                 // build3DScene calls init3D itself when the scene does not exist yet.
                 if (filteredData.length > 0) { build3DScene(); updateVisualComponents(currentIdx); }
                 // real-scale was likely toggled while in 2D, where the camera couldn't dolly; frame the
@@ -1063,9 +1035,7 @@
         const band = document.getElementById('satBandSelect');
         if (!list || !sat) return;
         const activeSat = sat.value, activeBand = band ? band.value : '';
-        // The Off row turns the satellite layer off; with no layer on there is nothing to turn
-        // off, so it renders disabled (grayed, no data-off, so the click handler never matches).
-        let html = `<button type="button" class="sat-pick-off"${activeSat === 'none' ? ' disabled' : ' data-off="1"'}>Off (satellite overlay)</button>`;
+        let html = '';
         // Heading wherever the list crosses between the two kinds of satellite (GIBS_LAYERS is
         // ordered geostationary-first). They behave very differently, so the split is worth calling
         // out: GOES scans continuously, a polar orbiter gives one usable pass per day.
@@ -1103,7 +1073,8 @@
                     const dark = isDark(b);
                     const off = unavail || dark;
                     return `<button type="button" class="sat-pick-prod${(isActive && activeBand === b.id) ? ' active' : ''}${off ? ' unavailable' : ''}"`
-                        + (off ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`) + `>`
+                        + (off ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`)
+                        + ((isActive && activeBand === b.id) ? ' title="Click again to turn the satellite overlay off"' : '') + `>`
                         + `<span class="sat-pick-name">${escapeHtml(b.name)}</span>`
                         + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : (dark ? `<span class="sat-pick-tag">night flight</span>` : ``)) + `</button>`;
                 };
@@ -1142,12 +1113,9 @@
         const panel = document.getElementById('satPickerPanel');
         if (!panel) return;
         const sat = document.getElementById('satelliteSelect');
-        const body = document.getElementById('satExpandBody'), expandBtn = document.getElementById('satExpandBtn');
-        if (sat && sat.value !== 'none') {
-            satPickerExpanded = sat.value;   // open with the active layer expanded already
-            if (body) body.classList.remove('hidden');   // and the satellite section expanded, so the choice shows
-            if (expandBtn) expandBtn.setAttribute('aria-expanded', 'true');
-        }
+        // open with the active layer's products listed; the satellite section itself stays folded or
+        // unfolded as the user last left it
+        if (sat && sat.value !== 'none') satPickerExpanded = sat.value;
         renderSatPickerPanel();
         panel.classList.remove('hidden');
         panel.scrollTop = 0;   // always reopen scrolled to the top
@@ -1179,13 +1147,17 @@
             if (panel && panel.classList.contains('hidden')) openSatPicker(); else closeSatPicker();
         });
         list.addEventListener('click', (e) => {
-            if (e.target.closest('[data-off]')) { satPickerChooseOff(); return; }
+            // a product turns its layer on; clicking the active one again turns the overlay off
             const prod = e.target.closest('[data-band]');
-            if (prod) { satPickerChooseProduct(prod.getAttribute('data-sat'), prod.getAttribute('data-band')); return; }
+            if (prod) {
+                if (prod.classList.contains('active')) satPickerChooseOff();
+                else satPickerChooseProduct(prod.getAttribute('data-sat'), prod.getAttribute('data-band'));
+                return;
+            }
             const row = e.target.closest('.sat-pick-sat-row[data-sat]');
             if (row) { const v = row.getAttribute('data-sat'); satPickerExpanded = (satPickerExpanded === v) ? null : v; renderSatPickerPanel(); }
         });
-        // The "Satellite" button expands/collapses the layer picker below it.
+        // The "Satellite" button folds and unfolds the layer picker below it.
         const satExpandBtn = document.getElementById('satExpandBtn');
         if (satExpandBtn) satExpandBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1226,8 +1198,8 @@
     function syncClearMarksBtn() { const b = document.getElementById('clearMarksBtn'); if (b) b.disabled = customMarkers.length === 0; }
     // okabe-ito colors, which stay distinct for the common color vision deficiencies, ordered so each mark
     // differs strongly from the one before it, the wrap back to vermillion included: vermillion, blue,
-    // orange, sky blue, reddish purple, bluish green. the set's yellow and black are left out, since they
-    // vanish on the light and dark panels.
+    // orange, sky blue, reddish purple, bluish green. the set's yellow and black are left out: yellow
+    // vanishes on the light panels and black would read as the page ink.
     const MARK_PALETTE = ['#D55E00', '#0072B2', '#E69F00', '#56B4E9', '#CC79A7', '#009E73'];
     document.getElementById('markBtn').addEventListener('click', () => {
         if (!customMarkers.find(m => m.idx === currentIdx)) {
@@ -1255,7 +1227,6 @@
         if (e.target.value === 'auto') { ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; }
         else {
             ocrIndicator.style.display = 'none'; if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none';
-            const m = document.getElementById('manualSyncModal'); if (m) m.style.display = 'flex';
         }
         applySyncModeLock();
         refreshSyncingIndicator();  // hide the badge immediately when leaving Auto-Sync

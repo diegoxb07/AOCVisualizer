@@ -28,8 +28,8 @@
 
     // Convert a NetCDF ArrayBuffer into the same tab-separated text the .txt parser consumes.
     // Shared by the single-file .nc loader, the parse worker, and the multi-flight batch sat-cache.
-    // onProgress (optional): called with { phase, ... } as decoding advances, so the loader overlay
-    // can show which variable is being processed. no-op for the tests, batch, and main thread callers.
+    // onProgress (optional): called with { phase, index, total } as decoding and row building advance,
+    // so the loader overlay can show how far along the load is. no-op for the tests and batch callers.
     function ncArrayBufferToTsv(data, onProgress) {
         const report = (typeof onProgress === 'function') ? onProgress : function () {};
         const nc = new netcdfjs(data);
@@ -78,13 +78,13 @@
             varsData['time'] = timeArr;
         }
 
-        report({ phase: 'rows', numRows: numRows });
+        report({ phase: 'rows', numRows: numRows, index: 0, total: numRows });
         // The marker rides the HEADER only; rows keep their original field count, so its column index
         // simply has no value on every line (getVal reads that as null, exactly like a blank cell).
         // That keeps the TSV contract and costs nothing per row on a 30k-sample flight.
         const headerNames = timeReconstructed ? finalVarNames.concat(['TimeReconstructed']) : finalVarNames;
         let tsvStr = headerNames.join('\t') + '\n';
-        for (let i = 0; i < numRows; i++) { let row = []; for (let j = 0; j < finalVarNames.length; j++) { let val = varsData[finalVarNames[j]][i]; row.push(val !== undefined && val !== null ? val : ''); } tsvStr += row.join('\t') + '\n'; }
+        for (let i = 0; i < numRows; i++) { if (i && i % 2000 === 0) report({ phase: 'rows', numRows: numRows, index: i, total: numRows }); let row = []; for (let j = 0; j < finalVarNames.length; j++) { let val = varsData[finalVarNames[j]][i]; row.push(val !== undefined && val !== null ? val : ''); } tsvStr += row.join('\t') + '\n'; }
         return tsvStr;
     }
 
@@ -95,7 +95,10 @@
     // Returns { rows, stats }. `stats` is the honesty ledger: every row the cleaner drops and every
     // value the parser derives (rather than reads) is counted, so the UI can disclose exactly what
     // was done to the data instead of silently modifying the record.
-    function parseFlightTextToRows(rawText) {
+    // onProgress (optional): called with { phase: 'parse', index, total } every 2000 lines across the
+    // time range scan and the row loop, and once more at the end.
+    function parseFlightTextToRows(rawText, onProgress) {
+        const report = (typeof onProgress === 'function') ? onProgress : function () {};
         const stats = {
             dataLines: 0, parsed: 0, rows: 0, timeSource: null,
             dropped: { shortLine: 0, noTime: 0, badPosition: 0, noSpeed: 0, error: 0, preTakeoff: 0, dupTime: 0, glitch: 0, gapReset: 0, belowMinAlt: 0 },
@@ -108,10 +111,12 @@
         const getVal = (row, key) => { let k = key.toLowerCase(); if (hMap[k] !== undefined && row[hMap[k]] !== undefined && row[hMap[k]].trim() !== '') { const val = parseFloat(row[hMap[k]]); if (isNaN(val) || val <= -990) return null; return val; } return null; };
 
         let timeMax = -1; const tIdx = hMap['time'];
-        if (tIdx !== undefined) { for (let i = 1; i < lines.length; i++) { const parts = lines[i].replace(/\r/g, '').split('\t'); if (parts.length > tIdx) { const v = parseFloat(parts[tIdx]); if (!isNaN(v) && v > timeMax) timeMax = v; } } }
+        const lineCount = lines.length - 1, passTotal = (tIdx !== undefined ? 2 : 1) * lineCount;
+        if (tIdx !== undefined) { for (let i = 1; i < lines.length; i++) { if (i % 2000 === 0) report({ phase: 'parse', index: i, total: passTotal }); const parts = lines[i].replace(/\r/g, '').split('\t'); if (parts.length > tIdx) { const v = parseFloat(parts[tIdx]); if (!isNaN(v) && v > timeMax) timeMax = v; } } }
 
         let firstSec = -1; let tempParsedData = [];
         for (let i = 1; i < lines.length; i++) {
+            if (i % 2000 === 0) report({ phase: 'parse', index: passTotal - lineCount + i, total: passTotal });
             if (!lines[i] || !lines[i].trim()) continue;
             stats.dataLines++;
             const parts = lines[i].replace(/\r/g, '').split('\t');
@@ -167,6 +172,7 @@
                 });
             } catch (err) { stats.dropped.error++; continue; }
         }
+        report({ phase: 'parse', index: passTotal, total: passTotal });
 
         // A NetCDF whose clock ncArrayBufferToTsv rebuilt from the TimeInterval span: the timestamps are
         // evenly spaced by construction, not read per sample. That outranks whatever shape the decoded

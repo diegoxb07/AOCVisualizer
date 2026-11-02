@@ -25,6 +25,9 @@ const PRECACHE = [
     'lib/tesseract.min.js',
     'lib/three.min.js',
 
+    // the vendored interface typeface (Nunito Sans, SIL OFL), so the page keeps its type offline.
+    'lib/fonts/nunito-sans/nunito-sans-latin.woff2',
+
     // The vendored OCR engine (worker, wasm cores, eng language data) fetched lazily by
     // js/06-ocr.js when an MMR video arrives; Auto-Sync stays available offline.
     'lib/tesseract/eng.traineddata.gz',

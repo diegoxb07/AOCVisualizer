@@ -304,6 +304,8 @@
         if (uploadApiOfflineToastWrapper) {
             uploadApiOfflineToastWrapper.classList.toggle('hidden', !apiDown);
         }
+        // the batch load and pre-cache menu items follow the api state too (js/12b-recon-archive.js)
+        if (typeof syncReconLoadButtonState === 'function') syncReconLoadButtonState();
         // the "use manual upload instead" hint sits below the upload button, only while offline
         const manualUploadHint = document.getElementById('manualUploadHint');
         if (manualUploadHint) manualUploadHint.classList.toggle('hidden', !apiDown);

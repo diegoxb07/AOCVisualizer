@@ -62,7 +62,7 @@
             }
 
             if (!silent) showToast(verified
-                ? "Sync Locked Successfully!"
+                ? "Synced!"
                 : "Synced on an UNVERIFIED clock reading: the timestamp never confirmed it was ticking with the video. Check the tracker time against the MMR, and use Sync Now on a clearer frame (or Manual Time Input) if it looks wrong.", verified ? 2000 : 9000);
             ocrNoteLock();
             ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;

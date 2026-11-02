@@ -109,10 +109,6 @@
         return !(bbox[0] + lonShift > v.maxLon + m || bbox[2] + lonShift < v.minLon - m || bbox[1] > v.maxLat + m || bbox[3] < v.minLat - m);
     }
 
-    // true on the light theme, where map inks drawn over the light basemap need darker shades.
-    // guarded so the node tests (no document) get the dark set.
-    function mapInkIsLight() { return typeof document !== 'undefined' && document.documentElement.dataset.theme === 'light'; }
-
     // saffir-simpson bands, with everything below hurricane force left black so the categories
     // stand out on their own.
     function getHurricaneColorRGB(spd) {
@@ -151,23 +147,16 @@
     // missing); the rest follow whichever wind ramp the barbs are using.
     function getPathColorRGB(d, idx) {
         if (pathColorSelect.value === 'temp') {
-            // the neutral end has to contrast with the basemap: white on the dark map, a true gray on the
-            // light one (white there would hide most of the track, which sits near its baseline). on the
-            // light map cooling runs to a violet-blue, a hue well away from the light blue water, and the
-            // square-root ease makes a mild change of a fraction of a degree already read as a color.
-            // full color still lands at a 3 degree difference.
+            // the neutral end is a true gray, which contrasts with the light basemap (white would hide
+            // most of the track, whose values stay close to the baseline). cooling runs to a violet-blue, a hue well
+            // away from the light blue water, and the square-root ease makes a mild change of a fraction
+            // of a degree already read as a color. full color still lands at a 3 degree difference.
             const t = d.tempr;
-            if (mapInkIsLight()) {
-                const n = [0.42, 0.42, 0.42], mix = (to, f) => n.map((c, i) => c + (to[i] - c) * f);
-                if (t === null || tempBaseline[idx] === null) return n;
-                const delta = t - tempBaseline[idx];
-                const f = Math.sqrt(Math.min(Math.abs(delta) / 3.0, 1));
-                return delta > 0 ? mix([0.86, 0.1, 0.1], f) : mix([0.42, 0.12, 0.9], f);
-            }
-            if (t === null || tempBaseline[idx] === null) return [1, 1, 1];
+            const n = [0.42, 0.42, 0.42], mix = (to, f) => n.map((c, i) => c + (to[i] - c) * f);
+            if (t === null || tempBaseline[idx] === null) return n;
             const delta = t - tempBaseline[idx];
-            const f = Math.min(Math.abs(delta) / 3.0, 1);
-            return delta > 0 ? [1, 1 - f, 1 - f] : [1 - f, 1 - f, 1];
+            const f = Math.sqrt(Math.min(Math.abs(delta) / 3.0, 1));
+            return delta > 0 ? mix([0.86, 0.1, 0.1], f) : mix([0.42, 0.12, 0.9], f);
         }
         return getBarbColorRGB(d.windSpd);
     }
@@ -353,9 +342,8 @@
 
     function renderBackground() {
         if (!bgCanvas.width || !bgCanvas.height) return;
-        // theme-aware basemap palette (ocean base fill here; land and lines below)
-        const lightMap = document.documentElement.dataset.theme === 'light';
-        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = lightMap ? '#d4e3f0' : '#0e1a29'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+        // basemap palette (ocean base fill here; land and lines below)
+        bgCtx.setTransform(1, 0, 0, 1, 0, 0); bgCtx.fillStyle = '#d4e3f0'; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
         bgCtx.save(); bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0); bgCtx.translate(mapOffsetX, mapOffsetY); bgCtx.scale(mapScale, mapScale);
 
         const clipBox = mapClipBox();
@@ -397,12 +385,9 @@
             // over satellite imagery the land goes translucent so the tiles still show through, unless
             // it is drawing underneath fully-opaque imagery, where the normal solid palette applies.
             const overSat = isSatOn && !satHidesBasemap;
-            const landFill = overSat ? (lightMap ? 'rgba(70,110,80,0.20)' : 'rgba(40,74,62,0.26)')
-                                     : (lightMap ? '#e4ebdd' : '#22463a');
-            const coastCol = overSat ? (lightMap ? 'rgba(45,60,72,0.60)' : 'rgba(214,228,238,0.65)')
-                                     : (lightMap ? '#5e6f7c' : '#7ea8bf');
-            const borderCol = overSat ? (lightMap ? 'rgba(45,60,72,0.32)' : 'rgba(214,228,238,0.34)')
-                                      : (lightMap ? 'rgba(94,111,124,0.50)' : 'rgba(126,168,191,0.40)');
+            const landFill = overSat ? 'rgba(70,110,80,0.20)' : '#e4ebdd';
+            const coastCol = overSat ? 'rgba(45,60,72,0.60)' : '#5e6f7c';
+            const borderCol = overSat ? 'rgba(45,60,72,0.32)' : 'rgba(94,111,124,0.50)';
             bgCtx.fillStyle = landFill;
             const strokeFor = isState => { bgCtx.strokeStyle = isState ? borderCol : coastCol; bgCtx.lineWidth = (isState ? 1.0 : 1.5) / mapScale; };
             // Draw the whole world, cull off-screen, and repeat it shifted 360 degrees each way so a dateline-centered
@@ -456,11 +441,11 @@
                 // home in the accent and a size up, since it is the reference every mission starts
                 // and ends at; military in the accent too, civil in a neutral ink. All keylined so
                 // they read over land, water and satellite imagery alike.
-                const col = (home || a.mil) ? '#38bdf8' : (lightMap ? '#1f2937' : '#e2e8f0');
+                const col = (home || a.mil) ? '#38bdf8' : '#1f2937';
                 bgCtx.font = '600 ' + ((home ? 12 : 10) / mapScale) + 'px Inter, ui-sans-serif, sans-serif';
                 bgCtx.beginPath(); bgCtx.arc(x, y, home ? r * 1.5 : r, 0, 2 * Math.PI);
                 bgCtx.fillStyle = col; bgCtx.fill();
-                bgCtx.strokeStyle = lightMap ? 'rgba(255,255,255,0.9)' : 'rgba(5,12,20,0.85)';
+                bgCtx.strokeStyle = 'rgba(255,255,255,0.9)';
                 bgCtx.stroke();
                 bgCtx.strokeText(a.code, x + pad, y);
                 bgCtx.fillStyle = col; bgCtx.fillText(a.code, x + pad, y);
@@ -502,8 +487,8 @@
             bgCtx.textAlign = 'left'; bgCtx.textBaseline = 'middle';
             bgCtx.lineWidth = 2.5 / mapScale; bgCtx.lineJoin = 'round';
             const r = 1.6 / mapScale, pad = 3.5 / mapScale;
-            const col = lightMap ? '#475569' : '#94a3b8';
-            const keyline = lightMap ? 'rgba(255,255,255,0.9)' : 'rgba(5,12,20,0.85)';
+            const col = '#475569';
+            const keyline = 'rgba(255,255,255,0.9)';
             for (let i = 0; i < cities.length; i++) {
                 const c = cities[i];
                 if (!all && !c.big) continue;
@@ -625,8 +610,8 @@
             const d = dPlane; ctx.save(); ctx.translate(getX(d.lon), getY(d.lat)); ctx.scale(1/mapScale, 1/mapScale); 
             const zoomFactor = Math.max(1, Math.pow(mapScale, 0.6));
             if (document.getElementById('simpleTrackerIcon').checked) {
-                // light dot on the dark map, dark dot on the light map; the white rim reads on both
-                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = mapInkIsLight() ? '#1f2937' : '#e2e4e8'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
+                // a dark dot with a white rim, which reads on the light map and over imagery
+                ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#1f2937'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();
             } else {
                 const planeScale = 0.15 * zoomFactor; let t_th = d.th ?? 0; let t_track = d.gTrack ?? 0;
                 // ground-track (blue) and true-heading (yellow) arrows ahead of the plane, the

@@ -135,114 +135,6 @@
     document.getElementById('skipBack10Btn').addEventListener('click', () => skipFlightMinutes(-10));
     document.getElementById('skipFwd10Btn').addEventListener('click', () => skipFlightMinutes(10));
 
-    // resets the app to its fresh-load state in place, without a page reload, so real (page) fullscreen
-    // is kept (re-entering fullscreen needs a user gesture a reload can't carry). tears down the loaded
-    // flight, video, satellite overlay, charts and map/3d view via the same helpers used when switching
-    // flights. things that persist across an F5 are left alone: display prefs (aocVizPrefs), the
-    // preloaded-mission list, the satellite tile cache, and the basemap geojson.
-    function resetAppToDefault() {
-        // drop the shareable ?mission=/t=/view= params so a later manual F5 also lands on a clean session.
-        try { const u = new URL(window.location.href); ['mission', 't', 'view'].forEach(k => u.searchParams.delete(k)); history.replaceState(null, '', u); } catch (e) {}
-
-        // stop playback and any pending sync/render timers.
-        isPlaying = false; playPauseBtn.innerText = 'Play';
-        if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
-        [scrubSyncTimeout, scrubDebounceTimer, satDebounceTimer].forEach(t => { if (t) clearTimeout(t); });
-        scrubSyncTimeout = null; scrubDebounceTimer = null; satDebounceTimer = null; scrubSeekTarget = null;
-        playbackAccumulator = 0; lastTickTime = 0; videoPlaybackAccumulator = 0; videoStartSeconds = 0;
-
-        // stop any running satellite cache pass and clear the tile preloader queue. The bar hides at
-        // once here rather than on cancelSatCachePass's fade delay, since a reset clears the screen.
-        cancelSatCachePass('Stopped');
-        // end any running AVI to MP4 conversion and put the converter back to fresh.
-        if (typeof aviResetAll === 'function') aviResetAll();
-        if (typeof hideSatPrefetchBar === 'function') hideSatPrefetchBar();
-        if (typeof resetSatPreload === 'function') resetSatPreload();
-
-        // unload the MMR video (revokes its object URL, resets both drop zones + speeds) and drop its zoom/pan.
-        if (typeof clearLoadedMedia === 'function') clearLoadedMedia();
-        if (typeof floatPanelsDockAll === 'function') floatPanelsDockAll();
-        currentSpeedIdx = 0; if (typeof updateSpeedDisplay === 'function') updateSpeedDisplay();
-        resetVideoZoom();
-
-        // tear down every chart (master + per-metric sub-charts + any clip-preview charts).
-        if (masterChartInstance) { try { masterChartInstance.destroy(); } catch (e) {} }
-        masterChartInstance = null;
-        Object.values(customCharts).forEach(c => { try { c.destroy(); } catch (e) {} }); customCharts = {};
-        if (typeof resetExtraGraphs === 'function') resetExtraGraphs();
-        if (typeof destroyClipPreviews === 'function') destroyClipPreviews();
-
-        // clear the loaded flight, storm-track, analysis, measure and slide state.
-        allParsedData = []; filteredData = []; availableMetrics.clear(); currentIdx = 0; _lastStaticIdx = -1;
-        customMarkers = []; tempBaseline = []; lastParseStats = null;
-        flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
-        reconArchiveMeta = null; stormTrackPoints = []; stormTrackMeta = null;
-        showStormTrack = true; hoveredStormIdx = -1; currentPointAnalysisData = null;
-        if (typeof resetTdrOverlay === 'function') resetTdrOverlay();
-        window._appliedWindow = undefined;
-        isMeasuring = false; measurePointsGeo = []; drawnShapes = []; liveMouseGeo = null;
-        isDraggingShape = false; draggingShapeIndex = -1; hoveredShapeIndex = -1;
-        isScrubbing = false; activeScrubChart = null;
-        hasInitialSyncOccurred = false; forceOcrSyncNextTick = false; lastOcrVideoTime = 0;
-
-        // reset the map view + satellite draw state, and put the satellite picker back to Off.
-        mapScale = 1; mapOffsetX = 0; mapOffsetY = 0; followAircraft2D = true; bgNeedsUpdate = true;
-        followAircraft3D = true;
-        if (typeof updateFollowButton === 'function') updateFollowButton();   // hides the recenter overlay
-        satImageLoaded = false; satImage = new Image(); satLoadedInfo = null; satImageBox = null; lastSatFetchTime = '';
-        if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();
-        satTileOpacity = 0.92;
-        const opSlider = document.getElementById('satOpacitySlider'); if (opSlider) opSlider.value = 92;
-        const opVal = document.getElementById('satOpacityVal'); if (opVal) opVal.textContent = '92%';
-        const satSel = document.getElementById('satelliteSelect'); if (satSel) satSel.value = 'none';
-        const bandSel = document.getElementById('satBandSelect'); if (bandSel) bandSel.value = '';
-        if (typeof updateSatelliteOptions === 'function') updateSatelliteOptions();   // repopulate for "no flight": hides band + legend, refreshes the picker button
-
-        // wipe the tracker canvases; clear the 3d scene's dynamic content if it was ever built.
-        try { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); } catch (e) {}
-        const pfdC = document.getElementById('pfdCanvas');
-        if (pfdC && pfdC.getContext) { const pc = pfdC.getContext('2d'); pc.clearRect(0, 0, pfdC.width, pfdC.height); }
-        if (threeDInitialized) {
-            while (threeMapGroup.children.length > 0) threeMapGroup.remove(threeMapGroup.children[0]);
-            if (typeof sync3DMarkers === 'function') sync3DMarkers();   // customMarkers is [] now, so this empties the marker group
-            [planeGroup3D, trackArrow3D, headingArrow3D, stormNowDisc3D, stormNowArms3D].forEach(o => { if (o) o.visible = false; });
-            attitudeHud.innerHTML = '';
-        }
-
-        // restore the fresh-load UI: show placeholders, hide the flight-only overlays, re-disable controls.
-        mapPlaceholder.style.display = '';
-        hud.style.display = 'none';
-        const pfdOv = document.getElementById('pfdOverlay'); if (pfdOv) pfdOv.style.display = 'none';
-        const stormLbl = document.getElementById('stormTrackToggleLabel'); if (stormLbl) stormLbl.style.display = 'none';
-        const stormCb = document.getElementById('toggleStormTrack'); if (stormCb) stormCb.checked = true;
-        const dataLine = document.getElementById('dataReportLine'); if (dataLine) dataLine.classList.add('hidden');
-        const srcLink = document.getElementById('reconSourceLink'); if (srcLink) srcLink.classList.add('hidden');
-        if (ocrIndicator) ocrIndicator.style.display = 'none';
-        ['replayBtn','playPauseBtn','markBtn','clearMarksBtn','timelineSlider','skipBack10Btn','skipFwd10Btn','startTimeInput','endTimeInput','exportClipBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
-        const ovBtn = document.getElementById('satPickerBtn'); if (ovBtn) ovBtn.disabled = true;   // grey the Overlays dropdown again with nothing loaded
-        if (typeof closeSatPicker === 'function') closeSatPicker();
-        const startI = document.getElementById('startTimeInput'); if (startI) startI.value = '';
-        const endI = document.getElementById('endTimeInput'); if (endI) endI.value = '';
-        const vsi = document.getElementById('videoStartInput'); if (vsi) { vsi.value = '000000'; vsi.disabled = true; }
-        timelineSlider.min = 0; timelineSlider.max = 100; timelineSlider.value = 0;
-        if (timelineTimeDisplay) timelineTimeDisplay.textContent = '00:00:00 UTC';
-        updateMissionHeader();            // blanks the header chips + resets document.title
-        updateCustomGraphVisibility(MASTER_GRAPH_ID);    // master chart gone, so the "create a graph" prompt comes back
-
-        // put the dropdowns back to their default state (as a fresh reload would): the previously-loaded
-        // picker back to its "Previously Loaded Missions..." label (the saved list itself stays), the
-        // archive Year->Storm->Mission cascade back to unpicked, and close any open popovers.
-        if (typeof updatePreloadedSelect === 'function') updatePreloadedSelect('');
-        if (typeof closeLoadedPicker === 'function') closeLoadedPicker();
-        if (typeof closeSatPicker === 'function') closeSatPicker();
-        const reconYearSel = document.getElementById('reconYearSelect');
-        if (reconYearSel && reconYearSel.value) { reconYearSel.value = ''; reconYearSel.dispatchEvent(new Event('change')); }
-
-        if (typeof syncMediaGridLayout === 'function') syncMediaGridLayout();
-    }
-
-    document.getElementById('resetAppBtn').addEventListener('click', resetAppToDefault);
-
     // Mini playback bar (shown in the collapsed media strip): keeps play/pause, sliding, marking and
     // S.I. usable when the full playback bar is collapsed away with the media. The controls proxy the
     // real ones (so all their logic runs unchanged), and syncMiniPlaybackBar mirrors state back each frame.
@@ -461,7 +353,7 @@
         radarVid.style.transform = `translate(${vidPanX}px, ${vidPanY}px) scale(${vidZoom})`;
     }
 
-    // native fit again, reached from the panel's ⟲ button, a double click, and Reset All.
+    // native fit again, reached from the panel's ⟲ button and a double click.
     function resetVideoZoom() {
         vidZoom = 1; vidPanX = 0; vidPanY = 0;
         if (radarVid) radarVid.style.transform = '';
@@ -935,14 +827,14 @@
     function drawTrackerInto(rctx, x, y, w, h) {
         const is3D = trackerModeSelect.value === '3d';
         const src = is3D ? (typeof renderer3D !== 'undefined' && renderer3D ? renderer3D.domElement : null) : canvas;
-        rctx.fillStyle = (recState && recState.pal) ? recState.pal.trackBg : '#0b1220';
+        rctx.fillStyle = (recState && recState.pal) ? recState.pal.trackBg : '#dfe3e7';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (src && src.width && src.height) drawImageContain(rctx, src, x, y, w, h);
         rctx.restore();
     }
     function drawVideoInto(rctx, x, y, w, h) {
-        rctx.fillStyle = (recState && recState.pal) ? recState.pal.videoBg : '#000';
+        rctx.fillStyle = (recState && recState.pal) ? recState.pal.videoBg : '#c9ced3';
         roundRectPath(rctx, x, y, w, h, 12); rctx.fill();
         rctx.save(); roundRectPath(rctx, x, y, w, h, 12); rctx.clip();
         if (video && video.videoWidth) drawImageContain(rctx, video, x, y, w, h);
@@ -951,13 +843,10 @@
 
     function clipFmtVal(v) { return Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)); }
 
-    // The recording follows the app theme so a light-mode chart (whose captured legend text is dark)
-    // reads on a light backing, and a dark-mode chart reads on a dark backing. Fixed once per capture.
+    // The recording uses a light backing, so the captured charts (whose legend text is dark) read
+    // on it. Fixed once per capture.
     function recPalette() {
-        const light = document.documentElement.dataset.theme === 'light';
-        return light
-            ? { page: '#e9ebee', slot: '#f6f7f9', slotStroke: '#d3d8dd', name: '#334155', trackBg: '#dfe3e7', videoBg: '#c9ced3', value: '#1e293b' }
-            : { page: '#0b0e13', slot: '#14191f', slotStroke: '#232b35', name: '#aab4be', trackBg: '#0b1220', videoBg: '#000000', value: '#e6edf3' };
+        return { page: '#e9ebee', slot: '#f6f7f9', slotStroke: '#d3d8dd', name: '#334155', trackBg: '#dfe3e7', videoBg: '#c9ced3', value: '#1e293b' };
     }
 
     // Recording-window bounds on each graph: subtle yellow lines at the clip's start/end indices.
@@ -974,7 +863,7 @@
     // playhead so it updates as the clip plays. Colors match the chart legend; no min/max clutter.
     function drawCurrentValues(rctx, ch, gx, y, gw) {
         if (!ch || !ch.data || !ch.data.datasets.length) return;
-        const pal = (recState && recState.pal) || { value: '#e6edf3' };
+        const pal = (recState && recState.pal) || { value: '#1e293b' };
         const idx = Math.max(0, Math.min(currentIdx, ch.data.labels.length - 1));
         const rightX = gx + gw - 14;
         let ty = y + 9;
@@ -1262,9 +1151,8 @@
                 }
             });
             const save = () => {
-                // Merge, don't replace: 'theme' shares this blob but is not a PREF_ID (see the theme
-                // toggle below), so a rebuild from PREF_IDS alone would drop it and revert the theme
-                // on reload.
+                // Merge into the stored blob rather than rebuilding it from PREF_IDS alone, so a key
+                // outside PREF_IDS survives a save.
                 let out = {};
                 try { out = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { out = {}; }
                 PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) out[id] = el.type === 'checkbox' ? el.checked : el.value; });
@@ -1272,59 +1160,4 @@
             };
             PREF_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', save); });
         } catch (e) { /* localStorage unavailable (private mode), defaults stand */ }
-    })();
-
-    /* ---- Light/dark theme toggle ----
-       documentElement[data-theme] is what css/app.css keys its tokens off; the inline <head>
-       script sets it before first paint (from the same aocVizPrefs blob) so there's no flash.
-       Stored under its own 'theme' key in aocVizPrefs rather than PREF_IDS above, since the
-       toggle isn't a form control that fires a 'change' event. */
-    (function themeToggle() {
-        const KEY = 'aocVizPrefs';
-        const btn = document.getElementById('themeToggleBtn');
-        if (!btn) return;
-        // The switch itself (knob position, lit icon) is CSS-driven off [data-theme]; only the
-        // ARIA state is mirrored here (checked = light). Do not write btn.textContent, it would
-        // wipe the knob/icon spans.
-        const syncAria = () => btn.setAttribute('aria-checked', document.documentElement.dataset.theme === 'light' ? 'true' : 'false');
-        syncAria();
-        let themeAnimTimer = null;
-        // light is the default (the head script); the toggle saves each choice, so a switch to dark sticks.
-        const applyTheme = (next) => {
-            const root = document.documentElement;
-            // Fade the token-driven colors across the switch (see css/app.css .theme-anim), then drop
-            // the class so it never affects ordinary hover/focus color changes.
-            root.classList.add('theme-anim');
-            clearTimeout(themeAnimTimer);
-            themeAnimTimer = setTimeout(() => root.classList.remove('theme-anim'), 420);
-            root.dataset.theme = next;
-            syncAria();
-            // the 2D basemap palette is theme-aware, so drop its cached render and repaint the tracker.
-            bgNeedsUpdate = true;
-            if (filteredData.length && trackerModeSelect.value === '2d' && typeof renderMapEngineFrame === 'function') {
-                renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
-            }
-            // the 3D basemap's water, land and line colours bake in at build time, so it re-colours by
-            // rebuilding; applyTheme3D also sets the scene background, which applies with no flight.
-            if (typeof applyTheme3D === 'function') applyTheme3D();
-            // Legend label colors are theme-aware (js/17-charts.js generateLabels), baked at build
-            // time, so rebuild the legends on toggle. update('none') re-runs generateLabels without
-            // animation; the zoom plugin preserves any pan/zoom across it.
-            try {
-                if (typeof customCharts !== 'undefined') Object.values(customCharts).forEach(c => c && c.update('none'));
-                if (typeof extraChartsEach === 'function') extraChartsEach(c => c.update('none'));
-            } catch (e) { /* charts not built yet */ }
-            // Variable-menu label colors are theme-aware (mutedMetricColor), baked in at build time, so
-            // rebuild the dropdowns on toggle.
-            try {
-                if (typeof buildDropdownMenus === 'function') buildDropdownMenus();
-                if (typeof buildCustomGraphMenu === 'function') buildCustomGraphMenu(MASTER_GRAPH_ID);
-            } catch (e) { /* menus not built yet */ }
-            try {
-                const saved = JSON.parse(localStorage.getItem(KEY) || '{}');
-                saved.theme = next;
-                localStorage.setItem(KEY, JSON.stringify(saved));
-            } catch (e) { /* localStorage unavailable (private mode) */ }
-        };
-        btn.addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
     })();

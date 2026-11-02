@@ -158,7 +158,7 @@
             let advanced = false;
             const go = () => { if (advanced) return; advanced = true; video.removeEventListener('seeked', go); attemptSync(); };
             video.addEventListener('seeked', go, { once: true });
-            setTimeout(go, 1500);
+            setTimeout(go, 1000);
             video.currentTime += 2.0;
         }
         attemptSync();
@@ -178,14 +178,14 @@
         performImmediateOcrLock(opts);
     }
 
-    // Recheck once the players reach a stable state: half a second after the last playhead jump
+    // recheck once the players reach a stable state: a quarter second after the last playhead jump
     // settles, the frame is re-read and the lock re-derived when the burned-in clock disagrees
     // with the current offset by 15 seconds or more (the motion check above confirms the reading
     // before the lock moves; anything closer is OCR jitter and the lock stands).
     function scheduleOcrRecheck() {
         if (!videoLoaded || videoSyncMode.value !== 'auto') return;
         clearTimeout(scrubSyncTimeout);
-        scrubSyncTimeout = setTimeout(() => { requestOcrLock({ silent: true, gateGapSeconds: 15 }); }, 500);
+        scrubSyncTimeout = setTimeout(() => { requestOcrLock({ silent: true, gateGapSeconds: 15 }); }, 250);
     }
 
     document.getElementById('forceSyncBtn').addEventListener('click', () => requestOcrLock({ silent: false }));

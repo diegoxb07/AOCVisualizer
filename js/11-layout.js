@@ -275,7 +275,6 @@
                         }
                     }
                 }
-                showToast(`tracker window auto-adjusted to synced video timeframe (${toHHMMSS(video.duration)})`, 5000);
             }
         }
     }

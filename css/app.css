@@ -380,6 +380,9 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 /* The loading overlay reads in the interface font rather than the mono one. Its numbers count up
    while it is on screen, so they hold a fixed digit width and the line does not shimmer. */
 #loadingOverlaySubtext, #loadingProgressWrap { font-variant-numeric: tabular-nums; }
+/* the percent (and the download speed, when there is one) centered under the step text */
+#loadingProgressWrap > div { justify-content: center; gap: 12px; }
+#loadingProgressSpeed:empty { display: none; }
 /* the loading overlay: an opaque blurred veil over the page (it still takes clicks, so nothing starts
    mid-load) with the spinner, the title, and the current step centered on it */
 #loadingOverlay { background: color-mix(in oklab, var(--bg) 85%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
@@ -646,14 +649,14 @@ body.media-collapsed .float-panel { display: none !important; }
 .timeline-track { position: relative; flex: 1 1 auto; min-width: 0; display: flex; align-items: center; }
 /* Loader over the timeline while the MMR runs its first sync (js/06-ocr.js updateTimelineSyncLock):
    it blocks scrub clicks on the greyed slider beneath and reads as a busy state, not a dead control. */
-#timelineSyncLoader { display: none; position: absolute; left: 0; top: 0; bottom: 0; right: 0; align-items: center; justify-content: center; gap: 8px; background: color-mix(in oklab, var(--panel-strip) 95%, transparent); border: 1px solid var(--border); border-radius: 6px; z-index: 6; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
+#timelineSyncLoader { display: none; position: absolute; left: 0; top: 0; bottom: 0; right: 0; align-items: center; justify-content: center; gap: 8px; z-index: 6; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.02em; white-space: nowrap; }
 #timelineSyncLoader.show { display: flex; }
 #timelineSyncLoader .spin { width: 12px; height: 12px; flex: none; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: syncSpin 0.8s linear infinite; }
 #timelineSlider:disabled { opacity: 0.45; cursor: not-allowed; }
 #cmdTimelineGroup input[type="range"] { height: 12px; border-radius: 6px; }
 #cmdTimelineGroup input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; }
 #cmdTimelineGroup input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; }
-#timelineTimeDisplay { min-width: 104px; font-size: 15px; line-height: 1; font-variant-numeric: tabular-nums; }
+#timelineTimeDisplay { min-width: 97px; font-size: 14px; line-height: 1; font-variant-numeric: tabular-nums; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) button,
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { height: 32px !important; padding-top: 0.25rem !important; padding-bottom: 0.25rem !important; padding-left: 0.7rem !important; padding-right: 0.7rem !important; font-size: 10.5px !important; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { max-width: 150px; text-overflow: ellipsis; }

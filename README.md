@@ -26,17 +26,17 @@ flowchart TD
     LOADARC --> LOADED["Flight loaded: map, charts populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
-    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR</b><br>Auto-Sync reads the burned-in timestamp<br>and the window auto-follows the video<br><b>Sync Now</b> forces a lock, or use Manual"]
+    MMR -- "Yes" --> VIDEO["Drop the <b>.mp4</b> in <b>Upload MMR to Sync</b><br>Auto-Sync reads the burned-in timestamp<br>and the time window matches the video<br><b>Sync Now</b> forces a lock, or use Manual"]
     MMR -- "No" --> SAT{"Want satellite imagery<br>behind the 2D track?"}
     VIDEO --> SAT
     SAT -- "Yes" --> FROMARC{"Is the API<br>online?"}
-    FROMARC -- "Yes" --> SATGOES["<b>Sat:</b> picker → GOES East/West (archive)<br>pick a product; imagery pre-caches<br>for the whole flight"]
-    FROMARC -- "No" --> SATPOLAR["<b>Sat:</b> picker → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
+    FROMARC -- "Yes" --> SATGOES["<b>Overlays</b> → GOES East/West (archive)<br>pick a product; imagery pre-caches<br>for the whole flight"]
+    FROMARC -- "No" --> SATPOLAR["<b>Overlays</b> → a MODIS/VIIRS pass<br>(works for any date, no API needed)"]
     SAT -- "No" --> TDRQ{"Want Tail Doppler Radar?<br>(needs the API online)"}
     SATGOES --> TDRQ
     SATPOLAR --> TDRQ
-    TDRQ -- "Yes" --> TDRMODE["<b>TDR Mode</b> (map header)<br>pinned radar workspace: altitude layers,<br>flight legs & two-point cross-sections"]
-    TDRQ -- "No, or it reads TDR Unavailable" --> PLAY["<b>Play</b>, scroll through timeline, filters: change speed,<br>toggle 8Hz Smoothing / PFD / S.I Units"]
+    TDRQ -- "Yes" --> TDRMODE["<b>TDR Mode</b> (Overlays, map header)<br>pinned radar workspace: altitude layers,<br>flight legs & two-point cross-sections"]
+    TDRQ -- "No, or it reads TDR Unavailable" --> PLAY["<b>Play</b>, scroll through timeline, change speed,<br><b>Settings</b>: toggle Cockpit PFD / S.I Units"]
     TDRMODE --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
     EXPORT -- "Briefing video" --> CLIP["Record Clip (.webm)"]
@@ -73,7 +73,7 @@ time window, color the track by wind speed or temperature, drop measurement shap
 analyses, overlay satellite imagery for the flight's date, and record annotated clips.
 
 With the API up, the Recon Archive browser (Year, Storm, Flight) loads full-resolution mission
-NetCDF and the storm's whole-life best-track on its own, and archive GOES imagery is rendered on
+NetCDF and the storm's whole-life best-track automatically, and archive GOES imagery is rendered on
 demand for the historical dates these flights fall on.
 
 
@@ -83,31 +83,33 @@ There are two ways in, and both feed the same parser, so the map, charts, PFD, a
 identically either way.
 
 **From the archive** (needs the API online, which it usually is). Pick Year, Storm, then Flight in
-the top-left card and click **⤓ Load Flight + Storm Track**. The search box above the dropdowns
+the **Load Mission** row and click **⤓ Load Flight + Storm Track**. The search box above the dropdowns
 also works: type a mission id to load it directly, or a storm name to find that storm across every
 season. The mission's NetCDF is processed and parsed, and the storm's whole-life best-track comes
-with it. The **.nc** button downloads the file the tool pulled. Refreshing the page, or clicking
-**Reset All** in the top right, clears everything back to a fresh session.
+with it. The **↓ .nc** link downloads the file the tool pulled. Refreshing the page clears
+everything back to a fresh session.
 
 **By hand** (works with the API offline). Drop the `.nc` file, for example `20221028H1_A.nc`, on the
 "or upload:" zone. A manually loaded flight has no storm best-track.
 
 Either way the mission joins **Previously Loaded Missions**, so you can reopen it or switch between
-flights later, even after a reset or a refresh.
+flights later, even after a refresh.
 
-Worth doing first: click **⤓ Batch Load Flight Data** after picking a year and check every mission
-you plan to look at. They download and parse once in the background and are saved on this device,
+Worth doing first: click **⤓ Batch Load Flight Data** in the menu bar, pick a year, and check every
+mission you plan to look at. They download and parse once in the background and are saved on this device,
 so they open instantly afterwards.
 
-If the archive dropdowns are greyed out under an "API Offline" banner, the archive loader service is
-unreachable. Upload by hand instead. The tool re-checks the service every 60 seconds and re-enables
-the archive when it recovers.
+If the archive dropdowns are greyed out under an "API Offline" banner, the archive service is
+unreachable. **⤓ Batch Load Flight Data** and **⤓ Pre-Cache Satellite Imagery** are greyed out too.
+Upload by hand instead. The app checks the API every 60 seconds and turns the archive back on once
+the API responds.
 
 
 ## Playback and the time window
 
 `Play` and `Pause` start and stop. `« / 1x / »` set the speed, `↻ Reset` jumps back to the start of
-the window, and the timeline slider goes to any moment with the UTC readout following along.
+the window, and the timeline slider goes to any moment, with the UTC readout in the bottom left
+updating as it moves.
 **8Hz Smoothing** in the map header interpolates between the native 1-second samples so motion is
 fluid instead of stepping.
 
@@ -123,8 +125,8 @@ between sessions.
 Switch between the two views with the **2D Map Tracker / 3D Tracker** dropdown in the map
 header.
 
-The 2D view is a whole-world canvas map, coastlines and US states, carrying the satellite imagery
-and the wind barbs. Wheel to zoom, drag to pan; zooming out brings in the surrounding synoptic
+The 2D view is a whole-world canvas map of coastlines and US states, with the satellite imagery
+and wind barbs drawn on it. Wheel to zoom, drag to pan; zooming out brings in the surrounding synoptic
 picture. Airfield codes appear as you zoom in, and KLAL is always shown.
 
 The 3D view is a Three.js scene over an elevation-shaded terrain basemap, with US state names laid
@@ -133,7 +135,8 @@ selectable, GPS by default). Pan and zoom with the mouse. **Real Scale (3D)** dr
 its true size and adds faint flight-level reference planes so climbs and descents read against them,
 which can overexaggerate.
 
-The bottom bar has **Track Color** (wind speed, or warming and cooling), **Wind Barb Preset**
+The **Settings** menu at the right end of the bottom bar has **Track Color Type** (wind speed, or
+warming and cooling), **Wind Barb Preset**
 (wind speed, or hurricane wind field), **3D Altitude Track** (GPS or pressure altitude for the 3D
 height), and **Simple Icon (2D)**. The ⛶ button fullscreens any block.
 
@@ -155,8 +158,9 @@ Clicking it opens the radar workspace. The tracker pins over the page keeping wh
 active: entering from 3D moves the camera above the recorded coverage, entering from 2D goes
 straight to the map view with cross-sections. Playback jumps ahead to the first radar leg.
 
-The sidebar lists the levels grouped into bands, to display alone or combined, plus leg buttons that
-show one chosen leg on its own at its end. Each band row shows the geometric altitude span it
+The sidebar has a **2D** / **3D** switch for the tracker view, then **Legs** and **Layers**. Each leg
+button shows that leg alone, at its end; click it again for all legs. Layers lists the levels
+grouped into bands, to display alone or combined. Each band row shows the geometric altitude span it
 selects, labelled with the millibar level that altitude corresponds to in the *standard* atmosphere.
 The radar grid is geometric km, so that millibar figure is a name for the height rather than an
 analysed pressure surface, and a storm's actual pressure surfaces are further from it the deeper the storm.
@@ -165,11 +169,11 @@ The radar scans in around the aircraft as it flies each leg, and every leg prelo
 are seamless. Re-scanned areas show the newest data wherever the new pass recorded any, and the
 white beam is the aircraft's position at that point.
 
-Switching the tracker to 2D inside TDR Mode lays the radar layers over the map, centered on the
+Switching to **2D** inside TDR Mode lays the radar layers over the map, centered on the
 aircraft, with the lower layers (500 mb and below, roughly 0 to
 5.6 km) selected so centers are easier to spot. The **TDR opacity** slider fades the composite so
 satellite imagery can read through it, and two-point vertical cross-sections are drawn the same way
-as the measure tool. Switching back to 3D restores the volumetric view with the layer selection you
+as the measure tool. Switching back to **3D** restores the volumetric view with the layer selection you
 had.
 
 The visualizer only pulls post-season quality-controlled (level 2) TDR data, keeping data integrity
@@ -178,14 +182,16 @@ and accuracy as high as possible.
 
 ## MMR video sync
 
-Load an MMR or nose-radar `.mp4` in the **Upload MMR** zone. There are two ways to line it up with
+Load an MMR or nose-radar `.mp4` in the **Upload MMR to Sync** row. There are two ways to line it up with
 the flight data.
 
 **Auto-Sync** runs OCR over the whole video frame looking for the burned-in clock (usually bottom
 right, though exports vary) and locks onto the time that advances with the video, so a static number
 elsewhere on screen is ignored. A green pulse means OCR is active, and a "Syncing" pill shows while it
-searches. **Sync Now** forces a lock, and a few clicks on a clear frame helps. Readings are checked
-against the flight's own time range, so a misread will not throw playback wildly off.
+searches. While it syncs, the timeline slider is hidden and "Syncing MMR to flight data..." shows in
+its place, so a scrub cannot move the video mid-scan. A short "Synced!" message confirms the lock.
+**Sync Now** forces a lock, and a few clicks on a clear frame help. Readings are checked against
+the flight's own time range, so a misread outside the flight is discarded.
 
 If several scans find a plausible timestamp but none of them confirms it is ticking with the video,
 the last resort is to lock onto that reading anyway; the message marks the sync as
@@ -193,18 +199,21 @@ the last resort is to lock onto that reading anyway; the message marks the sync 
 30 seconds, try a plain MMR recording instead of the nose-radar compiled video, which places the
 clock somewhere unusual and sometimes cannot sync at all.
 
-**Manual Time Input**, picked in the **MMR Sync Mode** dropdown under the upload zone, opens a
-window for the flight-data start and end times plus the video's UTC start time (`HHMMSS`). It is
-tedious and easy to get wrong, so it is a fallback rather than a first choice.
+**Manual Time Input**, picked in the sync dropdown of the **Upload MMR to Sync** row, shows fields
+beside it for the flight-data start and end times plus the video's UTC start time (**Flight Start**,
+**Flight End**, **MMR Start**, all `HHMMSS`). It is tedious and easy to get wrong, so keep it as the
+fallback.
 
-If you have no MMR yet, the **AVI to MP4** converter builds one: upload the raw `.avi` files for the
+If you have no MMR yet, the **AVI to MP4 Converter** in the menu bar builds one: upload the raw `.avi` files for the
 storm you want and it joins them into one file. Those files are under MMR in the SEB OMAO archive for
 the most recent years.
 
 
 ## Satellite overlays
 
-Open **Overlays** in the map header and choose a satellite.
+Open **Overlays** in the map header and click the satellite section to unfold it. **Satellite
+opacity** is its first row. Choose a satellite and product; clicking the active product again turns
+the overlay off.
 
 MODIS and VIIRS, the polar orbiters served by NASA GIBS, are available for any date back to each
 mission's start. Their imagery is organized by calendar day: the day-stepper moves between days, and
@@ -212,17 +221,17 @@ overpass times are looked up automatically.
 
 GOES-East and GOES-West come from the archive and need the API. They are rendered server side for
 the flight's date and advance in 10-minute steps as playback runs. A product the API cannot serve
-right now is marked unavailable on its own, and day bands are unavailable at night.
+right now is marked unavailable automatically, and day bands are unavailable at night.
 
-**⤓ Pre-Cache Satellite Imagery** in the top card downloads imagery for several flights at once.
-Cached imagery is saved on this device and survives reloads.
+**⤓ Pre-Cache Satellite Imagery** in the menu bar downloads imagery for several flights at once.
+Cached imagery is saved on this device and stays available after a reload.
 
-The imagery is never from exactly the playback moment. Hovering the **Overlays** button reports the
+The image time differs from the playback moment. Hovering the **Overlays** button shows the
 time of the tile currently drawn and how that time was arrived at: a real scan or overpass time from
 the archive, the 10-minute cadence bucket that was requested when the archive returned no scan time,
-or, for a polar orbiter, the single daily pass held across the whole flight.
+or, for a polar orbiter, the single daily pass used for the whole flight.
 
-The picker discovers the product list from the API at startup, so new products appear without an app
+The picker loads the product list from the API at startup, so new products appear without an app
 update. The full 16-band GOES ABI set is available for both GOES satellites, plus two composites:
 
 - Bands 1 to 6, visible and near-IR, daylight only. Band 2 (Red Visible, 0.64 µm) has the sharpest
@@ -240,7 +249,7 @@ update. The full 16-band GOES ABI set is available for both GOES satellites, plu
 ## Storm best-track
 
 Archive loads draw the storm's whole-life, intensity-colored, dashed best-track on both trackers. It
-starts on, and the **Storm Track** checkbox in the map controls hides it.
+is on by default, and the **Storm Track** checkbox in **Overlays** hides it.
 
 A spinning cyclone marker shows the storm's estimated position for the current playback
 moment, interpolated between the best-track fixes so it moves smoothly as playback advances.
@@ -251,11 +260,11 @@ Hovering a track point on the 2D map shows its category, wind, pressure, and tim
 
 Eight synced charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and
 accelerations, pressure, thermodynamics) follow playback like everything else. ↺ resets zoom, ＋ adds
-or removes series, and scroll or drag zooms and pans. **Create Your Own Graph** at the bottom plots
-any variables the file contains against each other.
+or removes series, and scroll or drag zooms and pans. The dashed **Create Graph** box under the
+charts plots any variables the file contains against each other.
 
-Three filters are in the bottom bar. **Cockpit PFD** brings up a primary flight display with an
-attitude ladder, airspeed, altitude and heading tapes, VSI, a bank scale with a slip/skid indicator,
+Three filters are in the **Settings** menu at the right end of the bottom bar. **Cockpit PFD**
+brings up a primary flight display with an attitude ladder, airspeed, altitude and heading tapes, VSI, a bank scale with a slip/skid indicator,
 wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts; the VSI, GS and the slip/skid ball are
 computed rather than recorded, which the derivations appendix covers. **S.I Units** switches the
 readouts to metric, since they are imperial by default. **GPS→Press Alt** switches the PFD altitude
@@ -265,21 +274,21 @@ text.
 **8Hz Smoothing** in the map header interpolates between the 1-second samples for a more fluid
 playback. The sub-second motion it adds is synthesized, not recorded: its amplitude scales with the
 recorded vertical wind, so calm legs stay smooth and only genuinely bumpy air shakes the airframe,
-and a file with no vertical-wind channel at all gets a faint fixed baseline instead so the plane is
-never frozen dead.
+and a file with no vertical-wind channel gets a faint fixed baseline, so the plane always shows
+slight motion.
 
 That motion is drawn, never counted. The HUD reads the raw 1 Hz sample, and the PFD's altitude tape,
-altitude box and RA readout use the un-jittered interpolated values, so no number the app displays
-is invented.
+altitude box and RA readout use the un-jittered interpolated values, so every number the app
+displays comes from the data.
 
 
 ## Comparing flights
 
-**Metrics Across Flights** in the top card scans every loaded flight, or a subset you pick, for the
+**Metrics Across Flights** in the menu bar scans every loaded flight, or a subset you pick, for the
 highest or lowest value of a chosen metric. It ranks the flights, reports each one's peak with its
 time, altitude, and position, and draws them together on one comparison graph.
 
-It works offline on whatever is already loaded, and it does not touch the flight you have open.
+It works offline on whatever is already loaded, and the flight you have open stays as it is.
 
 
 ## Recording a clip
@@ -296,14 +305,14 @@ button.
 
 | Symptom | What it means and what to do |
 | --- | --- |
-| The archive dropdowns are greyed out with an "API Offline" banner. | The archive service is unreachable. Load flights by manual upload; the tool re-checks every 60 seconds and re-enables the archive when the service returns. See [API & Connectivity](docs/CONNECTIVITY.md). |
+| The archive dropdowns are greyed out with an "API Offline" banner. | The archive service is unreachable. Load flights by manual upload. The app checks the API every 60 seconds and turns the archive back on once the API responds. See [API & Connectivity](docs/CONNECTIVITY.md). |
 | A GOES option is greyed out. | Either the API is offline, or the flight is outside that satellite's view of the Earth. An Atlantic flight greys out GOES-West, and an east-Pacific flight greys out GOES-East. Use the other GOES or MODIS/VIIRS. |
-| A GOES satellite is picked but nothing shows. | Products are not auto-selected. Pick a product under **Overlays** first. |
-| Auto-Sync lands on the wrong time. | Click **Sync Now** on a frame where the burned-in timestamp is clear, hide any other on-screen timestamps, or switch to Manual mode. |
+| A GOES satellite is picked but nothing shows. | GOES products are picked by hand. Pick a product under **Overlays** first. |
+| Auto-Sync locks onto the wrong time. | Click **Sync Now** on a frame where the burned-in timestamp is clear, hide any other on-screen timestamps, or switch to **Manual Time Input**. |
 | The charts and map do not update after changing the time window. | Press `Play`. It applies the current window before starting. |
 | Nothing plays. | Load a flight file first, then press `Play`. |
 | Playback is sluggish with satellite imagery on. | Let the pre-cache finish, or cache the imagery ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
-| You found a bug, or have a question or idea. | Click the **!** button in the top right. It opens a report form addressed to diegoxiaobarbero@gmail.com, and Send opens Gmail with the subject, details, and mission id prefilled. |
+| You found a bug, or have a question or idea. | Click **Report a Problem** in the menu bar. It opens a report form addressed to diegoxiaobarbero@gmail.com, and Send opens Gmail with the subject, details, and mission id prefilled. |
 
 There is one more doc alongside this one: [API & Connectivity](docs/CONNECTIVITY.md) covers what the
 external API does, how the app decides it is online or offline, and exactly what still works and
@@ -319,8 +328,8 @@ same-origin, so nothing loads from a CDN and manual uploads replay with no inter
 
 **Architecture.** Plain HTML, CSS, and classic scripts, with no build step. [index.html](index.html)
 contains the markup, and the numbered files in `js/`, split by subsystem, share one global scope and
-load in order. File parsing runs in a web worker (`js/parse-worker.js`), so a large flight file
-never freezes the page; the worker, the page, and the tests all share the one parser core in
+load in order. File parsing runs in a web worker (`js/parse-worker.js`), so the page stays responsive
+while a large flight file parses, with a percent on the loading screen; the worker, the page, and the tests all share the one parser core in
 `js/11b-parser-core.js`, so every path produces identical rows. Batch-loaded missions and satellite
 imagery persist in IndexedDB, which is what lets them survive reloads.
 
@@ -330,15 +339,15 @@ on, so after one online load the page opens and replays flights with no network.
 [API & Connectivity](docs/CONNECTIVITY.md) has the full online/offline matrix.
 
 Cross-origin requests (recon-api, NASA GIBS, the GeoJSON fallback) pass straight through uncached,
-so the API health check still sees real failures and the "API Offline" banner keeps working. The
+so the API health check still detects real failures and the "API Offline" banner keeps working. The
 deploy workflow stamps `CACHE_VERSION` in `sw.js` with the commit SHA (the same `sed` that stamps
 the `?v=` tokens), so every deploy installs a fresh cache, each file revalidated against the server
 rather than trusted to the HTTP cache, and drops the previous one on activate; cached files are
 matched ignoring the query string. The first load after a deploy still renders the old build while
 the new cache installs in the background, and the reload after that shows it, so a live replay
-session is never interrupted.
+session continues uninterrupted.
 
-Two rules keep that honest. Every added or renamed css/js/font/data file must also be added to
+Two rules keep the offline cache working. Every added or renamed css/js/font/data file must also be added to
 `PRECACHE` in `sw.js`, because `cache.addAll` rejects wholesale on a single 404 and the app then
 silently stays online-only. And cache names keep the `aoc-viz-` prefix, because the `github.io`
 origin is shared with sibling project pages, so cleanup only ever deletes this app's own caches. The
@@ -352,9 +361,9 @@ browsers fresh.
 **Checks.** `node tests/run-tests.js` runs the QC checks against synthetic fixtures: the parser core,
 the longitude domain used for dateline crossings, the wind color ramps (whose steps are the
 Saffir-Simpson thresholds), and the lat/lon to pixel projection every map layer goes through. A FLAG
-means one of those judgment calls no longer matches its independently computed expectation. The
-deploy workflow runs it on every push so the PASS/FLAG lines land in the Actions log; it is
-flag-style and always exits 0, so it reports but never blocks a deploy. The rest of the app is
+means one of those judgment calls differs from its independently computed expectation. The deploy
+workflow runs it on every push so the PASS/FLAG lines appear in the Actions log; it is flag-style
+and always exits 0, so it reports without blocking a deploy. The rest of the app is
 canvas and DOM, which the harness cannot reach, so verify UI changes by opening the page and
 exercising the load and playback flow.
 
@@ -371,12 +380,12 @@ terrain files load directly.
 through the recon archive API at full resolution, and the `.nc` button links the original file. A
 mission folder can hold more than one NetCDF; the API serves the highest-lettered revision, so `_B`
 is used over `_A`, since the higher letter is the quality-assured pass and a lower one is an earlier
-version that may still carry an error. Manual upload of a `.nc` (or `.txt`) works with no API.
+version that may still contain an error. Manual upload of a `.nc` (or `.txt`) works with no API.
 
 **MMR video.** NOAA SEB Archive, `https://seb.omao.noaa.gov/pub/acdata/{year}/MMR/{missionid}/`, as
-zipped `.avi` segments. The built-in AVI to MP4 converter unzips and stitches the segments into one
+zipped `.avi` segments. The built-in AVI to MP4 Converter unzips and joins the segments into one
 `.mp4` on your device (ffmpeg in the browser), which you then load as the MMR video. Compiling a
-full mission of video runs on the order of 30 minutes. The MMR player itself takes `.mp4`.
+full mission of video takes about 30 minutes. The MMR player itself takes `.mp4`.
 
 **Storm best-track.** NHC ATCF best-track, the b-decks at `https://ftp.nhc.noaa.gov/atcf/btk/` for
 the current season and `https://ftp.nhc.noaa.gov/atcf/archive/` for past years. Whole storm life at
@@ -385,7 +394,7 @@ Each fix has time, lat, lon, wind (kt), pressure (mb), category, and status.
 
 **TDR (tail Doppler radar).** NOAA AOML / Hurricane Research Division airborne tail-Doppler radar
 (AOML HRD radar archive, `https://www.aoml.noaa.gov/ftp/pub/hrd/data/radar/`; the analyses are also
-held by the AOC SEB archive). Relayed by the recon archive API as level 2 (quality-controlled)
+stored in the AOC SEB archive). Relayed by the recon archive API as level 2 (quality-controlled)
 reflectivity, in 3D volumes and two-point vertical cross-sections.
 
 **GOES (archive).** NOAA GOES ABI archive on AWS S3 (NOAA Open Data Dissemination,
@@ -410,7 +419,7 @@ Terrain from the ETOPO 0.5 degree grid, NOAA NCEI via CoastWatch ERDDAP (`etopo1
 
 ## Appendix: flight-level variables and sensors
 
-AOC flight-level files carry hundreds of columns. This visualizer reads only the quality-controlled
+AOC flight-level files contain hundreds of columns. This visualizer reads only the quality-controlled
 subset it needs to plot: position, GPS/pressure/radar altitude, D-value, pressures, temperature and
 dew point, true and indicated airspeed, wind speed, direction and vertical wind, drift, heading,
 ground track, pitch and roll, angle of attack and sideslip, vertical acceleration, mixing ratio, and
@@ -467,8 +476,8 @@ a steady coordinated turn and ignores the actual side force, so it is indicative
 **Relative humidity.** The point analysis' `COMPUTED RH` is the Magnus saturation-vapour-pressure
 ratio of dew point to ambient temperature, `100 * e(Td) / e(T)` with
 `e(x) = 6.11*exp(17.625x / (243.04 + x))` (Alduchov-Eskridge coefficients), clamped to 0-100%. Every
-other line in that report is read from the file, and a value the row does not carry is omitted
-rather than defaulted.
+other line in that report is read from the file, and a value missing from the row is left out
+with no default filled in.
 
 **TDR layer pressures.** The radar analysis grid is indexed by geometric altitude (0 to 18 km every
 0.5 km), not by pressure. The picker's millibar band labels are that altitude put through the
@@ -485,9 +494,9 @@ sliding-window sum so a long flight does not recompute the window at every step.
 interpolated between the 1-second samples at 8 Hz with a uniform Catmull-Rom spline: position,
 heading and ground track, pitch and roll, and altitude, with longitude and headings unwrapped the
 short way so a dateline crossing or a 359 to 1 degree turn interpolates correctly. A small
-turbulence-aware micro-motion is then added so the airframe is never perfectly still: its amplitude
+turbulence-aware micro-motion is then added so the airframe always shows slight motion: its amplitude
 scales with the recorded vertical wind (`vtWnd`, the turbulence proxy) and its shape is smooth
-band-limited noise, a few sub-2 Hz sinusoids, so calm legs stay steady and only bumpy air rocks the
+band-limited noise, a few sub-2 Hz sinusoids, so calm legs stay steady and only bumpy air moves the
 plane. The drawn 2D and 3D flight tracks use the same Catmull-Rom curve (one cubic Bezier per
 1-second segment in 2D), so the plane is always drawn on the line.
 

@@ -50,8 +50,7 @@
 
     // non-blocking "Syncing..." badge, shown while Auto-Sync aligns the MMR timestamp
     // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
-    // Visible while Auto-Sync has a video and is warming the engine up (ensureOCR), while it
-    // hunts for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked),
+    // visible while Auto-Sync searches for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked),
     // and while a detected mismatch is being corrected (ocrMismatchHold). The periodic re-syncs
     // that agree with the current offset run silently, so a good alignment stays quiet. A badge
     // rather than a cover, since the MMR plays through and only the alignment is pending.
@@ -59,12 +58,11 @@
         const el = document.getElementById('syncingIndicator');
         if (!el) return;
         const onAuto = videoLoaded && videoSyncMode && videoSyncMode.value === 'auto';
-        const warming = onAuto && ocrWarmingUp;
         const hunting = onAuto && ocrAvailable && ((!ocrEverLocked && (isOcrRunning || forceOcrSyncNextTick)) || ocrMismatchHold);
         const label = el.querySelector('.sync-label'), sub = el.querySelector('.sync-sub');
-        if (label) label.textContent = warming ? 'Preparing Auto-Sync...' : 'Syncing...';
-        if (sub) sub.textContent = warming ? 'loading OCR engine, first video only' : (ocrMismatchHold ? 'correcting a time mismatch' : 'aligning tracker');
-        el.classList.toggle('show', !!(warming || hunting));
+        if (label) label.textContent = 'Syncing...';
+        if (sub) sub.textContent = ocrMismatchHold ? 'correcting a time mismatch' : 'aligning tracker';
+        el.classList.toggle('show', !!hunting);
         updateTimelineSyncLock();
     }
 
@@ -90,6 +88,7 @@
         const locked = syncLockActive();
         if (loader) loader.classList.toggle('show', locked);
         if (slider) {
+            slider.style.visibility = locked ? 'hidden' : '';   // the loader takes the slider's place
             if (locked) slider.disabled = true;
             else if (typeof filteredData !== 'undefined' && filteredData.length > 0) slider.disabled = false;
         }

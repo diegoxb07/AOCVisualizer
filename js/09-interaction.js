@@ -217,7 +217,7 @@
     document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });
 
     // Reset the 2D view = re-engage follow (zoom in and re-center on the aircraft). Called on a
-    // double-click on the map, on a new flight or time window, and on leaving the TDR workspace.
+    // double-click on the map, and on a new flight or time window.
     function resetMapView() { engageFollowAircraft(); }
 
     // The recenter button surfaces once the user has moved off the aircraft: in 2D on a pan or zoom,

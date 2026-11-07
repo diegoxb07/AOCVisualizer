@@ -162,23 +162,25 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #satPickerBtn.sat-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); color: var(--accent); }
 /* position:fixed (placed by positionSatPicker in js/07-ui-controls.js) escapes the map header's
    z-20 stacking context so the panel layers above the pfd and hud overlays (z-2500) and scrolls. */
-.sat-picker-panel { position: fixed; z-index: 3200; width: 250px; max-height: 340px; overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.sat-picker-panel { position: fixed; z-index: 3200; width: 250px; max-height: min(560px, calc(100vh - 140px)); overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
 .sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 2px 4px 6px; }
 /* Umbrella "Overlays" dropdown: on/off toggle rows above the satellite picker section. */
 .ov-toggle-group { display: flex; flex-direction: column; gap: 1px; }
 .ov-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
 .ov-row:hover:not(:disabled) { background: var(--panel-strip); }
 .ov-row-name { flex: 1 1 auto; min-width: 0; }
-.ov-row-wrap { width: 100%; }
-.ov-row-btn:disabled { cursor: not-allowed; }
-/* One checkbox look for both toggles: Storm Track fills it from its hidden native input's :checked,
-   TDR from the button's .sat-on class (set while TDR mode is on). */
+/* the Storm Track checkbox look: filled from its hidden native input's :checked. */
 .ov-native-check { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; margin: 0; }
 .ov-check { flex: none; width: 15px; height: 15px; border: 1.5px solid color-mix(in oklab, var(--text-faint) 85%, transparent); border-radius: 3px; background: transparent; position: relative; transition: background 0.12s, border-color 0.12s; }
-.ov-native-check:checked ~ .ov-check, #tdrPickerBtn.sat-on .ov-check { background: var(--accent); border-color: var(--accent); }
-.ov-native-check:checked ~ .ov-check::after, #tdrPickerBtn.sat-on .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
-/* Satellite section: a toggle + expander header over a collapsible picker body. */
-#ovSatSection { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
+.ov-native-check:checked ~ .ov-check { background: var(--accent); border-color: var(--accent); }
+.ov-native-check:checked ~ .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+/* TDR and Satellite sections: an expander header over a collapsible body. the TDR rows lay out in
+   the panel's own scroll, so the layer list has no scrollbar of its own there. */
+#ovSatSection, #tdrControlGroup { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
+.tdr-expand-body { padding: 0 4px 6px; }
+.tdr-expand-body .tdr-level-hero { max-height: none; overflow: visible; }
+#tdrControlGroup .tdr-btn-skel { display: block; margin: 6px 8px; }
+#tdrPickerBtn:disabled { cursor: not-allowed; }
 .ov-sat-row { gap: 7px; }
 .ov-sat-expand { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; background: transparent; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .ov-caret { margin-left: auto; color: var(--text-muted); font-size: 14px; line-height: 1; transition: transform 0.15s; }
@@ -505,32 +507,6 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .help-body b, .help-body strong { color: var(--text); font-weight: 600; }
 .help-body a { color: var(--link); text-decoration: underline; }
 .help-body kbd { font-family: var(--font-mono); font-size: 11px; background: var(--panel-strip); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--text); white-space: nowrap; }
-/* TDR workspace sidebar: docked over the pinned tracker's left edge while TDR mode is up.
-   Below the sticky bottom bar (z-2000) and above the canvas overlays. */
-.tdr-mode-bar { position: absolute; left: 14px; top: 64px; width: 244px; max-height: calc(100vh - 200px); z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: color-mix(in oklab, var(--panel) 96%, transparent); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.35); }
-.tdr-mode-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--text); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.tdr-mode-head button { background: transparent; border: none; color: var(--text-faint); font-size: 16px; cursor: pointer; line-height: 1; }
-.tdr-mode-head button:hover { color: var(--text); }
-.tdr-mode-bar .tdr-level-hero { flex: 0 1 auto; max-height: 38vh; overflow-y: auto; }
-/* TDR workspace: the left edge belongs to the sidebar, so the info stack keeps top-right, the
-   HUD box moves bottom-right beside the PFD, and the fullscreen buttons hide like in the other
-   pinned modals. */
-/* TDR mode hides the 2D/scale filter toggles that make no sense inside the radar workspace. */
-html:has(#mapPanel.tdr-mode) label:has(#toggleRealScale), html:has(#mapPanel.tdr-mode) label:has(#simpleTrackerIcon) { display: none; }
-/* With those two hidden, the remaining filters (Cockpit PFD + its child, S.I Units) stack in
-   one column so the bottom bar's filter block stays narrow while the workspace is up. */
-html:has(#mapPanel.tdr-mode) #filtersGrid { flex-direction: column; gap: 4px !important; }
-/* Stacked vertically, the PFD sub-option's reserved (visibility:hidden) row would wedge a gap
-   between Cockpit PFD and S.I Units; collapse it while it is off so they sit close together. */
-html:has(#mapPanel.tdr-mode) .filter-child.child-off { display: none; }
-/* the readout stack sits on the bottom row, level with the pinned PFD and just left of it while the
-   PFD shows, clear of the top-right items (the satellite color bar in 2D, the pitch/roll box in 3D):
-   its top never rises above 250px */
-#mapPanel.tdr-mode .overlays-wrapper { left: auto; right: 16px; top: 250px; bottom: var(--pfd-pin-bottom, 170px); align-items: flex-end; transform-origin: bottom right; }
-html:has(#togglePfd:checked) #mapPanel.tdr-mode .overlays-wrapper { right: calc(32px + var(--pfd-pin-size, 210px)); }
-#mapPanel.tdr-mode #fullscreenMapBtn { display: none; }
-/* While the workspace waits for its first volume, the HUD greys out with the skeleton. */
-#mapPanel.tdr-loading .overlays-wrapper { filter: grayscale(1) opacity(0.45); transition: filter 0.2s; }
 
 /* TDR level column plus its action row. */
 .tdr-hero-actions { display: flex; gap: 6px; margin: 8px 0 2px; }
@@ -565,16 +541,9 @@ html:has(#togglePfd:checked) #mapPanel.tdr-mode .overlays-wrapper { right: calc(
 .tdr-level-alt { display: block; font-size: 8.5px; font-weight: 500; color: var(--text-faint); letter-spacing: 0.01em; }
 .tdr-level-bar { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--accent) 30%, transparent); }
 .tdr-hero-note { font-size: 10.5px; color: var(--text-faint); padding: 6px 2px; }
-/* Skeleton cover while the TDR workspace waits for its first volume (a few seconds per leg). */
-.tdr-skel-cover { position: absolute; inset: 0; z-index: 55; display: flex; align-items: center; justify-content: center; background: color-mix(in oklab, var(--bg) 72%, transparent); }
-.tdr-skel-box { display: flex; flex-direction: column; gap: 10px; width: 260px; }
-.tdr-skel-bar { height: 14px; border-radius: 4px; background: color-mix(in oklab, var(--text-faint) 25%, transparent); animation: tdrskel 1.2s ease-in-out infinite; }
-.tdr-skel-bar:nth-child(2) { animation-delay: 0.15s; width: 80%; }
-.tdr-skel-bar:nth-child(3) { animation-delay: 0.3s; width: 60%; }
-.tdr-skel-text { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 4px; }
 @keyframes tdrskel { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
-/* Header placeholder while the TDR probe runs: the control shimmers in place instead of the
-   button popping in once the archive answers. */
+/* placeholder while the TDR probe runs: the section shimmers in place instead of the button
+   popping in once the archive answers. */
 .tdr-btn-skel { display: inline-block; width: 78px; height: 26px; border-radius: 4px; background: color-mix(in oklab, var(--text-faint) 25%, transparent); animation: tdrskel 1.2s ease-in-out infinite; }
 /* Floating (picture-in-picture) media panels: dragged out of the media bar by their outline
    (js/11c-float-panels.js). z 1400/1401 sits above the sticky media bar (1000), below a pinned
@@ -609,9 +578,10 @@ body.media-collapsed .float-panel { display: none !important; }
 .create-graph-box { min-height: 160px; }
 .cg-plus { font-size: 30px; }   /* the box's ＋ glyph; plain CSS for the same compile-time reason */
 
-/* Sidebar row under the pressure layers that starts the 2D display's section pick. */
+/* the TDR section's cross-section button: starts (or cancels) the two-point pick on the 2D map. */
 .tdr-slice-start { width: 100%; padding: 6px 8px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: filter 0.12s; }
-.tdr-slice-start:hover { filter: brightness(1.1); }
+.tdr-slice-start:hover:not(:disabled) { filter: brightness(1.1); }
+.tdr-slice-start:disabled { opacity: 0.45; cursor: not-allowed; }
 /* band rows while the first radar volume downloads: dimmed, inert, spinner instead of the bar */
 .tdr-level-row.loading { cursor: default; opacity: 0.55; }
 .tdr-level-row.loading:hover { color: var(--text-muted); border-color: var(--border); }
@@ -732,11 +702,6 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 #recenterPlaneBtn { bottom: 36px !important; }
 #mapPanel:is(:fullscreen, .fake-fs) #recenterPlaneBtn { bottom: calc(var(--bottom-bar-h, 96px) + 58px) !important; z-index: 2001; }
 
-/* Exit TDR button: a small control in the top-right of the pinned workspace, tucked just under the
-   header/Overlays row. Shown only while the workspace is up (.tdr-mode). */
-#tdrExitBtn { display: none; position: absolute; right: 16px; top: 60px; z-index: 2001; align-items: center; gap: 5px; padding: 4px 9px; background: color-mix(in oklab, var(--danger) 90%, transparent); color: #fff; border: 1px solid var(--danger); border-radius: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); transition: filter 0.12s; }
-#tdrExitBtn:hover { filter: brightness(1.1); }
-#mapPanel.tdr-mode #tdrExitBtn { display: inline-flex; }
 
 /* report a problem form (Report a Problem in the menu bar): subject + details handed to a prefilled
    gmail compose, same feature as in AOCQualityCheck */
@@ -772,7 +737,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 /* flat skin: small rounded corners, no drop shadows or blur, and uppercase labels with light tracking */
 .shadow, .shadow-sm, .shadow-md, .shadow-lg { box-shadow: none; }
 #hudOverlay, #pfdOverlay, #satLoadingOverlay, #satColorLegend, #satPrefetchBar, #syncingIndicator, #recordProgress,
-.dropdown-menu, .tdr-mode-bar, .float-panel, .float-panel .float-dock-btn, .toast-notification, #tdrExitBtn,
+.dropdown-menu, .float-panel, .float-panel .float-dock-btn, .toast-notification,
 #aviConvertPill { box-shadow: none; }
 .modal-overlay, .sticky-bottom-bar, .backdrop-blur-md { -webkit-backdrop-filter: none; backdrop-filter: none; }
 .sticky-bottom-bar { background: var(--band); border-top: none; padding: 8px 16px; align-items: center; gap: 8px 14px; }
@@ -890,11 +855,5 @@ body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="
 #manualTimeFields input { width: 84px; padding: 5px 6px; font-size: 13px; }
 .mt-note { font-size: 11px; color: var(--text-faint); }
 
-/* TDR sidebar: a 2D / 3D switch for the tracker view, and short labels over the leg and layer lists */
-.tdr-view-switch { display: flex; margin: 2px 0 4px; }
-.tdr-view-btn { flex: 1 1 0; padding: 4px 0; font-size: 12px; font-weight: 700; background: var(--panel-strip); color: var(--text-muted); border: 1px solid var(--border); cursor: pointer; }
-.tdr-view-btn + .tdr-view-btn { margin-left: -1px; }
-.tdr-view-2d { border-radius: 3px 0 0 3px; }
-.tdr-view-3d { border-radius: 0 3px 3px 0; }
-html:not(.pref-tracker-3d) .tdr-view-2d, html.pref-tracker-3d .tdr-view-3d { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+/* short uppercase labels over the TDR section's leg, layer, and cross-section rows */
 .tdr-section-label { margin-top: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }

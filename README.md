@@ -35,7 +35,7 @@ flowchart TD
     SAT -- "No" --> TDRQ{"Want Tail Doppler Radar?<br>(needs the API online)"}
     SATGOES --> TDRQ
     SATPOLAR --> TDRQ
-    TDRQ -- "Yes" --> TDRMODE["<b>TDR Mode</b> (Overlays, map header)<br>pinned radar workspace: altitude layers,<br>flight legs & two-point cross-sections"]
+    TDRQ -- "Yes" --> TDRMODE["<b>TDR</b> (Overlays, map header)<br>radar on the tracker beside the MMR:<br>altitude layers, flight legs & two-point cross-sections"]
     TDRQ -- "No, or it reads TDR Unavailable" --> PLAY["<b>Play</b>, scroll through timeline, change speed,<br><b>Settings</b>: toggle Cockpit PFD / S.I Units"]
     TDRMODE --> PLAY
     PLAY --> EXPORT{"Need a deliverable?"}
@@ -149,32 +149,29 @@ hurricane-force winds.
 much like the tool the FDs have on the MMR. **Mark Point** in the bottom bar drops a marker at the
 current position; clicking that point on the 2D map opens a point analysis you can download.
 
-### TDR mode
+### TDR
 
-The **TDR Mode** button is in the **Overlays** dropdown in the map header. It reads "TDR Loading..." until the data is usable,
-and greys out as "TDR Unavailable" for missions flown without tail Doppler radar.
+The **TDR** section is in the **Overlays** dropdown in the map header. It reads "TDR Loading..." while
+the first radar volume downloads, and greys out as "TDR Unavailable" for missions flown without tail
+Doppler radar. Click **TDR** to unfold its controls.
 
-Clicking it opens the radar workspace. The tracker pins over the page keeping whichever view was
-active: entering from 3D moves the camera above the recorded coverage, entering from 2D goes
-straight to the map view with cross-sections. Playback jumps ahead to the first radar leg.
+The radar draws on whichever tracker is showing, 2D or 3D, while the MMR video keeps playing. Picking
+layers turns it on, and **None** turns it off.
 
-The sidebar has a **2D** / **3D** switch for the tracker view, then **Legs** and **Layers**. Each leg
-button shows that leg alone, at its end; click it again for all legs. Layers lists the levels
-grouped into bands, to display alone or combined. Each band row shows the geometric altitude span it
+**Legs** has one button per radar leg. A leg button shows that leg alone, at its end; click it again
+for all legs. **Eye Pass** jumps to the leg's closest approach to the storm center. **Layers** lists
+the levels grouped into bands, to display alone or combined, with **All** and **None** above them. Each band row shows the geometric altitude span it
 selects, labelled with the millibar level that altitude corresponds to in the *standard* atmosphere.
 The radar grid is geometric km, so that millibar figure is a name for the height rather than an
 analysed pressure surface, and a storm's actual pressure surfaces are further from it the deeper the storm.
 
-The radar scans in around the aircraft as it flies each leg, and every leg preloads so transitions
-are seamless. Re-scanned areas show the newest data wherever the new pass recorded any, and the
-white beam is the aircraft's position at that point.
+The radar scans in around the aircraft as it flies each leg. Once TDR is in use, every leg downloads
+in the background, so leg transitions are seamless. Re-scanned areas show the newest data wherever the
+new pass recorded any. In 3D, the white beam is the aircraft's position.
 
-Switching to **2D** inside TDR Mode lays the radar layers over the map, centered on the
-aircraft, with the lower layers (500 mb and below, roughly 0 to
-5.6 km) selected so centers are easier to spot. The **TDR opacity** slider fades the composite so
-satellite imagery can read through it, and two-point vertical cross-sections are drawn the same way
-as the measure tool. Switching back to **3D** restores the volumetric view with the layer selection you
-had.
+On the 2D map the **TDR opacity** slider fades the composite so satellite imagery can read through it,
+and **Draw a Cross-Section** starts a two-point vertical cross-section, picked the same way as the
+measure tool. **Cancel Cross-Section** or Esc stops a pick.
 
 The visualizer only pulls post-season quality-controlled (level 2) TDR data, keeping data integrity
 and accuracy as high as possible.

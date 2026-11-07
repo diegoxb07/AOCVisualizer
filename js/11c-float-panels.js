@@ -7,7 +7,7 @@
    the ⇱ Dock button returns it to the media bar. A floating panel reparents to <body>, so
    collapsing the media bar cannot hide it, and every size change routes through
    resizeCanvasLayout, which already preserves the 2D view and resizes the 3D renderer.
-   Pinning (.fake-fs via the panel ⛶ or TDR mode) suspends a float: the inline rect clears so
+   Pinning (.fake-fs via the panel ⛶) suspends a float: the inline rect clears so
    the pin's inset:0 wins, and the float returns when the pin releases (floatPanelsOnPinChange,
    called from setFakePanel in js/07-ui-controls.js). */
 

@@ -1010,15 +1010,16 @@
     // product list is currently open in the panel.
     let satPickerExpanded = null;
 
-    // The header button is the umbrella "Overlays" trigger now, so its label stays fixed; the accent
-    // (sat-on) just signals that the satellite layer, at least, is currently drawing.
+    // the header button is the umbrella "Overlays" trigger, so its label stays fixed; the accent
+    // (sat-on) signals that a layer it controls is drawing: the satellite, or the radar (picked TDR
+    // layers, js/07d-tdr.js).
     function updateSatPickerButton() {
         const sat = document.getElementById('satelliteSelect');
         const btn = document.getElementById('satPickerBtn');
         const lbl = document.getElementById('satPickerBtnLabel');
         if (!sat || !btn || !lbl) return;
         lbl.textContent = 'Overlays';
-        const on = sat.value !== 'none';
+        const on = sat.value !== 'none' || (typeof tdrSelectedKm !== 'undefined' && tdrSelectedKm.size > 0);
         btn.classList.toggle('sat-on', on);
         // Nothing on the map says WHEN the satellite tile under the track was taken, and it is never
         // the playback moment: archive GOES is bucketed to the scan cadence, and a polar pass is one

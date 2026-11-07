@@ -60,27 +60,15 @@
         const label = document.getElementById('autosyncLabel'); label.classList.add('show'); setTimeout(() => { label.classList.remove('show'); }, 4000);
     }
 
-    // the mission line under the map header (id, storm, aircraft), the tab title, and the share
-    // button, which needs an archive mission id.
+    // the mission id in the map header's corner, the tab title, and the share button, which needs an
+    // archive mission id. an archive load's id ends with the storm as "(NAME)", which the corner drops.
     function updateMissionHeader() {
         const sub = document.getElementById('missionSubline');
         if (sub) {
             const rawId = (flightMetaData.id && flightMetaData.id !== 'Unknown') ? flightMetaData.id : '';
             const idPart = rawId.replace(/\s*\([^)]*\)\s*$/, '');
-            // Storm name: archive metadata when available, else the "(NAME)" an archive
-            // load bakes into flightMetaData.id (reconArchiveMeta is set after parse).
-            let storm = (reconArchiveMeta && reconArchiveMeta.stormName) || (rawId.match(/\(([^)]+)\)/) || [])[1] || '';
-            if (/unknown|training/i.test(storm)) storm = '';
-            if (storm) storm = storm.charAt(0).toUpperCase() + storm.slice(1).toLowerCase();
-            // Aircraft designator from the tail number, NOAA name, or the mission-id letter (H/I/N).
-            const acId = ((flightMetaData.aircraft || '') + ' ' + rawId).toUpperCase();
-            let plane = '';
-            if (/N?42 ?RF|NOAA ?42|\d{8}H\d/.test(acId)) plane = 'NOAA42';
-            else if (/N?43 ?RF|NOAA ?43|\d{8}I\d/.test(acId)) plane = 'NOAA43';
-            else if (/N?49 ?RF|NOAA ?49|GULFSTREAM|\bG-?IV\b|\d{8}N\d/.test(acId)) plane = 'NOAA49';
-            const parts = [idPart, storm, plane].filter(Boolean);
-            sub.textContent = parts.join(' · ');
-            sub.classList.toggle('hidden', parts.length === 0);
+            sub.textContent = idPart;
+            sub.classList.toggle('hidden', !idPart);
             document.title = (idPart ? idPart + ' · ' : '') + 'AOC Mission Visualizer';
         }
         // Share links need an archive mission id; a manually uploaded file has none.
@@ -1109,6 +1097,10 @@
         panel.style.top = (r.bottom + 4) + 'px';
         panel.style.left = 'auto';
         panel.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+        // end above the fixed playback bar (its live height is published as --bottom-bar-h by
+        // js/11-layout.js), so an unfolded TDR section scrolls inside the panel instead of covering it
+        const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-h')) || 0;
+        panel.style.maxHeight = Math.max(160, Math.min(560, window.innerHeight - (r.bottom + 4) - barH - 8)) + 'px';
     }
     function openSatPicker() {
         const panel = document.getElementById('satPickerPanel');

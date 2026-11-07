@@ -582,11 +582,11 @@ body.media-collapsed .float-panel { display: none !important; }
 .tdr-slice-start { width: 100%; padding: 6px 8px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: filter 0.12s; }
 .tdr-slice-start:hover:not(:disabled) { filter: brightness(1.1); }
 .tdr-slice-start:disabled { opacity: 0.45; cursor: not-allowed; }
-/* band rows while the first radar volume downloads: dimmed, inert, spinner instead of the bar */
-.tdr-level-row.loading { cursor: default; opacity: 0.55; }
-.tdr-level-row.loading:hover { color: var(--text-muted); border-color: var(--border); }
-.tdr-row-spin { width: 10px; height: 10px; flex: none; margin-left: auto; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: tdrspin 0.8s linear infinite; }
-@keyframes tdrspin { to { transform: rotate(360deg); } }
+/* while the first radar volume downloads: gray skeleton rows in place of the band rows, and the TDR
+   header row pulsing in the same shade, like the flight-loading skeletons */
+.tdr-level-row.tdr-skel-row { height: 26px; cursor: default; border-color: transparent; animation: skeletonPulse 1.3s ease-in-out infinite; }
+.tdr-level-row.tdr-skel-row:hover { border-color: transparent; }
+#tdrControlGroup.tdr-is-loading .ov-sat-row { animation: skeletonPulse 1.3s ease-in-out infinite; }
 
 /* Section-jump pills at the top of the help guide; each scrolls to its h3 below. */
 .help-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }

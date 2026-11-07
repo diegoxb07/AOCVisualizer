@@ -53,6 +53,8 @@
     let tdrSliceLine = null;          // committed { A, B } endpoints, drawn while the modal is up
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrSectionOpen = false;       // the Overlays TDR section is unfolded: its rows need data, so fetching starts
+    let tdrIntroDone = false;         // the once-per-flight fly-through over every leg has run
+    let tdrIntroRaf = 0;              // its animation frame handle, cancelled on a new flight
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
     let tdrEyeActive = false;         // within the picked leg: true shows its eye pass, false its whole span
     let tdrScanWall = null;           // vertical section wall riding the reveal frontier at the aircraft
@@ -94,6 +96,8 @@
         const opValReset = document.getElementById('tdr2dOpacityVal'); if (opValReset) opValReset.textContent = '85%';
         tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         tdrAnyFetched = false;
+        if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
+        tdrIntroDone = false;
         if (tdrScanWall) {
             if (tdrScanWall.geometry) tdrScanWall.geometry.dispose();
             if (tdrScanWall.material) { if (tdrScanWall.material.map) tdrScanWall.material.map.dispose(); tdrScanWall.material.dispose(); }
@@ -674,6 +678,7 @@
             if (!next) next = tdrAnalyses.find(x => x.state === 'idle');
             if (next) fetchTdrAnalysis(next);
         }
+        if (!tdrIntroDone) tdrIntroSweep();
     }
 
     // 2D picker overlay
@@ -770,6 +775,8 @@
         const loading = !tdrAnalyses.some(x => x.state === 'ready') && (tdrFetchActive || tdrAnyFetched);
         lbl.textContent = loading ? 'TDR Loading...' : 'TDR';
         if (btn) btn.classList.toggle('opacity-60', loading);
+        // the header row pulses like the other skeleton loaders while that first volume downloads
+        const grp = document.getElementById('tdrControlGroup'); if (grp) grp.classList.toggle('tdr-is-loading', loading);
         // the Overlays button lights while any overlay draws, the radar included
         if (typeof updateSatPickerButton === 'function') updateSatPickerButton();
     }
@@ -828,12 +835,13 @@
                 const legOn = (tdrLegPick === a && !tdrEyeActive) || (in2dNow && !tdrLegPick && tdrCurrent === a);
                 if (legOn) legBtn.classList.add('on');
                 legBtn.addEventListener('click', () => {
-                    if (!filteredData.length) return;
+                    if (!filteredData.length || (typeof syncLockActive === 'function' && syncLockActive())) return;
                     if (tdrLegPick === a && !tdrEyeActive) { tdrLegPick = null; buildTdrHero(); updateTdr3D(); return; }
                     tdrLegPick = a; tdrEyeActive = false;   // show this leg's whole span
                     let idx = filteredData.findIndex(r => r.absSeconds >= a.stopSec);   // its end, where its radar is complete
                     if (idx < 0) idx = filteredData.length - 1;
                     currentIdx = idx;
+                    tdrSeekVideo(true);
                     if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
                     buildTdrHero();
                 });
@@ -850,9 +858,10 @@
                                  + 'position interpolated between the 6-hourly best-track fixes.';
                         if (tdrLegPick === a && tdrEyeActive) eb.classList.add('on');
                         eb.addEventListener('click', () => {
-                            if (!filteredData.length) return;
+                            if (!filteredData.length || (typeof syncLockActive === 'function' && syncLockActive())) return;
                             tdrLegPick = a; tdrEyeActive = true;   // show this leg, parked on its eye pass
                             currentIdx = p.idx;
+                            tdrSeekVideo(true);
                             if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
                             buildTdrHero();
                         });
@@ -882,14 +891,12 @@
                 list.appendChild(d);
                 return;
             }
-            // First volume still downloading: the standard bands render as spinner placeholders,
-            // not clickable, so nothing invites a click that cannot show anything yet.
-            TDR_BANDS.forEach(b => {
+            // first volume still downloading: one gray pulsing skeleton row per standard band, not
+            // clickable, so nothing invites a click that cannot show anything yet
+            TDR_BANDS.forEach(() => {
                 const row = document.createElement('div');
-                row.className = 'tdr-level-row loading';
+                row.className = 'tdr-level-row tdr-skel-row';
                 row.title = 'Loading radar data...';
-                row.title = tdrBandTitle(b);
-                row.innerHTML = '<span class="tdr-level-ft">' + b.label + '<span class="tdr-level-alt">' + b.alt + '</span></span><span class="tdr-row-spin"></span>';
                 list.appendChild(row);
             });
             return;
@@ -923,6 +930,56 @@
         buildTdrHero();
         updateTdr3D();
         if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
+    }
+
+    // moves the MMR video to the playhead the way the timeline does (js/09-interaction.js): a
+    // continuous move pumps seeks so the picture keeps up, and the end of a move or a jump also has
+    // Auto-Sync recheck the burned-in clock there.
+    function tdrSeekVideo(final) {
+        if (typeof videoLoaded === 'undefined' || !videoLoaded || !filteredData[currentIdx]) return;
+        let vt = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds);
+        if (video.duration) vt = Math.min(vt, video.duration);
+        if (typeof pumpScrubSeek === 'function') pumpScrubSeek(vt); else video.currentTime = vt;
+        if (final && typeof scheduleOcrRecheck === 'function') scheduleOcrRecheck();
+    }
+
+    // A 4-second fly-through over every radar leg, once per flight, the first time the radar shows
+    // with every leg downloaded: the radar scans in as the playhead crosses each leg, so the loaded
+    // data is visible at once. Playback pauses for it. The MMR video follows through tdrSeekVideo and
+    // the satellite through updateVisualComponents. Scrubbing, playing, picking a leg, or None stops
+    // it; while an MMR sync has the timeline locked, it starts only once that sync finishes.
+    function tdrIntroSweep() {
+        if (tdrIntroDone || !tdrSelectedKm.size || !tdrAnalyses.length || !filteredData.length) return;
+        if (tdrAnalyses.some(x => x.state === 'idle' || x.state === 'loading')) return;   // every leg downloads first
+        if (!tdrAnalyses.some(x => x.state === 'ready')) return;
+        if (typeof isScrubbing !== 'undefined' && isScrubbing) return;
+        if ((typeof syncLockActive === 'function' && syncLockActive()) || (typeof isOcrRunning !== 'undefined' && isOcrRunning)) return;
+        tdrIntroDone = true;
+        if (typeof isPlaying !== 'undefined' && isPlaying) {
+            isPlaying = false;
+            if (typeof videoLoaded !== 'undefined' && videoLoaded) video.pause();
+            if (typeof playPauseBtn !== 'undefined' && playPauseBtn) playPauseBtn.innerText = 'Play';
+        }
+        const t0 = tdrAnalyses[0].startSec;
+        const tEnd = tdrAnalyses[tdrAnalyses.length - 1].stopSec + 60;
+        const begun = performance.now();
+        const gen = tdrGeneration;
+        let cursor = 0;
+        const step = now => {
+            if (gen !== tdrGeneration) return;
+            if ((typeof isScrubbing !== 'undefined' && isScrubbing) || (typeof isPlaying !== 'undefined' && isPlaying) || tdrLegPick || !tdrSelectedKm.size) return;
+            const f = Math.min(1, (now - begun) / 4000);
+            const target = t0 + (tEnd - t0) * f;
+            while (cursor < filteredData.length - 1 && filteredData[cursor].absSeconds < target) cursor++;
+            if (cursor !== currentIdx) {
+                currentIdx = cursor;
+                tdrSeekVideo(false);
+                if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
+            }
+            if (f < 1) tdrIntroRaf = requestAnimationFrame(step);
+            else tdrSeekVideo(true);
+        };
+        tdrIntroRaf = requestAnimationFrame(step);
     }
 
     // cross-section (top-down pick on the 2D map, rendered by /v1/tdr/plane_slice)

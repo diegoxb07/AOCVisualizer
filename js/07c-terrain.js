@@ -85,9 +85,9 @@
     }
 
     // the ground takes the 2D basemap's palette (its pale land and light ocean) so the two views read
-    // alike, with relief on top: land is hill-shaded from the northwest and warms toward tan with
-    // height, and the ocean darkens with depth, so mountains, the continental shelf, and deep water
-    // show from any camera angle.
+    // alike, with relief on top: land warms toward tan with height and the ocean darkens with depth,
+    // so high ground, the continental shelf, and deep water show from any camera angle. hill shading
+    // from the northwest is added as the view tilts toward the horizon (terrainShadeK).
     // a light green land, dimmer and greener than the 2D basemap's #e4ebdd: the 3D ground fills most of
     // the view and the shading below brightens slopes facing the light, so the 2D tone itself would glare
     const TERRAIN_LAND_RGB = [0xc6, 0xd6, 0xb4];
@@ -99,11 +99,18 @@
     // get3DCoord), so the shading matches the heights the mesh draws.
     const TERRAIN_LIGHT = [Math.sin(315 * Math.PI / 180) * Math.SQRT1_2, Math.cos(315 * Math.PI / 180) * Math.SQRT1_2, Math.SQRT1_2];
     const TERRAIN_RELIEF_Z = 8;
+    // the hill shading is kept in its own small texture, one byte per cell holding the shade factor
+    // as TERRAIN_SHADE_MIN + byte / 255 * TERRAIN_SHADE_SPAN, and the terrain material multiplies it in
+    // at terrainShadeK of full strength. animate3D (js/07-ui-controls.js) sets terrainShadeK each frame
+    // from the camera's angle above the horizon: 0 looking down from above, where shaded slopes read
+    // as dark patches on flat ground, up to 1 with the camera low and the mesh's height in view.
+    const TERRAIN_SHADE_MIN = 0.6, TERRAIN_SHADE_SPAN = 0.5;
+    const terrainShadeK = { value: 0 };
 
-    // land color (0..255 rgb) at an elevation, scaled by a hill-shade factor (1 on flat ground)
-    function landColorAt(e, shade) {
+    // land color (0..255 rgb) at an elevation
+    function landColorAt(e) {
         const t = Math.max(0, Math.min(1, e / 3000)) * 0.7;
-        return [0, 1, 2].map(k => Math.min(255, (TERRAIN_LAND_RGB[k] + (TERRAIN_HIGH_RGB[k] - TERRAIN_LAND_RGB[k]) * t) * shade));
+        return [0, 1, 2].map(k => TERRAIN_LAND_RGB[k] + (TERRAIN_HIGH_RGB[k] - TERRAIN_LAND_RGB[k]) * t);
     }
     // water color (0..255 rgb) by depth in metres: the 2D ocean over the shelf, darkening to deep water
     function waterColorAt(depth) {
@@ -139,10 +146,10 @@
     function terrainTexture(lon0, lon1, lat0, lat1) {
         const key = [lon0, lon1, lat0, lat1,
                      (typeof mapFeatures !== 'undefined' ? mapFeatures.length : 0)].join('|');
-        if (_terrainTex && _terrainTex.key === key) return _terrainTex.tex;
-        if (_terrainTex) _terrainTex.tex.dispose();
-        _terrainTex = { key, tex: buildTerrainTexture(lon0, lon1, lat0, lat1) };
-        return _terrainTex.tex;
+        if (_terrainTex && _terrainTex.key === key) return _terrainTex;
+        if (_terrainTex) { _terrainTex.tex.dispose(); _terrainTex.shadeTex.dispose(); }
+        _terrainTex = Object.assign({ key }, buildTerrainTexture(lon0, lon1, lat0, lat1));
+        return _terrainTex;
     }
 
     function buildTerrainTexture(lon0, lon1, lat0, lat1) {
@@ -169,9 +176,10 @@
             E = out;
         }
         const dLonM = (lon1 - lon0) / (N - 1) * 111320, dLatM = (lat1 - lat0) / (N - 1) * 110540;
-        const landCv = document.createElement('canvas'), waterCv = document.createElement('canvas');
-        landCv.width = waterCv.width = N; landCv.height = waterCv.height = N;
+        const landCv = document.createElement('canvas'), waterCv = document.createElement('canvas'), shadeCv = document.createElement('canvas');
+        landCv.width = waterCv.width = shadeCv.width = N; landCv.height = waterCv.height = shadeCv.height = N;
         const landImg = landCv.getContext('2d').createImageData(N, N), waterImg = waterCv.getContext('2d').createImageData(N, N);
+        const shadeImg = shadeCv.getContext('2d').createImageData(N, N);
         for (let y = 0; y < N; y++) {
             const lat = lat1 - (lat1 - lat0) * y / (N - 1);
             const dx = dLonM * Math.max(0.2, Math.cos(lat * Math.PI / 180));
@@ -186,14 +194,17 @@
                 const lit = Math.max(0, (nx * TERRAIN_LIGHT[0] + ny * TERRAIN_LIGHT[1] + TERRAIN_LIGHT[2]) / len) / TERRAIN_LIGHT[2];
                 // slopes facing away darken more than lit ones brighten, so relief shows without glare
                 const shade = Math.max(0.68, Math.min(1.05, lit));
-                const lc = landColorAt(e, shade), wc = waterColorAt(-e);
+                const lc = landColorAt(e), wc = waterColorAt(-e);
                 const i = (y * N + x) * 4;
                 landImg.data[i] = lc[0]; landImg.data[i + 1] = lc[1]; landImg.data[i + 2] = lc[2]; landImg.data[i + 3] = 255;
                 waterImg.data[i] = wc[0]; waterImg.data[i + 1] = wc[1]; waterImg.data[i + 2] = wc[2]; waterImg.data[i + 3] = 255;
+                const sb = Math.round((shade - TERRAIN_SHADE_MIN) / TERRAIN_SHADE_SPAN * 255);
+                shadeImg.data[i] = shadeImg.data[i + 1] = shadeImg.data[i + 2] = sb; shadeImg.data[i + 3] = 255;
             }
         }
         landCv.getContext('2d').putImageData(landImg, 0, 0);
         waterCv.getContext('2d').putImageData(waterImg, 0, 0);
+        shadeCv.getContext('2d').putImageData(shadeImg, 0, 0);
 
         // water under everything, then the land clipped to the country outlines at full resolution
         const cv = document.createElement('canvas');
@@ -215,7 +226,28 @@
         tex.anisotropy = (typeof renderer3D !== 'undefined' && renderer3D && renderer3D.capabilities)
             ? renderer3D.capabilities.getMaxAnisotropy() : 1;
         tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
-        return tex;
+        const shadeTex = new THREE.CanvasTexture(shadeCv);
+        shadeTex.minFilter = THREE.LinearFilter; shadeTex.magFilter = THREE.LinearFilter; shadeTex.generateMipmaps = false;
+        return { tex, shadeTex };
+    }
+
+    // the terrain's material: the colour texture with the hill shading multiplied in at terrainShadeK,
+    // on land only. a pixel greener than it is blue is land (every land tone is, and every water tone
+    // is bluer), so the shading never darkens the ocean next to a steep coast.
+    function terrainMaterial(t) {
+        const mat = new THREE.MeshBasicMaterial({ map: t.tex, side: THREE.DoubleSide });
+        mat.onBeforeCompile = shader => {
+            shader.uniforms.uTerrShade = { value: t.shadeTex };
+            shader.uniforms.uTerrShadeK = terrainShadeK;
+            shader.fragmentShader = 'uniform sampler2D uTerrShade;\nuniform float uTerrShadeK;\n'
+                + shader.fragmentShader.replace('#include <map_fragment>', [
+                    '#include <map_fragment>',
+                    'float terrLand = clamp((diffuseColor.g - diffuseColor.b) * 12.0, 0.0, 1.0);',
+                    'float terrShade = ' + TERRAIN_SHADE_MIN.toFixed(3) + ' + texture2D(uTerrShade, vUv).r * ' + TERRAIN_SHADE_SPAN.toFixed(3) + ';',
+                    'diffuseColor.rgb *= mix(1.0, terrShade, uTerrShadeK * terrLand);'
+                ].join('\n'));
+        };
+        return mat;
     }
 
     // How far from an end the ground is pulled toward the aircraft, and how far off the grid may be
@@ -311,7 +343,7 @@
         geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         geom.setIndex(idx);
         const terrain = new THREE.Mesh(geom,
-            new THREE.MeshBasicMaterial({ map: terrainTexture(lon0, lon1, lat0, lat1), side: THREE.DoubleSide }));
+            terrainMaterial(terrainTexture(lon0, lon1, lat0, lat1)));
         terrain.renderOrder = -2;   // draw under the track, storm ribbon and plane
         grp.add(terrain);
         return grp;

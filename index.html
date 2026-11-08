@@ -34,7 +34,7 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/tailwind.css?v=20261107q">
+    <link rel="stylesheet" href="css/tailwind.css?v=20261108b">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
 
     <!-- the interface font starts loading with the page, so text draws in it from the first frame -->
     <link rel="preload" href="lib/fonts/nunito-sans/nunito-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/app.css?v=20261107q">
+    <link rel="stylesheet" href="css/app.css?v=20261108b">
 </head>
 <body class="font-sans antialiased">
 
@@ -779,6 +779,7 @@
                 <li><b>Manual upload (works offline):</b> drop a <b>.nc</b> file (for example <kbd>20221028H1_A.nc</kbd>) on the <b>or upload</b> area. While the API is offline, the archive controls are greyed out under an "API Offline" banner and the upload area is enlarged. <b>Batch Load Flight Data</b> and <b>Pre-Cache Satellite Imagery</b> are greyed out too. The app checks the API every 60 seconds and turns the archive back on once the API responds.</li>
                 <li><b>Batch Load Flight Data</b> downloads and parses several missions in the background. They are saved on this device and open instantly from <b>Previously Loaded Missions</b>, including after a reload.</li>
                 <li><b>Metrics Across Flights</b> shows which loaded flight recorded the highest or lowest value of a metric, with a comparison graph. It works offline.</li>
+                <li><b>Opening a different flight</b> unloads the MMR video and resets the overlays: satellite off at 100% opacity, TDR layers cleared, both sections folded, and Storm Track on.</li>
             </ul>
 
             <h3 id="hs-playback">2. Playback and time window</h3>
@@ -794,7 +795,7 @@
             <p>Choose <b>2D Map Tracker</b> or <b>3D Tracker</b> in the dropdown in the map header.</p>
             <ul>
                 <li><b>2D:</b> a world map with coastlines and US states, satellite imagery, and wind barbs. Scroll to zoom and drag to pan. After you pan away, the <b>Recenter on Aircraft</b> button appears.</li>
-                <li><b>3D:</b> a Three.js scene with hill-shaded terrain in the 2D map's colors, ocean shaded by depth, nearby city names on the ground, and an aircraft model, with the track drawn at GPS or pressure altitude. Use the mouse to orbit and zoom.</li>
+                <li><b>3D:</b> a Three.js scene with terrain in the 2D map's colors, hill shading on low side views, ocean shaded by depth, nearby city names on the ground, and an aircraft model, with the track drawn at GPS or pressure altitude. Use the mouse to orbit and zoom.</li>
                 <li><b>Settings</b> in the bottom bar holds <b>Track Color Type</b> (wind speed or warming/cooling), <b>Wind Barb Preset</b> (wind speed, or hurricane wind field, which colors winds by Saffir-Simpson category and draws winds below 64 kt in black), <b>3D Altitude Track</b>, <b>S.I Units</b>, <b>Simple Icon (2D)</b>, and <b>Real Scale (3D)</b>.</li>
                 <li><b>TDR</b> (in the <b>Overlays</b> dropdown) shows Tail Doppler Radar on the tracker, in 2D or 3D, while the MMR video keeps playing. Click <b>TDR</b> to unfold its controls. It uses quality-controlled (level 2) radar. For a mission without level 2 radar, the button reads "TDR Unavailable" and is greyed out.</li>
                 <li><b>TDR layers:</b> layers are selected when the first radar volume arrives, so the radar shows right away: every layer in 3D, and on the 2D map 500 mb and below (about 0 to 5.6 km). Until you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick altitude layers to show alone or together, or use <b>All</b> and <b>None</b>; <b>None</b> turns the radar off. Each layer is labelled with the millibar level of its altitude in the <i>standard</i> atmosphere, so read the mb value as a name for the height; a storm's actual pressure surfaces are at different heights. Under <b>TDR Legs</b>, each radar leg's button (named by its number and time window) shows that leg alone at the end of the leg (click it again for all legs), and <b>Jump to Eye</b>, at the right of a leg's row, jumps to the leg's closest approach to the storm center. The radar fills in around the aircraft as playback moves through each leg; in 3D, the white beam is the aircraft's position. The first time the radar shows with every leg downloaded, the playhead runs over all the legs in 4 seconds, with the MMR video and satellite imagery following it.</li>
@@ -813,7 +814,7 @@
             <p>Open <b>Overlays</b> in the map header and choose a satellite; its products appear right below it. The options are filled in from the flight's date and location.</p>
             <ul>
                 <li><b>MODIS / VIIRS (polar, NASA GIBS):</b> any date back to each mission's start. The day-stepper moves between days, and overpass times are looked up automatically.</li>
-                <li><b>GOES-East / GOES-West (archive, needs the API):</b> rendered on the server from the GOES S3 archive for the flight's date, refreshed at a 10-minute interval. The product list (spectral bands plus the Sandwich and GeoColor composites) comes from the API. A product the API cannot serve right now is greyed out as <b>unavailable</b>, and the rest of that satellite stays usable. A GOES option is greyed out entirely when the flight is outside that satellite's Earth-disk view.</li>
+                <li><b>GOES-East / GOES-West (archive, needs the API):</b> rendered on the server from the GOES S3 archive for the flight's date, refreshed at a 10-minute interval. The list of spectral bands comes from the API. A product the API cannot serve right now is greyed out as <b>unavailable</b>, and the rest of that satellite stays usable. A GOES option is greyed out entirely when the flight is outside that satellite's Earth-disk view.</li>
                 <li><b>Pre-Cache Satellite Imagery</b> (menu bar) downloads imagery for several flights at once. Cached imagery is saved on this device and kept across reloads.</li>
                 <li><b>When is the imagery from?</b> The image time differs from the playback moment. Hover the <b>Overlays</b> button to see the time of the image on the map and its source: a real scan or overpass time from the archive, the requested 10-minute slot when the archive returned no scan time, or, for a polar orbiter, the single daily pass used for the whole flight.</li>
             </ul>
@@ -957,36 +958,36 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20261107q"></script>
-    <script src="js/01-state.js?v=20261107q"></script>
-    <script src="js/02-satellite.js?v=20261107q"></script>
-    <script src="js/03-metrics.js?v=20261107q"></script>
-    <script src="js/04-geo-measure.js?v=20261107q"></script>
-    <script src="js/05-interpolation.js?v=20261107q"></script>
-    <script src="js/06-ocr.js?v=20261107q"></script>
-    <script src="js/07-ui-controls.js?v=20261107q"></script>
-    <script src="js/07b-plane-models.js?v=20261107q"></script>
-    <script src="js/07c-terrain.js?v=20261107q"></script>
-    <script src="js/07d-tdr.js?v=20261107q"></script>
-    <script src="js/08-ocr-lock-export.js?v=20261107q"></script>
-    <script src="js/09-interaction.js?v=20261107q"></script>
-    <script src="js/10-point-analysis.js?v=20261107q"></script>
-    <script src="js/11-layout.js?v=20261107q"></script>
-    <script src="js/11c-float-panels.js?v=20261107q"></script>
-    <script src="js/11b-parser-core.js?v=20261107q"></script>
-    <script src="js/12-file-parsing.js?v=20261107q"></script>
-    <script src="js/12b-recon-archive.js?v=20261107q"></script>
-    <script src="js/13-charts-master.js?v=20261107q"></script>
-    <script src="js/14-filters-sync.js?v=20261107q"></script>
-    <script src="js/15-map-render.js?v=20261107q"></script>
-    <script src="js/16-pfd-hud.js?v=20261107q"></script>
-    <script src="js/17-charts.js?v=20261107q"></script>
-    <script src="js/18-engine.js?v=20261107q"></script>
-    <script src="js/18b-flight-search.js?v=20261107q"></script>
-    <script src="js/19-bootstrap.js?v=20261107q"></script>
-    <script src="js/20-ui-polish.js?v=20261107q"></script>
-    <script src="js/21-report.js?v=20261107q"></script>
-    <script src="js/22-avi-convert.js?v=20261107q"></script>
+    <script src="js/00-var-catalog.js?v=20261108b"></script>
+    <script src="js/01-state.js?v=20261108b"></script>
+    <script src="js/02-satellite.js?v=20261108b"></script>
+    <script src="js/03-metrics.js?v=20261108b"></script>
+    <script src="js/04-geo-measure.js?v=20261108b"></script>
+    <script src="js/05-interpolation.js?v=20261108b"></script>
+    <script src="js/06-ocr.js?v=20261108b"></script>
+    <script src="js/07-ui-controls.js?v=20261108b"></script>
+    <script src="js/07b-plane-models.js?v=20261108b"></script>
+    <script src="js/07c-terrain.js?v=20261108b"></script>
+    <script src="js/07d-tdr.js?v=20261108b"></script>
+    <script src="js/08-ocr-lock-export.js?v=20261108b"></script>
+    <script src="js/09-interaction.js?v=20261108b"></script>
+    <script src="js/10-point-analysis.js?v=20261108b"></script>
+    <script src="js/11-layout.js?v=20261108b"></script>
+    <script src="js/11c-float-panels.js?v=20261108b"></script>
+    <script src="js/11b-parser-core.js?v=20261108b"></script>
+    <script src="js/12-file-parsing.js?v=20261108b"></script>
+    <script src="js/12b-recon-archive.js?v=20261108b"></script>
+    <script src="js/13-charts-master.js?v=20261108b"></script>
+    <script src="js/14-filters-sync.js?v=20261108b"></script>
+    <script src="js/15-map-render.js?v=20261108b"></script>
+    <script src="js/16-pfd-hud.js?v=20261108b"></script>
+    <script src="js/17-charts.js?v=20261108b"></script>
+    <script src="js/18-engine.js?v=20261108b"></script>
+    <script src="js/18b-flight-search.js?v=20261108b"></script>
+    <script src="js/19-bootstrap.js?v=20261108b"></script>
+    <script src="js/20-ui-polish.js?v=20261108b"></script>
+    <script src="js/21-report.js?v=20261108b"></script>
+    <script src="js/22-avi-convert.js?v=20261108b"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

@@ -410,6 +410,14 @@
                 scene3D.fog.near = Math.max(60, cd * 2.5);
                 scene3D.fog.far = Math.max(260, cd * 9);
             }
+            // hill shading strength (terrainShadeK, js/07c-terrain.js) from the camera's angle above the
+            // horizon: none at 35 degrees and steeper, easing in to full at 10 degrees and lower
+            if (typeof terrainShadeK !== 'undefined' && camera3D && controls3D) {
+                const dx = camera3D.position.x - controls3D.target.x, dz = camera3D.position.z - controls3D.target.z;
+                const elev = Math.atan2(camera3D.position.y - controls3D.target.y, Math.hypot(dx, dz)) * 180 / Math.PI;
+                const t = Math.max(0, Math.min(1, (35 - elev) / 25));
+                terrainShadeK.value = t * t * (3 - 2 * t);
+            }
             renderer3D.render(scene3D, camera3D);
         }
         animate3D(); threeDInitialized = true;

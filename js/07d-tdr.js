@@ -68,6 +68,7 @@
     // layers clear, and the TDR section hides until the next mission with TDR coverage.
     function resetTdrOverlay() {
         tdrGeneration++;
+        tdrFoldSection();
         tdrFetchActive = false;
         // meshes may or may not be parented into tdrGroup3D yet (a 2D-only session builds them
         // without a scene), so disposal walks the analyses, not the group
@@ -484,9 +485,9 @@
                     }
                     // a fresh auto-pick repaints the paused 2D map too, through the same path as a row click
                     if (autoPicked) tdrSelectionChanged(); else buildTdrHero();
-                } else a.state = 'error';
+                } else { a.state = 'error'; buildTdrHero(); updateTdrPickerBtn(); }
             })
-            .catch(() => { if (gen === tdrGeneration) { a.state = 'error'; buildTdrHero(); } })
+            .catch(() => { if (gen === tdrGeneration) { a.state = 'error'; buildTdrHero(); updateTdrPickerBtn(); } })
             .finally(() => {
                 tdrFetchActive = false;
                 // Keep draining the queue and syncing visibility even while paused (the per-frame
@@ -861,10 +862,15 @@
         const lbl = document.getElementById('tdrPickerBtnLabel'), btn = document.getElementById('tdrPickerBtn');
         if (!lbl) return;
         // while the first volume downloads the section header shows TDR Loading..., so its rows never
-        // read as ready before any layer can display.
-        const loading = !tdrAnalyses.some(x => x.state === 'ready') && (tdrFetchActive || tdrAnyFetched);
-        lbl.textContent = loading ? 'TDR Loading...' : 'TDR';
-        if (btn) btn.classList.toggle('opacity-60', loading);
+        // read as ready before any layer can display. that lasts only while a leg is still pending: when
+        // every leg failed to load (some older missions' radar grids cannot be read), the header reads TDR
+        // Failed to Load and the section's note offers a retry.
+        const anyReady = tdrAnalyses.some(x => x.state === 'ready');
+        const pending = tdrAnalyses.some(x => x.state === 'idle' || x.state === 'loading');
+        const allFailed = tdrAnalyses.length > 0 && tdrAnalyses.every(x => x.state === 'error');
+        const loading = !anyReady && pending && (tdrFetchActive || tdrAnyFetched);
+        lbl.textContent = loading ? 'TDR Loading...' : (allFailed ? 'TDR Failed to Load' : 'TDR');
+        if (btn) btn.classList.toggle('opacity-60', loading || allFailed);
         // the loading ring over the skeleton layer rows shows while that first volume downloads
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.classList.toggle('tdr-is-loading', loading);
         // the Overlays button lights while any overlay draws, the radar included

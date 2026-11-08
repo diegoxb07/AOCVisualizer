@@ -814,6 +814,11 @@
         return await loadImageToCanvas(url);
     }
 
+    // composites (sandwich, geocolor) stay out of the product list while this is false: each new frame
+    // is a fresh multi-band render the api keeps on its disk, so they wait until the server has room.
+    // true lists them again with the rest of the api's products.
+    const RECON_COMPOSITES_ON = false;
+
     // Discovery endpoint: every band/composite the API can render, plus each spacecraft's active date
     // range. Fetched once at startup; replaces the archive-GOES `bands` fallback in GIBS_LAYERS and
     // refines `minDate`. Falls back to the hardcoded list if the fetch fails.
@@ -839,7 +844,7 @@
             if (b13) [['ir4', 'IR Enhanced (ir4)'], ['bd', 'IR BD Curve (Dvorak)']].forEach(([cmap, label]) => {
                 if (b13.cmaps.includes(cmap)) bandDefs.push({ id: 'band13_' + cmap, band: 13, cmap: cmap, name: 'Band 13: ' + label, bboxSupported: b13.bbox_supported !== false });
             });
-            const productDefs = (data.products || []).map(p => ({
+            const productDefs = (RECON_COMPOSITES_ON ? (data.products || []) : []).map(p => ({
                 id: p.product, product: p.product, name: p.name,
                 bboxSupported: p.bbox_supported === true,
                 isComposite: true

@@ -93,7 +93,8 @@ everything back to a fresh session.
 "or upload:" zone. A manually loaded flight has no storm best-track.
 
 Either way the mission joins **Previously Loaded Missions**, so you can reopen it or switch between
-flights later, even after a refresh.
+flights later, even after a refresh. Opening a different flight unloads the MMR video and resets the
+overlays: satellite off at 100% opacity, TDR layers cleared, both sections folded, and Storm Track on.
 
 Worth doing first: click **⤓ Batch Load Flight Data** in the menu bar, pick a year, and check every
 mission you plan to look at. They download and parse once in the background and are saved on this device,
@@ -129,8 +130,8 @@ The 2D view is a whole-world canvas map of coastlines and US states, with the sa
 and wind barbs drawn on it. Wheel to zoom, drag to pan; zooming out brings in the surrounding synoptic
 picture. Airfield codes appear as you zoom in, and KLAL is always shown.
 
-The 3D view is a Three.js scene over a terrain basemap in the 2D map's colors, hill-shaded so
-mountains show, with the ocean darkening from the shallow shelf to deep water and a light haze toward
+The 3D view is a Three.js scene over a terrain basemap in the 2D map's colors, with hill shading
+that fades in as the camera lowers toward a side view so mountains show, the ocean darkening from the shallow shelf to deep water and a light haze toward
 the horizon. US state names and nearby city names lie on the ground, with detailed aircraft models
 and the track drawn at altitude (GPS or pressure, selectable, GPS by default). Pan and zoom with the mouse. **Real Scale (3D)** draws the aircraft at
 its true size and adds faint flight-level reference planes so climbs and descents read against them,
@@ -235,7 +236,7 @@ the archive, the 10-minute cadence bucket that was requested when the archive re
 or, for a polar orbiter, the single daily pass used for the whole flight.
 
 The picker loads the product list from the API at startup, so new products appear without an app
-update. The full 16-band GOES ABI set is available for both GOES satellites, plus two composites:
+update. The full 16-band GOES ABI set is available for both GOES satellites:
 
 - Bands 1 to 6, visible and near-IR, daylight only. Band 2 (Red Visible, 0.64 µm) has the sharpest
   daytime cloud and convection detail, Band 3 (Veggie, 0.86 µm) shows land and vegetation better,
@@ -245,8 +246,6 @@ update. The full 16-band GOES ABI set is available for both GOES satellites, plu
   and shear.
 - Bands 11 to 16, IR windows and trace-gas channels: cloud-top temperature, day or night. Band 13
   (Clean IR, 10.3 µm) is also offered as IR Enhanced (ir4) and BD Curve (Dvorak) variants.
-- Sandwich, a composite of Band 13 IR color over visible texture, for daytime convection.
-- GeoColor, a composite: true color in the day, IR at night.
 
 
 ## Storm best-track

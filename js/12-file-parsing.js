@@ -92,6 +92,12 @@
     function clearLoadedMedia() {
         document.getElementById('fileInput').value = '';
         resetDropZone('dataDropZone', 'dataDropLabel', 'Choose File/Drag & Drop');
+        unloadMmrVideo();
+    }
+
+    // unloads the MMR video alone, back to the empty Upload MMR to Sync row, leaving the flight's own
+    // upload zone as it is.
+    function unloadMmrVideo() {
         if (!videoLoaded) return;
         // An unloaded video panel has nothing to float; back to the bar before the video goes.
         if (typeof floatDock === 'function') floatDock('videoPanel');
@@ -217,15 +223,29 @@
         // tiles are keyed by layer/band/time/box so they never collide between flights). Just reset the
         // preloader's neighborhood pointer so it re-warms around the new flight.
         if (typeof resetSatPreload === 'function') resetSatPreload();
-        // The satellite preference does NOT carry over: a new mission starts with the picker on
-        // Off (a held-over layer/product would auto-rebuild its cache for the new flight
-        // unasked). The old flight's auto cache pass stops with it; a modal batch pass caches
-        // its own chosen flights and is left alone.
+        // a flight replacing another one unloads the MMR video, which belongs to the flight being left
+        // (archive and previously loaded opens clear it before they get here). A video uploaded before
+        // the first flight stays, ready to sync to it.
+        if (allParsedData.length > 0) unloadMmrVideo();
+        // the overlays start at their defaults for every new flight: satellite off at full opacity,
+        // the satellite and TDR sections folded, and the storm track on (initTdrForFlight below clears
+        // the TDR layers, legs, and opacity). A held-over satellite product would also auto-rebuild
+        // its cache for the new flight unasked. The old flight's auto cache pass stops with it; a modal
+        // batch pass caches its own chosen flights and is left alone.
+        if (typeof closeSatPicker === 'function') closeSatPicker();
         if (typeof batchCaching !== 'undefined' && batchCaching && batchCacheIsAuto && typeof cancelSatCachePass === 'function') cancelSatCachePass('Stopped');
-        const satSelReset = document.getElementById('satelliteSelect'); if (satSelReset) satSelReset.value = 'none';
         const bandSelReset = document.getElementById('satBandSelect'); if (bandSelReset) bandSelReset.value = '';
+        const satSelReset = document.getElementById('satelliteSelect');
+        if (satSelReset) { satSelReset.value = 'none'; satSelReset.dispatchEvent(new Event('change')); }   // the picker, legend, and day stepper follow
         satLoadedInfo = null; satImageBox = null;
         if (typeof refreshSatImageTimeNote === 'function') refreshSatImageTimeNote();
+        satTileOpacity = 1;
+        const satOpSl = document.getElementById('satOpacitySlider'); if (satOpSl) satOpSl.value = 100;
+        const satOpVal = document.getElementById('satOpacityVal'); if (satOpVal) satOpVal.textContent = '100%';
+        const satBody = document.getElementById('satExpandBody'); if (satBody) satBody.classList.add('hidden');
+        const satExp = document.getElementById('satExpandBtn'); if (satExp) satExp.setAttribute('aria-expanded', 'false');
+        const stormTog = document.getElementById('toggleStormTrack'); if (stormTog) stormTog.checked = true;
+        showStormTrack = true;
         // Clear any storm best-track / archive-mission metadata from the previous flight, it's
         // re-set after this returns by loadReconMission for an archive load.
         stormTrackPoints = []; stormTrackMeta = null; reconArchiveMeta = null;

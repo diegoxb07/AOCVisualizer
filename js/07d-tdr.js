@@ -54,6 +54,9 @@
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrSectionOpen = false;       // the Overlays TDR section is unfolded: its rows need data, so fetching starts
     let tdrIntroDone = false;         // the once-per-flight fly-through over every leg has run
+    let tdrAutoPicked = false;        // the first volume of this flight has preselected every layer
+    let tdrCamFixed = false;          // the 3D camera is parked zoomed out over the radar's center
+    let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
     let tdrIntroRaf = 0;              // its animation frame handle, cancelled on a new flight
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
     let tdrEyeActive = false;         // within the picked leg: true shows its eye pass, false its whole span
@@ -79,6 +82,8 @@
                 }
             });
         });
+        if (tdrCamFixed && typeof followAircraft3D !== 'undefined') followAircraft3D = true;
+        tdrCamFixed = false; tdrCamReadyCount = 0;
         if (tdrPlaneBeam) {
             if (tdrPlaneBeam.geometry) tdrPlaneBeam.geometry.dispose();
             if (tdrPlaneBeam.material) tdrPlaneBeam.material.dispose();
@@ -97,7 +102,7 @@
         tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         tdrAnyFetched = false;
         if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
-        tdrIntroDone = false;
+        tdrIntroDone = false; tdrAutoPicked = false;
         if (tdrScanWall) {
             if (tdrScanWall.geometry) tdrScanWall.geometry.dispose();
             if (tdrScanWall.material) { if (tdrScanWall.material.map) tdrScanWall.material.map.dispose(); tdrScanWall.material.dispose(); }
@@ -452,7 +457,14 @@
                     a.levelsKm = assets.levelsKm; a.gridW = assets.gridW; a.gridH = assets.gridH;
                     a.maskStamp = 0; a.maskFull = false; a.lastStampSec = null; a._stampIdx = 0;
                     a.state = 'ready';
-                    if (tdrSelectedKm.size) {
+                    let autoPicked = false;
+                    if (!tdrSelectedKm.size && !tdrAutoPicked) {
+                        // the flight's first volume with nothing picked selects every layer with data,
+                        // so the radar shows (and the fly-through can run) without a pick first. once
+                        // per flight: a later None stays off as later legs arrive.
+                        a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
+                        tdrAutoPicked = true; autoPicked = true;
+                    } else if (tdrSelectedKm.size) {
                         // A later volume can carry data at levels the earlier analyses lacked
                         // (usually the very top of the column). While the selection still covers
                         // every data level seen so far, the new analysis's levels join it, so
@@ -463,7 +475,8 @@
                         if (others.every(x => x.levels.every(l => !l.canvas || tdrSelectedKm.has(l.km))))
                             a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
                     }
-                    buildTdrHero();
+                    // a fresh auto-pick repaints the paused 2D map too, through the same path as a row click
+                    if (autoPicked) tdrSelectionChanged(); else buildTdrHero();
                 } else a.state = 'error';
             })
             .catch(() => { if (gen === tdrGeneration) { a.state = 'error'; buildTdrHero(); } })
@@ -600,6 +613,45 @@
     // start and scans in as the aircraft flies it) and the 2D picker overlay (current analysis,
     // picked levels, same scan mask). Fetching runs one volume at a time, once layers are picked or
     // the TDR section is unfolded.
+    // geographic and world-space centers of everything the radar recorded so far
+    function tdrCenterGeo() {
+        const ready = tdrAnalyses.filter(x => x.state === 'ready' && x.geo);
+        if (!ready.length) return null;
+        let sLon = 0, sLat = 0;
+        ready.forEach(x => {
+            const g = x.geo;
+            sLon += g.originLon + ((g.x0 + g.x1) / 2) * g.lonDegPerKm;
+            sLat += g.originLat + ((g.y0 + g.y1) / 2) * g.latDegPerKm;
+        });
+        return { lon: sLon / ready.length, lat: sLat / ready.length };
+    }
+    function tdrCenterWorld() {
+        const c = tdrCenterGeo();
+        return c ? get3DCoord(c.lon, c.lat, 0) : null;
+    }
+    // moves the orbit target over the radar's center. the first move looks nearly straight down
+    // from overhead (the slight lateral offset keeps the orbit controls stable at the pole); later
+    // moves, as more legs load, shift the target but keep the user's view direction.
+    function tdrCamPark(overhead) {
+        if (typeof camera3D === 'undefined' || !camera3D || typeof controls3D === 'undefined' || !controls3D) return;
+        const c = tdrCenterWorld();
+        if (!c) return;
+        // target the stack's mid altitude (9 of 18 km), not the ground, so the upper layers stay
+        // in frame instead of clipping off the top of the view
+        c.y = 9000 / 690;
+        if (overhead) {
+            camera3D.position.set(c.x, c.y + TDR_ZOOM_OUT_DIST * 0.96, c.z + TDR_ZOOM_OUT_DIST * 0.28);
+        } else {
+            const off = camera3D.position.clone().sub(controls3D.target);
+            const dist = off.length() || 1;
+            if (dist < TDR_ZOOM_OUT_DIST) off.multiplyScalar(TDR_ZOOM_OUT_DIST / dist);
+            camera3D.position.copy(c).add(off);
+        }
+        controls3D.target.copy(c);
+        controls3D.update();
+        tdrCamReadyCount = tdrAnalyses.filter(x => x.state === 'ready').length;
+    }
+
     function updateTdr3D(nowSec) {
         if (nowSec !== undefined) _tdrLastSec = nowSec;
         if (!tdrAnalyses.length || typeof THREE === 'undefined') return;
@@ -660,6 +712,25 @@
             if (anyShown && typeof planeGroup3D !== 'undefined' && planeGroup3D) {
                 tdrPlaneBeam.position.set(planeGroup3D.position.x, TDR_BEAM_H / 2, planeGroup3D.position.z);
             }
+            // camera: while the radar shows in 3D the view moves zoomed out over the radar's center,
+            // looking down, with aircraft follow off. as more legs load the view re-centers, keeping
+            // the user's orbit direction, unless Recenter put the view back on the aircraft.
+            const anyReady = tdrAnalyses.some(x => x.state === 'ready');
+            if (anyReady && !tdrCamFixed) {
+                tdrCamFixed = true;
+                if (typeof followAircraft3D !== 'undefined') followAircraft3D = false;
+                tdrCamPark(true);
+                if (typeof updateFollowButton === 'function') updateFollowButton();
+            } else if (anyReady && tdrCamFixed && !(typeof followAircraft3D !== 'undefined' && followAircraft3D)
+                       && tdrAnalyses.filter(x => x.state === 'ready').length !== tdrCamReadyCount) {
+                tdrCamPark(false);
+            }
+        } else if (tdrCamFixed) {
+            // the radar went off (None) or the view left 3D: back to the normal view following the aircraft
+            tdrCamFixed = false; tdrCamReadyCount = 0;
+            if (typeof reset3DView === 'function') reset3DView();
+            if (typeof followAircraft3D !== 'undefined') followAircraft3D = true;
+            if (typeof updateFollowButton === 'function') updateFollowButton();
         }
         // Scan masks update NEWEST leg first: a backward jump makes a later leg's uncross reset
         // wipe every earlier mask, and the earlier legs must decide their reflood AFTER that

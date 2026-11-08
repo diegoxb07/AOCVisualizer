@@ -155,8 +155,9 @@ The **TDR** section is in the **Overlays** dropdown in the map header. It reads 
 the first radar volume downloads, and greys out as "TDR Unavailable" for missions flown without tail
 Doppler radar. Click **TDR** to unfold its controls.
 
-The radar draws on whichever tracker is showing, 2D or 3D, while the MMR video keeps playing. Picking
-layers turns it on, and **None** turns it off. The first time the radar shows with every leg
+The radar draws on whichever tracker is showing, 2D or 3D, while the MMR video keeps playing.
+Unfolding the section loads the radar, and every layer is selected when the first volume arrives, so
+it draws right away; pick layers to narrow it, and **None** turns it off. The first time the radar shows with every leg
 downloaded, playback pauses and the playhead runs over all the legs in 4 seconds so the radar scans in;
 the MMR video and satellite imagery follow it, and Auto-Sync rechecks the clock where it stops.
 

@@ -11,7 +11,7 @@
     
     let satImage = new Image();
     let satImageLoaded = false;
-    let satTileOpacity = 0.92;   // satellite tile draw opacity, controlled by the opacity slider in the sat picker
+    let satTileOpacity = 1;      // satellite tile draw opacity, controlled by the opacity slider in the sat picker
     let lastSatFetchTime = "";
     let satLoadedInfo = null;
     let satImageBox = null;

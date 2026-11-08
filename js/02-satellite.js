@@ -1080,9 +1080,12 @@
         if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
         try {
             let data = await fetch(`${RECON_API_BASE}/v1/satellite/tile?${params}`, { signal, headers: reconAuthHeaders() }).then(r => r.json());
-            // Poll while the job renders. Cap total wait so playback never hangs on a slow/stuck render.
+            // poll while the job renders. cap the total wait so playback never hangs on a slow/stuck render:
+            // 30 s for a single band, longer for a composite (product), which renders several bands at
+            // once and can run past 30 s on its first render of a frame.
             // Checked both before AND after the sleep so a mid-batch Cancel is noticed within ~3s.
-            for (let waited = 0; data && data.status === 'generating' && waited < 30000; waited += 3000) {
+            const maxWaitMs = product ? 120000 : 30000;
+            for (let waited = 0; data && data.status === 'generating' && waited < maxWaitMs; waited += 3000) {
                 if (batchCaching && batchCacheCancel) return { error: 'cancelled' };
                 // Abort-aware sleep: a Cancel click resolves it immediately instead of
                 // waiting out the remainder of the 3s tick.
@@ -1510,7 +1513,9 @@
             const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
             if (seen.has(fetchId)) return; seen.add(fetchId);
             if (satTileCache.has(fetchId)) return;   // already decoded in the hot cache, nothing to warm
-            q.push({ fetchId, params: { band: bandObj.band, cmap: bandObj.cmap, timeIso,
+            // product names a composite (sandwich, geocolor); without it the request carries no band
+            // and fails, and the live view joins that failed request for the same frame
+            q.push({ fetchId, params: { band: bandObj.band, cmap: bandObj.cmap, product: bandObj.product, timeIso,
                                         center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite,
                                         cadMin: layerDef.cadenceMin || 10 } });
         });
@@ -1701,9 +1706,9 @@
             for (let ms = startMs; ms <= endMs; ms += cadMs) buckets.push({ ms, dark: sunElevationDeg(ms, cLat, cLon) < -6 });
             for (const bandId of bandIds) {
                 const bandObj = layerDef.bands.find(b => b.id === bandId); if (!bandObj) continue;
-                // Composite products (sandwich/geocolor) don't support bbox, a full-timeframe build
-                // would mean a slow full-disk render per bucket, which isn't what "cache this flight's
-                // area" is for. They're still viewable live (fetchReconApiSat), just not pre-built here.
+                // a full-disk-only product (bboxSupported false) has no area render, so a full-timeframe
+                // build would mean a slow full-disk render per bucket, which isn't what "cache this
+                // flight's area" is for. it stays viewable live (fetchReconApiSat), just not pre-built here.
                 if (bandObj.bboxSupported === false) continue;
                 // Reflective bands (1-6) are daylight-only, so their dark buckets are skipped: a pass
                 // that starts before dawn jumps straight to the usable daytime frames instead of
@@ -1714,7 +1719,8 @@
                     const timeIso = goesTimeStr(bk.ms);
                     const fetchId = layerDef.value + '||' + bandObj.id + '||' + timeIso + '||' + centerStr + '||' + dimsKm;
                     if (seen.has(fetchId)) return; seen.add(fetchId);
-                    const params = { band: bandObj.band, cmap: bandObj.cmap, timeIso, center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite, cadMin: layerDef.cadenceMin || 10 };
+                    // product carries a composite through, the same as the live request (fetchReconApiSat)
+                    const params = { band: bandObj.band, cmap: bandObj.cmap, product: bandObj.product, timeIso, center: centerStr, dims: dimsKm, unit: 'km', satellite: layerDef.satellite, cadMin: layerDef.cadenceMin || 10 };
                     out.push({ fetchId, run: () => getOrFetchReconTile(fetchId, params) });
                 });
             }
@@ -1869,7 +1875,7 @@
         const bandId = bandSelect ? bandSelect.value : '';
         if (!bandId) return;
         const bandObj = (layerDef.bands || []).find(b => b.id === bandId);
-        if (!bandObj || bandObj.bboxSupported === false) return;   // unknown product, or a full-disk-only composite (streams live instead, see fetchReconApiSat)
+        if (!bandObj || bandObj.bboxSupported === false) return;   // unknown product, or a full-disk-only one (streams live instead, see fetchReconApiSat)
 
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, [bandId], layerDef.value);
         if (targets.length === 0) return;                            // out of view / before this satellite's data
@@ -1987,8 +1993,8 @@
             return;
         }
         if (startBtn) { startBtn.disabled = false; startBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
-        // Full-disk-only composites (sandwich/geocolor) can't be cached by area like everything else
-        // here, batch caching is always a bbox around each flight. They're still viewable live.
+        // full-disk-only products (bboxSupported false) can't be cached by area like everything else
+        // here, batch caching is always a bbox around each flight. they stay viewable live.
         const bands = ((layerDef && layerDef.bands) ? layerDef.bands : []).filter(b => b.bboxSupported !== false && b.available !== false);
         const curBand = (document.getElementById('satBandSelect') || {}).value;
         bands.forEach((b, i) => {
@@ -1997,7 +2003,8 @@
             const prev = prevChecked.find(p => p.id === b.id);
             if (prev) cb.checked = prev.on;
             else cb.checked = bands.some(x => x.id === curBand) ? (b.id === curBand) : true;
-            lbl.appendChild(cb); lbl.appendChild(document.createTextNode(' ' + b.name));
+            // composites take about a minute per new frame, so the list notes it beside their names
+            lbl.appendChild(cb); lbl.appendChild(document.createTextNode(' ' + b.name + (b.isComposite ? ' (slow)' : '')));
             wrap.appendChild(lbl);
         });
     }

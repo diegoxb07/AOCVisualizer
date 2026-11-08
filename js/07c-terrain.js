@@ -84,20 +84,31 @@
         return m.data[y * m.w + x] === 1;
     }
 
-    // One flat tone for water. Depth is not shaded, the sea floor's shape being no part of
-    // what this map is read for. Pitched to hold against the 3D scene background (scene3DBgColor in
-    // js/07-ui-controls.js) rather than against the 2D basemap's darker ocean, which it would sink into.
-    function waterColorCss() {
-        return 'rgb(148,184,217)';
-    }
+    // the ground takes the 2D basemap's palette (its pale land and light ocean) so the two views read
+    // alike, with relief on top: land is hill-shaded from the northwest and warms toward tan with
+    // height, and the ocean darkens with depth, so mountains, the continental shelf, and deep water
+    // show from any camera angle.
+    // a light green land, dimmer and greener than the 2D basemap's #e4ebdd: the 3D ground fills most of
+    // the view and the shading below brightens slopes facing the light, so the 2D tone itself would glare
+    const TERRAIN_LAND_RGB = [0xc6, 0xd6, 0xb4];
+    const TERRAIN_HIGH_RGB = [0xc2, 0xb7, 0x9c];      // high ground warms toward this tan
+    const TERRAIN_SHALLOW_RGB = [0xd4, 0xe3, 0xf0];   // the 2D basemap's ocean, over the shelf
+    const TERRAIN_DEEP_RGB = [0x86, 0xa8, 0xc8];      // deep water
+    // relief light from the northwest, 45 degrees up (the cartographic convention), as an east,
+    // north, up vector. slopes are stretched by the scene's own altitude exaggeration (about 8x in
+    // get3DCoord), so the shading matches the heights the mesh draws.
+    const TERRAIN_LIGHT = [Math.sin(315 * Math.PI / 180) * Math.SQRT1_2, Math.cos(315 * Math.PI / 180) * Math.SQRT1_2, Math.SQRT1_2];
+    const TERRAIN_RELIEF_Z = 8;
 
-    // Land color (0..1 rgb) by height: green->tan->snow. Its mid-tones hold against the water and
-    // the scene background, and it starts at green, so ground below sea level inside a coastline
-    // still reads as land.
-    function landColorRGB(e) {
-        const t = Math.max(0, Math.min(1, e / 4000));
-        if (t < 0.5) { const s = t / 0.5; return [0.17 + 0.36 * s, 0.42 - 0.05 * s, 0.20 - 0.01 * s]; }   // green -> tan
-        const s = (t - 0.5) / 0.5; return [0.53 + 0.30 * s, 0.37 + 0.34 * s, 0.18 + 0.55 * s];             // tan -> snow
+    // land color (0..255 rgb) at an elevation, scaled by a hill-shade factor (1 on flat ground)
+    function landColorAt(e, shade) {
+        const t = Math.max(0, Math.min(1, e / 3000)) * 0.7;
+        return [0, 1, 2].map(k => Math.min(255, (TERRAIN_LAND_RGB[k] + (TERRAIN_HIGH_RGB[k] - TERRAIN_LAND_RGB[k]) * t) * shade));
+    }
+    // water color (0..255 rgb) by depth in metres: the 2D ocean over the shelf, darkening to deep water
+    function waterColorAt(depth) {
+        const t = Math.sqrt(Math.max(0, Math.min(1, depth / 4000)));
+        return [0, 1, 2].map(k => TERRAIN_SHALLOW_RGB[k] + (TERRAIN_DEEP_RGB[k] - TERRAIN_SHALLOW_RGB[k]) * t);
     }
 
     // Trace the country outlines into the current path, in the given lon/lat to pixel frame. States
@@ -115,9 +126,9 @@
     }
 
     // The surface's colour, painted rather than taken per-vertex, so the coastline comes from the
-    // vector outlines at texture resolution instead of the mesh's ~23 km vertex spacing. Shading is
-    // rasterised at TERRAIN_SHADE and scaled up, the elevation source being half-degree; only the
-    // coastline needs TERRAIN_TEX. Both carry TERRAIN_PAD: widening the box without them would
+    // vector outlines at texture resolution instead of the mesh's ~23 km vertex spacing. Colour and
+    // relief are rasterised at TERRAIN_SHADE and scaled up, the elevation source being half-degree;
+    // only the coastline needs TERRAIN_TEX. Both carry TERRAIN_PAD: widening the box without them would
     // spread the same pixels over more ground and soften every coastline near the aircraft.
     const TERRAIN_TEX = 3072, TERRAIN_SHADE = 384;
 
@@ -135,26 +146,60 @@
     }
 
     function buildTerrainTexture(lon0, lon1, lat0, lat1) {
-        const shadeCv = document.createElement('canvas');
-        shadeCv.width = TERRAIN_SHADE; shadeCv.height = TERRAIN_SHADE;
-        const sctx = shadeCv.getContext('2d');
-        const img = sctx.createImageData(TERRAIN_SHADE, TERRAIN_SHADE);
-        for (let y = 0; y < TERRAIN_SHADE; y++) {
-            for (let x = 0; x < TERRAIN_SHADE; x++) {
-                const lon = lon0 + (lon1 - lon0) * x / (TERRAIN_SHADE - 1);
-                const lat = lat1 - (lat1 - lat0) * y / (TERRAIN_SHADE - 1);
-                const c = landColorRGB(terrainGroundMeters(lat, lon));
-                const i = (y * TERRAIN_SHADE + x) * 4;
-                img.data[i] = c[0] * 255; img.data[i + 1] = c[1] * 255; img.data[i + 2] = c[2] * 255; img.data[i + 3] = 255;
+        const N = TERRAIN_SHADE;
+        // raw elevation on the shading grid, lightly smoothed so the half-degree source cells shade
+        // as slopes instead of facets. the field pins (terrainGroundMeters) are left out here: they
+        // lift the mesh to meet the aircraft, and shading them would draw a bump around each field.
+        let E = new Float32Array(N * N);
+        for (let y = 0; y < N; y++) {
+            const lat = lat1 - (lat1 - lat0) * y / (N - 1);
+            for (let x = 0; x < N; x++) E[y * N + x] = terrainElevationMeters(lat, lon0 + (lon1 - lon0) * x / (N - 1));
+        }
+        const R = 2;
+        for (let pass = 0; pass < 2; pass++) {
+            const out = new Float32Array(N * N);
+            for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+                let sum = 0, cnt = 0;
+                for (let k = -R; k <= R; k++) {
+                    const xx = pass ? x : Math.max(0, Math.min(N - 1, x + k)), yy = pass ? Math.max(0, Math.min(N - 1, y + k)) : y;
+                    sum += E[yy * N + xx]; cnt++;
+                }
+                out[y * N + x] = sum / cnt;
+            }
+            E = out;
+        }
+        const dLonM = (lon1 - lon0) / (N - 1) * 111320, dLatM = (lat1 - lat0) / (N - 1) * 110540;
+        const landCv = document.createElement('canvas'), waterCv = document.createElement('canvas');
+        landCv.width = waterCv.width = N; landCv.height = waterCv.height = N;
+        const landImg = landCv.getContext('2d').createImageData(N, N), waterImg = waterCv.getContext('2d').createImageData(N, N);
+        for (let y = 0; y < N; y++) {
+            const lat = lat1 - (lat1 - lat0) * y / (N - 1);
+            const dx = dLonM * Math.max(0.2, Math.cos(lat * Math.PI / 180));
+            for (let x = 0; x < N; x++) {
+                const e = E[y * N + x];
+                const eE = E[y * N + Math.min(N - 1, x + 1)], eW = E[y * N + Math.max(0, x - 1)];
+                const eN = E[Math.max(0, y - 1) * N + x], eS = E[Math.min(N - 1, y + 1) * N + x];
+                // surface normal from the slope east and north, then the share of the light it faces,
+                // normalised so flat ground is 1
+                const nx = -TERRAIN_RELIEF_Z * (eE - eW) / (2 * dx), ny = -TERRAIN_RELIEF_Z * (eN - eS) / (2 * dLatM);
+                const len = Math.hypot(nx, ny, 1);
+                const lit = Math.max(0, (nx * TERRAIN_LIGHT[0] + ny * TERRAIN_LIGHT[1] + TERRAIN_LIGHT[2]) / len) / TERRAIN_LIGHT[2];
+                // slopes facing away darken more than lit ones brighten, so relief shows without glare
+                const shade = Math.max(0.68, Math.min(1.05, lit));
+                const lc = landColorAt(e, shade), wc = waterColorAt(-e);
+                const i = (y * N + x) * 4;
+                landImg.data[i] = lc[0]; landImg.data[i + 1] = lc[1]; landImg.data[i + 2] = lc[2]; landImg.data[i + 3] = 255;
+                waterImg.data[i] = wc[0]; waterImg.data[i + 1] = wc[1]; waterImg.data[i + 2] = wc[2]; waterImg.data[i + 3] = 255;
             }
         }
-        sctx.putImageData(img, 0, 0);
+        landCv.getContext('2d').putImageData(landImg, 0, 0);
+        waterCv.getContext('2d').putImageData(waterImg, 0, 0);
 
+        // water under everything, then the land clipped to the country outlines at full resolution
         const cv = document.createElement('canvas');
         cv.width = TERRAIN_TEX; cv.height = TERRAIN_TEX;
         const c = cv.getContext('2d');
-        c.fillStyle = waterColorCss();
-        c.fillRect(0, 0, TERRAIN_TEX, TERRAIN_TEX);
+        c.drawImage(waterCv, 0, 0, TERRAIN_TEX, TERRAIN_TEX);
         if (typeof mapFeatures !== 'undefined' && mapFeatures.length) {
             const X = lon => (lon - lon0) / (lon1 - lon0) * TERRAIN_TEX;
             const Y = lat => (lat1 - lat) / (lat1 - lat0) * TERRAIN_TEX;
@@ -162,7 +207,7 @@
             c.beginPath();
             traceLandPath(c, X, Y);
             c.clip('evenodd');   // later rings are holes, the same rule the 2D basemap fills by
-            c.drawImage(shadeCv, 0, 0, TERRAIN_TEX, TERRAIN_TEX);
+            c.drawImage(landCv, 0, 0, TERRAIN_TEX, TERRAIN_TEX);
             c.restore();
         }
         const tex = new THREE.CanvasTexture(cv);

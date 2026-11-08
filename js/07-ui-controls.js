@@ -29,7 +29,7 @@
         });
     });
 
-    const canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d'), video = document.getElementById('radarVideo'), hud = document.getElementById('hudOverlay'), mapPlaceholder = document.getElementById('mapPlaceholder'), playPauseBtn = document.getElementById('playPauseBtn'), timelineSlider = document.getElementById('timelineSlider'), timelineTimeDisplay = document.getElementById('timelineTimeDisplay'), speedDownBtn = document.getElementById('speedDownBtn'), speedDisplayBtn = document.getElementById('speedDisplayBtn'), speedUpBtn = document.getElementById('speedUpBtn'), replayBtn = document.getElementById('replayBtn'), videoSyncMode = document.getElementById('videoSyncMode'), ocrIndicator = document.getElementById('ocrIndicator'), fullscreenBtn = document.getElementById('fullscreenBtn'), fullscreenMapBtn = document.getElementById('fullscreenMapBtn'), fullscreenVideoBtn = document.getElementById('fullscreenVideoBtn'), mapPanel = document.getElementById('mapPanel'), videoPanel = document.getElementById('videoPanel'), trackerModeSelect = document.getElementById('trackerModeSelect'), threeDContainer = document.getElementById('threeDContainer'), attitudeHud = document.getElementById('attitudeHud'), stickyBottomBar = document.getElementById('stickyBottomBar'), pathColorSelect = document.getElementById('pathColorSelect'), barbColorSelect = document.getElementById('barbColorSelect');
+    const canvas = document.getElementById('mapCanvas'), ctx = canvas.getContext('2d'), video = document.getElementById('radarVideo'), hud = document.getElementById('hudOverlay'), mapPlaceholder = document.getElementById('mapPlaceholder'), playPauseBtn = document.getElementById('playPauseBtn'), timelineSlider = document.getElementById('timelineSlider'), timelineTimeDisplay = document.getElementById('timelineTimeDisplay'), speedDownBtn = document.getElementById('speedDownBtn'), speedDisplayBtn = document.getElementById('speedDisplayBtn'), speedUpBtn = document.getElementById('speedUpBtn'), replayBtn = document.getElementById('replayBtn'), videoSyncMode = document.getElementById('videoSyncMode'), fullscreenBtn = document.getElementById('fullscreenBtn'), fullscreenMapBtn = document.getElementById('fullscreenMapBtn'), fullscreenVideoBtn = document.getElementById('fullscreenVideoBtn'), mapPanel = document.getElementById('mapPanel'), videoPanel = document.getElementById('videoPanel'), trackerModeSelect = document.getElementById('trackerModeSelect'), threeDContainer = document.getElementById('threeDContainer'), attitudeHud = document.getElementById('attitudeHud'), stickyBottomBar = document.getElementById('stickyBottomBar'), pathColorSelect = document.getElementById('pathColorSelect'), barbColorSelect = document.getElementById('barbColorSelect');
 
     function applySyncModeLock() {
         // On Auto-Sync the timeline window is driven by the video clock, so the user must NOT type start/end times.
@@ -45,7 +45,7 @@
 
     function evaluateAutoSyncDefault() {
         if (videoLoaded && allParsedData.length > 0) {
-            videoSyncMode.value = 'auto'; ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block';
+            videoSyncMode.value = 'auto'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block';
             applySyncModeLock();
             forceOcrSyncNextTick = true; isManualSyncRequest = true;
             refreshSyncingIndicator();
@@ -237,6 +237,9 @@
         if (threeDInitialized) return;
         const w = threeDContainer.clientWidth || canvas.width, h = threeDContainer.clientHeight || canvas.height, aspect = w / (h || 1);
         scene3D = new THREE.Scene(); scene3D.background = new THREE.Color(scene3DBgColor());
+        // haze toward the horizon in the background colour, for depth; animate3D sets its range from
+        // the camera distance each frame
+        scene3D.fog = new THREE.Fog(scene3DBgColor(), 60, 260);
         // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so
         // small in world units that a default near plane clips it before the camera gets close);
         // the huge near/far span rides a logarithmic depth buffer to stay z-fight-free.
@@ -385,6 +388,28 @@
                     } else cl.sprite.visible = false;
                 }
             }
+            // city names lie flat on the ground near the plane (the major cities out to a wider reach),
+            // faded at the edge of that reach and turned about the vertical so they read upright
+            if (_cityLabels.length && camera3D && planeGroup3D) {
+                const in3dC = !trackerModeSelect || trackerModeSelect.value === '3d';
+                const px = planeGroup3D.position.x, pz = planeGroup3D.position.z;
+                for (let i = 0; i < _cityLabels.length; i++) {
+                    const cl = _cityLabels[i];
+                    const R1 = cl.big ? 90 : 45, R0 = R1 * 0.7;   // world units, 20 per degree
+                    const dist = Math.hypot(cl.at.x - px, cl.at.z - pz);
+                    if (!in3dC || !filteredData.length || dist >= R1) { cl.mesh.visible = false; continue; }
+                    cl.mesh.visible = true;
+                    cl.mesh.rotation.y = Math.atan2(camera3D.position.x - cl.at.x, camera3D.position.z - cl.at.z);
+                    cl.mat.opacity = dist <= R0 ? 1 : (R1 - dist) / (R1 - R0);
+                }
+            }
+            // the haze stays clear out to a few camera distances from the view's center, so the
+            // ground near the aircraft is crisp at any zoom and only the far ground fades
+            if (scene3D.fog && camera3D && controls3D) {
+                const cd = camera3D.position.distanceTo(controls3D.target) || 1;
+                scene3D.fog.near = Math.max(60, cd * 2.5);
+                scene3D.fog.far = Math.max(260, cd * 9);
+            }
             renderer3D.render(scene3D, camera3D);
         }
         animate3D(); threeDInitialized = true;
@@ -396,6 +421,7 @@
     let realScale3D = false;
     let _borderLines = [];      // { line, mat, box, base } coastline/border lines, faded by distance to the plane
     let _countryLabels = [];    // { sprite, mat, aspect, pts, isUSA } country name labels shown near visible coastlines
+    let _cityLabels = [];       // { mesh, mat, at, big } city names lying flat on the ground, shown near the plane
     let _stateLabels = [];      // { mesh, mat, rings, bbox } flat US state names, lying on the basemap
     let _stateLabelIdx = -1;    // index into _stateLabels of the state under the plane, -1 = none
     let _stormSyms = [];        // { mesh, at } storm fix symbols, held to one screen size by camera distance
@@ -552,6 +578,36 @@
         return { sprite: spr, mat, aspect: w / 58, pts: [] };
     }
 
+    // a city name lying flat on the 3D ground: a small dot on the city with the name beside it in muted
+    // slate, at a fixed size on the ground (CITY_LABEL_H world units tall, about 2.8 km), so it reads as
+    // part of the map, flat under the track. built flat with the dot at the mesh's origin;
+    // animate3D only turns it about the vertical so the text reads upright from the camera.
+    const CITY_LABEL_H = 0.5;
+    function cityLabelMesh(name) {
+        const h = 48, fs = 30, dotX = 10, textX = 24;
+        const font = '600 ' + fs + "px 'Nunito Sans', sans-serif";
+        const cv = document.createElement('canvas');
+        let c = cv.getContext('2d');
+        c.font = font;
+        const w = Math.ceil(c.measureText(name).width) + textX + 8;
+        cv.width = w; cv.height = h;
+        c = cv.getContext('2d');
+        c.font = font; c.textBaseline = 'middle'; c.lineJoin = 'round';
+        c.beginPath(); c.arc(dotX, h / 2, 5, 0, 2 * Math.PI); c.fillStyle = 'rgba(71,85,105,0.85)'; c.fill();
+        c.lineWidth = 5; c.strokeStyle = 'rgba(255,255,255,0.6)'; c.strokeText(name, textX, h / 2);
+        c.fillStyle = 'rgba(51,65,85,0.85)'; c.fillText(name, textX, h / 2);
+        const tex = new THREE.CanvasTexture(cv);
+        tex.anisotropy = (renderer3D && renderer3D.capabilities) ? renderer3D.capabilities.getMaxAnisotropy() : 1;
+        tex.minFilter = THREE.LinearMipmapLinearFilter; tex.magFilter = THREE.LinearFilter;
+        const W = CITY_LABEL_H * w / h;
+        const geo = new THREE.PlaneGeometry(W, CITY_LABEL_H);
+        geo.translate(W / 2 - dotX / w * W, 0, 0);   // the dot, not the label's middle, at the origin
+        geo.rotateX(-Math.PI / 2);                    // flat on the ground, text running east, top to the north
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+        const mesh = new THREE.Mesh(geo, mat); mesh.renderOrder = 1; mesh.visible = false;
+        return { mesh, mat };
+    }
+
     // The 3D scene's void behind the map, a pale blue-gray that matches the basemap.
     function scene3DBgColor() {
         return 0xdfe6ec;
@@ -628,6 +684,8 @@
         // country and state labels live on the scene (not threeMapGroup), so drop the previous set here.
         _countryLabels.forEach(cl => { if (cl.sprite.parent) cl.sprite.parent.remove(cl.sprite); if (cl.mat.map) cl.mat.map.dispose(); cl.mat.dispose(); });
         _countryLabels = [];
+        _cityLabels.forEach(cl => { if (cl.mesh.parent) cl.mesh.parent.remove(cl.mesh); cl.mesh.geometry.dispose(); if (cl.mat.map) cl.mat.map.dispose(); cl.mat.dispose(); });
+        _cityLabels = [];
         _stateLabels.forEach(sl => { if (sl.mesh.parent) sl.mesh.parent.remove(sl.mesh); sl.mesh.geometry.dispose(); if (sl.mat.map) sl.mat.map.dispose(); sl.mat.dispose(); });
         _stateLabels = []; _stateLabelIdx = -1;
         // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
@@ -709,8 +767,19 @@
                 }
             }
         });
-        // elevation-shaded terrain surface from the bundled ETOPO grid, so land sits at real height
-        // over a flat sea. null until the grid loads, while the flat coastline map above renders.
+        // city names (data/cities.json, the 2D map's set) inside the terrain's box, each on the drawn
+        // ground; animate3D shows the ones near the plane
+        const cityBox = typeof terrainExtent === 'function' ? terrainExtent() : null;
+        if (scene3D && typeof cities !== 'undefined') cities.forEach(cty => {
+            if (cityBox && (cty.lon < cityBox.lon0 || cty.lon > cityBox.lon1 || cty.lat < cityBox.lat0 || cty.lat > cityBox.lat1)) return;
+            const lbl = cityLabelMesh(cty.name);
+            lbl.at = get3DCoord(cty.lon, cty.lat, borderAlt([cty.lon, cty.lat]) + 60);
+            lbl.big = cty.big;
+            lbl.mesh.position.copy(lbl.at);
+            scene3D.add(lbl.mesh); _cityLabels.push(lbl);
+        });
+        // relief-shaded terrain surface from the bundled ETOPO grid (js/07c-terrain.js), so land is
+        // drawn at real height. null until the grid loads, while the flat coastline map above renders.
         if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }
         if(filteredData.length > 0) {
             // densify each 1 Hz segment with the same uniform catmull-rom the plane center rides
@@ -1057,15 +1126,19 @@
                 // Pickable products list first; unavailable and night-locked ones sink below
                 // them (stable sort, so band order holds within each half).
                 const bySelectable = defs => defs.slice().sort((a, b2) => ((a.available === false || isDark(a)) ? 1 : 0) - ((b2.available === false || isDark(b2)) ? 1 : 0));
+                // composites render several bands at once, about a minute for each new frame, so they
+                // show a "slow" tag
                 const renderBand = b => {
                     const unavail = b.available === false;   // api online but this product isn't being served
                     const dark = isDark(b);
                     const off = unavail || dark;
-                    return `<button type="button" class="sat-pick-prod${(isActive && activeBand === b.id) ? ' active' : ''}${off ? ' unavailable' : ''}"`
+                    const on = isActive && activeBand === b.id;
+                    const title = [on ? 'Click again to turn the satellite overlay off' : '', (b.isComposite && !off) ? 'Each new frame takes about a minute to render' : ''].filter(Boolean).join('\n');
+                    return `<button type="button" class="sat-pick-prod${on ? ' active' : ''}${off ? ' unavailable' : ''}"`
                         + (off ? ' disabled' : ` data-sat="${opt.value}" data-band="${escapeHtml(b.id)}"`)
-                        + ((isActive && activeBand === b.id) ? ' title="Click again to turn the satellite overlay off"' : '') + `>`
+                        + (title ? ` title="${title}"` : '') + `>`
                         + `<span class="sat-pick-name">${escapeHtml(b.name)}</span>`
-                        + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : (dark ? `<span class="sat-pick-tag">night flight</span>` : ``)) + `</button>`;
+                        + (unavail ? `<span class="sat-pick-tag">unavailable</span>` : (dark ? `<span class="sat-pick-tag">night flight</span>` : (b.isComposite ? `<span class="sat-pick-tag">slow</span>` : ``))) + `</button>`;
                 };
                 html += `<div class="sat-pick-products">`;
                 if (def.isReconApi) {
@@ -1089,14 +1162,17 @@
     }
 
     // the panel is position:fixed (see app.css) so it escapes the map header's z-20 stacking context
-    // and layers above the pfd and hud overlays. anchor it under the button, right aligned to it.
+    // and layers above the pfd and hud overlays. anchor it under the button with its left edge at the
+    // button's, so the TDR and Satellite columns extend right, over the MMR video beside the map
+    // rather than the map whose overlays they change; near the window's right edge it shifts left
+    // only as far as it needs to stay on screen.
     function positionSatPicker() {
         const panel = document.getElementById('satPickerPanel'), btn = document.getElementById('satPickerBtn');
         if (!panel || !btn || panel.classList.contains('hidden')) return;
         const r = btn.getBoundingClientRect();
         panel.style.top = (r.bottom + 4) + 'px';
-        panel.style.left = 'auto';
-        panel.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+        panel.style.right = 'auto';
+        panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - panel.offsetWidth - 8)) + 'px';
         // end above the fixed playback bar (its live height is published as --bottom-bar-h by
         // js/11-layout.js), so an unfolded TDR section scrolls inside the panel instead of covering it
         const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-h')) || 0;
@@ -1158,7 +1234,8 @@
             if (!body) return;
             const open = !body.classList.toggle('hidden');
             satExpandBtn.setAttribute('aria-expanded', String(open));
-            if (open) { renderSatPickerPanel(); positionSatPicker(); }
+            if (open) renderSatPickerPanel();
+            positionSatPicker();   // the panel's width follows which sections are unfolded
         });
         // outside click or esc closes, like the measure popover.
         document.addEventListener('mousedown', (e) => {
@@ -1174,7 +1251,7 @@
         // satellite tile opacity: redraw the map background at the new alpha as the user drags
         const opacitySlider = document.getElementById('satOpacitySlider'), opacityVal = document.getElementById('satOpacityVal');
         if (opacitySlider) opacitySlider.addEventListener('input', () => {
-            satTileOpacity = (parseInt(opacitySlider.value) || 92) / 100;
+            satTileOpacity = (parseInt(opacitySlider.value) || 100) / 100;
             if (opacityVal) opacityVal.textContent = opacitySlider.value + '%';
             if (filteredData.length > 0 && trackerModeSelect.value === '2d') { bgNeedsUpdate = true; renderMapEngineFrame(currentIdx, filteredData[currentIdx]); }
         });
@@ -1217,9 +1294,9 @@
     document.getElementById('toggleGpsAlt').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '3d') build3DScene(); updateVisualComponents(currentIdx); } });
     
     videoSyncMode.addEventListener('change', (e) => {
-        if (e.target.value === 'auto') { ocrIndicator.style.display = 'block'; document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; }
+        if (e.target.value === 'auto') { document.getElementById('videoStartInput').disabled = true; document.getElementById('forceSyncBtn').style.display = 'inline-block'; }
         else {
-            ocrIndicator.style.display = 'none'; if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none';
+            if (videoLoaded) document.getElementById('videoStartInput').disabled = false; document.getElementById('forceSyncBtn').style.display = 'none';
         }
         applySyncModeLock();
         refreshSyncingIndicator();  // hide the badge immediately when leaving Auto-Sync

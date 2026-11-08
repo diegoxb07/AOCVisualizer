@@ -54,7 +54,8 @@
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrSectionOpen = false;       // the Overlays TDR section is unfolded: its rows need data, so fetching starts
     let tdrIntroDone = false;         // the once-per-flight fly-through over every leg has run
-    let tdrAutoPicked = false;        // the first volume of this flight has preselected every layer
+    let tdrAutoPicked = false;        // the first volume of this flight has preselected the view's layers
+    let tdrSelectionIsAuto = false;   // the picked layers are still that automatic pick (no row, All, or None click since)
     let tdrCamFixed = false;          // the 3D camera is parked zoomed out over the radar's center
     let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
     let tdrIntroRaf = 0;              // its animation frame handle, cancelled on a new flight
@@ -102,7 +103,7 @@
         tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         tdrAnyFetched = false;
         if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
-        tdrIntroDone = false; tdrAutoPicked = false;
+        tdrIntroDone = false; tdrAutoPicked = false; tdrSelectionIsAuto = false;
         if (tdrScanWall) {
             if (tdrScanWall.geometry) tdrScanWall.geometry.dispose();
             if (tdrScanWall.material) { if (tdrScanWall.material.map) tdrScanWall.material.map.dispose(); tdrScanWall.material.dispose(); }
@@ -207,13 +208,13 @@
                     if (legSeen.has(key)) return; legSeen.add(key);
                     const s = hhmmToSec(l.start_time); let e = hhmmToSec(l.stop_time);
                     if (e < s) e += 86400;
-                    legs.push({ s, e, label: l.start_time + '-' + l.stop_time + 'Z' });
+                    legs.push({ s, e, label: tdrClock(l.start_time) + '-' + tdrClock(l.stop_time) + 'Z' });
                 });
                 tdrAnalyses = times.map(hhmm => {
                     const sec = hhmmToSec(hhmm);
                     const leg = legs.find(L => sec >= L.s && sec <= L.e);
                     // no matching leg: reveal in full at the analysis time (startSec === stopSec)
-                    return { hhmm, sec, startSec: leg ? leg.s : sec, stopSec: leg ? leg.e : sec, legLabel: leg ? leg.label : hhmm + 'Z', state: 'idle', mesh: null };
+                    return { hhmm, sec, startSec: leg ? leg.s : sec, stopSec: leg ? leg.e : sec, legLabel: leg ? leg.label : tdrClock(hhmm) + 'Z', state: 'idle', mesh: null };
                 }).sort((a, b) => a.sec - b.sec);
                 // Legs abut exactly (leg 1 stops the second leg 2 starts), so landing on a leg's
                 // end would immediately start the next leg's scan-and-erase and bite into the
@@ -229,6 +230,9 @@
             })
             .catch(() => { if (gen === tdrGeneration) tdrProbeResolve(false); });
     }
+
+    // an analysis HHMM as an HH:MM clock, for the leg time labels
+    function tdrClock(hhmm) { return String(hhmm).slice(0, 2) + ':' + String(hhmm).slice(2, 4); }
 
     // The API colorscale is [fraction, '#hex'] stops against zmin..zmax.
     function tdrColorStops(colorscale) {
@@ -459,11 +463,14 @@
                     a.state = 'ready';
                     let autoPicked = false;
                     if (!tdrSelectedKm.size && !tdrAutoPicked) {
-                        // the flight's first volume with nothing picked selects every layer with data,
-                        // so the radar shows (and the fly-through can run) without a pick first. once
-                        // per flight: a later None stays off as later legs arrive.
-                        a.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
-                        tdrAutoPicked = true; autoPicked = true;
+                        // the flight's first volume with nothing picked selects the view's default
+                        // layers (tdrDefaultLevels), so the radar shows (and the fly-through can run)
+                        // without a pick first. once per flight: a later None stays off as legs arrive.
+                        tdrDefaultLevels(a.levels).forEach(km => tdrSelectedKm.add(km));
+                        tdrAutoPicked = true; tdrSelectionIsAuto = true; autoPicked = true;
+                    } else if (tdrSelectionIsAuto) {
+                        // the automatic pick extends to the levels this leg adds
+                        tdrDefaultLevels(a.levels).forEach(km => tdrSelectedKm.add(km));
                     } else if (tdrSelectedKm.size) {
                         // A later volume can carry data at levels the earlier analyses lacked
                         // (usually the very top of the column). While the selection still covers
@@ -833,6 +840,18 @@
              + 'analysed pressure; a storm' + '\u2019' + 's actual pressure surfaces are at different heights.';
     }
 
+    // the automatic layer pick for the view showing: every layer with data in 3D, and on the 2D map
+    // only 500 mb and below (about 0 to 5.6 km), the lower layers where storm centers read clearly
+    function tdrDefaultLevels(levels) {
+        const in2d = typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
+        return (levels || []).filter(l => l.canvas && (!in2d || tdrMb(l.km) >= 500)).map(l => l.km);
+    }
+    // re-applies that pick across every loaded leg, after a switch between 2D and 3D
+    function tdrApplyDefaultSelection() {
+        tdrSelectedKm.clear();
+        tdrAnalyses.forEach(x => { if (x.state === 'ready') tdrDefaultLevels(x.levels).forEach(km => tdrSelectedKm.add(km)); });
+    }
+
     function tdrBandMembers(ref, band) {
         return ref.levels.filter(l => { const p = tdrMb(l.km); return p >= band.pMin && p < band.pMax; });
     }
@@ -846,7 +865,7 @@
         const loading = !tdrAnalyses.some(x => x.state === 'ready') && (tdrFetchActive || tdrAnyFetched);
         lbl.textContent = loading ? 'TDR Loading...' : 'TDR';
         if (btn) btn.classList.toggle('opacity-60', loading);
-        // the header row pulses like the other skeleton loaders while that first volume downloads
+        // the loading ring over the skeleton layer rows shows while that first volume downloads
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.classList.toggle('tdr-is-loading', loading);
         // the Overlays button lights while any overlay draws, the radar included
         if (typeof updateSatPickerButton === 'function') updateSatPickerButton();
@@ -899,8 +918,9 @@
                 const passes = tdrLegEyePasses(a);
                 const legBtn = document.createElement('button');
                 legBtn.className = 'tdr-leg-btn';
-                legBtn.textContent = 'Leg ' + (i + 1);
-                legBtn.title = a.legLabel + (a.state === 'ready' ? '' : ' (loads on jump)') + (tdrLegPick === a ? ' · click again to show all legs' : '');
+                // the leg's number and time window, so a leg reads against the playback clock
+                legBtn.textContent = 'Leg ' + (i + 1) + ' \u00b7 ' + a.legLabel;
+                legBtn.title = (tdrLegPick === a ? 'Click again to show all legs' : 'Show only this leg, at its end') + (a.state === 'ready' ? '' : ' (loads on jump)');
                 // The leg button lights while its whole span is shown; the eye-pass button lights while
                 // its pass is shown. In the 2D display the on-screen analysis lights even without a pick.
                 const legOn = (tdrLegPick === a && !tdrEyeActive) || (in2dNow && !tdrLegPick && tdrCurrent === a);
@@ -917,13 +937,13 @@
                     buildTdrHero();
                 });
                 group.appendChild(legBtn);
+                // the eye jump is its own action at the row's right end, styled apart from the time
+                // button, so it reads as a separate control rather than part of the leg
                 if (passes.length) {
-                    const conn = document.createElement('span'); conn.className = 'tdr-leg-conn';
-                    group.appendChild(conn);
                     passes.forEach((p) => {
                         const eb = document.createElement('button');
                         eb.className = 'tdr-eye-btn';
-                        eb.textContent = 'Eye Pass';
+                        eb.textContent = 'Jump to Eye';
                         eb.title = "Jump to this leg's closest approach to the storm center (within 55 km). "
                                  + "The center is the radar volume's own origin once the leg has loaded, otherwise a "
                                  + 'position interpolated between the 6-hourly best-track fixes.';
@@ -988,6 +1008,7 @@
                 if (!withData.length) return;
                 const turnOff = withData.every(m => tdrSelectedKm.has(m.km));
                 withData.forEach(m => { if (turnOff) tdrSelectedKm.delete(m.km); else tdrSelectedKm.add(m.km); });
+                tdrSelectionIsAuto = false;
                 tdrSelectionChanged();
             });
             list.appendChild(row);
@@ -1069,7 +1090,7 @@
             ab.disabled = !in2d;
             ab.textContent = tdrSliceArm ? 'Cancel Cross-Section' : 'Draw a Cross-Section';
             ab.title = in2d ? 'Click two points on the 2D map to draw a vertical cross-section of the radar'
-                            : 'Switch the tracker to 2D to draw a cross-section';
+                            : 'Draw a cross-section (only 2D)';
         }
         const or = document.getElementById('tdrOpacityRow');
         if (or) or.style.display = in2d ? '' : 'none';
@@ -1237,10 +1258,12 @@
             const ref = tdrCurrent || tdrAnalyses.find(a => a.state === 'ready');
             if (!ref || !ref.levels) return;
             ref.levels.forEach(l => { if (l.canvas) tdrSelectedKm.add(l.km); });
+            tdrSelectionIsAuto = false;
             tdrSelectionChanged();
         });
         if (noneBtn) noneBtn.addEventListener('click', () => {
             tdrSelectedKm.clear();
+            tdrSelectionIsAuto = false;
             tdrSelectionChanged();
         });
         // 2D-only radar opacity: fades the composite so satellite imagery reads through it.
@@ -1254,15 +1277,16 @@
         });
 
         // leaving the 2D map drops a pick in progress (it needs map clicks); either way the section's
-        // 2D-only controls, the leg highlight, and the radar follow the new view.
+        // 2D-only controls, the leg highlight, and the radar follow the new view, and a still
+        // automatic layer pick switches to the new view's default (tdrDefaultLevels).
         if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect) trackerModeSelect.addEventListener('change', () => {
             if (trackerModeSelect.value !== '2d' && (tdrSliceArm || tdrSliceLine)) {
                 tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
                 setTdrSliceHint('');
             }
             tdrUpdateSliceButtons();
-            buildTdrHero();
-            updateTdr3D();
+            if (tdrSelectionIsAuto) { tdrApplyDefaultSelection(); tdrSelectionChanged(); }
+            else { buildTdrHero(); updateTdr3D(); }
         });
         // Draw a Cross-Section arms the two-click pick and closes the Overlays dropdown so the clicks
         // reach the map; while armed the same button cancels.

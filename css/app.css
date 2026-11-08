@@ -162,10 +162,15 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #satPickerBtn.sat-on { border-color: color-mix(in oklab, var(--accent) 60%, transparent); color: var(--accent); }
 /* position:fixed (placed by positionSatPicker in js/07-ui-controls.js) escapes the map header's
    z-20 stacking context so the panel layers above the pfd and hud overlays (z-2500) and scrolls. */
-.sat-picker-panel { position: fixed; z-index: 3200; width: 250px; max-height: min(560px, calc(100vh - 140px)); overflow-y: auto; background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
-.sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 2px 4px 6px; }
+.sat-picker-panel { position: fixed; z-index: 3200; width: auto; max-width: calc(100vw - 16px); max-height: min(560px, calc(100vh - 140px)); overflow-y: auto; background: transparent; border: none; padding: 0; }
+/* the dropdown's outline follows its contents: the panel is a transparent frame, and the head, the
+   toggle rows, and each column carry the background and border, joined edge to edge. a long column
+   runs down while a short one stops at its own contents, so no empty block is left under a folded
+   section, and the edge the two columns share reads as a divider. */
+.sat-picker-head, .ov-toggle-group, .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); }
+.sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 8px 10px 6px; border-bottom: none; border-radius: 6px 6px 0 0; }
 /* Umbrella "Overlays" dropdown: on/off toggle rows above the satellite picker section. */
-.ov-toggle-group { display: flex; flex-direction: column; gap: 1px; }
+.ov-toggle-group { display: flex; flex-direction: column; gap: 1px; padding: 0 6px; border-top: none; border-bottom: none; }
 .ov-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }
 .ov-row:hover:not(:disabled) { background: var(--panel-strip); }
 .ov-row-name { flex: 1 1 auto; min-width: 0; }
@@ -176,7 +181,22 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .ov-native-check:checked ~ .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 /* TDR and Satellite sections: an expander header over a collapsible body. the TDR rows lay out in
    the panel's own scroll, so the layer list has no scrollbar of its own there. */
-#ovSatSection, #tdrControlGroup { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 3px; }
+#ovSatSection, #tdrControlGroup { padding: 3px 6px 6px; border-radius: 0 0 4px 4px; }
+/* the two sections are side by side as columns: a folded section is only as wide as its header, and
+   an unfolded one is a full 238px column, so unfolding one never widens the other. with no TDR for
+   the mission the panel holds the satellite column alone, and a narrow window stacks them */
+.ov-columns { display: flex; align-items: flex-start; gap: 0; }
+/* the satellite column overlaps the TDR column's right edge by a pixel, so the shared edge is one line;
+   with no TDR section shown it lines up with the head instead */
+.ov-columns > #ovSatSection { margin-left: -1px; }
+.ov-columns > #tdrControlGroup[style*="none"] + #ovSatSection { margin-left: 0; }
+.ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { flex: none; width: 120px; min-width: 0; }
+.ov-columns > #tdrControlGroup:has(#tdrExpandBody:not(.hidden)), .ov-columns > #ovSatSection:has(#satExpandBody:not(.hidden)) { width: 238px; }
+@media (max-width: 560px) { .ov-columns { flex-direction: column; } .ov-columns > #ovSatSection { margin: -1px 0 0; } }
+/* the loading ring centered over the skeleton layer rows while the first radar volume downloads */
+.tdr-layers-wrap { position: relative; }
+.tdr-layers-spin { display: none; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+#tdrControlGroup.tdr-is-loading .tdr-layers-spin { display: block; }
 .tdr-expand-body { padding: 0 4px 6px; }
 .tdr-expand-body .tdr-level-hero { max-height: none; overflow: visible; }
 #tdrControlGroup .tdr-btn-skel { display: block; margin: 6px 8px; }
@@ -512,17 +532,16 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .tdr-hero-actions { display: flex; gap: 6px; margin: 8px 0 2px; }
 .tdr-hero-actions button { background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 10.5px; font-weight: 600; border-radius: 4px; padding: 3px 10px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-hero-actions button:hover { color: var(--accent); border-color: var(--accent); }
-/* One row per leg: the leg button, then a connector line to any of its eye-pass buttons. Compact so
-   several legs (and their passes) fit without scrolling. */
-.tdr-leg-row { display: flex; flex-direction: column; gap: 3px; }
-.tdr-leg-group { display: flex; align-items: center; }
+/* one row per leg: its time button on the left and, when the leg passes the storm center, a separate
+   Jump to Eye button at the right end in its own outlined style. compact so several legs fit. */
+.tdr-leg-row { display: flex; flex-direction: column; gap: 4px; }
+.tdr-leg-group { display: flex; align-items: center; gap: 8px; }
 .tdr-leg-btn { flex: none; background: var(--panel-strip); border: 1px solid var(--border); color: var(--text-muted); font-size: 9.5px; font-weight: 600; border-radius: 4px; padding: 2px 8px; cursor: pointer; transition: color .12s, border-color .12s; }
 .tdr-leg-btn:hover { color: var(--accent); border-color: var(--accent); }
 .tdr-leg-btn.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
-.tdr-leg-conn { flex: none; width: 10px; height: 1px; background: var(--border-strong); }
-.tdr-eye-btn { flex: none; margin-left: 3px; background: color-mix(in oklab, var(--accent) 12%, transparent); border: 1px solid color-mix(in oklab, var(--accent) 50%, transparent); color: var(--accent); font-size: 9px; font-weight: 600; border-radius: 4px; padding: 1px 7px; cursor: pointer; transition: filter .12s; }
-.tdr-eye-btn:hover { filter: brightness(1.15); }
-.tdr-eye-btn.on { background: color-mix(in oklab, var(--accent) 30%, transparent); border-color: var(--accent); color: var(--text); }
+.tdr-eye-btn { flex: none; margin-left: auto; background: var(--panel); border: 1px solid var(--accent); color: var(--accent); font-size: 9.5px; font-weight: 700; border-radius: 10px; padding: 2px 9px; cursor: pointer; transition: background .12s, color .12s; }
+.tdr-eye-btn:hover { background: var(--accent-soft); }
+.tdr-eye-btn.on { background: var(--accent); color: var(--accent-ink); }
 
 /* Clear Marks: greyed while disabled (no points placed), a faint accent tint once points exist,
    lighter than the solid-accent Mark Point button beside it. */
@@ -582,11 +601,10 @@ body.media-collapsed .float-panel { display: none !important; }
 .tdr-slice-start { width: 100%; padding: 6px 8px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: filter 0.12s; }
 .tdr-slice-start:hover:not(:disabled) { filter: brightness(1.1); }
 .tdr-slice-start:disabled { opacity: 0.45; cursor: not-allowed; }
-/* while the first radar volume downloads: gray skeleton rows in place of the band rows, and the TDR
-   header row pulsing in the same shade, like the flight-loading skeletons */
+/* while the first radar volume downloads: gray skeleton rows in place of the band rows, like the
+   flight-loading skeletons */
 .tdr-level-row.tdr-skel-row { height: 26px; cursor: default; border-color: transparent; animation: skeletonPulse 1.3s ease-in-out infinite; }
 .tdr-level-row.tdr-skel-row:hover { border-color: transparent; }
-#tdrControlGroup.tdr-is-loading .ov-sat-row { animation: skeletonPulse 1.3s ease-in-out infinite; }
 
 /* Section-jump pills at the top of the help guide; each scrolls to its h3 below. */
 .help-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
@@ -830,13 +848,13 @@ body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="
 }
 @keyframes skeletonPulse { 0%, 100% { background-color: var(--panel-strip); } 50% { background-color: var(--elevated); } }
 
-/* the batch load and pre-cache menu items wait for the archive's year list: each shows a slim pulsing
-   pill over its label until js/12b-recon-archive.js removes the cover, in place of a spinner block */
-#preloadBtnSpin, #batchBtnSpin { inset: 4px 10px; border-radius: 3px; background: none; animation: menuSkeleton 1.3s ease-in-out infinite; }
-#preloadBtnSpin > div, #batchBtnSpin > div { display: none; }
-@keyframes menuSkeleton {
-    0%, 100% { background-color: color-mix(in oklab, var(--bar-ink) 8%, transparent); }
-    50% { background-color: color-mix(in oklab, var(--bar-ink) 20%, transparent); }
+/* the batch load and pre-cache menu items wait for the archive's year list: their own labels pulse in
+   gray until js/12b-recon-archive.js removes the hidden cover elements, with nothing drawn over them */
+#preloadBtnSpin, #batchBtnSpin { display: none; }
+.menu-item-wrap:has(#preloadBtnSpin) > .menu-item, .menu-item-wrap:has(#batchBtnSpin) > .menu-item { animation: menuTextPulse 1.3s ease-in-out infinite; }
+@keyframes menuTextPulse {
+    0%, 100% { color: color-mix(in oklab, var(--bar-ink) 35%, transparent); }
+    50% { color: color-mix(in oklab, var(--bar-ink) 70%, transparent); }
 }
 
 /* an empty custom graph shows only its dashed Create Graph box under the charts: the card's border,

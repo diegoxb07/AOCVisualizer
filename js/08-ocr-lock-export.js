@@ -19,7 +19,7 @@
         if (!silent) { ocrHistory = []; pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(true); }
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
 
-        videoSyncMode.value = 'auto'; document.getElementById('ocrIndicator').style.display = 'block'; document.getElementById('videoStartInput').disabled = true;
+        videoSyncMode.value = 'auto'; document.getElementById('videoStartInput').disabled = true;
         applySyncModeLock();
 
         if (!silent) showToast("Scanning the frame for the MMR clock... Please wait.", 4000);

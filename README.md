@@ -129,9 +129,10 @@ The 2D view is a whole-world canvas map of coastlines and US states, with the sa
 and wind barbs drawn on it. Wheel to zoom, drag to pan; zooming out brings in the surrounding synoptic
 picture. Airfield codes appear as you zoom in, and KLAL is always shown.
 
-The 3D view is a Three.js scene over an elevation-shaded terrain basemap, with US state names laid
-on the ground, detailed aircraft models, and the track drawn at altitude (GPS or pressure,
-selectable, GPS by default). Pan and zoom with the mouse. **Real Scale (3D)** draws the aircraft at
+The 3D view is a Three.js scene over a terrain basemap in the 2D map's colors, hill-shaded so
+mountains show, with the ocean darkening from the shallow shelf to deep water and a light haze toward
+the horizon. US state names and nearby city names lie on the ground, with detailed aircraft models
+and the track drawn at altitude (GPS or pressure, selectable, GPS by default). Pan and zoom with the mouse. **Real Scale (3D)** draws the aircraft at
 its true size and adds faint flight-level reference planes so climbs and descents read against them,
 which can overexaggerate.
 
@@ -156,13 +157,16 @@ the first radar volume downloads, and greys out as "TDR Unavailable" for mission
 Doppler radar. Click **TDR** to unfold its controls.
 
 The radar draws on whichever tracker is showing, 2D or 3D, while the MMR video keeps playing.
-Unfolding the section loads the radar, and every layer is selected when the first volume arrives, so
-it draws right away; pick layers to narrow it, and **None** turns it off. The first time the radar shows with every leg
+Unfolding the section loads the radar, and layers are selected when the first volume arrives, so it
+draws right away: every layer in 3D, and on the 2D map 500 mb and below (about 0 to 5.6 km). Until
+you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick
+layers to narrow it, and **None** turns it off. The first time the radar shows with every leg
 downloaded, playback pauses and the playhead runs over all the legs in 4 seconds so the radar scans in;
 the MMR video and satellite imagery follow it, and Auto-Sync rechecks the clock where it stops.
 
-**Legs** has one button per radar leg. A leg button shows that leg alone, at its end; click it again
-for all legs. **Eye Pass** jumps to the leg's closest approach to the storm center. **Layers** lists
+**TDR Legs** has one button per radar leg, named by its number and time window (for example
+Leg 1 · 22:00-22:30Z). A leg's button shows that leg alone, at its end; click it again for all legs. **Jump to Eye**, at the
+right of a leg's row, jumps to that leg's closest approach to the storm center. **Layers** lists
 the levels grouped into bands, to display alone or combined, with **All** and **None** above them. Each band row shows the geometric altitude span it
 selects, labelled with the millibar level that altitude corresponds to in the *standard* atmosphere.
 The radar grid is geometric km, so that millibar figure is a name for the height rather than an
@@ -187,8 +191,7 @@ the flight data.
 
 **Auto-Sync** runs OCR over the whole video frame looking for the burned-in clock (usually bottom
 right, though exports vary) and locks onto the time that advances with the video, so a static number
-elsewhere on screen is ignored. A green pulse means OCR is active, and a "Syncing" pill shows while it
-searches. While it syncs, the timeline slider is hidden and "Syncing MMR to flight data..." shows in
+elsewhere on screen is ignored. A "Syncing" pill shows while it searches. While it syncs, the timeline slider is hidden and "Syncing MMR to flight data..." shows in
 its place, so a scrub cannot move the video mid-scan. A short "Synced!" message confirms the lock.
 **Sync Now** forces a lock, and a few clicks on a clear frame help. Readings are checked against
 the flight's own time range, so a misread outside the flight is discarded.

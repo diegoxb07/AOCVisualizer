@@ -1138,7 +1138,7 @@
        no-op safely when no flight is loaded yet. */
     (function persistDisplayPrefs() {
         // toggleRealScale is deliberately absent: Real Scale always starts off, never remembered.
-        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
+        const PREF_IDS = ['toggleSI', 'toggle8Hz', 'togglePfd', 'toggleMetricHud', 'togglePitchHud', 'simpleTrackerIcon', 'trackerModeSelect', 'pathColorSelect', 'barbColorSelect', 'trackAltSelect'];
         const KEY = 'aocVizPrefs';
         try {
             const saved = JSON.parse(localStorage.getItem(KEY) || '{}');

@@ -20,8 +20,8 @@
    unavailable. Product is 'xy' (ground-relative), not 'xy_rel': each analysis is placed at
    its real-world origin on the earth-fixed map, which is already the ground frame; xy_rel
    (storm motion removed) suits the API's own storm-centered time composites instead.
-   Pre-2021 missions use a lat/lon grid the sweep endpoint rejects with a 400; those analyses
-   are marked errored and skipped, and the panel's failed-load note retries on click. */
+   An analysis whose volume fails to load is marked errored and its leg is dropped; when every
+   leg fails, the section folds and its button locks (updateTdrPickerBtn). */
 
     let tdrAnalyses = [];       // { hhmm, sec, state: 'idle'|'loading'|'ready'|'error', mesh }
     let tdrMissionId = '';      // mission the current analyses belong to, '' = none
@@ -53,12 +53,11 @@
     let tdrSliceLine = null;          // committed { A, B } endpoints, drawn while the modal is up
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrSectionOpen = false;       // the Overlays TDR section is unfolded: its rows need data, so fetching starts
-    let tdrIntroDone = false;         // the once-per-flight fly-through over every leg has run
+    let tdrIntroDone = false;         // the once-per-flight jump to the end of the last leg has run
     let tdrAutoPicked = false;        // the first volume of this flight has preselected the view's layers
     let tdrSelectionIsAuto = false;   // the picked layers are still that automatic pick (no row, All, or None click since)
     let tdrCamFixed = false;          // the 3D camera is parked zoomed out over the radar's center
     let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
-    let tdrIntroRaf = 0;              // its animation frame handle, cancelled on a new flight
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
     let tdrEyeActive = false;         // within the picked leg: true shows its eye pass, false its whole span
     let tdrScanWall = null;           // vertical section wall riding the reveal frontier at the aircraft
@@ -103,7 +102,6 @@
         const opValReset = document.getElementById('tdr2dOpacityVal'); if (opValReset) opValReset.textContent = '85%';
         tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         tdrAnyFetched = false;
-        if (tdrIntroRaf) cancelAnimationFrame(tdrIntroRaf);
         tdrIntroDone = false; tdrAutoPicked = false; tdrSelectionIsAuto = false;
         if (tdrScanWall) {
             if (tdrScanWall.geometry) tdrScanWall.geometry.dispose();
@@ -113,10 +111,10 @@
         _tdrScanWallSec = -1;
         bgNeedsUpdate = true;
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.style.display = 'none';
-        const sk = document.getElementById('tdrPickerSkel'); if (sk) sk.style.display = 'none';
+        if (grp) grp.classList.remove('tdr-probing');
         const pb = document.getElementById('tdrPickerBtn');
         if (pb) {
-            pb.disabled = false; pb.classList.remove('opacity-60'); pb.style.display = '';
+            pb.disabled = false; pb.classList.remove('opacity-60'); delete pb.dataset.tdrFailed;
             if (pb.dataset.defaultTitle) pb.title = pb.dataset.defaultTitle;
         }
         const sm = document.getElementById('tdrSliceModal'); if (sm) sm.style.display = 'none';
@@ -144,14 +142,19 @@
         if (!idMatch) return;
         const id = idMatch[1];
         if (typeof RECON_API_BASE === 'undefined' || typeof reconAuthHeaders !== 'function') return;
-        // the section shimmers in the Overlays dropdown while the probe runs, resolving to its
-        // button, instead of a button popping in from nowhere when the archive answers.
-        const grp0 = document.getElementById('tdrControlGroup'); if (grp0) grp0.style.display = 'block';
-        const skel0 = document.getElementById('tdrPickerSkel'); if (skel0) skel0.style.display = '';
-        const pb0 = document.getElementById('tdrPickerBtn'); if (pb0) pb0.style.display = 'none';
+        // while the probe runs the TDR row shows in the Overlays dropdown with its label pulsing gray
+        // and the button disabled, instead of a button popping in from nowhere when the archive answers.
+        const grp0 = document.getElementById('tdrControlGroup');
+        if (grp0) { grp0.style.display = 'block'; grp0.classList.add('tdr-probing'); }
+        const pb0 = document.getElementById('tdrPickerBtn');
+        if (pb0) {
+            if (!pb0.dataset.defaultTitle) pb0.dataset.defaultTitle = pb0.title;
+            pb0.disabled = true; pb0.title = 'Checking the archive for Tail Doppler Radar...';
+        }
         const tdrProbeResolve = hasTdr => {
-            const sk = document.getElementById('tdrPickerSkel'); if (sk) sk.style.display = 'none';
-            const pb = document.getElementById('tdrPickerBtn'); if (pb) pb.style.display = '';
+            if (grp0) grp0.classList.remove('tdr-probing');
+            const pb = document.getElementById('tdrPickerBtn');
+            if (pb) { pb.disabled = false; pb.title = pb.dataset.defaultTitle; }
             if (!hasTdr) {
                 // No TDR for this mission: the button greys out instead of vanishing, so the
                 // control reads as answered rather than missing.
@@ -465,7 +468,7 @@
                     let autoPicked = false;
                     if (!tdrSelectedKm.size && !tdrAutoPicked) {
                         // the flight's first volume with nothing picked selects the view's default
-                        // layers (tdrDefaultLevels), so the radar shows (and the fly-through can run)
+                        // layers (tdrDefaultLevels), so the radar shows (and the jump to the last leg can run)
                         // without a pick first. once per flight: a later None stays off as legs arrive.
                         tdrDefaultLevels(a.levels).forEach(km => tdrSelectedKm.add(km));
                         tdrAutoPicked = true; tdrSelectionIsAuto = true; autoPicked = true;
@@ -757,7 +760,7 @@
             if (!next) next = tdrAnalyses.find(x => x.state === 'idle');
             if (next) fetchTdrAnalysis(next);
         }
-        if (!tdrIntroDone) tdrIntroSweep();
+        if (!tdrIntroDone) tdrIntroJump();
     }
 
     // 2D picker overlay
@@ -863,14 +866,28 @@
         if (!lbl) return;
         // while the first volume downloads the section header shows TDR Loading..., so its rows never
         // read as ready before any layer can display. that lasts only while a leg is still pending: when
-        // every leg failed to load (some older missions' radar grids cannot be read), the header reads TDR
-        // Failed to Load and the section's note offers a retry.
+        // every leg failed to load (the archive could not fetch the radar files from their source), the
+        // header reads TDR Failed to Load, the section folds, and the button cannot unfold it.
         const anyReady = tdrAnalyses.some(x => x.state === 'ready');
         const pending = tdrAnalyses.some(x => x.state === 'idle' || x.state === 'loading');
         const allFailed = tdrAnalyses.length > 0 && tdrAnalyses.every(x => x.state === 'error');
         const loading = !anyReady && pending && (tdrFetchActive || tdrAnyFetched);
         lbl.textContent = loading ? 'TDR Loading...' : (allFailed ? 'TDR Failed to Load' : 'TDR');
-        if (btn) btn.classList.toggle('opacity-60', loading || allFailed);
+        if (btn) {
+            btn.classList.toggle('opacity-60', loading || allFailed);
+            if (allFailed && !btn.dataset.tdrFailed) {
+                btn.dataset.tdrFailed = '1';
+                if (!btn.dataset.defaultTitle) btn.dataset.defaultTitle = btn.title;
+                tdrFoldSection();
+                if (typeof positionSatPicker === 'function') positionSatPicker();
+                btn.disabled = true;
+                btn.title = 'The radar for this flight could not be loaded. Load the flight again to retry.';
+            } else if (!allFailed && btn.dataset.tdrFailed) {
+                delete btn.dataset.tdrFailed;
+                btn.disabled = false;
+                btn.title = btn.dataset.defaultTitle;
+            }
+        }
         // the loading ring over the skeleton layer rows shows while that first volume downloads
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.classList.toggle('tdr-is-loading', loading);
         // the Overlays button lights while any overlay draws, the radar included
@@ -976,15 +993,7 @@
             if (!tdrAnalyses.length || tdrAnalyses.every(x => x.state === 'error')) {
                 const d = document.createElement('div');
                 d.className = 'tdr-hero-note';
-                if (tdrAnalyses.length) {
-                    d.textContent = 'Radar data failed to load. Click here to retry.';
-                    d.style.cursor = 'pointer';
-                    d.addEventListener('click', () => {
-                        tdrAnalyses.forEach(x => { if (x.state === 'error') x.state = 'idle'; });
-                        buildTdrHero();
-                        updateTdr3D();
-                    });
-                } else d.textContent = 'No radar analyses for this flight.';
+                d.textContent = tdrAnalyses.length ? 'Radar data failed to load.' : 'No radar analyses for this flight.';
                 list.appendChild(d);
                 return;
             }
@@ -1041,43 +1050,32 @@
         if (final && typeof scheduleOcrRecheck === 'function') scheduleOcrRecheck();
     }
 
-    // A 4-second fly-through over every radar leg, once per flight, the first time the radar shows
-    // with every leg downloaded: the radar scans in as the playhead crosses each leg, so the loaded
-    // data is visible at once. Playback pauses for it. The MMR video follows through tdrSeekVideo and
-    // the satellite through updateVisualComponents. Scrubbing, playing, picking a leg, or None stops
-    // it; while an MMR sync has the timeline locked, it starts only once that sync finishes.
-    function tdrIntroSweep() {
+    // Once per flight, the first time the radar shows with every leg downloaded, the playhead jumps to
+    // the end of the last leg, where every leg's radar is complete, so the loaded data is visible at
+    // once. Playback pauses there. The MMR video follows through tdrSeekVideo and the satellite through
+    // updateVisualComponents. It waits while the user scrubs, and while an MMR sync has the timeline
+    // locked it runs only once that sync finishes.
+    function tdrIntroJump() {
         if (tdrIntroDone || !tdrSelectedKm.size || !tdrAnalyses.length || !filteredData.length) return;
         if (tdrAnalyses.some(x => x.state === 'idle' || x.state === 'loading')) return;   // every leg downloads first
-        if (!tdrAnalyses.some(x => x.state === 'ready')) return;
+        const ready = tdrAnalyses.filter(x => x.state === 'ready');
+        if (!ready.length) return;
         if (typeof isScrubbing !== 'undefined' && isScrubbing) return;
         if ((typeof syncLockActive === 'function' && syncLockActive()) || (typeof isOcrRunning !== 'undefined' && isOcrRunning)) return;
         tdrIntroDone = true;
+        if (tdrLegPick) return;   // a leg the user already picked keeps its view
         if (typeof isPlaying !== 'undefined' && isPlaying) {
             isPlaying = false;
             if (typeof videoLoaded !== 'undefined' && videoLoaded) video.pause();
             if (typeof playPauseBtn !== 'undefined' && playPauseBtn) playPauseBtn.innerText = 'Play';
         }
-        const t0 = tdrAnalyses[0].startSec;
-        const tEnd = tdrAnalyses[tdrAnalyses.length - 1].stopSec + 60;
-        const begun = performance.now();
-        const gen = tdrGeneration;
-        let cursor = 0;
-        const step = now => {
-            if (gen !== tdrGeneration) return;
-            if ((typeof isScrubbing !== 'undefined' && isScrubbing) || (typeof isPlaying !== 'undefined' && isPlaying) || tdrLegPick || !tdrSelectedKm.size) return;
-            const f = Math.min(1, (now - begun) / 4000);
-            const target = t0 + (tEnd - t0) * f;
-            while (cursor < filteredData.length - 1 && filteredData[cursor].absSeconds < target) cursor++;
-            if (cursor !== currentIdx) {
-                currentIdx = cursor;
-                tdrSeekVideo(false);
-                if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
-            }
-            if (f < 1) tdrIntroRaf = requestAnimationFrame(step);
-            else tdrSeekVideo(true);
-        };
-        tdrIntroRaf = requestAnimationFrame(step);
+        const tEnd = ready[ready.length - 1].stopSec;
+        let idx = filteredData.findIndex(r => r.absSeconds >= tEnd);
+        if (idx < 0) idx = filteredData.length - 1;
+        currentIdx = idx;
+        tdrSeekVideo(true);
+        if (typeof updateVisualComponents === 'function') updateVisualComponents(currentIdx);
+        buildTdrHero();
     }
 
     // cross-section (top-down pick on the 2D map, rendered by /v1/tdr/plane_slice)

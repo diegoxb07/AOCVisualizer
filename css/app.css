@@ -148,9 +148,9 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 /* when the recon api is offline, manual upload is the only way in, so enlarge the upload button
    to make it obvious. toggled by updateReconApiUiState in js/02-satellite.js. */
 #dataDropZone.data-drop-emph { padding: 7px 12px; gap: 6px; }
-/* while offline the manual-upload cluster is relocated over the archive pickers (js/02-satellite.js);
-   center it in the overlay (the "API Offline" pill stays left in the flow underneath) */
-#uploadApiOfflineToastWrapper #manualUploadWrap { position: absolute; left: 33%; top: 42%; transform: translate(-50%, -50%); }
+/* while offline the manual-upload cluster is relocated over the archive pickers (js/02-satellite.js),
+   in the flow right after the "API Offline" pill and offset the same way as the pill */
+#uploadApiOfflineToastWrapper #manualUploadWrap { transform: translate(8px, -5px); margin-left: 4px; }
 #dataDropZone.data-drop-emph span { font-size: 12px; }
 #dataDropZone.data-drop-emph #dataDropLabel { max-width: 200px; }
 
@@ -199,7 +199,16 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #tdrControlGroup.tdr-is-loading .tdr-layers-spin { display: block; }
 .tdr-expand-body { padding: 0 4px 6px; }
 .tdr-expand-body .tdr-level-hero { max-height: none; overflow: visible; }
-#tdrControlGroup .tdr-btn-skel { display: block; margin: 6px 8px; }
+/* while the archive is checked for radar (initTdrForFlight) the row keeps the Satellite row's size and
+   only its label pulses gray, like the menu labels while the archive's year list loads */
+#tdrControlGroup.tdr-probing #tdrPickerBtnLabel { animation: ovTextPulse 1.3s ease-in-out infinite; }
+/* a disabled TDR button (checking, unavailable, or failed to load) cannot unfold, so it drops the caret */
+#tdrPickerBtn:disabled .ov-caret { visibility: hidden; }
+#tdrControlGroup.tdr-probing #tdrPickerBtn { cursor: progress; }
+@keyframes ovTextPulse {
+    0%, 100% { color: color-mix(in oklab, var(--text) 30%, transparent); }
+    50% { color: color-mix(in oklab, var(--text) 65%, transparent); }
+}
 #tdrPickerBtn:disabled { cursor: not-allowed; }
 .ov-sat-row { gap: 7px; }
 .ov-sat-expand { display: flex; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; background: transparent; border: none; padding: 0; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
@@ -560,10 +569,6 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .tdr-level-alt { display: block; font-size: 8.5px; font-weight: 500; color: var(--text-faint); letter-spacing: 0.01em; }
 .tdr-level-bar { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--accent) 30%, transparent); }
 .tdr-hero-note { font-size: 10.5px; color: var(--text-faint); padding: 6px 2px; }
-@keyframes tdrskel { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.9; } }
-/* placeholder while the TDR probe runs: the section shimmers in place instead of the button
-   popping in once the archive answers. */
-.tdr-btn-skel { display: inline-block; width: 78px; height: 26px; border-radius: 4px; background: color-mix(in oklab, var(--text-faint) 25%, transparent); animation: tdrskel 1.2s ease-in-out infinite; }
 /* Floating (picture-in-picture) media panels: dragged out of the media bar by their outline
    (js/11c-float-panels.js). z 1400/1401 sits above the sticky media bar (1000), below a pinned
    panel (1500) and the sticky bottom bar (2000). The height chain runs through flex, and the
@@ -676,6 +681,8 @@ body.media-collapsed .float-panel { display: none !important; }
 /* Hide the pitch/roll box until it actually has telemetry, otherwise it's an odd empty bordered
    square floating in the 3D view before a flight is loaded. */
 #attitudeHud:empty { display: none !important; }
+/* Metric HUD and Pitch HUD (3D) unchecked in Settings (syncHudToggles in js/07-ui-controls.js) */
+#mapPanel.metric-hud-off #hudOverlay, #mapPanel.pitch-hud-off #attitudeHud { display: none !important; }
 #cmdSyncGroup { display: none; }
 #cmdSyncGroup:has(#forceSyncBtn[style*="inline-block"]) { display: flex; }
 

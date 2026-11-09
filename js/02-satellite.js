@@ -306,11 +306,14 @@
         }
         // the batch load and pre-cache menu items follow the api state too (js/12b-recon-archive.js)
         if (typeof syncReconLoadButtonState === 'function') syncReconLoadButtonState();
-        // the "use manual upload instead" hint sits below the upload button, only while offline
+        // while offline the upload is the only way in, so the zone drops the "or" and a hint to its right
+        // points back at it
+        const uploadPrefix = document.getElementById('dataDropPrefix');
+        if (uploadPrefix) uploadPrefix.textContent = apiDown ? 'Upload:' : 'or upload:';
         const manualUploadHint = document.getElementById('manualUploadHint');
         if (manualUploadHint) manualUploadHint.classList.toggle('hidden', !apiDown);
-        // when offline, relocate the manual-upload cluster to cover the dead archive pickers (next to the
-        // "API Offline" pill) instead of leaving it up in the label row; move it back when online.
+        // when offline, relocate the manual-upload cluster over the dead archive pickers, right after the
+        // "API Offline" pill, instead of leaving it in the row below; move it back when online.
         const manualUploadWrap = document.getElementById('manualUploadWrap');
         const loadGroup = document.getElementById('loadFlightDataGroup');
         if (manualUploadWrap && loadGroup && uploadApiOfflineToastWrapper) {

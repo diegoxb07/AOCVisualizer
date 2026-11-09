@@ -22,7 +22,7 @@ Repository: https://github.com/diegoxb07/AOCVisualizer
 flowchart TD
     START(["Open the app"]) --> ARCHIVE{"Archive dropdowns available?<br>(Year / Storm / Flight)"}
     ARCHIVE -- "Yes" --> LOADARC["Pick <b>Year → Storm → Flight</b><br>click <b>⤓ Load Flight + Storm Track</b><br>(full-res NetCDF + storm best-track)"]
-    ARCHIVE -- "No, API Offline banner" --> UPLOAD["Drop your <b>.nc</b> file<br>on the <b>or upload:</b> zone"]
+    ARCHIVE -- "No, API Offline banner" --> UPLOAD["Drop your <b>.nc</b> file<br>on the <b>Upload:</b> zone"]
     LOADARC --> LOADED["Flight loaded: map, charts populate"]
     UPLOAD --> LOADED
     LOADED --> MMR{"Have an MMR video<br>for this flight?"}
@@ -90,7 +90,8 @@ with it. The **↓ .nc** link downloads the file the tool pulled. Refreshing the
 everything back to a fresh session.
 
 **By hand** (works with the API offline). Drop the `.nc` file, for example `20221028H1_A.nc`, on the
-"or upload:" zone. A manually loaded flight has no storm best-track.
+"or upload:" zone, which reads "Upload:" next to the "API Offline" banner while the API is offline. A
+manually loaded flight has no storm best-track.
 
 Either way the mission joins **Previously Loaded Missions**, so you can reopen it or switch between
 flights later, even after a refresh. Opening a different flight unloads the MMR video and resets the
@@ -140,7 +141,8 @@ which can overexaggerate.
 The **Settings** menu at the right end of the bottom bar has **Track Color Type** (wind speed, or
 warming and cooling), **Wind Barb Preset**
 (wind speed, or hurricane wind field), **3D Altitude Track** (GPS or pressure altitude for the 3D
-height), and **Simple Icon (2D)**. The ⛶ button fullscreens any block.
+height), **Metric HUD** and **Pitch HUD (3D)** (both on by default), and **Simple Icon (2D)**. The ⛶
+button fullscreens any block.
 
 Under hurricane wind field coloring, barbs (and the track, in that mode) stay black until the
 flight-level data records hurricane-force winds. Color starts at 64 kt and steps through the
@@ -162,8 +164,10 @@ Unfolding the section loads the radar, and layers are selected when the first vo
 draws right away: every layer in 3D, and on the 2D map 500 mb and below (about 0 to 5.6 km). Until
 you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick
 layers to narrow it, and **None** turns it off. The first time the radar shows with every leg
-downloaded, playback pauses and the playhead runs over all the legs in 4 seconds so the radar scans in;
-the MMR video and satellite imagery follow it, and Auto-Sync rechecks the clock where it stops.
+downloaded, playback pauses and the playhead jumps to the end of the last leg, where every leg's radar
+is complete; the MMR video and satellite imagery follow it, and Auto-Sync rechecks the clock there.
+If every leg fails to load, the section folds and its button reads **TDR Failed to Load** and stays
+locked; load the flight again to retry.
 
 **TDR Legs** has one button per radar leg, named by its number and time window (for example
 Leg 1 · 22:00-22:30Z). A leg's button shows that leg alone, at its end; click it again for all legs. **Jump to Eye**, at the
@@ -265,13 +269,14 @@ accelerations, pressure, thermodynamics) follow playback like everything else. �
 or removes series, and scroll or drag zooms and pans. The dashed **Create Graph** box under the
 charts plots any variables the file contains against each other.
 
-Three filters are in the **Settings** menu at the right end of the bottom bar. **Cockpit PFD**
+The filters are in the **Settings** menu at the right end of the bottom bar. **Cockpit PFD**
 brings up a primary flight display with an attitude ladder, airspeed, altitude and heading tapes, VSI, a bank scale with a slip/skid indicator,
 wind box, ground-track diamond, and OAT/GS/TAS/IAS readouts; the VSI, GS and the slip/skid ball are
 computed rather than recorded, which the derivations appendix covers. **S.I Units** switches the
 readouts to metric, since they are imperial by default. **GPS→Press Alt** switches the PFD altitude
-tape from GPS to pressure altitude when both exist. The HUD box on the map shows live telemetry
-text.
+tape from GPS to pressure altitude when both exist. The **Metric HUD** box on the map shows live
+telemetry text, and the **Pitch HUD (3D)** box shows pitch, roll, heading, and track on the 3D map;
+both are on by default and each can be turned off there.
 
 **8Hz Smoothing** in the map header interpolates between the 1-second samples for a more fluid
 playback. The sub-second motion it adds is synthesized, not recorded: its amplitude scales with the

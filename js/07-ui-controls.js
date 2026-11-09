@@ -1298,6 +1298,17 @@
         if (filteredData.length > 0) { const pfd = document.getElementById('pfdOverlay'); pfd.style.display = e.target.checked ? 'block' : 'none'; resizeCanvasLayout(); updateVisualComponents(currentIdx); }
     });
 
+    // Metric HUD and Pitch HUD (3D) in Settings: a class on the map panel hides each box (css/app.css),
+    // so the code that fills and shows them runs unchanged. the pitch box then rechecks its spot,
+    // since it sits beside the metric hud only when the two would overlap.
+    const syncHudToggles = () => {
+        mapPanel.classList.toggle('metric-hud-off', !document.getElementById('toggleMetricHud').checked);
+        mapPanel.classList.toggle('pitch-hud-off', !document.getElementById('togglePitchHud').checked);
+        if (typeof fitAttitudeHud === 'function') fitAttitudeHud();
+    };
+    document.getElementById('toggleMetricHud').addEventListener('change', syncHudToggles);
+    document.getElementById('togglePitchHud').addEventListener('change', syncHudToggles);
+
     document.getElementById('toggleSI').addEventListener('change', () => { if (filteredData.length > 0) { buildChartLayout(); updateVisualComponents(currentIdx); } });
     document.getElementById('toggleGpsAlt').addEventListener('change', () => { if (filteredData.length > 0) { if (trackerModeSelect.value === '3d') build3DScene(); updateVisualComponents(currentIdx); } });
     

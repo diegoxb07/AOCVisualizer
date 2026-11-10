@@ -1193,7 +1193,7 @@
         const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-h')) || 0;
         const maxH = Math.max(160, Math.min(560, window.innerHeight - (r.bottom + 4) - barH - 8));
         panel.style.maxHeight = maxH + 'px';
-        // side by side, the TDR and Satellite columns each scroll on their own (css/app.css), within the
+        // with only the TDR section unfolded, its column scrolls on its own (css/app.css), within the
         // height left under the head and toggle rows
         const cols = panel.querySelector('.ov-columns');
         if (cols) panel.style.setProperty('--ov-col-max', Math.max(80, Math.floor(maxH - (cols.getBoundingClientRect().top - panel.getBoundingClientRect().top))) + 'px');

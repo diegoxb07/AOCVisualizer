@@ -192,16 +192,17 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { flex: none; width: 120px; min-width: 0; }
 .ov-columns > #tdrControlGroup:has(#tdrExpandBody:not(.hidden)), .ov-columns > #ovSatSection:has(#satExpandBody:not(.hidden)) { width: 238px; }
 @media (max-width: 560px) { .ov-columns { flex-direction: column; } .ov-columns > #ovSatSection { margin: -1px 0 0; } }
-/* side by side, each column scrolls inside its own border, so a long section's scrollbar runs down its
-   own right edge rather than past a folded neighbor. --ov-col-max is the height left under the head and
-   toggle rows (positionSatPicker in js/07-ui-controls.js). stacked in a narrow window, the panel
-   scrolls as one instead. */
+/* with only the TDR section unfolded, its column scrolls inside its own border, so the scrollbar runs
+   down its right edge rather than past the folded satellite column. --ov-col-max is the height left
+   under the head and toggle rows (positionSatPicker in js/07-ui-controls.js). once the satellite
+   section unfolds, or in a narrow window that stacks the columns, the panel scrolls as one, with the
+   scrollbar at its far right. */
 @media (min-width: 561px) {
-    .sat-picker-panel { overflow-y: hidden; }
-    .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { max-height: var(--ov-col-max, none); overflow-y: auto; }
-    .ov-columns > #tdrControlGroup::-webkit-scrollbar, .ov-columns > #ovSatSection::-webkit-scrollbar { width: 6px; }
-    .ov-columns > #tdrControlGroup::-webkit-scrollbar-track, .ov-columns > #ovSatSection::-webkit-scrollbar-track { background: transparent; }
-    .ov-columns > #tdrControlGroup::-webkit-scrollbar-thumb, .ov-columns > #ovSatSection::-webkit-scrollbar-thumb { border: none; border-radius: 3px; }
+    .sat-picker-panel:has(#tdrExpandBody:not(.hidden)):has(#satExpandBody.hidden) { overflow-y: hidden; }
+    .sat-picker-panel:has(#satExpandBody.hidden) .ov-columns > #tdrControlGroup:has(#tdrExpandBody:not(.hidden)) { max-height: var(--ov-col-max, none); overflow-y: auto; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar { width: 6px; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar-track { background: transparent; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar-thumb { border: none; border-radius: 3px; }
 }
 /* the loading ring centered over the skeleton layer rows while the first radar volume downloads */
 .tdr-layers-wrap { position: relative; }

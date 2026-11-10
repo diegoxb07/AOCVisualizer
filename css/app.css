@@ -179,8 +179,7 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .ov-check { flex: none; width: 15px; height: 15px; border: 1.5px solid color-mix(in oklab, var(--text-faint) 85%, transparent); border-radius: 3px; background: transparent; position: relative; transition: background 0.12s, border-color 0.12s; }
 .ov-native-check:checked ~ .ov-check { background: var(--accent); border-color: var(--accent); }
 .ov-native-check:checked ~ .ov-check::after { content: ''; position: absolute; left: 4.5px; top: 1px; width: 4px; height: 8px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
-/* TDR and Satellite sections: an expander header over a collapsible body. the TDR rows lay out in
-   the panel's own scroll, so the layer list has no scrollbar of its own there. */
+/* TDR and Satellite sections: an expander header over a collapsible body. */
 #ovSatSection, #tdrControlGroup { padding: 3px 6px 6px; border-radius: 0 0 4px 4px; }
 /* the two sections are side by side as columns: a folded section is only as wide as its header, and
    an unfolded one is a full 238px column, so unfolding one never widens the other. with no TDR for
@@ -193,6 +192,17 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { flex: none; width: 120px; min-width: 0; }
 .ov-columns > #tdrControlGroup:has(#tdrExpandBody:not(.hidden)), .ov-columns > #ovSatSection:has(#satExpandBody:not(.hidden)) { width: 238px; }
 @media (max-width: 560px) { .ov-columns { flex-direction: column; } .ov-columns > #ovSatSection { margin: -1px 0 0; } }
+/* side by side, each column scrolls inside its own border, so a long section's scrollbar runs down its
+   own right edge rather than past a folded neighbor. --ov-col-max is the height left under the head and
+   toggle rows (positionSatPicker in js/07-ui-controls.js). stacked in a narrow window, the panel
+   scrolls as one instead. */
+@media (min-width: 561px) {
+    .sat-picker-panel { overflow-y: hidden; }
+    .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { max-height: var(--ov-col-max, none); overflow-y: auto; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar, .ov-columns > #ovSatSection::-webkit-scrollbar { width: 6px; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar-track, .ov-columns > #ovSatSection::-webkit-scrollbar-track { background: transparent; }
+    .ov-columns > #tdrControlGroup::-webkit-scrollbar-thumb, .ov-columns > #ovSatSection::-webkit-scrollbar-thumb { border: none; border-radius: 3px; }
+}
 /* the loading ring centered over the skeleton layer rows while the first radar volume downloads */
 .tdr-layers-wrap { position: relative; }
 .tdr-layers-spin { display: none; position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; }

@@ -1172,19 +1172,31 @@
     // the panel is position:fixed (see app.css) so it escapes the map header's z-20 stacking context
     // and layers above the pfd and hud overlays. anchor it under the button with its left edge at the
     // button's, so the TDR and Satellite columns extend right, over the MMR video beside the map
-    // rather than the map whose overlays they change; near the window's right edge it shifts left
-    // only as far as it needs to stay on screen.
+    // rather than the map whose overlays they change. its right edge stops at the media row's inner
+    // edge: flush with the map header's ⛶ button when the map stands alone, or the same distance
+    // inside the MMR panel's edge when the video sits beside the map; past that it shifts left.
     function positionSatPicker() {
         const panel = document.getElementById('satPickerPanel'), btn = document.getElementById('satPickerBtn');
         if (!panel || !btn || panel.classList.contains('hidden')) return;
         const r = btn.getBoundingClientRect();
         panel.style.top = (r.bottom + 4) + 'px';
         panel.style.right = 'auto';
-        panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - panel.offsetWidth - 8)) + 'px';
+        const grid = document.getElementById('mediaGrid');
+        const mpR = mapPanel.getBoundingClientRect();
+        const inset = Math.max(0, mpR.right - fullscreenMapBtn.getBoundingClientRect().right);
+        // a floating or fullscreen map leaves the media row, so its own panel bounds the dropdown
+        const alone = !grid || mapPanel.classList.contains('float-panel') || mapPanel.classList.contains('fake-fs') || document.fullscreenElement === mapPanel;
+        const edge = Math.min(window.innerWidth - 8, (alone ? mpR.right : grid.getBoundingClientRect().right) - inset);
+        panel.style.left = Math.max(8, Math.min(r.left, edge - panel.offsetWidth)) + 'px';
         // end above the fixed playback bar (its live height is published as --bottom-bar-h by
         // js/11-layout.js), so an unfolded TDR section scrolls inside the panel instead of covering it
         const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-h')) || 0;
-        panel.style.maxHeight = Math.max(160, Math.min(560, window.innerHeight - (r.bottom + 4) - barH - 8)) + 'px';
+        const maxH = Math.max(160, Math.min(560, window.innerHeight - (r.bottom + 4) - barH - 8));
+        panel.style.maxHeight = maxH + 'px';
+        // side by side, the TDR and Satellite columns each scroll on their own (css/app.css), within the
+        // height left under the head and toggle rows
+        const cols = panel.querySelector('.ov-columns');
+        if (cols) panel.style.setProperty('--ov-col-max', Math.max(80, Math.floor(maxH - (cols.getBoundingClientRect().top - panel.getBoundingClientRect().top))) + 'px');
     }
     function openSatPicker() {
         const panel = document.getElementById('satPickerPanel');
@@ -1195,7 +1207,9 @@
         if (sat && sat.value !== 'none') satPickerExpanded = sat.value;
         renderSatPickerPanel();
         panel.classList.remove('hidden');
-        panel.scrollTop = 0;   // always reopen scrolled to the top
+        // always reopen scrolled to the top, the panel and each column alike
+        panel.scrollTop = 0;
+        panel.querySelectorAll('.ov-columns > *').forEach(c => { c.scrollTop = 0; });
         positionSatPicker();
     }
     function closeSatPicker() { const p = document.getElementById('satPickerPanel'); if (p) p.classList.add('hidden'); }
@@ -1256,6 +1270,12 @@
         // keep the fixed panel glued to the button as the page or media bar scrolls or the window resizes.
         window.addEventListener('resize', positionSatPicker);
         window.addEventListener('scroll', positionSatPicker, true);
+        // the panel also grows after it is placed (TDR rows filling in as legs load, a scrollbar once
+        // it outgrows its height), so it re-places itself on every size change
+        const pickerPanel = document.getElementById('satPickerPanel');
+        if (pickerPanel && typeof ResizeObserver !== 'undefined') {
+            try { new ResizeObserver(() => requestAnimationFrame(positionSatPicker)).observe(pickerPanel); } catch (e) {}
+        }
         // satellite tile opacity: redraw the map background at the new alpha as the user drags
         const opacitySlider = document.getElementById('satOpacitySlider'), opacityVal = document.getElementById('satOpacityVal');
         if (opacitySlider) opacitySlider.addEventListener('input', () => {

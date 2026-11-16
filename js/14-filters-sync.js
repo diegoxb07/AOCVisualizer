@@ -6,7 +6,7 @@
         isPlaying = false; playPauseBtn.innerText = "Play"; if (animationFrameId) cancelAnimationFrame(animationFrameId);
 
         const sLim = timeToSeconds(document.getElementById('startTimeInput').value); const eLim = timeToSeconds(document.getElementById('endTimeInput').value); videoStartSeconds = timeToSeconds(document.getElementById('videoStartInput').value);
-        // Remember the applied time window so the Play button can tell whether the manual window
+        // remember the applied time window so the Play button can check whether the manual window
         // was edited since and needs re-applying before playing.
         window._appliedWindow = document.getElementById('startTimeInput').value + '|' + document.getElementById('endTimeInput').value + '|' + document.getElementById('videoStartInput').value;
         filteredData = allParsedData.filter(d => d.absSeconds >= sLim && (d.absSeconds <= eLim || eLim < sLim && d.absSeconds <= eLim + 86400));
@@ -50,12 +50,13 @@
     }
 
     async function syncTelemetryToVideoClock() {
-        if (!videoLoaded || filteredData.length === 0 || isScrubbing) return;
+        // a clip render seeks the video frame by frame, which must not start Auto-Sync rescans
+        if (!videoLoaded || filteredData.length === 0 || isScrubbing || clipRenderSec != null) return;
         const mode = videoSyncMode.value, now = performance.now();
 
         if (mode === 'auto' && !isOcrRunning) {
             // Re-verify the lock periodically; while a disagreeing offset is pending confirmation,
-            // re-check more often so a genuine correction still lands within seconds, not minutes.
+            // re-check more often so a genuine correction still commits within seconds, not minutes.
             const recheckGap = pendingSyncBase != null ? 4 : 60;
             if (Math.abs(video.currentTime - lastOcrVideoTime) >= recheckGap) forceOcrSyncNextTick = true;
         }
@@ -64,7 +65,7 @@
             isOcrRunning = true; lastOcrTime = now; refreshSyncingIndicator();
             ocrNoteScanStart();
             // Whole frame, native resolution (ocrCaptureFullFrame in js/06-ocr.js): the clock can
-            // sit anywhere depending on the export, and the drift-hunt below already keys on the
+            // be anywhere depending on the export, and the drift search below already keys on the
             // candidate that advances with the video clock.
             const cv = ocrCaptureFullFrame(false);
             // The video clock is read at frame capture: recognize() can take seconds on a playing
@@ -141,7 +142,7 @@
             } else { isOcrRunning = false; }
         }
 
-        // Keep the non-blocking "Syncing..." badge in step with the hunt state every frame.
+        // keep the non-blocking "Syncing..." badge in step with the search state every frame.
         refreshSyncingIndicator();
 
         const targetSec = videoStartSeconds + video.currentTime;

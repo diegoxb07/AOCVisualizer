@@ -4,7 +4,7 @@
 
     function getInterpolatedRow() {
         if (!filteredData || filteredData.length === 0) return null;
-        let exactSec = videoLoaded ? (videoStartSeconds + video.currentTime) : (filteredData[currentIdx].absSeconds + playbackAccumulator);
+        let exactSec = clipRenderSec != null ? clipRenderSec : (videoLoaded ? (videoStartSeconds + video.currentTime) : (filteredData[currentIdx].absSeconds + playbackAccumulator));
         let idx1 = currentIdx;
         if (filteredData[idx1] && filteredData[idx1].absSeconds > exactSec && idx1 > 0) idx1--;
         let d1 = filteredData[idx1]; if (!d1) return null;
@@ -39,7 +39,7 @@
         // micro-motion between the 1 Hz keyframes
         // Amplitude scales with vertical wind (the measured turbulence proxy); shape is smooth
         // band-limited noise (a few sub-2 Hz sinusoids) so it reads as gust response, not static.
-        // In calm air (vtWnd ~ 0) the plane sits still.
+        // in calm air (vtWnd ~ 0) the plane stays still.
         //
         // This motion is SYNTHESIZED, not recorded. It exists to animate the airframe, so it is
         // added only to the fields that draw it (pitch/roll for the rocking, the altitudes for the
@@ -50,7 +50,7 @@
         let turb = 0.10;   // faint baseline only for files with NO vertical-wind channel (never frozen-dead)
         if (d1.vtWnd !== null && d2.vtWnd !== null) turb = Math.min(1, Math.abs(d1.vtWnd + (d2.vtWnd - d1.vtWnd) * t) / 3.0);
         const bandNoise = (ph) => 0.6 * Math.sin(exactSec * 2.3 + ph) + 0.3 * Math.sin(exactSec * 5.9 + ph * 2.1) + 0.1 * Math.sin(exactSec * 11.7 + ph * 3.7);
-        // Vertical bounce is kept small so the plane rides ON the track (a bigger draw threw it visibly
+        // vertical bounce is kept small so the plane stays ON the track (a bigger draw threw it visibly
         // off/below the line, especially at real scale where the plane is tiny). Turbulence is carried by
         // the pitch/roll rocking instead, which tilts the airframe without lifting it off the path.
         let alt_jitter = bandNoise(0.0) * 0.12 * turb;     // metres

@@ -5,8 +5,8 @@
    data/etopo-heightmap.png is a 721x361 (0.5 deg) global ETOPO elevation grid, source NOAA NCEI via
    the CoastWatch ERDDAP (etopo180). Elevation in metres is packed into the R and G channels:
    elev = (R*256 + G) - 11000. Row 0 is the north edge (+90 lat), columns run west (-180) to east.
-   It gives the 3D basemap real land height and tells land from sea, so a flight over high ground sits
-   at the correct height relative to the terrain. */
+   It gives the 3D basemap real land height and separates land from sea, so a flight over high ground is
+   drawn at the correct height relative to the terrain. */
 
     const TERRAIN_OFFSET = 11000;   // packed value = elev + this; see data/etopo-heightmap.png
     let _terrain = null;            // { w, h, data: Float32Array } once the png decodes, else null
@@ -28,8 +28,8 @@
     }
 
     // The padded box the terrain covers, as a multiple of the plot span on each side. It reaches
-    // well past the flight because the camera sits close to the aircraft: at that range the edge of
-    // a tight box lands inside the view, and beyond it there is nothing to draw but the scene
+    // well past the flight because the camera is close to the aircraft: at that range the edge of
+    // a tight box falls inside the view, and beyond it there is nothing to draw but the scene
     // background. The texture sizes below are scaled with it so ground detail holds. Shared, so
     // build3DScene can prime the land mask from it before it drapes anything on the surface.
     const TERRAIN_PAD = 1.2;
@@ -46,7 +46,7 @@
         if (e) buildLandMask(e.lon0, e.lon1, e.lat0, e.lat1);
     }
 
-    // Land is what the country borders enclose, not what sits above sea level, so ground inside a
+    // land is what the country borders enclose, not what is above sea level, so ground inside a
     // coastline reads as land at any height. The borders are rasterised once per extent into a mask
     // and sampled per vertex: testing 14,400 vertices against 242 country outlines of ~100k points
     // between them runs to tens of millions of crossings, while a fill is one native raster and the
@@ -74,7 +74,7 @@
     }
 
     // True inside a country outline. Falls back to sea level while the basemap has not loaded, so a
-    // terrain built before the borders arrive still tells land from water.
+    // terrain built before the borders arrive still separates land from water.
     function isLandAt(lat, lon) {
         const m = _landMask;
         if (!m) return terrainElevationMeters(lat, lon) >= 0;
@@ -297,7 +297,7 @@
 
     // The height the map is drawn at. Land keeps its ground whatever it reads, so a coastline that
     // encloses ground below sea level dips rather than flooding and the aircraft stays over it.
-    // Water lies flat at sea level, but for a pin's reach of a field, where the ground rides up to
+    // water is flat at sea level, except within a pin's reach of a field, where the ground rises to
     // meet the aircraft: an island small enough for the borders to miss still gets its ground.
     // Anything laid on the surface reads this rather than the raw ground.
     function terrainSurfaceMeters(lat, lon) {
@@ -324,7 +324,7 @@
                 const lon = lon0 + (lon1 - lon0) * ix / (NX - 1);
                 const lat = lat0 + (lat1 - lat0) * iy / (NY - 1);
                 // The mesh carries height only; the texture carries land, water and shading. The mask
-                // still decides here whether the ground may dip below sea level.
+                // still sets here whether the ground may dip below sea level.
                 const p = get3DCoord(lon, lat, terrainSurfaceMeters(lat, lon));
                 verts.push(p.x, p.y, p.z);
                 // CanvasTexture flips Y by default, so the canvas's top row (lat1) reads at v=1,

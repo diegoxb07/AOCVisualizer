@@ -34,7 +34,7 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/tailwind.css?v=20261115b">
+    <link rel="stylesheet" href="css/tailwind.css?v=20261115c">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
 
     <!-- the interface font starts loading with the page, so text draws in it from the first frame -->
     <link rel="preload" href="lib/fonts/nunito-sans/nunito-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/app.css?v=20261115b">
+    <link rel="stylesheet" href="css/app.css?v=20261115c">
 </head>
 <body class="font-sans antialiased">
 
@@ -77,13 +77,13 @@
         <div class="menu-group">
             <button id="aviConvertOpenBtn" title="Turn the raw archival AVI recordings into one .mp4 that you can upload as the MMR video" class="menu-item">AVI to MP4 Converter</button>
             <div class="menu-item-wrap">
-                <button id="reconPreloadBtn" disabled title="Download and parse missions from any season now; they are saved on this device and open instantly, including after a reload" class="menu-item">⤓ Batch Load Flight Data</button>
+                <button id="reconPreloadBtn" disabled title="Download missions from any season ahead of time, so they're saved on this device and open instantly, even after a reload" class="menu-item">⤓ Batch Load Flight Data</button>
                         <div id="preloadBtnSpin" class="absolute inset-0 z-10 flex items-center justify-center bg-[color-mix(in_oklab,var(--panel)_40%,transparent)] rounded">
                             <div class="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
                         </div>
             </div>
             <div class="menu-item-wrap">
-                <button id="batchCacheBtn" disabled title="Pre-download satellite imagery to the local cache for one or more flights" class="menu-item">⤓ Pre-Cache Satellite Imagery</button>
+                <button id="batchCacheBtn" disabled title="Download satellite imagery ahead of time for one or more flights" class="menu-item">⤓ Pre-Cache Satellite Imagery</button>
                         <div id="batchBtnSpin" class="absolute inset-0 z-10 flex items-center justify-center bg-[color-mix(in_oklab,var(--panel)_40%,transparent)] rounded">
                             <div class="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
                         </div>
@@ -111,7 +111,7 @@
                                  direct load for any full mission id, so a flight filed under the wrong storm
                                  or buried in Unknown / Training is still findable. -->
                             <div id="missionSearchWrap" class="relative w-full">
-                                <input type="text" id="missionSearchInput" disabled autocomplete="off" placeholder="Search a mission by id, storm, or date (YY-MM-DD)" title="Type a full mission id to load it directly, a storm name alone to find it across all years, or a year plus a storm name / date to search that season" class="w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none focus:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[var(--text-faint)]" />
+                                <input type="text" id="missionSearchInput" disabled autocomplete="off" placeholder="Search a mission by id, storm, or date (YY-MM-DD)" title="Type a full mission id to load it right away, a storm name to find it in every season, or a year with a storm name or date to search just that season" class="w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none focus:border-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-[var(--text-faint)]" />
                                 <div id="missionSearchResults" class="hidden absolute left-0 right-0 top-full mt-1 z-40 max-h-64 overflow-y-auto bg-panel border border-hairline rounded shadow-lg text-[11px]"></div>
                             </div>
                             <select id="reconYearSelect" disabled style="cursor:progress" class="flex-1 min-w-[92px] bg-panel-strip text-ink border border-hairline rounded px-1.5 py-1 text-[11px] outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
@@ -124,7 +124,7 @@
                                 <option value="">Flight...</option>
                             </select>
                             <button id="reconLoadBtn" disabled title="Load this mission's flight-level track and the storm's best-track for its whole life" class="flex-1 min-w-[180px] bg-accent text-accent-ink border border-accent hover:bg-accent rounded px-3 py-1.5 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed ">⤓ Load Flight + Storm Track</button>
-                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Open the original full NetCDF (for full flight-level detail which is richer than the quick-load track)" class="hidden shrink-0 bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">↓ .nc</a>
+                            <a id="reconSourceLink" href="#" target="_blank" rel="noopener" title="Download the original NetCDF file for this mission" class="hidden shrink-0 bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors">↓ .nc</a>
                             <!-- Covers only the API-backed archive pickers while the API is down; the preloaded
                                  dropdown and status line below stay usable for on-device missions. -->
                             <div id="uploadApiOfflineToastWrapper" class="hidden absolute inset-0 z-20 flex flex-row items-center gap-2 bg-[color-mix(in_oklab,var(--bg)_90%,transparent)] rounded pointer-events-none" style="justify-content:flex-start;padding-left:8px;">
@@ -138,7 +138,7 @@
                      over the archive pickers while the api is offline and back here once it recovers -->
                 <div id="loadFlightDataGroup" class="relative flex items-center">
                         <div id="manualUploadWrap" class="shrink-0" style="display:flex;flex-direction:row;align-items:center;gap:6px;">
-                            <div id="dataDropZone" title="Manual upload (.txt or .nc)" class="relative flex items-center gap-1 bg-panel-strip border border-dashed border-hairline-strong rounded px-2 py-1 hover:border-accent hover:bg-elevated transition-colors cursor-pointer group">
+                            <div id="dataDropZone" title="Upload a flight file yourself (.txt or .nc)" class="relative flex items-center gap-1 bg-panel-strip border border-dashed border-hairline-strong rounded px-2 py-1 hover:border-accent hover:bg-elevated transition-colors cursor-pointer group">
                                 <input type="file" id="fileInput" accept=".txt,.nc" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                 <!-- reads "Upload:" while the api is offline (updateReconApiUiState) -->
                                 <span id="dataDropPrefix" class="text-[10px] text-muted normal-case group-hover:text-accent transition-colors whitespace-nowrap">or upload:</span>
@@ -149,12 +149,12 @@
                         </div>
                 </div>
                             <div id="loadedPickerWrap" class="relative flex-1 min-w-[180px]">
-                                <button id="loadedPickerBtn" type="button" disabled title="Missions loaded or batch loaded this session; picking one reopens it instantly, no download or parse wait. Use the red × on a row to remove that flight from this device." class="w-full flex items-center justify-between gap-2 bg-panel-strip text-accent font-semibold border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                <button id="loadedPickerBtn" type="button" disabled title="Missions you've loaded or batch loaded, which reopen instantly with no download or parse wait, and the red × on a row removes that flight from this device" class="w-full flex items-center justify-between gap-2 bg-panel-strip text-accent font-semibold border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                                     <span id="loadedPickerLabel" class="truncate">Previously Loaded Missions...</span>
                                     <span class="shrink-0 opacity-70 text-[10px]">▾</span>
                                 </button>
                             </div>
-                            <span id="reconArchiveStatus" class="flex-1 min-w-[200px] text-[10px] text-faint leading-tight">Search for a flight or upload manually.</span>
+                            <span id="reconArchiveStatus" class="flex-1 min-w-[200px] text-[10px] text-faint leading-tight">Search for a flight or upload one yourself.</span>
             </div>
                             <!-- static SEB-archive reminder under the pickers: a mission missing from search
                                  usually has not been filed to the SEB Archive yet (it can lag a day), so it points
@@ -162,7 +162,7 @@
                                  search dropdown's no-match rows (js/12b-recon-archive.js sebHintRow). -->
                             <div id="sebArchiveHint" class="w-full flex items-center gap-1.5 text-[10px] leading-tight" style="color:var(--warn);">
                                 <span aria-hidden="true" class="shrink-0" style="display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border:1.5px solid var(--warn);border-radius:50%;font-size:9px;font-weight:700;line-height:1;">?</span>
-                                <span>Can't find a recent mission? Check if the flight has been put onto the SEB Archive (may take up to a day to populate. Remember you can always manually upload it above).</span>
+                                <span>Can't find a recent mission? New flights can take up to a day to show up in the SEB Archive, so you can upload the file yourself above in the meantime.</span>
                             </div>
         </div>
         <div class="lf-label">Upload MMR<br>to Sync</div>
@@ -202,7 +202,7 @@
                             <span id="missionSubline" class="hidden normal-case tracking-normal text-[9px] font-semibold text-accent leading-tight"></span>
                         </div>
                         <div class="map-controls flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-grow ml-auto pr-9">
-                            <label title="Interpolates the 1 Hz samples up to 8 Hz (Catmull-Rom) so playback is fluid instead of stepping. It also adds a small SYNTHESIZED turbulence micro-motion to the drawn airframe, scaled by the recorded vertical wind (a faint fixed baseline when the file has no vertical-wind channel). That motion is drawn only, never counted: the HUD and the PFD&#39;s altitude readouts use the un-jittered values." class="flex items-center normal-case text-accent font-bold text-[10px] cursor-pointer whitespace-nowrap flex-none">
+                            <label title="Fills in the motion between the 1 Hz samples at 8 Hz (Catmull-Rom) so playback looks smooth, and adds a little simulated turbulence to how the aircraft is drawn, scaled to the recorded vertical wind (or a small fixed amount if the file has no vertical wind). That motion is only visual, so the Metric HUD and the PFD altitude readouts still show the recorded values." class="flex items-center normal-case text-accent font-bold text-[10px] cursor-pointer whitespace-nowrap flex-none">
                                 <input type="checkbox" id="toggle8Hz" class="accent-accent w-3 h-3 mr-1" checked>
                                 <span class="leading-tight">8Hz Smoothing<br><span class="text-faint" style="font-size:8px;font-weight:400;">(derived from 1Hz)</span></span>
                             </label>
@@ -213,7 +213,7 @@
                             <div id="measureCluster" class="relative flex items-center flex-none">
                                 <button id="measureBtn" class="px-1.5 py-0.5 bg-accent hover:bg-accent text-accent-ink text-[10px] rounded border border-accent transition-colors shadow-sm whitespace-nowrap" title="Measure distance / area">Measure</button>
                                 <div id="measureGroup" class="hidden absolute right-0 top-full mt-2 z-30 items-center gap-2 bg-[color-mix(in_oklab,var(--panel)_95%,transparent)] border border-hairline border-l-2 border-l-[color-mix(in_oklab,var(--accent)_60%,transparent)] rounded px-2 py-1.5 shadow-lg whitespace-nowrap">
-                                    <!-- The stop control lives here, not on the header button: the shape select's
+                                    <!-- the stop control is here, not on the header button: the shape select's
                                          native popup can cover the header, so stopping never depends on reaching it. -->
                                     <button id="stopMeasureBtn" style="display:none" class="px-2 py-0.5 bg-danger hover:bg-danger text-white text-[11px] rounded border border-danger transition-colors shadow-sm whitespace-nowrap">Stop Measuring</button>
                                     <select id="measureShapeSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-0.5 text-[11px] outline-none cursor-pointer">
@@ -235,13 +235,13 @@
                                     <span class="opacity-60 leading-none">&#9662;</span>
                                 </button>
                                 <span id="satNativeSelects" class="hidden">
-                                    <select id="satelliteSelect" title="Satellite overlay (auto-populated by date/location after data loads)">
+                                    <select id="satelliteSelect" title="Satellite overlay (filled in from the flight's date and location once it loads)">
                                         <option value="none">Sat: Off</option>
                                     </select>
                                     <select id="satBandSelect" style="display:none;" title="Satellite Spectral Band">
                                     </select>
                                 </span>
-                                <!-- #satPickerPanel lives at <body> level (see near the modals) so its fixed
+                                <!-- #satPickerPanel is at <body> level (see near the modals) so its fixed
                                      position escapes this header's z-20 stacking context and layers above the map overlays -->
                                 <div id="satDayStepper" class="hidden absolute right-0 top-full mt-1 z-30 items-center gap-1 bg-panel border border-hairline border-l-2 border-l-[var(--accent)] rounded px-1.5 py-1 shadow-lg">
                                     <button id="satDayPrev" title="Previous day" class="px-1.5 py-0.5 bg-panel-strip hover:bg-elevated text-ink rounded border border-hairline text-[11px] leading-none">‹</button>
@@ -317,7 +317,7 @@
             </div>
         </div>
         <div class="media-resize-handle" id="mediaResizeHandle" title="Drag to resize the tracker & video (drag all the way down to collapse)"><span class="grip">⋯</span></div>
-        <!-- collapser: sits on the drag grip's line at the bottom right, so it adds no extra row -->
+        <!-- collapser: on the drag grip's line at the bottom right, so it adds no extra row -->
         <button id="mediaCollapseBtn" type="button" title="Collapse or expand the media players" aria-expanded="true" class="media-collapse-btn px-2 py-0.5 bg-panel-strip text-muted border border-hairline hover:bg-elevated hover:text-ink rounded text-[11px] font-semibold transition-colors whitespace-nowrap leading-tight">&#9650; Collapse media</button>
         <!-- shown only when the media is collapsed: the full playback bar hides, and this compact row
              keeps play/pause, sliding, marking and S.I. usable inside the thin media strip. -->
@@ -436,7 +436,7 @@
 
     <div class="cmd-group" id="cmdSyncGroup">
         <div class="cmd-row">
-            <button id="forceSyncBtn" class="hidden px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="Tip: Click a few times if sync fails. Hide other timestamps to avoid OCR errors.">Sync Now</button>
+            <button id="forceSyncBtn" class="hidden px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap h-9" title="If it doesn't sync, click a few times on a clear frame, and hide any other timestamps on screen so OCR doesn't misread them">Sync Now</button>
         </div>
     </div>
 
@@ -460,7 +460,7 @@
         </div>
     </div>
 
-    <!-- map display options fold into one menu, so the bar itself holds only playback -->
+    <!-- map display options fold into one menu, so the bar itself has only playback -->
     <details class="cmd-group display-menu" id="displayMenu">
         <summary class="display-summary" title="Track color, wind barbs, 3D altitude, PFD and HUDs, units, and icon options">Settings</summary>
         <div class="display-panel">
@@ -487,7 +487,7 @@
     <div class="cmd-group">
         <span class="cmd-label">3D Altitude Track</span>
         <div class="cmd-row">
-            <select id="trackAltSelect" title="Which altitude the 3D map plots the track/plane at (independent of the PFD's Press&#8594;GPS filter)" class="bg-panel-strip text-ink border border-hairline rounded-md px-2 py-1.5 text-xs font-semibold outline-none cursor-pointer h-9 shadow-sm focus:border-accent transition-colors">
+            <select id="trackAltSelect" title="Which altitude the 3D map draws the track and aircraft at (separate from the PFD's GPS&#8594;Press Alt setting)" class="bg-panel-strip text-ink border border-hairline rounded-md px-2 py-1.5 text-xs font-semibold outline-none cursor-pointer h-9 shadow-sm focus:border-accent transition-colors">
                 <option value="gps">GPS Altitude</option>
                 <option value="press">Pressure Altitude</option>
             </select>
@@ -510,7 +510,7 @@
                 <label class="filter-lbl"><input type="checkbox" id="simpleTrackerIcon" class="filter-cb" /> Simple Icon (2D)</label>
             </div>
             <div class="filter-col">
-                <label title="Draw the 3D aircraft at its true real-world size against the map (dolly in close to see it)" class="filter-lbl"><input type="checkbox" id="toggleRealScale" class="filter-cb" /> Real Scale (3D)</label>
+                <label title="Draw the 3D aircraft at its real size against the map (zoom in close to see it)" class="filter-lbl"><input type="checkbox" id="toggleRealScale" class="filter-cb" /> Real Scale (3D)</label>
             </div>
         </div>
     </div>
@@ -545,7 +545,7 @@
             <button id="preloadCloseX" class="modal-x" title="Close">✕</button>
         </div>
         <div class="modal-body">
-        <p class="modal-intro">Pick a season and check its missions (or a whole storm), or upload your own flight files, and each flight is saved in this browser so it opens instantly from the Previously Loaded Missions list.</p>
+        <p class="modal-intro">Pick a season and check the missions you want (or a whole storm), or upload your own flight files, and each one is saved in this browser so you can open it instantly from Previously Loaded Missions.</p>
         <div class="modal-inline">
             <span class="modal-label">Season</span>
             <span class="relative inline-flex">
@@ -582,7 +582,7 @@
             <button id="aviConvertCloseX" class="modal-x" title="Close">✕</button>
         </div>
         <div class="modal-body">
-        <p class="modal-intro">Combines an MMR recording that is split into many .avi segments, as single files or zipped, into one .mp4 that you can upload as the MMR video, and you can add several files at once and keep using the visualizer while it converts, though refreshing or closing the tab stops the conversion.</p>
+        <p class="modal-intro">Add an MMR recording that's split into many .avi segments (single files or zipped) and they're joined into one .mp4 you can load as the MMR video. You can add several files at once and keep using the visualizer while it converts, as long as you don't refresh or close the tab, which stops the conversion.</p>
         <div class="modal-inline">
             <label id="aviAddLabel" class="flex items-center gap-1.5 bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1 text-[11px] font-semibold cursor-pointer transition-colors">
                 Add files (.zip / .avi / .ts)
@@ -656,7 +656,7 @@
             <button id="fsCloseX" class="modal-x" title="Close">✕</button>
         </div>
         <div class="modal-body">
-        <p class="modal-intro">Find which flight recorded the highest or lowest value of a metric at any point, with the time, altitude, and position of that moment and a graph comparing every flight, searching the flights loaded or batch loaded on this device, which works offline too.</p>
+        <p class="modal-intro">Find which of your loaded flights recorded the highest or lowest value of a metric, with the time, altitude, and position of that moment and a graph comparing all of them. It searches the flights you've loaded or batch loaded on this device, so it works offline too.</p>
 
         <div class="flex flex-wrap items-end gap-3">
             <div class="modal-field">
@@ -751,8 +751,8 @@
                     <option value="none">Sat: Off</option>
                 </select>
                 <select id="clipSatBandSelect" style="display:none;" class="mt-1.5 w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer"></select>
-                <button id="clipSatCacheBtn" type="button" title="Download this satellite's imagery for the whole flight now, so the recording does not wait on the API mid-clip" class="mt-1.5 w-full bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⤓ Cache imagery first</button>
-                <span id="clipSatNote" class="hidden block text-[10px] text-faint leading-snug mt-1">The satellite overlay draws on the 2D tracker only.</span>
+                <button id="clipSatCacheBtn" type="button" title="Download this satellite's imagery for the whole flight first, so the recording doesn't have to wait on the API partway through" class="mt-1.5 w-full bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1 text-[11px] font-semibold outline-none cursor-pointer whitespace-nowrap transition-colors disabled:opacity-40 disabled:cursor-not-allowed">⤓ Cache imagery first</button>
+                <span id="clipSatNote" class="hidden block text-[10px] text-faint leading-snug mt-1">The satellite overlay only shows on the 2D tracker.</span>
             </div>
             <div>
                 <label class="modal-label mb-2">MMR Video</label>
@@ -767,14 +767,14 @@
             <label class="modal-label mb-2">Graphs: stacked on the right <span class="text-muted normal-case">(4 Graphs Max)</span></label>
             <div id="clipGraphList" class="max-h-44 overflow-y-auto bg-[color-mix(in_oklab,var(--bg)_50%,transparent)] border border-hairline rounded p-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1"></div>
             <!-- populateClipGraphList() relocates this button into #clipGraphList as a full-width cell so it
-                 sits inside the pre-selected-graphs container; kept here in the DOM so its listener survives. -->
-            <button id="clipAddCustomBtn" type="button" title="Build a graph from any variables, recorded with this clip only" class="text-accent text-[13px] font-semibold hover:text-ink transition-colors" style="width:100%;background:none;border:1px dashed var(--border-strong);border-radius:6px;cursor:pointer;padding:7px 10px;">+ Add customized graphs</button>
+                 is inside the pre-selected-graphs container; kept here in the DOM so its listener survives. -->
+            <button id="clipAddCustomBtn" type="button" title="Build a graph from any variables for this clip only" class="text-accent text-[13px] font-semibold hover:text-ink transition-colors" style="width:100%;background:none;border:1px dashed var(--border-strong);border-radius:6px;cursor:pointer;padding:7px 10px;">+ Add customized graphs</button>
             <div id="clipCustomList" class="mt-1 flex flex-col gap-2"></div>
         </div>
 
         </div>
         <div class="modal-foot">
-            <span class="modal-foot-note">After clicking Start Recording, angle and zoom the tracker during the 3-second countdown.</span>
+            <span class="modal-foot-note">The clip is rendered at full 1080p and saved as an .mp4, using the playback speed and 3D camera angle you have set now.</span>
             <button id="startClipRecordBtn" class="modal-btn">● Start Recording</button>
         </div>
     </div>
@@ -872,7 +872,7 @@
 
             <h3 id="hs-export">8. Exporting and sharing</h3>
             <ul>
-                <li><b>Record Clip:</b> click it to save part of the flight as a video. Pick a start and end (you'll see a preview of both), the tracker view, a satellite overlay, whether to include the MMR video, and up to four graphs, then start recording.</li>
+                <li><b>Record Clip:</b> click it to save part of the flight as a video. Pick a start and end (you'll see a preview of both), the tracker view, a satellite overlay, whether to include the MMR video, and up to four graphs, then click <b>Start Recording</b>, and the app draws the clip frame by frame at full 1080p and saves it as an .mp4, using the playback speed and 3D camera angle you have set. A progress card shows how far along it is, with <b>Stop and Save</b> to keep what's done so far and <b>Cancel</b> to drop it.</li>
                 <li><b>Share Link:</b> click it to copy a link that opens this mission at the moment and tracker view you're looking at.</li>
             </ul>
 
@@ -891,7 +891,7 @@
     </div>
 </div>
 
-<!-- satellite picker popover, kept at body level so its position:fixed z-index sits above the map
+<!-- satellite picker popover, kept at body level so its position:fixed z-index is above the map
      overlays (pfd, sat info, storm info) instead of being trapped in the map header's stacking context.
      positionSatPicker() anchors it under #satPickerBtn. -->
 <div id="satPickerPanel" class="hidden sat-picker-panel">
@@ -925,10 +925,10 @@
                 <input type="range" id="tdr2dOpacitySlider" min="20" max="100" value="85" title="Radar overlay opacity on the 2D map">
                 <span id="tdr2dOpacityVal" class="sat-opacity-val">85%</span>
             </div>
-            <div class="tdr-section-label" title="Pick a leg to view it alone; click it again for all legs">TDR Legs</div>
+            <div class="tdr-section-label" title="Pick a leg to see it alone, and click it again for all legs">TDR Legs</div>
             <!-- one row per leg: its time button, and a separate Jump to Eye button when the leg passes the storm center (buildTdrHero) -->
             <div id="tdrLegRow" class="tdr-leg-row"></div>
-            <div class="tdr-section-label" title="Millibars are a standard-atmosphere label for each layer&rsquo;s geometric altitude, not an analysed pressure">Layers</div>
+            <div class="tdr-section-label" title="Each layer is labeled with the pressure its altitude would have in a standard atmosphere, so read the mb value as a name for the height">Layers</div>
             <div class="tdr-hero-actions">
                 <button id="tdrLevelsAll" title="Show every layer with data">All</button>
                 <button id="tdrLevelsNone" title="Hide all layers">None</button>
@@ -986,7 +986,7 @@
 </div>
 
 <!-- previously-loaded-missions picker: a custom popover (not a native <select>) so each flight row
-     can carry a red × to remove it. Lives at <body> level, fixed-positioned under its button. -->
+     can carry a red × to remove it. It is at <body> level, fixed-positioned under its button. -->
 <div id="loadedPickerPanel" class="hidden loaded-picker-panel">
     <div id="loadedPickerList" class="loaded-picker-list"></div>
 </div>
@@ -997,42 +997,44 @@
     <span class="rec-dot"></span>
     <span id="recordProgressLabel">Recording&hellip; 0%</span>
     <div class="rec-bar"><div id="recordProgressFill"></div></div>
-    <button id="recordStopBtn" title="Stop &amp; save the recording now">■ Stop</button>
+    <button id="recordStopBtn" title="Stop and save the recording now">■ Stop</button>
 </div>
 
 <!-- Application logic is split across js/*.js so one broken file cannot take down the
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20261115b"></script>
-    <script src="js/01-state.js?v=20261115b"></script>
-    <script src="js/02-satellite.js?v=20261115b"></script>
-    <script src="js/03-metrics.js?v=20261115b"></script>
-    <script src="js/04-geo-measure.js?v=20261115b"></script>
-    <script src="js/05-interpolation.js?v=20261115b"></script>
-    <script src="js/06-ocr.js?v=20261115b"></script>
-    <script src="js/07-ui-controls.js?v=20261115b"></script>
-    <script src="js/07b-plane-models.js?v=20261115b"></script>
-    <script src="js/07c-terrain.js?v=20261115b"></script>
-    <script src="js/07d-tdr.js?v=20261115b"></script>
-    <script src="js/08-ocr-lock-export.js?v=20261115b"></script>
-    <script src="js/09-interaction.js?v=20261115b"></script>
-    <script src="js/10-point-analysis.js?v=20261115b"></script>
-    <script src="js/11-layout.js?v=20261115b"></script>
-    <script src="js/11c-float-panels.js?v=20261115b"></script>
-    <script src="js/11b-parser-core.js?v=20261115b"></script>
-    <script src="js/12-file-parsing.js?v=20261115b"></script>
-    <script src="js/12b-recon-archive.js?v=20261115b"></script>
-    <script src="js/13-charts-master.js?v=20261115b"></script>
-    <script src="js/14-filters-sync.js?v=20261115b"></script>
-    <script src="js/15-map-render.js?v=20261115b"></script>
-    <script src="js/16-pfd-hud.js?v=20261115b"></script>
-    <script src="js/17-charts.js?v=20261115b"></script>
-    <script src="js/18-engine.js?v=20261115b"></script>
-    <script src="js/18b-flight-search.js?v=20261115b"></script>
-    <script src="js/19-bootstrap.js?v=20261115b"></script>
-    <script src="js/20-ui-polish.js?v=20261115b"></script>
-    <script src="js/22-avi-convert.js?v=20261115b"></script>
+    <script src="js/00-var-catalog.js?v=20261115c"></script>
+    <script src="js/01-state.js?v=20261115c"></script>
+    <script src="js/02-satellite.js?v=20261115c"></script>
+    <script src="js/03-metrics.js?v=20261115c"></script>
+    <script src="js/04-geo-measure.js?v=20261115c"></script>
+    <script src="js/05-interpolation.js?v=20261115c"></script>
+    <script src="js/06-ocr.js?v=20261115c"></script>
+    <script src="js/07-ui-controls.js?v=20261115c"></script>
+    <script src="js/07b-plane-models.js?v=20261115c"></script>
+    <script src="js/07c-terrain.js?v=20261115c"></script>
+    <script src="js/07d-tdr.js?v=20261115c"></script>
+    <script src="js/08-ocr-lock-export.js?v=20261115c"></script>
+    <script src="js/09-interaction.js?v=20261115c"></script>
+    <script src="js/10-point-analysis.js?v=20261115c"></script>
+    <script src="js/11-layout.js?v=20261115c"></script>
+    <script src="js/11c-float-panels.js?v=20261115c"></script>
+    <script src="js/11b-parser-core.js?v=20261115c"></script>
+    <script src="js/12-file-parsing.js?v=20261115c"></script>
+    <script src="js/12b-recon-archive.js?v=20261115c"></script>
+    <script src="js/13-charts-master.js?v=20261115c"></script>
+    <script src="js/14-filters-sync.js?v=20261115c"></script>
+    <script src="js/15-map-render.js?v=20261115c"></script>
+    <script src="js/16-pfd-hud.js?v=20261115c"></script>
+    <script src="js/17-charts.js?v=20261115c"></script>
+    <script src="js/18-engine.js?v=20261115c"></script>
+    <script src="js/18b-flight-search.js?v=20261115c"></script>
+    <script src="js/19-bootstrap.js?v=20261115c"></script>
+    <script src="js/20-ui-polish.js?v=20261115c"></script>
+    <script src="js/22-avi-convert.js?v=20261115c"></script>
+    <script src="lib/mp4-muxer.js"></script>
+    <script src="js/23-clip-render.js?v=20261115c"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

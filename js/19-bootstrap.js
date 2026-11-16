@@ -114,7 +114,7 @@
     // Jump the playhead by N flight-minutes (10-min steps line up with the GOES scan cadence).
     function skipFlightMinutes(mins) {
         if (!filteredData.length || !filteredData[currentIdx]) return;
-        if (typeof syncLockActive === 'function' && syncLockActive()) return;   // hold the playhead until the MMR sync lands
+        if (typeof syncLockActive === 'function' && syncLockActive()) return;   // hold the playhead until the MMR sync commits
         const targetSec = filteredData[currentIdx].absSeconds + mins * 60;
         let bestIdx = currentIdx, bestDiff = Infinity;
         for (let i = 0; i < filteredData.length; i++) {
@@ -337,7 +337,7 @@
         loadCities();
     }).catch(e => {});
 
-    // MP4 video zoom and pan. the transform rides on the <video> element and the wrapper clips it,
+    // MP4 video zoom and pan. the transform is set on the <video> element and the wrapper clips it,
     // so the panel keeps its size however far the frame is zoomed.
     let vidZoom = 1, vidPanX = 0, vidPanY = 0;
     let isVidDragging = false, vidStartX = 0, vidStartY = 0;
@@ -608,7 +608,7 @@
             const def = GIBS_LAYERS.find(d => d.value === wantSat);
             showToast(def && def.isReconApi
                 ? 'This product is already cached for the flight.'
-                : 'This layer streams a single image per day, so there is nothing to build ahead.', 5000);
+                : 'This layer has a single image per day, so there\'s nothing to cache ahead of time.', 5000);
         }
     });
 
@@ -786,7 +786,7 @@
     }
 
     // keep end at or after start: dragging or typing one past the other clamps it to the other instead
-    // of crossing, so the end point can never sit before the start point. runs after wireClipTimeField's
+    // of crossing, so the end point can never be before the start point. runs after wireClipTimeField's
     // own sync, then rewrites the moved time field to the clamped value and refreshes that side's preview.
     function clipSyncField(which) {
         const slider = document.getElementById(which === 'start' ? 'clipStartSlider' : 'clipEndSlider');
@@ -1006,8 +1006,17 @@
         if (trackerModeSelect.value !== wantMode) { trackerModeSelect.value = wantMode; trackerModeSelect.dispatchEvent(new Event('change')); }
         applyClipSatToLive(document.getElementById('clipSatSelect').value, document.getElementById('clipSatBandSelect').value);
 
-        // Wait for any satellite fetch to finish, then run a 3-second countdown so the user can frame the tracker.
-        waitForSatThenCountdown(() => startClipCapture(startIdx, endIdx, graphs, videoStack));
+        // a browser with the video encoder renders the clip frame by frame (js/23-clip-render.js) once
+        // any whole-flight satellite cache pass is done; otherwise the live view is recorded after a
+        // 3-second countdown for framing the tracker
+        if (typeof clipRenderSupported === 'function' && clipRenderSupported()) {
+            (function waitCachePass() {
+                if (batchCaching) { setTimeout(waitCachePass, 250); return; }
+                setTimeout(() => renderClipToMp4(startIdx, endIdx, graphs, videoStack), 300);
+            })();
+        } else {
+            waitForSatThenCountdown(() => startClipCapture(startIdx, endIdx, graphs, videoStack));
+        }
     });
 
     function waitForSatThenCountdown(cb) {

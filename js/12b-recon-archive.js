@@ -164,7 +164,7 @@
             // The seek/tracker params apply as soon as the rows exist, ahead of the slower
             // storm-track fetch, so the shared moment is on screen from the first playable frame.
             applySharedPlaybackParams(sharedT, sharedView);
-            // Let the storm-track fetch land its final status message BEFORE the selector
+            // let the storm-track fetch write its final status message BEFORE the selector
             // reflection suppresses status writes, otherwise "Loaded ... + N obs best-track"
             // arrives mid-reflection and gets swallowed.
             try { await stormTrackFetchPromise; } catch (e) { }
@@ -212,9 +212,9 @@
             try { history.replaceState(null, '', url); } catch (e2) {}
             try {
                 await navigator.clipboard.writeText(url);
-                showToast('Share link copied. It opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
+                showToast('Share link copied, and it opens this mission at ' + hhmmss + 'Z in the ' + (trackerModeSelect.value === '3d' ? '3D' : '2D') + ' tracker.', 6000);
             } catch (e) {
-                showToast('Could not access the clipboard. The share link is in the address bar.', 6000);
+                showToast('Couldn\'t copy to the clipboard, but the share link is in the address bar.', 6000);
             }
         });
     })();
@@ -252,7 +252,7 @@
         const year = reconYearSelect.value;
         if (!year) return;
         const req = ++stormListReqId;
-        reconStormSelect.options[0].textContent = 'Loading...';   // stays disabled until the list lands
+        reconStormSelect.options[0].textContent = 'Loading...';   // stays disabled until the list arrives
         reconStormSelect.style.cursor = 'progress';
         setReconStatus('Loading storms for ' + year + '...');
         try {
@@ -411,7 +411,7 @@
             d.className = 'px-2.5 py-1.5 bg-panel';
             d.style.cssText = 'color:var(--warn);display:flex;align-items:center;gap:6px;font-size:10.5px;line-height:1.35;';
             d.innerHTML = '<span aria-hidden="true" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border:1.5px solid var(--warn);border-radius:50%;font-size:9px;font-weight:700;">?</span>' +
-                '<span>Can\'t find the mission you\'re looking for? Check if the flight has been put onto the SEB Archive (may take up to a day to populate; remember you can always manually upload it below).</span>';
+                '<span>Can\'t find the mission you\'re looking for? New flights can take up to a day to show up in the SEB Archive, so you can upload the file yourself below in the meantime.</span>';
             return d;
         }
         function missionRow(m, primary) {
@@ -604,7 +604,7 @@
             mission = await reconApiJson('/v1/recon/mission/' + encodeURIComponent(missionId));
             if (!mission.obs || mission.obs.length === 0) throw new Error('mission has no observations');
         } catch (e) {
-            setReconStatus('Could not load mission ' + missionId + ' (' + e.message + '). Try again, or upload it manually.');
+            setReconStatus('Could not load mission ' + missionId + ' (' + e.message + '), so try again or upload it yourself.');
             hideLoadingOverlay();
             syncReconLoadButtonState();
             return;
@@ -653,7 +653,7 @@
             // Full resolution only: no decimated-preview fallback, so a loaded flight always carries
             // every recorded variable rather than the sparse ~7-field copy. A failed download/parse
             // reports and aborts instead of opening a preview.
-            setReconStatus(`Could not load the full-resolution flight for ${missionId} (${e.message}). Try again, or upload it manually.`);
+            setReconStatus(`Could not load the full-resolution flight for ${missionId} (${e.message}), so try again or upload it yourself.`);
             hideLoadingOverlay();
             syncReconLoadButtonState();
             return;
@@ -672,11 +672,11 @@
         try { const u = new URL(window.location.href); u.searchParams.set('mission', mission.mission_id); u.searchParams.delete('t'); u.searchParams.delete('view'); history.replaceState(null, '', u); } catch (e) {}
         if (mission.source_url) {
             reconSourceLink.href = mission.source_url; reconSourceLink.classList.remove('hidden');
-            reconSourceLink.title = 'Open the original NetCDF directly (same file this loaded automatically)';
+            reconSourceLink.title = 'Download the original NetCDF file this mission was loaded from';
         } else { reconSourceLink.classList.add('hidden'); }
 
-        if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples). Fetching storm track...`);
-        else setReconStatus(`Loaded ${mission.obs_count} decimated obs for ${mission.mission_id}. Fetching storm track...`);
+        if (usedFullRes) setReconStatus(`Loaded ${mission.mission_id} (${allParsedData.length} samples), now fetching the storm track...`);
+        else setReconStatus(`Loaded ${mission.obs_count} reduced samples for ${mission.mission_id}, now fetching the storm track...`);
         // Every archive mission loaded this session joins the preloaded list too, so it can be
         // reopened instantly without an explicit preload. Rows are captured by reference now
         // (another load may replace allParsedData before the storm fetch settles).
@@ -694,7 +694,7 @@
 
     // Best-track (every ~6-hourly fix) for the WHOLE storm life, not just the flight's window, so the
     // map shows where the storm came from and where it went. storm_id is an ATCF id like "AL142024":
-    // first 2 chars are the basin NHC's /v1/storms endpoints want to disambiguate reused names.
+    // first 2 chars are the basin NHC's /v1/storms endpoints need to disambiguate reused names.
     // Pure fetch (no globals): shared by the live loader and the mission preloader.
     async function fetchStormTrackData(mission) {
         const stormName = mission.storm_name;
@@ -714,13 +714,13 @@
 
     async function loadStormTrackForMission(mission) {
         stormTrackPoints = []; stormTrackMeta = null;
-        if (!mission.storm_name || /unknown|training/i.test(mission.storm_name)) { setReconStatus(`Loaded ${mission.mission_id}. No named storm to fetch a best-track for.`); refreshStormTrackDisplay(); return; }
+        if (!mission.storm_name || /unknown|training/i.test(mission.storm_name)) { setReconStatus(`Loaded ${mission.mission_id}, which has no named storm, so there's no best-track to fetch.`); refreshStormTrackDisplay(); return; }
         try {
             const track = await fetchStormTrackData(mission);
             stormTrackPoints = track.points; stormTrackMeta = track.meta;
             setReconStatus(`Loaded ${mission.mission_id} for ${track.meta.name}.`);
         } catch (e) {
-            setReconStatus(`Loaded ${mission.mission_id}. No best-track found for ${mission.storm_name} (${e.message}).`);
+            setReconStatus(`Loaded ${mission.mission_id}, but no best-track was found for ${mission.storm_name} (${e.message}).`);
         }
         refreshStormTrackDisplay();
     }
@@ -777,8 +777,8 @@
     }
 
     // Expected storm center at a moment: linear interpolation between the two best-track fixes
-    // bracketing that time, weighted by how far the clock sits from each observation. The fixes
-    // are ~6-hourly and the storm moves meaningfully between them, so this lands on where the
+    // bracketing that time, weighted by how far the clock is from each observation. The fixes
+    // are ~6-hourly and the storm moves meaningfully between them, so this gives where the
     // center IS rather than where the nearest observation put it. Clamped to the track's ends.
     function interpStormCenter(ms) {
         if (!stormTrackPoints.length) return null;
@@ -856,7 +856,7 @@
             if (idx >= 0) {
                 tooltip.innerHTML = formatStormPointTooltip(stormTrackPoints[idx]);
                 // Show the card ABOVE the point (not trailing under the cursor) so the data never
-                // sits beneath what you're pointing at; flip below only when clipped by the top edge.
+                // is beneath what you're pointing at; flip below only when clipped by the top edge.
                 tooltip.style.left = (e.clientX + 14) + 'px';
                 if (e.clientY > 130) {
                     tooltip.style.top = (e.clientY - 12) + 'px';
@@ -1026,12 +1026,12 @@
 
     // Puts the archive Year -> Storm -> Flight cascade back to blank (the year change handler
     // empties the downstream selects), so a manually uploaded flight never shows the archive
-    // pickers still sitting on some earlier mission.
+    // pickers still set to some earlier mission.
     function resetArchiveCascade() {
         const yearSel = document.getElementById('reconYearSelect');
         if (yearSel && yearSel.value) { yearSel.value = ''; yearSel.dispatchEvent(new Event('change')); }
         const search = document.getElementById('missionSearchInput'); if (search) search.value = '';
-        setReconStatus('Search for a flight or upload manually.');
+        setReconStatus('Search for a flight or upload one yourself.');
     }
 
     function positionLoadedPicker() {
@@ -1103,7 +1103,7 @@
             setReconStatus('Opening ' + missionId + ' from the browser cache...');
             const stored = await missionIdbGet(missionId);
             if (!stored || !stored.parsed) {
-                setReconStatus('The stored copy of ' + missionId + ' is gone. Preload it again.');
+                setReconStatus('The stored copy of ' + missionId + ' is gone, so batch load it again.');
                 preloadedMissions.delete(missionId); missionIdbDelete(missionId); updatePreloadedSelect();
                 setFlightLoading(false);
                 return;
@@ -1147,7 +1147,7 @@
 
     // shared archive season picker
     // The Batch Load modal and the Pre-Cache Satellite Imagery modal both need the same
-    // Year -> Storm -> Flight tree over the archive, so it lives out here rather than inside
+    // the Year -> Storm -> Flight tree over the archive, so it is defined out here and not inside
     // either wire-up. They differ only in what an already-loaded mission means: Batch Load has
     // nothing left to do for one (locks it), pre-cache still has its imagery to fetch (leaves it
     // selectable, and it costs no download).
@@ -1364,7 +1364,7 @@
                 }
                 if (fill) fill.style.width = Math.round((i + 1) / list.length * 100) + '%';
             }
-            setModalStatus(`Done: ${ok}/${list.length} uploaded file${list.length === 1 ? '' : 's'} preloaded. They stay on this device and open from the Previously Loaded Missions list.`);
+            setModalStatus(`Done: ${ok}/${list.length} uploaded file${list.length === 1 ? '' : 's'} preloaded, and they stay on this device and open from Previously Loaded Missions.`);
         }
 
         // Sequential download + parse of everything checked; closing the modal lets it keep
@@ -1381,7 +1381,7 @@
                 if (fill) fill.style.width = Math.round((i + 1) / ids.length * 100) + '%';
             }
             preloadRunning = false; if (startBtn) startBtn.disabled = false;
-            setModalStatus(`Done: ${ok}/${ids.length} preloaded, and they stay on this device and open instantly from the Previously Loaded Missions list.`);
+            setModalStatus(`Done: ${ok}/${ids.length} preloaded, and they stay on this device and open instantly from Previously Loaded Missions.`);
             setReconStatus(`Preloaded ${ok}/${ids.length} missions.`);
             if (yearSel && yearSel.value) loadSeasonIntoModal(yearSel.value);   // relist so finished missions show checked and locked
         }

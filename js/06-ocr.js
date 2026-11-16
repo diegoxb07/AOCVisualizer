@@ -39,8 +39,8 @@
     // corrected the "Syncing..." pill shows and the timeline holds still (syncLockActive), so the
     // user cannot slide against a wrong offset. Set by the scrub-release recheck and the playback
     // drift check when a reading disagrees, and by a manual Sync Now; cleared when a lock commits,
-    // a hunt gives up, or a scan agrees with the current offset. Self-expires so a mismatch that
-    // never resolves cannot hold the timeline hostage.
+    // a search ends with no lock, or a scan agrees with the current offset. It expires after 15 s so a
+    // mismatch that never resolves cannot lock the timeline indefinitely.
     let ocrMismatchHold = false, ocrMismatchHoldSince = 0;
     function ocrSetMismatchHold(on) {
         if (ocrMismatchHold === on) { if (on) ocrMismatchHoldSince = performance.now(); return; }
@@ -49,7 +49,7 @@
     }
 
     // non-blocking "Syncing..." badge, shown while Auto-Sync aligns the MMR timestamp
-    // State-driven (not a counter) so the multi-scan drift hunt stays solid instead of flickering.
+    // state-driven (not a counter) so the badge stays steady through a multi-scan drift search instead of flickering.
     // visible while Auto-Sync searches for the very first lock (isOcrRunning || forceOcrSyncNextTick, before ocrEverLocked),
     // and while a detected mismatch is being corrected (ocrMismatchHold). The periodic re-syncs
     // that agree with the current offset run silently, so a good alignment stays quiet. A badge
@@ -66,20 +66,20 @@
         updateTimelineSyncLock();
     }
 
-    // The initial MMR sync steps the video by seeking; a user scrub mid-hunt hijacks those seeks and
+    // the initial MMR sync steps the video by seeking; a user scrub mid-search overrides those seeks and
     // locks the sync to the wrong place (and can strand the OCR mid-scan). So the timeline is held
-    // until the first lock lands, shown by a loader over a greyed slider, then handed back. Every
+    // until the first lock commits, shown by a loader over a greyed slider, then handed back. Every
     // scrub path also checks syncLockActive() so a forwarded or keyboard slide can't slip through.
     let syncLockTimer = null, syncLockTimedOut = false;
     function syncLockActive() {
         if (!videoLoaded || typeof filteredData === 'undefined' || filteredData.length === 0) return false;
         if (!videoSyncMode || videoSyncMode.value !== 'auto') return false;   // manual mode: the user sets the times
-        if (ocrMismatchHold && performance.now() - ocrMismatchHoldSince > 15000) ocrMismatchHold = false;   // never hold the timeline hostage
-        if (ocrMismatchHold) return true;   // a detected mismatch is being corrected: no scrubbing until it lands
+        if (ocrMismatchHold && performance.now() - ocrMismatchHoldSince > 15000) ocrMismatchHold = false;   // never lock the timeline indefinitely
+        if (ocrMismatchHold) return true;   // a detected mismatch is being corrected: no scrubbing until it commits
         if (ocrEverLocked || ocrCompiledWarned || syncLockTimedOut) return false;   // synced, gave up, or timed out
         // Locked only while a sync is actually in motion: warming the engine (a scan starts the
-        // moment it lands) or a scan running or queued. An idle hunt-less state hands the slider
-        // back at once; the 20 s timer below stays as the backstop.
+        // moment it is ready) or a scan running or queued. An idle state with no search running returns
+        // the slider at once; the 20 s timer below stays as the backstop.
         return ocrWarmingUp || (ocrAvailable && (isOcrRunning || forceOcrSyncNextTick));
     }
     function updateTimelineSyncLock() {
@@ -92,7 +92,7 @@
             if (locked) slider.disabled = true;
             else if (typeof filteredData !== 'undefined' && filteredData.length > 0) slider.disabled = false;
         }
-        // Safety: never hold the slider hostage, release it even if the sync never lands.
+        // safety: release the slider even if the sync never commits.
         if (locked && syncLockTimer === null) {
             syncLockTimer = setTimeout(() => { syncLockTimedOut = true; syncLockTimer = null; updateTimelineSyncLock(); }, 20000);
         } else if (!locked && syncLockTimer !== null) {
@@ -124,8 +124,8 @@
 
     // 30-second no-lock watchdog
     // Compiled nose-radar videos re-render the clock somewhere unusual (or too small) and
-    // routinely defeat the scan. Once 30 s pass after the first scan with no lock ever landing,
-    // say so once; a new video resets the clock.
+    // often keep the scan from finding it. Once 30 s pass after the first scan with no lock,
+    // show a message once; a new video resets the clock.
     let ocrHuntStartMs = 0, ocrEverLocked = false, ocrCompiledWarned = false;
     function ocrNoteScanStart() { if (!ocrHuntStartMs) ocrHuntStartMs = performance.now(); }
     function ocrNoteLock() { ocrEverLocked = true; }
@@ -134,7 +134,7 @@
         if (ocrEverLocked || ocrCompiledWarned || !ocrHuntStartMs) return;
         if (performance.now() - ocrHuntStartMs < 30000) return;
         ocrCompiledWarned = true;
-        showToast('Auto-Sync has not found the MMR clock after 30 seconds of trying. Upload only the MMR video, not the nose-radar compiled video: compiled videos place the clock somewhere unusual and often cannot sync. Manual Time Input also works.', 14000);
+        showToast('Auto-Sync hasn\'t found the MMR clock after 30 seconds, so try uploading the plain MMR video in place of the compiled nose-radar video, which puts the clock somewhere unusual and often can\'t be synced, or switch to Manual Time Input.', 14000);
     }
 
     // Inverse of markDropZoneLoaded: returns a drop zone to its dashed waiting state.

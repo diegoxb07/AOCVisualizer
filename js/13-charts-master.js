@@ -3,7 +3,7 @@
    Loaded as a classic (non-module) script; all parts share one global scope, in order. */
 
     // the master card and every card spawned under it are the same graph, addressed by id. the
-    // master's chart sits in its own global because other modules build and reset it directly, and
+    // master's chart is in its own global because other modules build and reset it directly, and
     // its wrapper/prompt/title come from index.html with ids of their own rather than the id pattern
     // the spawned cards follow.
     const MASTER_GRAPH_ID = 'masterChart';
@@ -201,7 +201,7 @@
 
         buildCustomGraphMenu(id);
         updateCustomGraphVisibility(id);   // starts on the create prompt with the default title
-        ensureExtraCreateBox();            // the fresh add box lands under the new card
+        ensureExtraCreateBox();            // the fresh add box goes under the new card
 
         // open the new card's variable menu right away, matching the master prompt's flow.
         const addBtn = card.querySelector(`[onclick*="menu-${id}"]`);

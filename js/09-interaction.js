@@ -116,7 +116,7 @@
     timelineSlider.addEventListener('mousedown', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } });
     timelineSlider.addEventListener('touchstart', () => { if (typeof syncLockActive === 'function' && syncLockActive()) return; isScrubbing = true; wasPlayingBeforeScrub = isPlaying; if (isPlaying) { isPlaying = false; if (videoLoaded) video.pause(); } }, {passive: true});
 
-    // Only treat a click as a slide if it lands inside the chart's plotting area.
+    // only treat a click as a slide if it is inside the chart's plotting area.
     // The legend strip above chartArea acts as the per-variable filter toggles, so
     // clicking a variable there must NOT jump the playhead (start a drag).
     const pointInChartPlotArea = (chart, xPixel, yPixel) => {
@@ -206,7 +206,7 @@
             e.preventDefault(); if (!playPauseBtn.disabled) playPauseBtn.click(); return;
         }
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-            if (typeof syncLockActive === 'function' && syncLockActive()) { e.preventDefault(); return; }   // no scrubbing until the MMR sync lands
+            if (typeof syncLockActive === 'function' && syncLockActive()) { e.preventDefault(); return; }   // no scrubbing until the MMR sync commits
             // Shift+arrow = jump 10 flight-minutes (same step as the satellite scan buttons).
             if (e.shiftKey) { e.preventDefault(); skipFlightMinutes(e.key === 'ArrowRight' ? 10 : -10); return; }
             e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1;
@@ -251,8 +251,8 @@
         }
 
         // TDR cross-section picking (js/07d-tdr.js): while armed, mousedown only starts a map
-        // pan; the point lands on mouseup when the mouse did not drag. The auto-centered view
-        // often sits off the radar data, so the map must stay draggable mid-pick.
+        // pan; the point is placed on mouseup when the mouse did not drag. The auto-centered view
+        // is often off the radar data, so the map must stay draggable mid-pick.
         if (typeof tdrSliceArm !== 'undefined' && tdrSliceArm) {
             isDraggingMap = true; dragStartX = e.clientX - mapOffsetX; dragStartY = e.clientY - mapOffsetY; canvas.dataset.downX = e.clientX; canvas.dataset.downY = e.clientY;
             canvas.dataset.maxDrag = '0';
@@ -317,7 +317,7 @@
         isDraggingMap = false; if (trackerModeSelect.value === '3d') return;
         const totalDist = Math.sqrt(Math.pow(e.clientX - parseFloat(canvas.dataset.downX || 0), 2) + Math.pow(e.clientY - parseFloat(canvas.dataset.downY || 0), 2));
         // A clean click while the cross-section pick is armed places that point; any drag was a
-        // pan. Judged by PEAK distance (a to-and-fro pan nets near zero), and the point lands at
+        // pan. Judged by PEAK distance (a to-and-fro pan nets near zero), and the point is placed at
         // the PRESS position so a release slip cannot pull it off the aimed spot.
         if (typeof tdrSliceArm !== 'undefined' && tdrSliceArm && typeof tdrSliceMapClick === 'function') {
             const maxDrag = Math.max(totalDist, parseFloat(canvas.dataset.maxDrag || 0));

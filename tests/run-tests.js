@@ -1,12 +1,12 @@
 /* QC checks: node tests/run-tests.js
    Flag-style, not fail-style: every check prints PASS or FLAG with the observed vs expected value,
-   and the process always exits 0. A FLAG means a scientific judgment call in the code no longer
-   matches its independently computed expectation and should be looked at, not that the app is down.
+   and the process always exits 0. A FLAG means a scientific judgment call in the code differs from
+   its independently computed expectation and should be looked at, not that the app is down.
    All fixtures are synthetic and built in this file; expected values come from physics constants
    and the format spec, never from a captured baseline.
 
    Covers the parser core, and the map projection and wind color ramps. Those are the parts that
-   decide what a number MEANS; the rest of the app is canvas and DOM, which this harness cannot
+   set what a number MEANS; the rest of the app is canvas and DOM, which this harness cannot
    reach, so it is checked by opening the page. */
 
 'use strict';
@@ -56,7 +56,7 @@ section('Units and physics (expected values computed independently)');
     check('absSeconds of 10:00:01', r.rows[1].absSeconds, 10 * 3600 + 1);
 }
 {
-    // Pressure altitude derived from static pressure: 700 hPa sits near 3012 m in the ICAO
+    // pressure altitude derived from static pressure: 700 hPa is near 3012 m in the ICAO
     // standard atmosphere (literature value, independent of the code's own constants).
     const r = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'PS.c', 'WD.d', 'X8', 'TA.d'], [
         ['12', '0', '0', '25.0', '-70.0', '210', '700', '90', '', '15'],
@@ -67,7 +67,7 @@ section('Units and physics (expected values computed independently)');
 }
 {
     // Mixing ratio by column definition: MR.d is already g/kg; MRkg.d is kg/kg and converts by
-    // the x1000 unit identity. MR.d wins when both columns are present.
+    // the x1000 unit identity. MR.d is used when both columns are present.
     const kg = parseFlightTextToRows(tsv(['HH', 'MM', 'SS', 'LATref', 'LONref', 'TASkt.d', 'MRkg.d', 'WD.d', 'X8', 'TA.d'], [
         ['10', '0', '0', '20.0', '-60.0', '200', '0.012', '90', '', '20'],
         ['10', '0', '1', '20.001', '-60.001', '200', '0.012', '90', '', '20'],

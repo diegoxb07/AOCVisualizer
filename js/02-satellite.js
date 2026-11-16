@@ -245,7 +245,7 @@
             reconBtn.classList.toggle('saturate-0', apiDown);
             reconBtn.classList.toggle('pointer-events-none', apiDown);
             reconBtn.disabled = apiDown || (reconMissionSelect ? !reconMissionSelect.value : false);
-            reconBtn.title = apiDown ? 'Archive flight loading is unavailable while the API is offline' : reconBtn.dataset.defaultTitle;
+            reconBtn.title = apiDown ? 'You can\'t load flights from the archive while the API is offline' : reconBtn.dataset.defaultTitle;
         }
         // The "Load a Mission" header deliberately keeps its accent color and full opacity while
         // the API is down: loading a mission still works fine offline (manual upload and the
@@ -336,7 +336,7 @@
                 if (preloadStartBtn.dataset.apiDownForced === undefined) preloadStartBtn.dataset.apiDownForced = preloadStartBtn.disabled ? '0' : '1';
                 if (!preloadStartBtn.dataset.defaultTitle) preloadStartBtn.dataset.defaultTitle = preloadStartBtn.title || '';
                 preloadStartBtn.disabled = true;
-                preloadStartBtn.title = 'Archive batch loading is unavailable while the API is offline. Uploaded files still load from the file picker.';
+                preloadStartBtn.title = 'You can\'t batch load from the archive while the API is offline, but you can still upload files with the file picker.';
             } else {
                 if (preloadStartBtn.dataset.apiDownForced === '1') preloadStartBtn.disabled = false;
                 delete preloadStartBtn.dataset.apiDownForced;
@@ -492,7 +492,7 @@
                     const mm = String(fmtDate.getUTCMinutes()).padStart(2, '0');
                     // "(Daily)" so the time does not read like a GOES-style scan you can slide through
                     // through: a polar orbiter gives this one overpass for the whole day.
-                    // The no-granule branch below already says "Daily" on its own.
+                    // the no-granule branch below already shows "Daily" by itself.
                     opt.textContent = `${layerDef.baseLabel} [${hh}:${mm}Z] (Daily)`;
 
                     if (satSelect.value === layerDef.value && satLoadedInfo) {
@@ -570,7 +570,7 @@
         refreshSatImageTimeNote();
     }
 
-    // A no-op kept for its existing callers: the satellite selects sit behind the Overlays dropdown,
+    // A no-op kept for its existing callers: the satellite selects are behind the Overlays dropdown,
     // so the header layout needs no .split footprint adjustment.
     function syncSatSplit() {}
 
@@ -659,7 +659,7 @@
                         // "unavailable", so it reads as temporarily offline rather than silently vanishing.
                         const dark = night && needsDay(b);
                         opt.textContent = b.available === false ? b.name + ' (unavailable)' : (dark ? b.name + ' (night flight)' : b.name);
-                        opt.title = dark ? b.name + ': needs daylight, and this flight is in night for most of its length' : b.name;
+                        opt.title = dark ? b.name + ': needs daylight, and this flight is at night for most of its length' : b.name;
                         if (b.available === false || dark) opt.disabled = true;
                         og.appendChild(opt);
                     });
@@ -713,7 +713,7 @@
         const active = in2d && satOn && flightMetaData.date !== 'Unknown' && !isGoesLike;
         if (active) { wrap.classList.remove('hidden'); wrap.classList.add('flex'); }
         else { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
-        // The stepper overhangs the map's top-right, where the "Fetching satellite" pill also sits,
+        // the stepper overhangs the map's top-right, where the "Fetching satellite" pill also shows,
         // so flag the container and let the pill move to the top-left while the stepper is up.
         // css/app.css #mapContainer.sat-daystepper-open carries the stacking-context reasoning.
         const mapContainerEl = document.getElementById('mapContainer');
@@ -941,7 +941,7 @@
     // playback clock: archive GOES is bucketed to the scan cadence (up to ~10 min off the playhead), and a polar
     // pass is ONE overpass held across the whole flight, so it can be many hours from the moment
     // being replayed. This turns that state into the Overlays button's hover text (built into the
-    // title by updateSatPickerButton in js/07-ui-controls.js), and says how the time was arrived at
+    // title by updateSatPickerButton in js/07-ui-controls.js), and shows how the time was arrived at
     // rather than implying more precision than there is:
     //   a real scan/granule time from the API or CMR   -> stated as the scan/overpass time
     //   no scan time came back                         -> stated as the requested cadence bucket
@@ -1551,7 +1551,7 @@
         satLoadedInfo = {
             layerLabel: shortLabel + ' · ' + bandName,
             imageTimeMs: r.scanStartMs || bucketMs,
-            // Distinguishes a real scan start from the cadence bucket we asked for, so the badge can
+            // distinguishes a real scan start from the cadence bucket that was requested, so the badge can
             // say which it is showing instead of presenting the bucket as an observation time.
             scanExact: !!r.scanStartMs,
             isModis: false,
@@ -1579,7 +1579,7 @@
         clearSatPrefetchHide();
         const b = document.getElementById('satPrefetchBar'); if (b) b.classList.remove('hidden');
         const pl = document.getElementById('satPrefetchLabel'); if (pl) pl.textContent = 'Preparing satellite loader...';
-        setPrefetchIndeterminate(true);   // bounce until the first tile actually lands
+        setPrefetchIndeterminate(true);   // bounce until the first tile actually arrives
     }
     function hideSatPrefetchBar() {
         clearSatPrefetchHide();
@@ -1618,7 +1618,7 @@
         return { minLat, maxLat, minLon, maxLon };
     }
 
-    // Until the first tile lands there is no meaningful percentage (the first server-side
+    // until the first tile arrives there is no meaningful percentage (the first server-side
     // render can take ~30s), so the fills bounce indeterminately, like the flight-data
     // loading overlay, and switch to the real bar on the first setBatchProgress(done>0).
     function setPrefetchIndeterminate(on) {
@@ -1640,7 +1640,7 @@
         const pl = document.getElementById('satPrefetchLabel'); if (pl && note) pl.textContent = note;
     }
 
-    // The cache pill's live "~time left · MB/s". Both numbers ride rolling windows of the LAST FEW
+    // the cache pill's live "~time left · MB/s". Both numbers use rolling windows of the LAST FEW
     // tiles and re-anchor as each image completes, so they track current conditions instead of an
     // all-time average. Every number is MEASURED, never estimated: the ETA is remaining uncached
     // tiles times the recent average wall seconds per tile, and the speed is recent PNG bytes over
@@ -1817,7 +1817,7 @@
         }
         const targets = batchTargetsForFlight(allParsedData, flightMetaData.date, bandIds, layerValue);
         if (!targets.length) { showToast('Nothing to pre-cache for this satellite/flight.', 5000); return; }
-        if (targets.skippedDark) showToast('Skipping frames ' + targets.skippedDark + ', as they are in darkness.', 6000);
+        if (targets.skippedDark) showToast('Skipping ' + targets.skippedDark + ' frames that are in darkness.', 6000);
         const myPass = ++batchCachePass;
         batchCaching = true; batchCacheIsAuto = true; batchCacheCancel = false; batchCacheAbortController = new AbortController();
         setSatelliteControlsLocked(true);
@@ -1845,7 +1845,7 @@
             if (tb > 0 && td > 0) { recentDl.push({ bytes: tb, dlMs: td }); if (recentDl.length > 5) recentDl.shift(); }
             done++;
             // a tile that failed because the user cancelled the pass is not an issue to report
-            if (!ok && !batchCacheCancel && myPass === batchCachePass) showToast(`Issue finding satellite image ${done}/${total}, skipping...`, 4000);
+            if (!ok && !batchCacheCancel && myPass === batchCachePass) showToast(`Couldn't find satellite image ${done}/${total}, so it's skipped...`, 4000);
             const remain = targets.slice(ti + 1).filter(x => !satBlobStore.has(x.fetchId)).length;
             satEtaAnchor(done, total, remain, recentMs, recentDl);
         }
@@ -1853,7 +1853,7 @@
         satEtaStop();
         batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
-        const doneMsg = `Pre-cache done: ${fetched} new tile(s) cached for smooth playback.`;
+        const doneMsg = `Pre-cache done, with ${fetched} new tile(s) saved for smooth playback.`;
         setBatchProgress(done, total || 1, doneMsg);
         fadeSatPrefetchBar(2500);
         showToast(doneMsg, 6000);
@@ -1958,7 +1958,7 @@
         batchCaching = false; batchCacheIsAuto = false; batchCacheCancel = false; batchCacheAbortController = null;
         setSatelliteControlsLocked(false);
         if (startBtn) startBtn.textContent = 'Start caching';
-        const msg = `Local cache done: ${fetched} new tile(s) from ${sources.length - skipped} flight(s)${skipped ? `, ${skipped} skipped (out of view / before this satellite's data / no date / unreadable)` : ''}.`;
+        const msg = `Caching done, with ${fetched} new tile(s) saved from ${sources.length - skipped} flight(s)${skipped ? ` and ${skipped} skipped because they were out of view, before this satellite's data, missing a date, or unreadable` : ''}.`;
         setBatchProgress(done, total || 1, msg);
         fadeSatPrefetchBar(2500);   // leave the pill up briefly with the final count
         showToast(msg, 7000);

@@ -8,7 +8,7 @@
 
         // HiDPI: render the backing store at devicePixelRatio so text/lines are crisp on Retina.
         // CSS size stays `rect` (the element is width/height:100%); logical coords use cssW/cssH.
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = renderDprOverride || window.devicePixelRatio || 1;
         const wCss = Math.round(rect.width), hCss = Math.round(rect.height);
         const bw = Math.round(wCss * dpr), bh = Math.round(hCss * dpr);
         if (canvas.width !== bw || canvas.height !== bh) {
@@ -46,7 +46,7 @@
                 if(filteredData.length > 0) renderPFD(filteredData[currentIdx]);
             }
         }
-        // the satellite legend fits itself to the map box's new height
+        // the satellite legend is refit to the map box's new height
         if (typeof fitSatColorLegend === 'function') fitSatColorLegend();
         fitAttitudeHud();
     }
@@ -122,7 +122,7 @@
         // until the handle is first dragged the height follows the screen: 54vh up to 600px, but on a
         // short screen it gives way so most of a graph row still shows under the stuck bar. 180px keeps
         // a 13 inch laptop window (about 790 to 830px tall) on the plain 54vh height; only shorter
-        // windows shrink. css/app.css carries the same rule as the --media-h default, so first paint lands close.
+        // windows shrink. css/app.css carries the same rule as the --media-h default, so the first paint is close.
         const AUTO_VH = 0.54, AUTO_MAX = 600, GRAPH_ROOM = 180;
         // the hard ceiling keeps this much clear above the sticky bottom bar, so the drag handle (in the
         // bar's bottom padding) never slips under it and the layout is never stuck big with no way to shrink.
@@ -208,14 +208,14 @@
             if (typeof syncVideoCrop === 'function') syncVideoCrop();
         }
         window.addEventListener('resize', fitMediaToViewport);
-        // no-video and the floating classes on the grid decide whether the panels stack
+        // no-video and the floating classes on the grid set whether the panels stack
         const mediaGridEl = document.getElementById('mediaGrid');
         if (mediaGridEl && typeof MutationObserver !== 'undefined') new MutationObserver(fitMediaToViewport).observe(mediaGridEl, { attributes: true, attributeFilter: ['class'] });
         fitMediaToViewport();
 
         // The sticky bottom bar's height varies: it wraps to more rows on narrow widths and grows
         // once a loaded mission enables the Share/Record controls. Publish the live height as
-        // --bottom-bar-h so the fullscreen recenter/skip overlays sit just above it via calc(),
+        // --bottom-bar-h so the fullscreen recenter/skip overlays are just above it via calc(),
         // and re-fit the docked media height on every change so the map never slips under a bar
         // that just grew taller.
         const bottomBar = document.getElementById('stickyBottomBar');

@@ -1,16 +1,13 @@
 # API & Connectivity
 
-The NOAA AOC video telemetry tool is **client-only**: it parses your files and does all replay
-locally. A few features, though, reach out to external services. This doc explains **what those
-services are**, **how the tool decides it's online or offline**, and **exactly what still works
-in each state**, so during a training or replay session you always know your options.
+The Mission Visualizer runs **entirely in your browser**: it reads your files and does all the replay on your own machine, and only a few features need outside services. This page explains **what those services are**, **how the app checks whether it's online or offline**, and **exactly what you can still do in each case**, so you always know your options during a training or replay session.
 
 - [The external services](#the-external-services)
-- [The noaa-recon-api](#the-noaa-recon-api)
-- [How online/offline is detected](#how-onlineoffline-is-detected)
+- [The recon archive API](#the-recon-archive-api)
+- [How the app checks the connection](#how-the-app-checks-the-connection)
 - [What works: online vs. offline](#what-works-online-vs-offline)
-- [Using the tool when the API is offline](#using-the-tool-when-the-api-is-offline)
-- [Recovery](#recovery)
+- [Using the app when the API is offline](#using-the-app-when-the-api-is-offline)
+- [When the API comes back](#when-the-api-comes-back)
 - [Endpoint reference](#endpoint-reference)
 - [FAQ](#faq)
 
@@ -18,188 +15,138 @@ in each state**, so during a training or replay session you always know your opt
 
 ## The external services
 
-| Service | Used for | Required? |
+| Service | What it's for | Do you need it? |
 | --- | --- | --- |
-| **recon archive API** | Archive flight loading (mission NetCDF plus storm best-track) and archive GOES satellite imagery | Only for archive load and GOES imagery |
-| **NASA GIBS** | MODIS / VIIRS polar satellite overlays | Only for MODIS/VIIRS overlays |
-| **GitHub-hosted GeoJSON** (Natural Earth plus US states) | Fallback for the map's coastline and state geometry if the repo's local copies fail | Fetched once at startup; map still runs if it fails |
+| **recon archive API** | Loading flights from the archive (the mission NetCDF plus the storm's best-track), archive GOES imagery, and TDR | Only for archive loading, GOES imagery, and TDR |
+| **NASA GIBS** | MODIS / VIIRS polar satellite imagery | Only for MODIS/VIIRS imagery |
+| **GitHub-hosted GeoJSON** (Natural Earth plus US states) | A backup copy of the coastline and state outlines in case the app's own copies fail to load | Fetched once at startup, and the map still works if it fails |
 
-There are **no CDNs**: all libraries, fonts, basemap data, and the Auto-Sync OCR engine ship in
-the repo and are served same-origin. A **service worker** (`sw.js`) precaches the entire app on
-the first visit, so the page itself, its scripts, fonts, coastlines, terrain, and OCR all load
-with **no network at all** afterwards.
+There are **no CDNs**: all the libraries, fonts, basemap data, and the Auto-Sync OCR engine are in the repo and served from the same site. A **service worker** (`sw.js`) saves the whole app on your first visit, so after that the page, its scripts, fonts, coastlines, terrain, and OCR all load with **no network at all**.
 
-**None of your uploaded data is ever sent anywhere.** Files are read and parsed in the browser.
-The requests above are for imagery, geometry, and the archive catalog only.
+**Your uploaded files never leave your computer.** They're read and parsed in your browser, and the requests above are only for imagery, map outlines, and the archive catalog.
 
 ---
 
-## The noaa-recon-api
+## The recon archive API
 
-The **recon archive API** is a public, CORS-open service that
-does two jobs for this tool. Its requests carry a bearer token that ships embedded in the page
-(`js/02-satellite.js`); like a publishable key it is meant to be visible, so nothing needs a
-sign-in. A user with their own token can override it by setting `reconApiToken` in localStorage.
+The **recon archive API** is a public service that does two jobs for the app. Its requests carry a token that's built into the page (`js/02-satellite.js`), and like a publishable key it's meant to be visible, so you never have to sign in. If you have your own token, you can use it by setting `reconApiToken` in localStorage.
 
-1. **Archive catalog plus flight data.** The Year/Storm/Flight browser is backed by its
-   `/v1/recon/*` and `/v1/storms/*` endpoints. Loading a mission streams the original
-   **full-resolution NetCDF** straight through the API (CORS-open), plus the storm's
-   **whole-life best-track**.
-2. **Archive GOES imagery.** It renders **GOES-East / GOES-West** ABI tiles **server-side from
-   NOAA's AWS S3 archive**, auto-resolving the right spacecraft for the date (East: GOES-16/19,
-   West: GOES-17/18). This is what makes GOES available for the *historical* dates recon flights
-   fall on, which NASA GIBS does not serve.
+1. **Archive catalog and flight data.** The Year/Storm/Flight browser runs on its `/v1/recon/*` and `/v1/storms/*` endpoints, and when you load a mission, the API streams the original **full-resolution NetCDF** to you along with the storm's **best-track for its whole life**.
+2. **Archive GOES imagery.** It renders **GOES-East / GOES-West** ABI tiles **on the server from NOAA's AWS S3 archive**, picking the right satellite for the date (East: GOES-16/19, West: GOES-17/18). That's how you get GOES for the *past* dates recon flights were flown, which NASA GIBS doesn't provide.
 
-Because it's actively developed, the tool **discovers** the available satellite products at
-startup (`GET /v1/satellite/products`) rather than hardcoding them. New bands and composites
-show up in the picker automatically, with no code change.
+Since the API is still being developed, the app **requests the list** of satellite products from the API at startup (`GET /v1/satellite/products`), so new bands show up in the picker with no code change.
 
 ---
 
-## How online/offline is detected
+## How the app checks the connection
 
-At startup (and every **60 seconds** while the tab is visible) the tool calls
-`GET /v1/satellite/products`. That single call is the **health check**.
+When the app starts, and every **60 seconds** while the tab is visible, it calls `GET /v1/satellite/products`, and that one call is the **health check**.
 
-- **Success** means the API is marked **online**. Archive controls and GOES options are enabled,
-  and the live product list replaces the built-in fallback.
-- **Failure** (network error, non-2xx, empty payload) means the API is marked **offline**. All
-  API-dependent controls are disabled and clearly labelled, and the tool steers you to manual
-  upload.
+- **If it succeeds**, the API is marked **online**, the archive controls and GOES options are turned on, and the live product list replaces the built-in fallback list.
+- **If it fails** (a network error, an error status, or an empty response), the API is marked **offline**, every control that needs it is turned off and clearly labeled, and you're pointed to uploading your file yourself.
 
-There's **no manual "reconnect" button**. The 60-second re-check flips everything back on by
-itself once the service recovers. (Reference: `loadSatelliteProducts()` and `setReconApiHealth()`
-in `js/02-satellite.js`.)
+There's **no "reconnect" button** to press. The 60-second check turns everything back on as soon as the API responds again. (In the code: `loadSatelliteProducts()` and `setReconApiHealth()` in `js/02-satellite.js`.)
 
-### What "offline" looks like in the UI
+### What you'll see when it's offline
 
-- The **Year / Storm / Flight** dropdowns and **⤓ Load Flight + Storm Track** button go greyed
-  out and unclickable.
-- A **full-cover banner** appears over those controls: **"API Offline, ↑ use manual upload
-  instead."**
-- The **manual upload zone** is highlighted (blue ring) to draw your eye to it.
-- In the satellite dropdown, **GOES-East/West** options are disabled and relabelled
-  **"...API Offline."**
-- The **Pre-Cache Satellite Imagery** modal disables GOES options the same way.
+- The **Year / Storm / Flight** dropdowns, the search box, and **⤓ Load Flight + Storm Track** are greyed out and can't be clicked.
+- An **"API Offline"** label covers those controls, with the upload box right next to it, enlarged and labeled **Upload:**, and the note "← upload a file manually while the API is offline" beside it.
+- **⤓ Batch Load Flight Data** and **⤓ Pre-Cache Satellite Imagery** in the menu bar are greyed out.
+- In the **Overlays** satellite list, the **GOES-East/West** options are turned off and labeled **"(API Offline)"**.
 
 ---
 
 ## What works: online vs. offline
 
-| Capability | API online | API offline |
+| What you want to do | API online | API offline |
 | --- | --- | --- |
-| **Archive browser** (Year, Storm, Flight load) | Yes | No (disabled, "API Offline") |
-| **Manual upload** (`.nc`, also `.txt`) | Yes | Yes |
-| Replay: play/pause, speed, timeline sliding, 8 Hz smoothing | Yes | Yes |
-| Map tracker (2D & 3D), track/barb colouring, markers | Yes | Yes |
-| Charts plus "Create Your Own Graph" | Yes | Yes |
-| PFD / HUD, units toggle | Yes | Yes |
-| Measure / Mark / point analysis export | Yes | Yes |
-| MMR video load plus sync (Auto-Sync/OCR and Manual) | Yes | Yes (all local) |
+| **Archive browser** (Year, Storm, Flight) | Yes | No (greyed out, "API Offline") |
+| **Uploading a file yourself** (`.nc`, also `.txt`) | Yes | Yes |
+| Replay: play/pause, speed, timeline, 8Hz Smoothing | Yes | Yes |
+| Map tracker (2D and 3D), track and barb colors, markers | Yes | Yes |
+| Charts and Create Your Own Graph | Yes | Yes |
+| PFD, HUDs, and the units switch | Yes | Yes |
+| Measure, Mark Point, and point reports | Yes | Yes |
+| Loading and syncing an MMR video (Auto-Sync/OCR and Manual) | Yes | Yes (all on your machine) |
 | **Record Clip** | Yes | Yes |
-| **MODIS / VIIRS** satellite overlays (NASA GIBS) | Yes | Needs GIBS, independent of the recon-api |
-| **GOES-East / GOES-West** archive imagery | Yes | No (disabled, "API Offline") |
-| **TDR overlays** (2D layers and 3D columns) | Yes | No for new analyses and cross-sections; already-fetched ones keep showing |
-| **Storm best-track** overlay | Yes (comes with archive load) | No for new loads; an already-loaded track stays until reset |
-| **Batch satellite pre-cache** (GOES) | Yes | No (GOES disabled) |
-| Imagery already in the **local cache** | Yes | Yes (served from cache, no fetch) |
+| **MODIS / VIIRS** satellite imagery (NASA GIBS) | Yes | Needs NASA GIBS, which is separate from the recon API |
+| **GOES-East / GOES-West** archive imagery | Yes | No (greyed out, "API Offline") |
+| **TDR** (2D layers and 3D columns) | Yes | No for new legs and cross-sections, though legs you already downloaded keep showing |
+| **Storm best-track** | Yes (comes with an archive load) | No for new loads, though a track you already loaded stays until you open another flight |
+| **Pre-caching satellite imagery** (GOES) | Yes | No (GOES greyed out) |
+| Imagery you **already cached** | Yes | Yes (loaded from the cache) |
 
-**Bottom line:** the only things that truly need the recon-api are **archive flight loading**,
-**archive GOES imagery** (and its caching), and the **storm-track overlay** that comes with an
-archive load. Everything about replaying a flight you already have works fully offline.
+**In short:** you only truly need the recon API for **loading flights from the archive**, **archive GOES imagery** (and caching it), **TDR**, and the **storm best-track** that comes with an archive load. Replaying a flight you already have works completely offline.
 
 ---
 
-## Using the tool when the API is offline
+## Using the app when the API is offline
 
-You can run a complete training or replay session with no API.
+You can run a full training or replay session with no API.
 
-1. **Load the flight manually.** Drop a `.nc` file on the upload zone (the tool highlights it for
-   you). This is the same parser the archive uses, so nothing downstream changes.
-2. **Load the MMR video** and sync it (Auto-Sync or Manual). All local.
-3. **Replay** with full controls, charts, PFD, measure, mark, and Record Clip.
-4. **Satellite:** use **MODIS/VIIRS** if you have general internet (NASA GIBS), or rely on any
-   imagery you cached earlier via **⤓ Pre-Cache Satellite Imagery**. GOES-archive is
-   unavailable until the recon-api is back.
+1. **Upload the flight yourself.** Drop a `.nc` file on the **Upload:** box next to the "API Offline" label. It goes through the same parser the archive uses, so everything after that works the same.
+2. **Load the MMR video** and sync it with Auto-Sync or Manual Time Input, which all happens on your machine.
+3. **Replay** with all the controls, charts, PFD, Measure, Mark Point, and Record Clip.
+4. **Satellite:** use **MODIS/VIIRS** if you have regular internet (NASA GIBS), or any imagery you cached earlier with **⤓ Pre-Cache Satellite Imagery**, since GOES from the archive is unavailable until the recon API is back.
 
-> Tip for field or limited-connectivity use: while you *do* have the API, use **⤓ Pre-Cache
-> Satellite Imagery** to download the GOES imagery for the flights you'll present. Cached
-> imagery plays back with no network, is saved on this device, and survives reloads.
+> Tip for the field or anywhere with poor internet: while you *do* have the API, use **⤓ Pre-Cache Satellite Imagery** to download the GOES imagery for the flights you'll present. Cached imagery plays back with no network, is saved on this device, and stays there after reloads.
 
 ---
 
-## Recovery
+## When the API comes back
 
-Nothing to do. The tool re-runs the health check every ~60s (when the tab is visible). As soon as
-`GET /v1/satellite/products` succeeds again:
+You don't need to do anything. The app repeats the health check about every 60 seconds while the tab is visible, and as soon as `GET /v1/satellite/products` works again:
 
-- Archive dropdowns and the Load button re-enable (restoring whatever cascading state they had).
-- The "API Offline" banner disappears and the upload zone highlight relaxes.
-- GOES satellite options re-enable and the live product list refreshes.
+- The archive dropdowns and the Load button turn back on, in whatever state they were in before.
+- The "API Offline" label goes away and the upload box goes back to its normal size and place.
+- The GOES options turn back on and the live product list refreshes.
 
-If you can't wait, reloading the page also re-checks immediately.
+If you don't want to wait, reloading the page checks right away.
 
 ---
 
 ## Endpoint reference
 
-All under `RECON_API_BASE` (defined in `js/02-satellite.js`).
+All of these are under `RECON_API_BASE` (defined in `js/02-satellite.js`).
 
-| Endpoint | Purpose |
+| Endpoint | What it's for |
 | --- | --- |
-| `GET /v1/satellite/products` | **Health check** plus discovery of available bands/composites and each spacecraft's active date range. |
-| `GET /v1/satellite/tile?...` | Request a GOES tile render (async job). |
-| `GET /v1/satellite/status/{key}` | Poll a tile job until `ready` (polled about every 3s, 30s cap). |
-| `GET /v1/recon/*`, `GET /v1/storms/*` | Archive catalog: years, storms, missions, and best-tracks. |
-| `GET /v1/recon/mission/{id}` | Mission metadata plus a 0.2 Hz-decimated track (the fallback path). |
-| `GET /v1/recon/mission/{id}/download` | Streams the **full-resolution** mission NetCDF (CORS-open; the primary archive load path). |
-| `GET /v1/tdr/mission/{id}`, `/v1/tdr/volume`, `/v1/tdr/plane_slice` | Tail Doppler Radar coverage, full reflectivity volumes for the radar overlays, and vertical cross-sections. |
+| `GET /v1/satellite/products` | The **health check**, plus the list of available bands and each satellite's active date range. |
+| `GET /v1/satellite/tile?...` | Requests a GOES tile render (a background job). |
+| `GET /v1/satellite/status/{key}` | Checked about every 3 seconds until the tile job is `ready`, for up to 30 seconds. |
+| `GET /v1/recon/*`, `GET /v1/storms/*` | The archive catalog: years, storms, missions, and best-tracks. |
+| `GET /v1/recon/mission/{id}` | Mission details plus a 0.2 Hz reduced track (the fallback path). |
+| `GET /v1/recon/mission/{id}/download` | Streams the **full-resolution** mission NetCDF (the main archive load path). |
+| `GET /v1/tdr/mission/{id}`, `/v1/tdr/volume`, `/v1/tdr/plane_slice` | Tail Doppler Radar coverage, full reflectivity volumes for the radar overlay, and vertical cross-sections. |
 
-> The API is the source of truth for available satellite products. New bands and composites need
-> **no** client change; they appear in the picker on the next `products` fetch. Check the API repo
-> or its `API.md` before assuming a product is missing.
+> The API's product list sets which satellite products you can pick. New bands need **no** change in the app and show up in the picker the next time the list is fetched, so check the API's own docs before you assume a product is missing.
 
 ---
 
 ## Changing the API host
 
-If the recon API host ever changes, every fetch in the app goes through the single
-`RECON_API_BASE` constant, so the swap is two edits:
+If the recon API ever moves to a new host, you only need two edits, because every request in the app goes through the single `RECON_API_BASE` constant:
 
-1. **`RECON_API_BASE`** in `js/02-satellite.js`: point it at the new base URL (keep the `/api` path
-   segment if the new deployment uses one).
-2. **The CSP `<meta>` tag** in `index.html`: replace the current recon origin (the value of
-   `RECON_API_BASE`) with the new origin in **both** `connect-src` and `img-src` (the browser blocks
-   the new host silently otherwise).
+1. **`RECON_API_BASE`** in `js/02-satellite.js`: point it at the new base URL (keep the `/api` path segment if the new server uses one).
+2. **The CSP `<meta>` tag** in `index.html`: replace the current API origin (the value of `RECON_API_BASE`) with the new one in **both** `connect-src` and `img-src`, because otherwise the browser blocks the new host without showing an error.
 
-Then update the doc comments at the top of `js/12b-recon-archive.js`, `js/01-state.js`, and
-`js/02-satellite.js`.
+After that, update the comments at the top of `js/12b-recon-archive.js`, `js/01-state.js`, and `js/02-satellite.js`.
 
 ---
 
 ## FAQ
 
 **Do my uploaded flight files get sent to the API?**
-No. Files are parsed entirely in your browser. The API is only queried for the archive catalog,
-archive NetCDF downloads (when *you* pick a mission), storm tracks, and satellite imagery.
+No, your files are parsed entirely in your browser. The app only contacts the API for the archive catalog, archive NetCDF downloads (when *you* pick a mission), storm tracks, TDR, and satellite imagery.
 
 **The archive worked this morning and now it's greyed out. Did I break something?**
-No, that's the offline state. The health check failed (service hiccup or your network). Use manual
-upload; it'll re-enable itself within ~60s of the service recovering, or on reload.
+No, that's the offline state, which means the health check failed because of a problem with the service or your network. Upload your file yourself in the meantime, and the archive turns back on within about 60 seconds of the service recovering, or when you reload.
 
 **Why can I pick MODIS/VIIRS but not GOES?**
-MODIS/VIIRS come from **NASA GIBS**, a different service; GOES-archive comes from the
-**noaa-recon-api**. If only the recon-api is down, MODIS/VIIRS still work.
+MODIS/VIIRS come from **NASA GIBS**, which is a different service, while archive GOES comes from the **recon archive API**, so if only the recon API is down, MODIS/VIIRS still work.
 
 **Why is one GOES option greyed out even when the API is online?**
-The flight is outside that satellite's Earth-disk view (more than about 65° from its sub-point).
-An Atlantic flight greys out GOES-West; an east-Pacific flight greys out GOES-East.
+The flight is outside that satellite's view of the Earth (more than about 65° from the point below it), so an Atlantic flight greys out GOES-West and an east Pacific flight greys out GOES-East.
 
-**Can I use this completely offline (no internet at all)?**
-Yes, after one online visit. A service worker (`sw.js`) precaches the whole app on first load,
-so the page opens with no network and manual upload, local replay, video sync (including
-Auto-Sync OCR), charts, map coastlines/terrain, and every export all work. The only things that
-still need connectivity are the network features themselves: archive loading, GOES imagery, and
-storm tracks (recon-api) plus MODIS/VIIRS (NASA GIBS), unless you pre-cached imagery while
-online. After a new version is deployed, the first page load still shows the previous build
-while the update installs in the background; the following reload shows the new one.
+**Can I use this with no internet at all?**
+Yes, after you've opened it online once. The service worker (`sw.js`) saves the whole app on that first load, so afterwards the page opens with no network, and uploading files, replay, video sync (including Auto-Sync OCR), charts, the map's coastlines and terrain, and every export all work. The only things that still need a connection are the network features themselves: archive loading, GOES imagery, TDR, and storm tracks (recon API), plus MODIS/VIIRS (NASA GIBS), unless you cached the imagery while you were online. After a new version is deployed, the first page load still shows the previous version while the update installs in the background, and the next reload shows the new one.

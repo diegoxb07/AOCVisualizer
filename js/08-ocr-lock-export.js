@@ -8,13 +8,13 @@
         // The engine is fetched on the first video, so the first lock of a session must wait on that
         // warmup before it can judge ocrAvailable. No-op once warm.
         await ensureOCR();
-        if (!ocrWorker || !ocrAvailable) { if (!silent) showToast("Auto-sync (OCR) isn't available. Use Manual time inputs.", 6000); return; }
+        if (!ocrWorker || !ocrAvailable) { if (!silent) showToast("Auto-Sync (OCR) isn't available here, so use Manual Time Input.", 6000); return; }
         if (isOcrRunning) return;   // a lock may have started while the warmup above was awaited
 
         isOcrRunning = true;
-        refreshSyncingIndicator();  // hunting for the timestamp frame
-        // A manual Sync Now means the user is telling us the current lock is wrong, so drop the
-        // drift-hunt history and the pending-correction hysteresis and re-derive the offset from
+        refreshSyncingIndicator();  // searching for the timestamp frame
+        // A manual Sync Now means the user considers the current lock wrong, so drop the
+        // drift-search history and the pending-correction hysteresis and re-derive the offset from
         // scratch below. The commit is ungated for a manual request, so it always replaces the lock.
         if (!silent) { ocrHistory = []; pendingSyncBase = null; pendingSyncCount = 0; ocrSetMismatchHold(true); }
         let wasPlaying = !video.paused; if (wasPlaying) video.pause();
@@ -22,7 +22,7 @@
         videoSyncMode.value = 'auto'; document.getElementById('videoStartInput').disabled = true;
         applySyncModeLock();
 
-        if (!silent) showToast("Scanning the frame for the MMR clock... Please wait.", 4000);
+        if (!silent) showToast("Scanning the frame for the MMR clock, this takes a moment...", 4000);
         ocrNoteScanStart();
 
         let attempts = 0; const maxAttempts = 6; const originalVideoTime = video.currentTime;
@@ -34,7 +34,7 @@
             video.currentTime = originalVideoTime;
             if (wasPlaying && isPlaying) video.play().catch(e => {});
             ocrMaybeWarnCompiled();
-            if (!silent) showToast("Sync failed after multiple attempts. Try jumping to a clearer frame.", 5000);
+            if (!silent) showToast("Sync didn't work after several tries, so try jumping to a frame where the clock is clearer.", 5000);
         };
 
         // `verified` is false for the exhaustion fallback below: a single plausible-looking clock that
@@ -57,13 +57,13 @@
                 const skipTo = minSecs - videoStartSeconds;
                 if (skipTo > 0.1 && video.currentTime < skipTo && (!video.duration || skipTo < video.duration - 0.05)) {
                     video.currentTime = skipTo;
-                    if (!silent) showToast("Video started before flight data, skipped ahead to data start.", 3500);
+                    if (!silent) showToast("The video starts before the flight data, so playback skipped ahead to where the data begins.", 3500);
                 }
             }
 
             if (!silent) showToast(verified
                 ? "Synced!"
-                : "Synced on an UNVERIFIED clock reading: the timestamp never confirmed it was ticking with the video. Check the tracker time against the MMR, and use Sync Now on a clearer frame (or Manual Time Input) if it looks wrong.", verified ? 2000 : 9000);
+                : "Synced on an unverified clock reading, because the timestamp couldn't be confirmed to tick with the video, so compare the tracker time with the MMR and use Sync Now on a clearer frame (or Manual Time Input) if it looks wrong.", verified ? 2000 : 9000);
             ocrNoteLock();
             ocrHistory = []; forceOcrSyncNextTick = false; isManualSyncRequest = false;
             refreshSyncingIndicator();  // lock settled, clear the badge even when paused
@@ -72,7 +72,7 @@
         };
 
         async function attemptSync() {
-            // A scrub grabbed the playhead mid-hunt: the gated recheck yields (its release
+            // A scrub moved the playhead mid-search: the gated recheck stops (its release
             // schedules a fresh one) rather than stepping on top of the user's drag or
             // reverting the finished scrub through finishFail's position restore.
             if (gateGapSeconds != null && isScrubbing) {
@@ -148,12 +148,12 @@
                 stepAndContinue();
             } catch(e) { isOcrRunning = false; ocrSetMismatchHold(false); refreshSyncingIndicator(); if (wasPlaying && isPlaying) video.play().catch(e=>{}); }
         }
-        // Step the clock forward and continue the hunt on 'seeked', but never wait on it forever: a
+        // step the clock forward and continue the search on 'seeked', but never wait on it forever: a
         // seek to a non-seekable or near-end spot, or one a user interaction interrupts, can silently
-        // skip the event, which would strand the hunt with isOcrRunning stuck true and dead-lock every
-        // later sync (including Sync Now). The timeout guarantees the hunt always reaches its end.
+        // skip the event, which would strand the search with isOcrRunning stuck true and dead-lock every
+        // later sync (including Sync Now). The timeout makes sure the search always reaches its end.
         // The 2 s step clears the dv >= 1.5 motion threshold on the very next attempt, so a
-        // disagreeing clock verifies within two reads and a post-slide correction lands fast.
+        // disagreeing clock verifies within two reads and a post-slide correction commits fast.
         function stepAndContinue() {
             let advanced = false;
             const go = () => { if (advanced) return; advanced = true; video.removeEventListener('seeked', go); attemptSync(); };
@@ -166,13 +166,13 @@
 
     // Runs an OCR lock as soon as the worker is free: a full-frame recognize can hold the worker
     // for seconds, so the request waits it out (up to ~8 s) instead of being silently dropped on
-    // a busy worker; a manual request that still cannot run says so. A request arriving mid-scrub
+    // a busy worker; a manual request that still cannot run shows a message. A request arriving mid-scrub
     // is dropped; the release handler schedules its own recheck.
     function requestOcrLock(opts, tries = 40) {
         if (isScrubbing) return;
         if (isOcrRunning) {
             if (tries > 0) { setTimeout(() => requestOcrLock(opts, tries - 1), 200); return; }
-            if (!opts || !opts.silent) showToast('Auto-Sync is busy scanning. Try Sync Now again in a moment.', 5000);
+            if (!opts || !opts.silent) showToast('Auto-Sync is still scanning, so try Sync Now again in a moment.', 5000);
             return;
         }
         performImmediateOcrLock(opts);

@@ -273,7 +273,7 @@
             g.lineTo(W * 0.555, vOf(spec.antiGlareZ) * H); g.lineTo(W * 0.445, vOf(spec.antiGlareZ) * H);
             g.closePath(); g.fill();
         }
-        // cabin windows on both sides, just above the side line; a drop entry sits lower on the
+        // cabin windows on both sides, just above the side line; a drop entry is lower on the
         // hull (toward the belly seam at u 0/1), the overwing emergency exit
         g.fillStyle = NOAA_LIV.black;
         (spec.windows || []).forEach(w => {
@@ -296,13 +296,13 @@
         const tex = makePlaneTexture(cv);
         // The roundel is the official NOAA emblem (the noaa.gov digital logo, inlined below as
         // NOAA_EMBLEM_URI), on the single side the real livery carries it, drawn through that
-        // side's orientation transform so it sits upright; the texture refreshes when it decodes.
+        // side's orientation transform so it is upright; the texture refreshes when it decodes.
         if (spec.emblem) {
             noaaEmblemImage().then(logo => {
                 if (!logo) return;
                 const r = spec.emblem.r || 22;
                 // height on the hull as the right-side u (the left side mirrors it); defaults to
-                // a touch crown-ward of the window line, riding above the cheatline
+                // a touch crown-ward of the window line, just above the cheatline
                 const u0 = spec.emblem.u != null ? spec.emblem.u : 0.300;
                 const xf = spec.emblem.side === 'left' ? [1 - u0, 1, -1] : [u0, -1, 1];
                 g.save(); g.translate(W * xf[0], vOf(spec.emblem.z) * H);
@@ -420,7 +420,7 @@
             // the Gulfstream windshield, drawn to the head-on photo: four equal-height panes
             // leaning into a strong vertical center post (each wider at its base), the end
             // pair swept back with a rounded upper-outboard corner, all set in thick white
-            // frame. Canvas y runs up the visor, so pane tops sit at the larger y. A darker
+            // frame. Canvas y runs up the visor, so pane tops are at the larger y. A darker
             // trim line runs along the band's base so the visor-to-nose edge reads defined,
             // like the WP-3D's brow.
             const glass = path => { path(); g.fillStyle = '#10151b'; g.fill(); path(); g.fillStyle = grad; g.fill(); };
@@ -443,7 +443,7 @@
             // Two eyebrow windows above the main glass, shaped to the WP-3D flight deck (1st.jpg):
             // a right-triangle-ish quad (four sides) tall on the OUTBOARD edge with a 90-degree
             // corner at its base, the top sloping down toward the center, tilted a few degrees.
-            // Each pane sits near its own outboard edge of the windshield (not toward the middle),
+            // each pane is near its own outboard edge of the windshield (not toward the middle),
             // and the two mirror each other so both lean outboard.
             const eyebrow = (cx, mirror) => {
                 g.save();
@@ -470,7 +470,7 @@
         return makePlaneTexture(cv);
     }
 
-    // Wraparound cockpit windshield: a partial-arc lathe band centered on the crown, riding the
+    // wraparound cockpit windshield: a partial-arc lathe band centered on the crown, following the
     // forehead stations a skin's thickness proud of the hull so the glass follows the nose
     // curvature exactly. stations = hull forehead stations with the outward offset already
     // applied; arc = half-angle of the wrap; posts = frame-post positions across the glass.
@@ -507,7 +507,7 @@
         const grp = new THREE.Group();
         // Livery: white hull and belly aft; the navy flank band runs below the window line and
         // keeps going forward into the nose, wrapping down under it so the nose underbelly is
-        // navy against the black radome, with the sky pinstripe riding the band's upper edge
+        // navy against the black radome, with the sky pinstripe along the band's upper edge
         // the whole way. Aft it flows into the all-navy tail.
         // The texture's z frame MUST match the hull lathe's station span (-2.30..2.45), because
         // bodyLathe maps texture v to the lathe's own z fraction; a nominal frame here shifts
@@ -533,7 +533,7 @@
         const mats = planeMats(tex, finTexture(0.68, { x0: 0.15, xs: 0.72, c0: 0.24, cs: 0.92 }));
 
         // hull starts behind the radome; the crown climbs steeply between -2.06 and -1.90 (the
-        // forehead face) with the windshield band riding that slope, and the aft body funnels
+        // forehead face) with the windshield band following that slope, and the aft body funnels
         // down to a third of the fuselage thickness where the tail Doppler radar takes over
         grp.add(bodyLathe([
             { z: -2.30, r: 0.150, y: -0.030 }, { z: -2.18, r: 0.178, y: -0.020 }, { z: -2.06, r: 0.213, y: -0.009 },
@@ -694,12 +694,12 @@
     // tail Doppler radar tube out the tail cone.
     function buildGIVModel(reg) {
         const grp = new THREE.Group();
-        // Livery: one navy sweep, drawn to the N49RF photos. Aft, the navy sits well above the
+        // livery: one navy sweep, drawn to the N49RF photos. Aft, the navy is well above the
         // tail radar (the tail cone is white at the TDR's level); going forward the sweep
         // narrows into a THIN band diving diagonally across the side at about the fifth window,
         // then runs forward as the navy underbelly, ending where the two sides' diagonals
         // CONVERGE under the belly still at thickness (a blunt rounded stop under the flight
-        // deck, not a hairline pinch; white under the nose). The sky stripe is bold and rides
+        // deck, not a hairline pinch; white under the nose). The sky stripe is bold and runs
         // the navy's upper edge the whole way. Registration is on the starboard engine
         // nacelle, not the hull.
         // The texture's z frame MUST match the hull lathe's station span (-2.06..1.98), because
@@ -713,7 +713,7 @@
                 // The diagonal is a LONG thin straight slit cutting across most of the side,
                 // its upper edge passing through the second window from the aft; at the
                 // forward belly the two sides' slits come together and wrap into a beret cap
-                // sitting on the LOWER PORT flank (the port side carries a rounded bulge, the
+                // on the LOWER PORT flank (the port side carries a rounded bulge, the
                 // starboard slit dives to the seam and feeds into it). The port side also
                 // samples the sweep shifted aft so the navy wraps the crown like wallpaper,
                 // the shift ramping to zero toward the nose so the cap stays joined.
@@ -747,7 +747,7 @@
         const noseTip = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 10), mats.white);
         noseTip.position.set(0, -0.052, -2.06); grp.add(noseTip);
 
-        // wraparound windshield riding the forehead rise, kept SHORT vertically and a touch
+        // wraparound windshield following the forehead rise, kept SHORT vertically and a touch
         // prouder of the skin at its base so it reads as a defined brow over the nose, like
         // the WP-3D's (the gulfPanes texture carries the pane shapes); the band's aft station
         // settles back flush with the hull, so the glass fairs smoothly into the fuselage
@@ -811,7 +811,7 @@
         addAntennas(grp, mats.white, [[-1.1, 0.19, true], [0.2, 0.195, true]]);
         // the whole airframe shrinks toward the real G-IV's proportions against the WP-3D:
         // smaller in span and diameter, and shorter still along its length; every child
-        // (wings, tail, decals, windshield) rides along
+        // (wings, tail, decals, windshield) moves with it
         grp.scale.set(0.92, 0.92, 0.81);
         return grp;
     }

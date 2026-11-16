@@ -2,7 +2,7 @@
    Part of index.html, split into modules so a failure in one file does not break the others.
    Loaded as a classic (non-module) script; all parts share one global scope, in order.
 
-   The parsing itself lives in js/11b-parser-core.js (pure, shared with the parse worker, the
+   The parsing code is in js/11b-parser-core.js (pure, shared with the parse worker, the
    batch sat-cache, and the node tests). This file owns the DOM side: upload wiring, the worker
    round-trip, the data report, and the post-parse UI/global setup. */
 
@@ -199,7 +199,7 @@
     }
 
     // Load a flight from a TSV string or an .nc ArrayBuffer. Throws (after cleaning up its own
-    // state) when the file yields nothing usable; callers decide how to surface that.
+    // state) when the file yields nothing usable; callers choose how to surface that.
     async function parseEntireFile(source) {
         applyParsedFlight(await parseFlightSource(source));
     }

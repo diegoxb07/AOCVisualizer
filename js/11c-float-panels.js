@@ -8,7 +8,7 @@
    collapsing the media bar cannot hide it, and every size change routes through
    resizeCanvasLayout, which already preserves the 2D view and resizes the 3D renderer.
    Pinning (.fake-fs via the panel ⛶) suspends a float: the inline rect clears so
-   the pin's inset:0 wins, and the float returns when the pin releases (floatPanelsOnPinChange,
+   the pin's inset:0 takes effect, and the float returns when the pin releases (floatPanelsOnPinChange,
    called from setFakePanel in js/07-ui-controls.js). */
 
     const floatPanels = {};            // panel id -> { rect: {x,y,w,h}, suspended: bool }
@@ -21,7 +21,7 @@
     const FLOAT_DETACH_PX = 6;         // outline drag distance before a docked panel detaches
     const FLOAT_EDGE_PX = 10;          // grab band along each side of a floating panel that resizes
 
-    // Which sides of the panel the pointer sits on (inside the edge band).
+    // which sides of the panel the pointer is on (inside the edge band).
     function floatEdgesAt(el, e) {
         const r = el.getBoundingClientRect();
         return {
@@ -133,7 +133,7 @@
 
     function floatPanelsDockAll() { floatDock('mapPanel'); floatDock('videoPanel'); }
 
-    // A video loaded while the map already floats joins it in PiP at the map's size, parked on
+    // A video loaded while the map already floats joins it in PiP at the map's size, placed on
     // whichever side has the room (right, then left, then below). Called from the video-upload
     // handler in js/12-file-parsing.js once videoLoaded is set.
     function floatVideoBesideMap() {
@@ -143,7 +143,7 @@
         const r = mapSt.rect, vw = window.innerWidth, vh = window.innerHeight, gap = 12;
         const w = r.w, h = r.h;
         // Clamp a corner so the WHOLE panel stays on screen (near margin when it is larger than the
-        // viewport), so an awkwardly-parked map never strands the video off-screen.
+        // viewport), so an awkwardly placed map never strands the video off-screen.
         const clampX = px => Math.max(8, Math.min(px, Math.max(8, vw - w - 8)));
         const clampY = py => Math.max(22, Math.min(py, Math.max(22, vh - h - 8)));
         let x, y;

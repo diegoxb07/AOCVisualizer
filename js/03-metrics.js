@@ -8,7 +8,7 @@
     let threeMarkersGroup = new THREE.Group();
     let threeDInitialized = false;
 
-    // chart typography. the same family the page uses, named here because Chart.js wants a
+    // chart typography. the same family the page uses, named here because Chart.js needs a
     // font stack as a plain string and cannot read the css token in css/app.css.
     const CHART_FONT_MONO = '"Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
     const CHART_FONT_SANS = '"Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
@@ -58,7 +58,7 @@
     let speeds = [1, 2, 4, 8, 16, 32, 64, 128];
     let currentSpeedIdx = 0;
     // Fastest speed the loaded MMR video is driven by raising playbackRate; Chromium accepts up
-    // to 16x and drops frames as needed to hold the clock. A decoder that cannot hold a high rate
+    // to 16x and drops frames as needed to keep up with the clock. A decoder that cannot keep up with a high rate
     // stalls the video clock (and both players with it), so the engine's stall watchdog
     // (masterSyncEngineTick) demotes this ceiling to 4 and higher speeds advance by seek-stepping
     // instead. A newly loaded video resets it: each file gets its own decoder judgment.
@@ -72,7 +72,7 @@
     let isScrubbing = false, activeScrubChart = null, wasPlayingBeforeScrub = false;
     let hasInitialSyncOccurred = false, scrubSyncTimeout = null, forceOcrSyncNextTick = false;
     let isManualSyncRequest = false, scrubDebounceTimer = null;
-    // Auto-sync hysteresis: once a good lock exists, a re-sync that disagrees must hold the SAME new
+    // Auto-Sync hysteresis: once a good lock exists, a re-sync that disagrees must show the SAME new
     // offset across several scans (pendingSyncCount) before it replaces the lock, so a momentary
     // OCR mispick cannot abruptly ruin an alignment that was consistently good.
     let pendingSyncBase = null, pendingSyncCount = 0;

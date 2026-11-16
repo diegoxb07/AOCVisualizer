@@ -14,7 +14,7 @@
    scaled to the machine's cores), and the work continues while the tab is hidden; closing
    the tab or Stop ends it. */
 
-    // Per-part output cap: the concat step's output .mp4 lives in ffmpeg's in-memory FS, and
+    // per-part output cap: the concat step's output .mp4 is held in ffmpeg's in-memory FS, and
     // the core's wasm memory tops out at 2 GB (declared in ffmpeg-core.wasm), so a flight whose
     // converted total passes this is emitted as sequential part files. The veryfast re-encode
     // keeps a whole mission under it in the normal case.
@@ -54,7 +54,7 @@
         let cdSize = dv.getUint32(eocd + 12, true);
         let cdOfs = dv.getUint32(eocd + 16, true);
         if (count === 0xffff || cdSize === 0xffffffff || cdOfs === 0xffffffff) {
-            const loc = eocd - 20;   // zip64 EOCD locator sits directly before the EOCD
+            const loc = eocd - 20;   // zip64 EOCD locator is directly before the EOCD
             if (loc >= 0 && tail[loc] === 0x50 && tail[loc + 1] === 0x4b && tail[loc + 2] === 0x06 && tail[loc + 3] === 0x07) {
                 const e64Ofs = Number(dv.getBigUint64(loc + 8, true));
                 const e64 = new DataView(await zipFile.slice(e64Ofs, e64Ofs + 56).arrayBuffer());
@@ -601,7 +601,7 @@
         row.classList.remove('hidden'); row.classList.add('flex');
     }
 
-    // Hands the finished .mp4 to the normal MMR upload path: the converted file lands on
+    // hands the finished .mp4 to the normal MMR upload path: the converted file goes to
     // #videoInput and its change handler runs the whole existing pipeline (drop zone label,
     // OCR warmup, auto-sync, PiP join).
     function aviUseAsMmr(res) {

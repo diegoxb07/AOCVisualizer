@@ -137,7 +137,7 @@
         return barbColorSelect.value === 'hurricane' ? getHurricaneColorRGB(spd) : getSpdColorRGB(spd);
     }
 
-    // 0-1 triple to the css color string the canvas context wants.
+    // 0-1 triple to the css color string for the canvas context.
     function rgbCss([r, g, b]) {
         return `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
     }
@@ -150,7 +150,7 @@
             // the neutral end is a true gray, which contrasts with the light basemap (white would hide
             // most of the track, whose values stay close to the baseline). cooling runs to a violet-blue, a hue well
             // away from the light blue water, and the square-root ease makes a mild change of a fraction
-            // of a degree already read as a color. full color still lands at a 3 degree difference.
+            // of a degree already read as a color. full color is reached at a 3 degree difference.
             const t = d.tempr;
             const n = [0.42, 0.42, 0.42], mix = (to, f) => n.map((c, i) => c + (to[i] - c) * f);
             if (t === null || tempBaseline[idx] === null) return n;
@@ -174,7 +174,7 @@
 
     // Frames for the estimated-center marker's arms while paused, when nothing else repaints the
     // map. js/18-engine.js owns them while playing, where it also supplies the interpolated row.
-    // Parks itself whenever there are no arms to turn.
+    // stops whenever there are no arms to turn.
     let _stormSpinRaf = null;
     function stormSpinWanted() {
         return !isPlaying && showStormTrack && stormTrackPoints.length > 1
@@ -525,8 +525,8 @@
 
         drawStormTrack2D();
 
-        // flight track drawn as the same uniform catmull-rom curve the plane center rides
-        // (getInterpolatedRow), one cubic bezier per 1 Hz segment, so the plane sits on the line through
+        // flight track drawn as the same uniform catmull-rom curve the plane center follows
+        // (getInterpolatedRow), one cubic bezier per 1 Hz segment, so the plane is on the line through
         // turns. control points are computed in screen space; cp is a single reused object (setSeg
         // mutates it) so a long flight doesn't allocate per segment per frame.
         const _n = filteredData.length;
@@ -544,7 +544,7 @@
         ctx.lineWidth = 2.5/mapScale; ctx.globalAlpha = 0.8;
         // `anchor` is the last sample actually drawn, and a skip must leave it put, so skipped
         // distance accumulates and the next draw spans from the last drawn point. At 1 Hz consecutive
-        // samples sit far under a pixel apart, so the anchor is what lets any segment clear the
+        // samples are far under a pixel apart, so the anchor is what lets any segment clear the
         // threshold. The threshold is in on-screen px, bounding the drawn segment count by the
         // track's pixel length rather than the sample count.
         let anchor = 0;
@@ -635,7 +635,7 @@
 
             if (d.windDir !== null && d.windSpd !== null) {
                 let headOffset = (d.th !== null ? d.th : (d.gTrack || 0)) * (Math.PI / 180);
-                // sit just off the glyph's nose tip (glyph nose is at ~x=25 in its local frame, so
+                // are just off the glyph's nose tip (glyph nose is at ~x=25 in its local frame, so
                 // the tip in the scaled frame tracks planeScale); the barb itself keeps its own
                 // size (drawWindBarbFrame's isDynamic scale is independent of the glyph scale).
                 const noseDist = 3.75 * zoomFactor / mapScale; let noseX = getX(d.lon) + Math.sin(headOffset) * noseDist; let noseY = getY(d.lat) - Math.cos(headOffset) * noseDist;
@@ -790,7 +790,7 @@
 
         ctx.restore();
         // Every repaint re-arms the spin, so pausing, loading a storm, or switching back to 2D picks
-        // it up without any of them knowing about it, and the loop feeds itself from here.
+        // it up without any of them knowing about it, and the loop schedules its next frame from here.
         ensureStormSpin();
     }
 

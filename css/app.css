@@ -71,7 +71,7 @@ body {
 :root { --font-ui: "Nunito Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif; --font-mono: var(--font-ui); }
 .font-sans, .font-mono, .font-serif { font-family: var(--font-ui); }
 
-/* Readouts sit in the interface font; only their digits are held to one width, so a ticking
+/* readouts use the interface font; only their digits are held to one width, so a ticking
    clock or a counting percentage does not shuffle the text beside it. */
 .tabular-nums { font-variant-numeric: tabular-nums; }
 .uppercase.tracking-wider { letter-spacing: 0.12em; }
@@ -183,7 +183,7 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
 #ovSatSection, #tdrControlGroup { padding: 3px 6px 6px; border-radius: 0 0 4px 4px; }
 /* the two sections are side by side as columns: a folded section is only as wide as its header, and
    an unfolded one is a full 238px column, so unfolding one never widens the other. with no TDR for
-   the mission the panel holds the satellite column alone, and a narrow window stacks them */
+   the mission the panel shows the satellite column alone, and a narrow window stacks them */
 .ov-columns { display: flex; align-items: flex-start; gap: 0; }
 /* the satellite column overlaps the TDR column's right edge by a pixel, so the shared edge is one line;
    with no TDR section shown it lines up with the head instead */
@@ -294,15 +294,15 @@ html.pref-tracker-3d #measureCluster { display: none; }
 html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
 /* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
-   clear the bar by position (child z-index can't beat it from the z-1500 panel), so they ride on
+   clear the bar by position (child z-index can't beat it from the z-1500 panel), so they use
    the bar's live measured height (--bottom-bar-h, js/11-layout.js) plus a margin, which stays
    correct when the bar wraps taller. z-2001 lifts them over the bar's shadow gradient. Recenter
-   sits a row above the 10-minute skip cluster. */
+   is a row above the 10-minute skip cluster. */
 #mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: calc(var(--bottom-bar-h, 96px) + 18px); z-index: 2001; }
 #mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
 #mapPanel:is(:fullscreen, .fake-fs) .map-controls { padding-right: 50px; }
 #mapPanel:is(:fullscreen, .fake-fs) #fullscreenMapBtn { position: absolute; top: 16px; right: 22px; z-index: 200; }
-/* The MMR header is a plain flex row (no .panel-title class), without this it sits flush
+/* the MMR header is a plain flex row (no .panel-title class), without this it is flush
    against the screen edge when the panel fills the screen, looking clipped. */
 #videoPanel:is(:fullscreen, .fake-fs) #videoHeader { padding: 14px 22px 0 22px; }
 #videoPanel:is(:fullscreen, .fake-fs) { height: 100vh !important; max-width: 100vw !important; align-self: stretch !important; }
@@ -312,7 +312,7 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
    controls remain usable on top. */
 #mapPanel.fake-fs, #videoPanel.fake-fs { position: fixed; inset: 0; width: 100vw; z-index: 1500; }
 /* Each panel is its own stacking context so one panel's overlays (the HUD, PFD, sat legend...)
-   can't bleed over the OTHER panel while it's pinned at z-1500. The map panel sits higher
+   can't bleed over the OTHER panel while it's pinned at z-1500. The map panel is higher
    by default so its popups (measure group, day stepper) can still overflow onto the video panel. */
 #mapPanel { z-index: 1; }
 #videoPanel { z-index: 0; }
@@ -345,7 +345,7 @@ html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 /* Sticky media bar + resize handle (functional) */
 /* Drags all over the app (panels, sliders, measure, scrubbing) would otherwise start text
    selections that stick highlighted. The app is an instrument panel, not a document, so selection is
-   off globally and back on only where typing or copyable report text lives (modal cards carry
+   off globally and back on only where typing or copyable report text is (modal cards carry
    the point-analysis report, cross-section info, and the help guide). */
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, .modal-card { -webkit-user-select: text; user-select: text; }
@@ -598,14 +598,14 @@ video#radarVideo { width: 100%; height: 100%; display: block; object-fit: contai
 .tdr-level-row.on { background: color-mix(in oklab, var(--accent) 16%, transparent); border-color: var(--accent); color: var(--text); }
 .tdr-level-row.empty { opacity: 0.4; }
 .tdr-level-ft { min-width: 118px; font-family: var(--font-mono); font-size: 10px; }
-/* The band's real selector: the geometric altitude span its radar levels sit at. The millibars beside
+/* the band's real selector: the geometric altitude span its radar levels are at. The millibars beside
    it are a standard-atmosphere label for that span (see tdrMb in js/07d-tdr.js), so the altitude is
    shown alongside rather than letting the mb read as an analysed pressure surface. */
 .tdr-level-alt { display: block; font-size: 8.5px; font-weight: 500; color: var(--text-faint); letter-spacing: 0.01em; }
 .tdr-level-bar { flex: 1; height: 4px; border-radius: 2px; background: color-mix(in oklab, var(--accent) 30%, transparent); }
 .tdr-hero-note { font-size: 10.5px; color: var(--text-faint); padding: 6px 2px; }
 /* Floating (picture-in-picture) media panels: dragged out of the media bar by their outline
-   (js/11c-float-panels.js). z 1400/1401 sits above the sticky media bar (1000), below a pinned
+   (js/11c-float-panels.js). z 1400/1401 is above the sticky media bar (1000), below a pinned
    panel (1500) and the sticky bottom bar (2000). The height chain runs through flex, and the
    !important beats the docked layout's var(--media-h) inline/class heights. */
 .float-panel { position: fixed; z-index: 1400; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); cursor: grab; }
@@ -621,7 +621,7 @@ body.media-collapsed .float-panel { display: none !important; }
 .float-panel .float-resize-grip { display: block; position: absolute; right: 3px; bottom: 3px; width: 18px; height: 18px; cursor: nwse-resize; z-index: 2700; border-right: 3px solid var(--text-faint); border-bottom: 3px solid var(--text-faint); border-radius: 0 0 6px 0; opacity: 0.8; }
 /* Dock control at the panel's top center, lifted just above the top edge so it clears the canvas
    and overlays. The panel floats overflow:visible and its rect clamps to y >= 22, so the button
-   rides above the content yet stays on screen. */
+   stays above the content and on screen. */
 .float-panel .float-dock-btn { display: block; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); z-index: 2700; padding: 3px 12px; background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
 /* Small float: the big overlays would bury the map, so they hide until the panel grows back. */
 #mapPanel.panel-compact .overlays-wrapper, #mapPanel.panel-compact #satStepCluster, #mapPanel.panel-compact #pfdOverlay { display: none !important; }
@@ -691,7 +691,7 @@ body.media-collapsed .float-panel { display: none !important; }
 .sticky-bottom-bar .cmd-group:not(#cmdTimelineGroup) select { max-width: 150px; text-overflow: ellipsis; }
 /* filters come last in Settings, ruled off from the three selects above them */
 #cmdFiltersGroup { padding-top: 10px; border-top: 1px solid var(--border); }
-/* Filters: compact columns. The PFD sub-option (Press->GPS Alt) lives directly under Cockpit PFD
+/* filters: compact columns. The PFD sub-option (GPS->Press Alt) is directly under Cockpit PFD
    in its own reserved slot with an elbow connector, so toggling PFD reveals it in place instead of
    reflowing the other filters. */
 #filtersGrid { display: flex !important; gap: 20px !important; align-items: flex-start; }
@@ -744,7 +744,7 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 
 /* Primary Play button: the app's one signature accent, sized up slightly from the other
    playback controls. Selector matches the compact bottom-bar sizing rule's specificity and is
-   placed later, so it wins. */
+   placed later, so it takes effect. */
 .sticky-bottom-bar .cmd-group button#playPauseBtn {
     height: 34px !important;
     font-size: 13px !important;
@@ -756,9 +756,9 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
 }
 .sticky-bottom-bar .cmd-group button#playPauseBtn:hover { filter: brightness(1.12); }
 
-/* Recenter-on-aircraft button: sits above the 10-min satellite stepper (bottom: 12px) instead
+/* recenter-on-aircraft button: above the 10-min satellite stepper (bottom: 12px) instead
    of overlapping it. In fullscreen it clears the fixed bottom bar and stays one row above the
-   skip cluster, riding the same live bar height. */
+   skip cluster, using the same live bar height. */
 #recenterPlaneBtn { bottom: 36px !important; }
 #mapPanel:is(:fullscreen, .fake-fs) #recenterPlaneBtn { bottom: calc(var(--bottom-bar-h, 96px) + 58px) !important; z-index: 2001; }
 
@@ -866,11 +866,9 @@ input[type="range"]::-webkit-slider-thumb:hover { transform: none; }
 }
 
 /* skeleton placeholders while a flight loads (body.flight-loading, from setFlightLoading in
-   js/12-file-parsing.js): the map, the video, and each chart's plot area are hidden under a solid gray
-   block whose shade pulses until the flight is in */
+   js/12-file-parsing.js): each chart's plot area is hidden under a solid gray block whose shade pulses
+   until the flight is in; the map and video keep showing under the loading screen */
 body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="title-"]) { position: relative; }
-body.flight-loading #mapContainer::after,
-body.flight-loading #videoPanel .media-container::after,
 body.flight-loading #mainContainer .bg-panel:has(> [id^="title-"]) > :not([id^="title-"])::after {
     content: ""; position: absolute; inset: 0; z-index: 2700; pointer-events: none;
     background-color: var(--panel-strip); border-radius: inherit; animation: skeletonPulse 1.3s ease-in-out infinite;

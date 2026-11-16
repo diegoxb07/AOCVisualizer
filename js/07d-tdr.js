@@ -7,7 +7,7 @@
    analysis time its full volume is fetched (/v1/tdr/volume). On the 3D tracker every analysis
    renders as a stack of translucent planes, one per altitude level with data (0 to 18 km every
    0.5 km), anchored at that analysis's own storm-center origin, so the radar column reads in
-   true 3D; past analyses stay visible like the flown track and the mosaic assembles itself
+   true 3D; past analyses stay visible like the flown track and the mosaic builds up
    under the aircraft, while sliding backward hides analyses the playhead has not reached. The TDR
    section of the Overlays dropdown (the satellite section's sibling) lists every altitude level, grouped
    into bands labelled by their STANDARD-ATMOSPHERE pressure (see tdrMb: the grid is geometric km, the
@@ -60,7 +60,7 @@
     let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
     let tdrLegPick = null;            // leg button pick: that analysis displays ALONE; null = all crossed legs
     let tdrEyeActive = false;         // within the picked leg: true shows its eye pass, false its whole span
-    let tdrScanWall = null;           // vertical section wall riding the reveal frontier at the aircraft
+    let tdrScanWall = null;           // vertical section wall at the reveal frontier at the aircraft
     let _tdrScanWallSec = -1;         // last playhead second the wall painted for
 
     // tear down the overlay (new flight). meshes and their GPU resources are disposed, the picked
@@ -163,7 +163,7 @@
                 if (pb) {
                     if (!pb.dataset.defaultTitle) pb.dataset.defaultTitle = pb.title;
                     pb.disabled = true; pb.classList.add('opacity-60');
-                    pb.title = 'No Tail Doppler Radar data exists for this mission.';
+                    pb.title = 'This mission has no Tail Doppler Radar data.';
                 }
                 const pl = document.getElementById('tdrPickerBtnLabel'); if (pl) pl.textContent = 'TDR Unavailable';
             }
@@ -184,7 +184,7 @@
                     if (pb) {
                         if (!pb.dataset.defaultTitle) pb.dataset.defaultTitle = pb.title;
                         pb.disabled = true; pb.classList.add('opacity-60');
-                        pb.title = 'Only the real-time (level 1b) radar exists for this mission; the overlay uses quality-controlled level 2 data only.';
+                        pb.title = 'This mission only has real-time (level 1b) radar, and the overlay uses only quality-controlled level 2 data.';
                     }
                     const pl = document.getElementById('tdrPickerBtnLabel'); if (pl) pl.textContent = 'TDR Unavailable';
                     return;
@@ -815,7 +815,7 @@
     // atmosphere a tropical cyclone is not: a warm core and a depressed central pressure displace the
     // real surfaces off this mapping, by more the deeper the storm. So the mb figures are a
     // standard-atmosphere LABEL for a geometric level, never a measured or analysed pressure. Every
-    // place they are shown says so (the band rows carry the level's km span and a std-atm note), and
+    // place they are shown makes that clear (the band rows carry the level's km span and a std-atm note), and
     // tdrFt above stays the honest primary label.
     function tdrMb(km) { return 1013.25 * Math.pow(Math.max(0.0001, 1 - (km * 1000) / 44307.69), 1 / 0.190284); }
 
@@ -823,7 +823,7 @@
     // list is the top of the atmosphere); one row toggles every member level at once. `label` is the
     // band's nominal pressure span, `alt` the geometric altitude span it actually selects, which is
     // what the grid is really indexed by. The bottom band runs to 1060 so a level at or below sea
-    // level (1013.25 mb at 0 km) still lands in it; its label says so rather than reading 900-1000.
+    // level (1013.25 mb at 0 km) still falls in it; its label shows that, so it does not read 900-1000.
     const TDR_BANDS = [
         { pMin: 0, pMax: 100, label: 'Under 100 mb', alt: 'above 15.8 km' },
         { pMin: 100, pMax: 200, label: '100-200 mb', alt: '11.8-15.8 km' },
@@ -967,9 +967,9 @@
                         const eb = document.createElement('button');
                         eb.className = 'tdr-eye-btn';
                         eb.textContent = 'Jump to Eye';
-                        eb.title = "Jump to this leg's closest approach to the storm center (within 55 km). "
-                                 + "The center is the radar volume's own origin once the leg has loaded, otherwise a "
-                                 + 'position interpolated between the 6-hourly best-track fixes.';
+                        eb.title = "Jump to the moment the aircraft came closest to the storm center on this leg (within 55 km), "
+                                 + "using the center of the leg's radar once it has loaded, or a position estimated between "
+                                 + 'the 6-hourly best-track points before that.';
                         if (tdrLegPick === a && tdrEyeActive) eb.classList.add('on');
                         eb.addEventListener('click', () => {
                             if (!filteredData.length || (typeof syncLockActive === 'function' && syncLockActive())) return;
@@ -1124,8 +1124,8 @@
     function tdrSliceMapClick(geo) {
         if (!tdrSliceArm || !geo) return false;
         if (!tdrRevealedAt(geo)) {
-            setTdrSliceHint('The radar has not scanned that spot yet. Play further into the leg, or pick inside the shown radar.');
-            setTimeout(() => { if (tdrSliceArm) setTdrSliceHint('Click two points to draw a cross-section. Drag to move the map.'); }, 3500);
+            setTdrSliceHint('The radar hasn\'t scanned that spot yet, so play further into the leg or pick a point inside the radar you can see.');
+            setTimeout(() => { if (tdrSliceArm) setTdrSliceHint('Click two points to draw a cross-section, and drag to move the map.'); }, 3500);
             return true;   // consumed; the pick stays armed
         }
         if (tdrSliceArm === 1) {
@@ -1195,7 +1195,7 @@
         const modal = document.getElementById('tdrSliceModal'), cv = document.getElementById('tdrSliceCanvas'), info = document.getElementById('tdrSliceInfo');
         if (!modal || !cv) return;
         // The slice grid is along-line distance (x, km) by altitude (y, km); the shared painter's
-        // row flip puts the lowest level at the canvas bottom, which is what a section wants.
+        // row flip puts the lowest level at the canvas bottom, which is what a section needs.
         // Upscaled nearest-neighbor (4x across, 12x up) so the cells stay crisp and the vertical
         // axis gets a readable exaggeration instead of 37 squished pixel rows.
         const painted = tdrCanvasFromGrid(sl.data || [], sl.x.length, sl.y.length, tdrColorStops(sl.colorscale), sl.zmin, sl.zmax);
@@ -1300,7 +1300,7 @@
             if (tdrSliceArm) { tdrCancelSlicePick(); return; }
             tdrSliceLine = null;
             tdrSliceArm = 1; tdrSlicePtA = null; tdrSliceMouse = null;
-            setTdrSliceHint('Click two points to draw a cross-section. Drag to move the map.');
+            setTdrSliceHint('Click two points to draw a cross-section, and drag to move the map.');
             tdrUpdateSliceButtons();
             if (typeof closeSatPicker === 'function') closeSatPicker();
             if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);

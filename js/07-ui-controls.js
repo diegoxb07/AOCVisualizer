@@ -37,8 +37,8 @@
         const dataLoaded = allParsedData.length > 0;
         const startEl = document.getElementById('startTimeInput');
         const endEl = document.getElementById('endTimeInput');
-        if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
-        if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Disabled during Auto-Sync (timeline follows the MMR video clock)' : ''; }
+        if (startEl) { startEl.disabled = isAuto || !dataLoaded; startEl.title = isAuto ? 'Turned off during Auto-Sync, since the timeline follows the MMR video clock' : ''; }
+        if (endEl) { endEl.disabled = isAuto || !dataLoaded; endEl.title = isAuto ? 'Turned off during Auto-Sync, since the timeline follows the MMR video clock' : ''; }
         // the time fields open beside the sync dropdown in manual mode and fold away in Auto-Sync
         const fields = document.getElementById('manualTimeFields'); if (fields) fields.classList.toggle('show', !isAuto);
     }
@@ -242,7 +242,7 @@
         scene3D.fog = new THREE.Fog(scene3DBgColor(), 60, 260);
         // Near clip is tiny so the camera can dolly right up to the aircraft (scaled 0.06, so
         // small in world units that a default near plane clips it before the camera gets close);
-        // the huge near/far span rides a logarithmic depth buffer to stay z-fight-free.
+        // the huge near/far span uses a logarithmic depth buffer to stay z-fight-free.
         camera3D = new THREE.PerspectiveCamera(45, aspect, 0.001, 50000);
         camera3D.position.set(CAM3D_HOME.x, CAM3D_HOME.y, CAM3D_HOME.z);   // starts zoomed into the aircraft, no scroll-in needed
         renderer3D = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true });
@@ -310,7 +310,7 @@
                     sl.mesh.rotation.set(0, 0, 0);
                     sl.mesh.rotateY(Math.atan2(dx, dz));
                     sl.mesh.rotateX(-elev);
-                    // it turns about its middle, so ride up by its half-height against the vertical,
+                    // it turns about its middle, so shift up by its half-height against the vertical,
                     // or standing it up puts its lower half through the terrain
                     sl.mesh.position.set(a.x, a.y + (k / 2) * Math.cos(elev), a.z);
                 }
@@ -364,7 +364,7 @@
                     }
                 }
             }
-            // country labels: sit at the nearest coastline point to the plane, only while that coast is in
+            // country labels: placed at the nearest coastline point to the plane, only while that coast is in
             // range, and scale with camera distance so they stay a constant readable size at any altitude.
             if (_countryLabels.length) {
                 const in3d = !trackerModeSelect || trackerModeSelect.value === '3d';
@@ -373,7 +373,7 @@
                 for (let i = 0; i < _countryLabels.length; i++) {
                     const cl = _countryLabels[i];
                     if (!show) { cl.sprite.visible = false; continue; }
-                    // a named state already says the country, so the US label stands down over one
+                    // a named state already names the country, so the US label is hidden over one
                     if (cl.isUSA && _stateLabelIdx >= 0) { cl.sprite.visible = false; continue; }
                     let best = Infinity, bx = 0, by = 0, bz = 0;
                     for (let k = 0; k < cl.pts.length; k++) { const p = cl.pts[k]; const dx = px - p.x, dz = pz - p.z, dd = dx * dx + dz * dz; if (dd < best) { best = dd; bx = p.x; by = p.y; bz = p.z; } }
@@ -656,13 +656,13 @@
         return Math.hypot(dx, dy);
     }
 
-    // How far offshore a state still names the ground beneath. These flights sit over water for most
+    // how far offshore a state still names the ground beneath. These flights are over water for most
     // of a mission, so an inside-only test would leave the state nameless exactly when the question
     // is being asked, and hand the frame to the country label instead.
     const STATE_NEAR_DEG = 2.5;
 
     // _stateLabels index for the US state at (lat, lon): the one holding it, else the nearest within
-    // STATE_NEAR_DEG, else -1. The last match is tested first, since a flight sits with one state for
+    // STATE_NEAR_DEG, else -1. The last match is tested first, since a flight stays over one state for
     // minutes at a time; the rest reject on bbox. Crossings count across every ring, so holes and each
     // part of a multi-part state fall out even-odd.
     function stateIndexAt(lat, lon) {
@@ -699,7 +699,7 @@
         // These live in threeMapGroup, drained above, so only the tracking arrays need clearing.
         _stormSyms = []; _stormStrips = [];
         const landMat = new THREE.MeshBasicMaterial({ color: 0xe4ebdd, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-        // coastlines carry, internal (state) borders sit back, so countries read against the terrain
+        // coastlines carry, internal (state) borders are fainter, so countries read against the terrain
         // shading. Both take the 2D basemap's line colours, since the light water needs dark
         // lines to show at all. depthWrite off keeps them from occluding the streaks and each other.
         const coastMat = new THREE.LineBasicMaterial({ color: 0x5e6f7c, transparent: true, opacity: 0.9, depthWrite: false });
@@ -707,7 +707,7 @@
         // when the bundled terrain grid (js/07c-terrain.js) is loaded, coastlines and borders drape onto
         // the terrain surface at their sampled elevation and the flat land fill is skipped. c is GeoJSON
         // [lon, lat], so terrainSurfaceMeters takes (c[1], c[0]). It reads the drawn surface, not the
-        // raw ground, or a coastline sampling to a water cell would sit under the sea.
+        // raw ground, or a coastline sampling to a water cell would end up under the sea.
         const hasTerrain = typeof isTerrainLoaded === 'function' && isTerrainLoaded();
         // both prime terrainSurfaceMeters, and the drape below is its first reader
         if (typeof refreshTerrainPins === 'function') refreshTerrainPins();
@@ -757,7 +757,7 @@
                 polys.forEach(poly => poly.forEach(ring => rings.push(ring.map(cc => ({ lon: cc[0], lat: cc[1] })))));
                 const bbox = feature.properties.bbox;
                 if (rings.length && bbox) {
-                    // Anchor on the largest ring's average vertex, which sits inside the landmass for
+                    // anchor on the largest ring's average vertex, which is inside the landmass for
                     // shapes whose bbox centre does not (a bay, a lake, a second peninsula).
                     let big = rings[0];
                     rings.forEach(r => { if (r.length > big.length) big = r; });
@@ -790,7 +790,7 @@
         // drawn at real height. null until the grid loads, while the flat coastline map above renders.
         if (typeof buildTerrainMesh3D === 'function') { const terrainMesh = buildTerrainMesh3D(); if (terrainMesh) threeMapGroup.add(terrainMesh); }
         if(filteredData.length > 0) {
-            // densify each 1 Hz segment with the same uniform catmull-rom the plane center rides
+            // densify each 1 Hz segment with the same uniform catmull-rom the plane center follows
             // (getInterpolatedRow), so the 3D track curves through turns and climbs like the plane.
             // built once per flight, so the extra vertices are cheap. colors lerp across each segment.
             const pathPts = []; const colors = [];
@@ -923,7 +923,7 @@
             hmat.transparent = true; hmat.opacity = op;
         }
         // Carry the camera along by the same delta as the target, so following holds the user's
-        // viewing angle and distance. A pan clears followAircraft3D, which parks the view and leaves
+        // viewing angle and distance. A pan clears followAircraft3D, which fixes the view in place and leaves
         // the plane free to fly out of it until the recenter button puts it back.
         if (followAircraft3D) {
             camera3D.position.x += (pos.x - controls3D.target.x); camera3D.position.y += (pos.y - controls3D.target.y); camera3D.position.z += (pos.z - controls3D.target.z);
@@ -1086,7 +1086,7 @@
         lbl.textContent = 'Overlays';
         const on = sat.value !== 'none' || (typeof tdrSelectedKm !== 'undefined' && tdrSelectedKm.size > 0);
         btn.classList.toggle('sat-on', on);
-        // Nothing on the map says WHEN the satellite tile under the track was taken, and it is never
+        // nothing on the map shows WHEN the satellite tile under the track was taken, and it is never
         // the playback moment: archive GOES is bucketed to the scan cadence, and a polar pass is one
         // overpass held across the whole flight. satImageTimeNote (js/02-satellite.js) puts that on
         // this button's hover text, appended to its own description rather than replacing it.
@@ -1174,7 +1174,7 @@
     // button's, so the TDR and Satellite columns extend right, over the MMR video beside the map
     // rather than the map whose overlays they change. its right edge stops at the media row's inner
     // edge: flush with the map header's ⛶ button when the map stands alone, or the same distance
-    // inside the MMR panel's edge when the video sits beside the map; past that it shifts left.
+    // inside the MMR panel's edge when the video is beside the map; past that it shifts left.
     function positionSatPicker() {
         const panel = document.getElementById('satPickerPanel'), btn = document.getElementById('satPickerBtn');
         if (!panel || !btn || panel.classList.contains('hidden')) return;
@@ -1193,7 +1193,7 @@
         const barH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bottom-bar-h')) || 0;
         const maxH = Math.max(160, Math.min(560, window.innerHeight - (r.bottom + 4) - barH - 8));
         panel.style.maxHeight = maxH + 'px';
-        // with only the TDR section unfolded, its column scrolls on its own (css/app.css), within the
+        // with only the TDR section unfolded, its column scrolls separately (css/app.css), within the
         // height left under the head and toggle rows
         const cols = panel.querySelector('.ov-columns');
         if (cols) panel.style.setProperty('--ov-col-max', Math.max(80, Math.floor(maxH - (cols.getBoundingClientRect().top - panel.getBoundingClientRect().top))) + 'px');
@@ -1271,7 +1271,7 @@
         window.addEventListener('resize', positionSatPicker);
         window.addEventListener('scroll', positionSatPicker, true);
         // the panel also grows after it is placed (TDR rows filling in as legs load, a scrollbar once
-        // it outgrows its height), so it re-places itself on every size change
+        // it outgrows its height), so it is re-placed on every size change
         const pickerPanel = document.getElementById('satPickerPanel');
         if (pickerPanel && typeof ResizeObserver !== 'undefined') {
             try { new ResizeObserver(() => requestAnimationFrame(positionSatPicker)).observe(pickerPanel); } catch (e) {}
@@ -1320,7 +1320,7 @@
 
     // Metric HUD and Pitch HUD (3D) in Settings: a class on the map panel hides each box (css/app.css),
     // so the code that fills and shows them runs unchanged. the pitch box then rechecks its spot,
-    // since it sits beside the metric hud only when the two would overlap.
+    // since it moves beside the metric hud only when the two would overlap.
     const syncHudToggles = () => {
         mapPanel.classList.toggle('metric-hud-off', !document.getElementById('toggleMetricHud').checked);
         mapPanel.classList.toggle('pitch-hud-off', !document.getElementById('togglePitchHud').checked);

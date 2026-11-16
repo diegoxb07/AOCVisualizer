@@ -29,10 +29,10 @@
         lastTickTime = now;
 
         if (videoLoaded) {
-            // An immediate OCR hunt pauses and steps the video itself; the engine idles until it
-            // finishes so the play-restart below and the high-speed seek stepping never fight the
-            // hunt's frame steps. Checked BEFORE the ended test: a hunt step clamped at the
-            // video's end reports ended=true, which must not stop playback mid-hunt.
+            // an immediate OCR search pauses and steps the video directly; the engine idles until it
+            // finishes so the play-restart below and the high-speed seek stepping never conflict with
+            // the search's frame steps. Checked BEFORE the ended test: a search step clamped at the
+            // video's end reports ended=true, which must not stop playback mid-search.
             if (isOcrRunning && video.paused) { animationFrameId = requestAnimationFrame(masterSyncEngineTick); return; }
             if (video.ended) { isPlaying = false; playPauseBtn.innerText = "Play"; syncTelemetryToVideoClock(); return; }
 
@@ -67,7 +67,7 @@
             } else {
                 _natWatchLastVt = null;
                 // The backoff window has passed: hand the speed back to the native branch and let
-                // the watchdog re-demote if the decoder still cannot hold it.
+                // the watchdog re-demote if the decoder still cannot keep up with it.
                 if (nativePlaybackCeiling < 16 && performance.now() >= nativeRetryAtMs) {
                     nativePlaybackCeiling = 16;
                     updateSpeedDisplay();

@@ -51,6 +51,10 @@
     let mapFeatures = [];
     let customMarkers = [];
     let flightMetaData = { id: 'Unknown', date: 'Unknown', aircraft: 'Unknown' };
+    // Record Clip rendering (js/23-clip-render.js): the exact flight second being drawn (null when no
+    // clip is rendering), and a pixel density that overrides the display's while it renders
+    let clipRenderSec = null;
+    let renderDprOverride = 0;
 
     // NOAA Recon Archive (noaa-recon-api: https://joshmurdock.net/api)
     // Year/storm/mission browser + best-track overlay, so a flight can be loaded straight from the
@@ -58,10 +62,10 @@
     let reconArchiveMeta = null;      // { missionId, stormName, stormId, aircraft, tailNum, sourceUrl } of the loaded mission, or null
     let stormTrackPoints = [];        // Best-track fixes for the WHOLE storm life: [{ms, lat, lon, windKt, pressureMb, category, status}]
     // Airfields for the 2D basemap: { code, name, lat, lon, big, mil }, filled by loadAirports()
-    // (js/19-bootstrap.js) from data/airports.json. Empty until it lands, and stays empty if it fails.
+    // (js/19-bootstrap.js) from data/airports.json. Empty until it loads, and stays empty if it fails.
     let airports = [];
     // City labels for the 2D basemap: { name, lat, lon, big }, filled by loadCities()
-    // (js/19-bootstrap.js) from data/cities.json. Empty until it lands, and stays empty if it fails.
+    // (js/19-bootstrap.js) from data/cities.json. Empty until it loads, and stays empty if it fails.
     let cities = [];
     let stormTrackMeta = null;        // { year, name, basin, atcfId } for the loaded best-track, or null
     let showStormTrack = true;        // "Storm Track" toggle; the track draws only once a best-track loads

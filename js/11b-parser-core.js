@@ -79,7 +79,7 @@
         }
 
         report({ phase: 'rows', numRows: numRows, index: 0, total: numRows });
-        // The marker rides the HEADER only; rows keep their original field count, so its column index
+        // the marker is on the HEADER only; rows keep their original field count, so its column index
         // simply has no value on every line (getVal reads that as null, exactly like a blank cell).
         // That keeps the TSV contract and costs nothing per row on a 30k-sample flight.
         const headerNames = timeReconstructed ? finalVarNames.concat(['TimeReconstructed']) : finalVarNames;

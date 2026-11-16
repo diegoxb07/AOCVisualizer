@@ -16,7 +16,7 @@ permissions:
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+# In-progress runs are left running so production deployments complete.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -41,10 +41,10 @@ jobs:
         run: sed -i "s/?v=[0-9A-Za-z._-]\{1,\}/?v=${GITHUB_SHA}/g" index.html sw.js
       - name: Parser QC checks
         # tests/run-tests.js is flag-style and always exits 0, so this can never block a deploy; it
-        # runs so the PASS/FLAG lines land in the Actions log for every push. A FLAG means a parser
-        # judgment call stopped matching its independently computed expectation and wants a look, not
-        # that the app is down. `node` is not installed on the primary dev machine, so before this
-        # step the suite had no place it actually ran.
+        # runs so the PASS/FLAG lines appear in the Actions log for every push. A FLAG means a parser
+        # judgment call stopped matching its independently computed expectation and needs a look, not
+        # that the app is down. `node` is not installed on the primary dev machine, so this step is
+        # where the suite runs.
         run: node tests/run-tests.js
 
       - name: Setup Pages

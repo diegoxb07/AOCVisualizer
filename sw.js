@@ -71,6 +71,8 @@ const PRECACHE = [
     'js/19-bootstrap.js',
     'js/20-ui-polish.js',
     'js/22-avi-convert.js',
+    'js/23-clip-render.js',
+    'lib/mp4-muxer.js',
     'js/parse-worker.js',
 
     'assets/noaa-bird.svg',

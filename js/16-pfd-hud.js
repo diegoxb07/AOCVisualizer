@@ -91,7 +91,7 @@
         }
         ctx.restore();
 
-        // fixed bank scale, roll pointer riding the horizon, slip/skid trapezoid (G1000 style)
+        // fixed bank scale, roll pointer following the horizon, slip/skid trapezoid (G1000 style)
         const ww = w - leftW - rightW - vsiW;
         const bankR = Math.min(ww * 0.42, botY * 0.42), k = Math.max(0.7, Math.min(1.5, w / 250));
         ctx.save(); ctx.rect(leftW, 0, ww, botY); ctx.clip(); ctx.translate(cx, cy);

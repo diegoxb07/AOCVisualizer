@@ -34,7 +34,7 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/tailwind.css?v=20261115a">
+    <link rel="stylesheet" href="css/tailwind.css?v=20261115b">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
 
     <!-- the interface font starts loading with the page, so text draws in it from the first frame -->
     <link rel="preload" href="lib/fonts/nunito-sans/nunito-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/app.css?v=20261115a">
+    <link rel="stylesheet" href="css/app.css?v=20261115b">
 </head>
 <body class="font-sans antialiased">
 
@@ -805,84 +805,84 @@
             </div>
             <h3 id="hs-shortcuts">Keyboard shortcuts</h3>
             <ul>
-                <li><kbd>Space</kbd> plays or pauses.</li>
-                <li><kbd>Left</kbd> / <kbd>Right</kbd> step through the timeline, faster while held.</li>
-                <li><kbd>Shift</kbd> + <kbd>Left</kbd> / <kbd>Right</kbd> jumps 10 minutes of flight time.</li>
+                <li>Press <kbd>Space</kbd> to play or pause.</li>
+                <li>Press <kbd>Left</kbd> or <kbd>Right</kbd> to step through the timeline, and hold the key down to move faster.</li>
+                <li>Press <kbd>Shift</kbd> + <kbd>Left</kbd> or <kbd>Right</kbd> to jump 10 minutes of flight time.</li>
             </ul>
 
             <h3 id="hs-loading">1. Loading a mission</h3>
-            <p>Archive loads and manual uploads use the same parser, so the map, charts, PFD, and exports are identical either way.</p>
+            <p>You can load a mission from the archive or upload the file yourself, and either way you get the same map, charts, PFD, and exports.</p>
             <ul>
-                <li><b>Archive browser (needs the API online):</b> in the <b>Load Mission</b> row at the top, search by mission id, storm name, or date (YY-MM-DD), or pick <b>Year</b>, <b>Storm</b>, and <b>Flight</b> from the dropdowns, then click <b>Load Flight + Storm Track</b>, which downloads the full-resolution mission NetCDF along with the storm's whole-life best-track. A storm name with no year searches every season, newest first, and clicking a result lists its flights.</li>
-                <li><b>Recent mission missing?</b> A new mission can take up to a day to appear in the SEB archive, so upload the file manually in the meantime.</li>
-                <li><b>Manual upload (works offline):</b> drop a <b>.nc</b> file (for example <kbd>20221028H1_A.nc</kbd>) on the <b>or upload:</b> area. While the API is offline, the archive controls are greyed out under an "API Offline" banner and <b>Batch Load Flight Data</b> and <b>Pre-Cache Satellite Imagery</b> are greyed out in the menu bar, while the upload area moves right next to the banner, enlarged and labeled <b>Upload:</b>; the app checks the API every 60 seconds and turns the archive back on once the API responds.</li>
-                <li><b>Batch Load Flight Data</b> downloads and parses several missions in the background and saves them on this device, so they open instantly from <b>Previously Loaded Missions</b>, including after a reload.</li>
-                <li><b>Metrics Across Flights</b> shows which loaded flight recorded the highest or lowest value of a metric, with a comparison graph, and works offline.</li>
-                <li><b>Opening a different flight</b> unloads the MMR video and resets the overlays: satellite off at 100% opacity, TDR layers cleared, both sections folded, and Storm Track on.</li>
+                <li><b>From the archive (needs the API online):</b> use the <b>Load Mission</b> row at the top. Type a mission id, a storm name, or a date (YY-MM-DD) into the search box, or pick a <b>Year</b>, <b>Storm</b>, and <b>Flight</b> from the dropdowns, then click <b>Load Flight + Storm Track</b> to download the full flight along with the storm's best-track for its whole life. If you type just a storm name without a year, you'll get matches from every season with the newest first, and clicking one shows you its flights.</li>
+                <li><b>Can't find a recent mission?</b> New missions can take up to a day to show up in the SEB archive, so upload the file yourself in the meantime.</li>
+                <li><b>Uploading a file (works offline):</b> drop a <b>.nc</b> file (for example <kbd>20221028H1_A.nc</kbd>) on the <b>or upload:</b> box. When the API is down, you'll see an "API Offline" banner over the archive controls with the upload box right next to it, labeled <b>Upload:</b>, and <b>Batch Load Flight Data</b> and <b>Pre-Cache Satellite Imagery</b> are greyed out in the menu bar. The app checks the API every 60 seconds and turns the archive back on as soon as the API responds.</li>
+                <li><b>Batch Load Flight Data</b> lets you download several missions at once in the background, and they're saved on this device so you can open any of them instantly from <b>Previously Loaded Missions</b>, even after reloading the page.</li>
+                <li><b>Metrics Across Flights</b> finds which of your loaded flights recorded the highest or lowest value of a metric and draws a graph comparing them, and you can use it offline too.</li>
+                <li>When you open a different flight, the MMR video is unloaded and the overlays go back to their defaults: satellite off at 100% opacity, TDR layers cleared, both sections folded, and Storm Track on.</li>
             </ul>
 
             <h3 id="hs-playback">2. Playback and time window</h3>
-            <p>The playback controls are in the bottom bar, and to replay a segment you set <b>Flight Start</b> and <b>Flight End</b> (<kbd>HHMMSS</kbd> UTC) so the map, charts, PFD, and timeline cover only that window.</p>
+            <p>You'll find the playback controls in the bottom bar. To replay just part of a flight, enter a <b>Flight Start</b> and <b>Flight End</b> time (<kbd>HHMMSS</kbd> UTC), and the map, charts, PFD, and timeline will cover only that window.</p>
             <ul>
-                <li><b>Play</b>/<b>Pause</b>, playback speed, and <b>Reset</b>, which jumps to the start of the window.</li>
-                <li>Drag the <b>timeline slider</b> to any moment in the flight, with the UTC time shown beside it.</li>
-                <li><b>8Hz Smoothing</b> (map header) interpolates between the 1-second samples for smooth motion and is recommended for training, and it adds a small synthesized turbulence motion to the drawn aircraft, scaled by the recorded vertical wind or set to a small fixed amount when the file has no vertical-wind channel. That motion is visual only, so the Metric HUD and the PFD altitude readouts show the recorded values.</li>
-                <li>With a synced MMR video loaded, playback is timed by the video's clock, and without one it is timed by the app's internal timer.</li>
+                <li><b>Play</b>/<b>Pause</b> starts and stops playback, the « and » buttons change the speed, and <b>Reset</b> takes you back to the start of the window.</li>
+                <li>Drag the <b>timeline slider</b> to jump to any moment, and you'll see the UTC time right next to it.</li>
+                <li><b>8Hz Smoothing</b> in the map header is on by default and makes the aircraft move smoothly between the once-per-second samples, which helps for training. It also adds a little simulated turbulence to how the aircraft is drawn, scaled to the recorded vertical wind (or a small fixed amount if the file has no vertical wind), but that motion is only visual, so the Metric HUD and the PFD altitude readouts still show the recorded values.</li>
+                <li>If you've synced an MMR video, playback follows the video's clock, and if you haven't, the app keeps time with its internal timer.</li>
             </ul>
 
             <h3 id="hs-map">3. Map tracker (2D and 3D)</h3>
-            <p>Choose <b>2D Map Tracker</b> or <b>3D Tracker</b> in the dropdown in the map header.</p>
+            <p>Use the dropdown in the map header to switch between the <b>2D Map Tracker</b> and the <b>3D Tracker</b>.</p>
             <ul>
-                <li><b>2D:</b> a world map with coastlines and US states, satellite imagery, and wind barbs, where scrolling zooms and dragging pans, and once you pan away the <b>Recenter on Aircraft</b> button appears.</li>
-                <li><b>3D:</b> a Three.js scene with terrain in the 2D map's colors, hill shading on low side views, ocean shaded by depth, nearby city names on the ground, and an aircraft model, with the track drawn at GPS or pressure altitude and the mouse to orbit and zoom.</li>
-                <li>The <b>Settings</b> menu in the bottom bar has <b>Track Color Type</b> (wind speed or warming/cooling), <b>Wind Barb Preset</b> (wind speed, or hurricane wind field, which colors winds by Saffir-Simpson category and draws winds below 64 kt in black), <b>3D Altitude Track</b>, <b>Cockpit PFD</b>, <b>Metric HUD</b> and <b>Pitch HUD (3D)</b> (both on by default), <b>S.I Units</b>, <b>Simple Icon (2D)</b>, and <b>Real Scale (3D)</b>.</li>
-                <li><b>TDR</b> (in the <b>Overlays</b> dropdown) shows Tail Doppler Radar on the tracker, in 2D or 3D, while the MMR video keeps playing, and clicking <b>TDR</b> unfolds its controls. It uses quality-controlled (level 2) radar, so for a mission without level 2 radar the button reads "TDR Unavailable" and is greyed out.</li>
-                <li><b>TDR layers:</b> layers are selected when the first radar volume arrives so the radar shows right away, every layer in 3D and 500 mb and below (about 0 to 5.6 km) on the 2D map, and until you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick altitude layers to show alone or together, or use <b>All</b> and <b>None</b>, where <b>None</b> turns the radar off. Each layer is labelled with the millibar level of its altitude in the <i>standard</i> atmosphere, so read the mb value as a name for the height, since a storm's actual pressure surfaces are at different heights.</li>
-                <li><b>TDR Legs:</b> each radar leg's button, named by its number and time window, shows that leg alone at its end (click it again for all legs), and <b>Jump to Eye</b>, at the right of a leg's row, jumps to the leg's closest approach to the storm center. The radar fills in around the aircraft as playback moves through each leg, with the white beam marking the aircraft's position in 3D, and the first time the radar shows with every leg downloaded, the playhead jumps to the end of the last leg, where every leg's radar is complete, with the MMR video and satellite imagery following it. If every leg fails to load, the section folds and <b>TDR Failed to Load</b> stays locked until you load the flight again.</li>
-                <li><b>TDR in 2D:</b> the <b>TDR opacity</b> slider fades the radar for use with satellite imagery, and <b>Draw a Cross-Section</b> starts a two-point vertical cross-section, where you click two points inside the shown radar and the section opens with compass directions at its ends, while <b>Cancel Cross-Section</b> or Esc stops a pick.</li>
-                <li><b>Measure</b> (map header) draws a polygon, circle, or rectangle and shows its distance and area, and <b>Mark Point</b> (bottom bar) drops a marker that opens its <b>Point Report</b> when you click it on the map, which you can download.</li>
+                <li><b>2D:</b> a flat map with coastlines, US states, satellite imagery, and wind barbs. Scroll to zoom and drag to pan, and if you pan away from the aircraft, click <b>Recenter on Aircraft</b> to bring it back into view.</li>
+                <li><b>3D:</b> a 3D view with terrain colored like the 2D map, hill shading when you look from a low angle, the ocean shaded by depth, city names on the ground, and an aircraft model flying the track at GPS or pressure altitude. Use the mouse to orbit around and zoom.</li>
+                <li>In <b>Settings</b> in the bottom bar, you can change the <b>Track Color Type</b> (wind speed or warming/cooling) and the <b>Wind Barb Preset</b> (wind speed, or hurricane wind field, which colors winds by Saffir-Simpson category and draws anything under 64 kt in black), pick the <b>3D Altitude Track</b>, and turn <b>Cockpit PFD</b>, <b>Metric HUD</b>, <b>Pitch HUD (3D)</b>, <b>S.I Units</b>, <b>Simple Icon (2D)</b>, and <b>Real Scale (3D)</b> on or off, with both HUDs on to start.</li>
+                <li><b>TDR:</b> open <b>Overlays</b> in the map header and click <b>TDR</b> to see the Tail Doppler Radar on the tracker, in 2D or 3D, while the MMR video keeps playing. The app uses only quality-controlled (level 2) radar, so if a mission doesn't have any, you'll see the button greyed out as "TDR Unavailable".</li>
+                <li><b>TDR layers:</b> when the first radar volume arrives, some layers are picked for you so you see the radar right away, every layer in 3D and 500 mb and below (about 0 to 5.6 km) on the 2D map, and until you change the layers yourself, switching between 2D and 3D switches between those two picks. Click layers to show them alone or together, or use <b>All</b> or <b>None</b>, where <b>None</b> turns the radar off. Each layer is named by the pressure its height would have in a <i>standard</i> atmosphere, so think of the mb value as a label for the height, because the real pressure levels inside a storm are at different heights.</li>
+                <li><b>TDR Legs:</b> each button is one radar leg, labeled with its number and time window. Click one to see just that leg as it looks at the end of the leg (click it again to go back to all legs), or click <b>Jump to Eye</b> beside it to go to the moment the aircraft came closest to the storm center on that leg. As you play through a leg, the radar fills in around the aircraft, and in 3D the white beam marks where the aircraft is. The first time every leg finishes downloading, the playhead jumps to the end of the last leg so you can see all the radar at once, and the MMR video and satellite imagery jump with it. If none of the legs load, the TDR section folds up and reads <b>TDR Failed to Load</b>, and you can load the flight again to retry.</li>
+                <li><b>TDR on the 2D map:</b> drag the <b>TDR opacity</b> slider to see satellite imagery through the radar. For a vertical slice through the radar, click <b>Draw a Cross-Section</b> and then click two points inside the radar, and the cross-section opens with compass directions at each end; click <b>Cancel Cross-Section</b> or press Esc if you change your mind.</li>
+                <li><b>Measuring and marking:</b> click <b>Measure</b> in the map header to draw a polygon, circle, or rectangle and get its distance and area. Click <b>Mark Point</b> in the bottom bar to drop a marker, then click that marker on the map to open its <b>Point Report</b>, which you can download.</li>
             </ul>
 
             <h3 id="hs-mmr">4. MMR video sync</h3>
-            <p>Load a cockpit or radar <b>.mp4</b> in the <b>Upload MMR to Sync</b> row at the top; without a video, the tracker spans the full width.</p>
+            <p>Load a cockpit or radar <b>.mp4</b> in the <b>Upload MMR to Sync</b> row at the top. If you don't load a video, the tracker uses the full width.</p>
             <ul>
-                <li><b>Auto-Sync (default):</b> OCR reads the burned-in clock anywhere in the frame and locks onto the time that advances with the video, with a pulsing dot at the top right of the MMR player while OCR runs and a "Syncing" pill while it searches, and clicking <b>Sync Now</b> on a clear frame forces a lock. If the scans find a plausible time but cannot confirm that it ticks with the video, Auto-Sync locks onto that time and the message marks the sync as <b>unverified</b>, so compare the tracker time with the MMR before relying on it, and if Auto-Sync fails for 30 seconds, upload the plain MMR recording in place of the compiled nose-radar video.</li>
-                <li><b>Manual Time Input:</b> choose it in the sync mode dropdown beside the MMR upload area, and fields for the flight-data window and the video's UTC start time (<kbd>HHMMSS</kbd>) open to the right of the dropdown.</li>
+                <li><b>Auto-Sync (default):</b> the app reads the timestamp burned into the video with OCR and lines the flight data up with it. While it's working, you'll see a pulsing dot at the top right of the MMR player, plus a "Syncing" label while it searches for the clock. If it hasn't synced yet, pause on a frame where the timestamp is easy to read and click <b>Sync Now</b>. If the app finds a likely time but can't confirm it ticks along with the video, it syncs anyway and marks the sync as <b>unverified</b>, so compare the tracker time with the MMR before you rely on it. If nothing syncs within 30 seconds, try uploading the plain MMR recording in place of the compiled nose-radar video.</li>
+                <li><b>Manual Time Input:</b> to set the times yourself, choose it in the sync dropdown next to the MMR upload box, then type the flight-data window and the video's UTC start time (<kbd>HHMMSS</kbd>) into the fields that appear to its right.</li>
             </ul>
 
             <h3 id="hs-sat">5. Satellite overlays</h3>
-            <p>Open <b>Overlays</b> in the map header and choose a satellite, and its products appear right below it, with the options filled in from the flight's date and location.</p>
+            <p>Open <b>Overlays</b> in the map header and pick a satellite to see its products listed under it. The choices you get depend on the flight's date and location.</p>
             <ul>
-                <li><b>MODIS / VIIRS (polar, NASA GIBS):</b> any date back to each mission's start, with the day-stepper moving between days and overpass times looked up automatically.</li>
-                <li><b>GOES-East / GOES-West (archive, needs the API):</b> rendered on the server from the GOES S3 archive for the flight's date and refreshed at a 10-minute interval, with the list of spectral bands coming from the API. A product the API cannot serve right now is greyed out as <b>unavailable</b> while the rest of that satellite stays usable, and a GOES option is greyed out entirely when the flight is outside that satellite's Earth-disk view.</li>
-                <li><b>Pre-Cache Satellite Imagery</b> (menu bar) downloads imagery for several flights at once and saves it on this device, where it is kept across reloads.</li>
-                <li><b>When is the imagery from?</b> The image time differs from the playback moment, so hover the <b>Overlays</b> button to see the time of the image on the map and its source: a real scan or overpass time from the archive, the requested 10-minute slot when the archive returned no scan time, or, for a polar orbiter, the single daily pass used for the whole flight.</li>
+                <li><b>MODIS / VIIRS (polar, NASA GIBS):</b> you can use these for any date back to each mission's start. Use the day-stepper to move between days, and the app looks up the overpass times for you.</li>
+                <li><b>GOES-East / GOES-West (archive, needs the API):</b> this imagery is made on the server from the GOES archive for the flight's date, in 10-minute steps, and the list of bands comes from the API. Any product the API can't provide right now is greyed out as <b>unavailable</b> while the rest still work, and if the flight is outside a GOES satellite's view, that satellite is greyed out entirely.</li>
+                <li><b>Pre-Cache Satellite Imagery</b> in the menu bar lets you download imagery for several flights ahead of time, and it's saved on this device across reloads.</li>
+                <li><b>When is the image from?</b> The image on the map is from a slightly different time than the playback moment. Hover over the <b>Overlays</b> button to see when it's from: the real scan or overpass time, the requested 10-minute slot if the archive didn't return a scan time, or, for a polar orbiter, the single daily pass used for the whole flight.</li>
             </ul>
 
             <h3 id="hs-storm">6. Storm best-track overlay</h3>
-            <p>Archive loads draw the storm's whole-life best-track on both trackers as a dashed line colored by intensity, which <b>Storm Track</b> in the <b>Overlays</b> dropdown turns on or off, and a spinning cyclone marker shows the storm's estimated position at the playback time, interpolated between best-track fixes so it moves smoothly during playback.</p>
+            <p>When you load a mission from the archive, you'll see the storm's best-track for its whole life on both trackers as a dashed line colored by intensity, and you can turn it on or off with <b>Storm Track</b> in the <b>Overlays</b> dropdown. The spinning cyclone marker shows roughly where the storm was at the playback time, estimated between the best-track points so it moves smoothly as you play.</p>
 
             <h3 id="hs-charts">7. Charts, PFD, and HUD</h3>
             <ul>
-                <li><b>Eight synced charts</b> (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accel, pressure, thermodynamics) show the playback moment as a vertical line, and each chart has its own zoom reset and controls for adding or removing series.</li>
-                <li><b>Create Your Own Graph</b> plots any variables together for custom comparisons.</li>
-                <li><b>Cockpit PFD</b> (<b>Settings</b> in the bottom bar): a G1000-style attitude ladder, airspeed, altitude, and heading tapes, a VSI, a bank scale with a slip/skid indicator, a wind box, and a ground-track pointer. Three readouts are computed, since the flight-level file has no channel for them: the <b>VSI</b> is the rate of change of altitude between samples, <b>GS</b> is the distance between neighbouring positions over time and is shown in grey to mark it as computed, and the <b>slip/skid</b> ball uses the measured sideslip angle when the flight recorded one, or else a coordinated-turn estimate from roll, heading rate, and speed.</li>
-                <li>The on-map <b>Metric HUD</b> shows live flight-level values at the playback moment and the <b>Pitch HUD (3D)</b> shows pitch, roll, heading, and track on the 3D map, and both are on by default and can be turned off in <b>Settings</b>.</li>
+                <li><b>Charts:</b> the eight charts (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and acceleration, pressure, and thermodynamics) follow playback with a vertical line marking the current moment, and each one has its own zoom reset and buttons for adding or removing series.</li>
+                <li><b>Create Your Own Graph</b> lets you plot any variables against each other.</li>
+                <li><b>Cockpit PFD:</b> turn it on in <b>Settings</b> for a G1000-style display with an attitude ladder, airspeed, altitude, and heading tapes, a VSI, a bank scale with a slip/skid ball, a wind box, and a ground-track pointer. Three of its readouts are calculated, since the flight-level file doesn't record them: the <b>VSI</b> comes from how fast the altitude changes between samples, <b>GS</b> comes from the distance between positions over time (shown in grey because it's calculated), and the <b>slip/skid</b> ball uses the measured sideslip angle when the flight has one, or an estimate from roll, heading rate, and speed when it doesn't.</li>
+                <li><b>HUDs:</b> the <b>Metric HUD</b> on the map shows the flight-level values at the current moment, and the <b>Pitch HUD (3D)</b> shows pitch, roll, heading, and track in the 3D view. Both are on to start, and you can turn either one off in <b>Settings</b>.</li>
             </ul>
 
             <h3 id="hs-export">8. Exporting and sharing</h3>
             <ul>
-                <li><b>Record Clip:</b> pick a start and end (with a live preview of both frames), a tracker mode, a satellite overlay, an optional MMR video, and up to four graphs, and recording plays that range and saves it as a video file.</li>
-                <li><b>Share Link:</b> copies a URL that opens this mission at the current playback moment and tracker view.</li>
+                <li><b>Record Clip:</b> click it to save part of the flight as a video. Pick a start and end (you'll see a preview of both), the tracker view, a satellite overlay, whether to include the MMR video, and up to four graphs, then start recording.</li>
+                <li><b>Share Link:</b> click it to copy a link that opens this mission at the moment and tracker view you're looking at.</li>
             </ul>
 
             <h3 id="hs-trouble">9. Troubleshooting</h3>
             <ul>
-                <li><b>Archive greyed out with "API Offline":</b> use manual upload in the meantime, and the archive turns back on once the API responds.</li>
+                <li><b>The archive is greyed out with "API Offline":</b> upload the file yourself for now, and the archive will come back as soon as the API does.</li>
                 <li><b>A GOES option is greyed out:</b> either the API is offline or the flight is outside that satellite's view, so try the other GOES satellite or a MODIS/VIIRS pass.</li>
-                <li><b>GOES picked but the map is empty:</b> GOES products are picked by hand, so pick a product in the picker.</li>
-                <li><b>Auto-Sync locks onto the wrong time:</b> click <b>Sync Now</b> on a clear frame, hide other on-screen timestamps, or switch to Manual Time Input.</li>
-                <li><b>Slow playback with satellite on:</b> wait for the pre-cache to finish, or pre-cache the flight in advance.</li>
+                <li><b>You picked GOES but the map is empty:</b> with GOES you also need to pick a product from the list under the satellite.</li>
+                <li><b>Auto-Sync picked the wrong time:</b> pause on a frame with a clear timestamp and click <b>Sync Now</b>, hide any other timestamps on screen, or switch to Manual Time Input.</li>
+                <li><b>Playback is slow with satellite imagery on:</b> let the pre-cache finish, or pre-cache the flight ahead of time.</li>
             </ul>
         </div>
         <div class="modal-foot">
@@ -1004,35 +1004,35 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20261115a"></script>
-    <script src="js/01-state.js?v=20261115a"></script>
-    <script src="js/02-satellite.js?v=20261115a"></script>
-    <script src="js/03-metrics.js?v=20261115a"></script>
-    <script src="js/04-geo-measure.js?v=20261115a"></script>
-    <script src="js/05-interpolation.js?v=20261115a"></script>
-    <script src="js/06-ocr.js?v=20261115a"></script>
-    <script src="js/07-ui-controls.js?v=20261115a"></script>
-    <script src="js/07b-plane-models.js?v=20261115a"></script>
-    <script src="js/07c-terrain.js?v=20261115a"></script>
-    <script src="js/07d-tdr.js?v=20261115a"></script>
-    <script src="js/08-ocr-lock-export.js?v=20261115a"></script>
-    <script src="js/09-interaction.js?v=20261115a"></script>
-    <script src="js/10-point-analysis.js?v=20261115a"></script>
-    <script src="js/11-layout.js?v=20261115a"></script>
-    <script src="js/11c-float-panels.js?v=20261115a"></script>
-    <script src="js/11b-parser-core.js?v=20261115a"></script>
-    <script src="js/12-file-parsing.js?v=20261115a"></script>
-    <script src="js/12b-recon-archive.js?v=20261115a"></script>
-    <script src="js/13-charts-master.js?v=20261115a"></script>
-    <script src="js/14-filters-sync.js?v=20261115a"></script>
-    <script src="js/15-map-render.js?v=20261115a"></script>
-    <script src="js/16-pfd-hud.js?v=20261115a"></script>
-    <script src="js/17-charts.js?v=20261115a"></script>
-    <script src="js/18-engine.js?v=20261115a"></script>
-    <script src="js/18b-flight-search.js?v=20261115a"></script>
-    <script src="js/19-bootstrap.js?v=20261115a"></script>
-    <script src="js/20-ui-polish.js?v=20261115a"></script>
-    <script src="js/22-avi-convert.js?v=20261115a"></script>
+    <script src="js/00-var-catalog.js?v=20261115b"></script>
+    <script src="js/01-state.js?v=20261115b"></script>
+    <script src="js/02-satellite.js?v=20261115b"></script>
+    <script src="js/03-metrics.js?v=20261115b"></script>
+    <script src="js/04-geo-measure.js?v=20261115b"></script>
+    <script src="js/05-interpolation.js?v=20261115b"></script>
+    <script src="js/06-ocr.js?v=20261115b"></script>
+    <script src="js/07-ui-controls.js?v=20261115b"></script>
+    <script src="js/07b-plane-models.js?v=20261115b"></script>
+    <script src="js/07c-terrain.js?v=20261115b"></script>
+    <script src="js/07d-tdr.js?v=20261115b"></script>
+    <script src="js/08-ocr-lock-export.js?v=20261115b"></script>
+    <script src="js/09-interaction.js?v=20261115b"></script>
+    <script src="js/10-point-analysis.js?v=20261115b"></script>
+    <script src="js/11-layout.js?v=20261115b"></script>
+    <script src="js/11c-float-panels.js?v=20261115b"></script>
+    <script src="js/11b-parser-core.js?v=20261115b"></script>
+    <script src="js/12-file-parsing.js?v=20261115b"></script>
+    <script src="js/12b-recon-archive.js?v=20261115b"></script>
+    <script src="js/13-charts-master.js?v=20261115b"></script>
+    <script src="js/14-filters-sync.js?v=20261115b"></script>
+    <script src="js/15-map-render.js?v=20261115b"></script>
+    <script src="js/16-pfd-hud.js?v=20261115b"></script>
+    <script src="js/17-charts.js?v=20261115b"></script>
+    <script src="js/18-engine.js?v=20261115b"></script>
+    <script src="js/18b-flight-search.js?v=20261115b"></script>
+    <script src="js/19-bootstrap.js?v=20261115b"></script>
+    <script src="js/20-ui-polish.js?v=20261115b"></script>
+    <script src="js/22-avi-convert.js?v=20261115b"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

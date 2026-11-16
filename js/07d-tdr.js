@@ -881,7 +881,7 @@
                 tdrFoldSection();
                 if (typeof positionSatPicker === 'function') positionSatPicker();
                 btn.disabled = true;
-                btn.title = 'The radar for this flight could not be loaded. Load the flight again to retry.';
+                btn.title = 'The radar for this flight could not be loaded, so load the flight again to retry.';
             } else if (!allFailed && btn.dataset.tdrFailed) {
                 delete btn.dataset.tdrFailed;
                 btn.disabled = false;

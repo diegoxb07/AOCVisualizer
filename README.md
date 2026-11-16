@@ -319,7 +319,6 @@ button.
 | The charts and map do not update after changing the time window. | Press `Play`. It applies the current window before starting. |
 | Nothing plays. | Load a flight file first, then press `Play`. |
 | Playback is sluggish with satellite imagery on. | Let the pre-cache finish, or cache the imagery ahead of time with **⤓ Pre-Cache Satellite Imagery**. |
-| You found a bug, or have a question or idea. | Click **Report a Problem** in the menu bar. It opens a report form addressed to diegoxiaobarbero@gmail.com, and Send opens Gmail with the subject, details, and mission id prefilled. |
 
 There is one more doc alongside this one: [API & Connectivity](docs/CONNECTIVITY.md) covers what the
 external API does, how the app decides it is online or offline, and exactly what still works and

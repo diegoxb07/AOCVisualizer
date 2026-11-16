@@ -70,7 +70,6 @@ const PRECACHE = [
     'js/18b-flight-search.js',
     'js/19-bootstrap.js',
     'js/20-ui-polish.js',
-    'js/21-report.js',
     'js/22-avi-convert.js',
     'js/parse-worker.js',
 

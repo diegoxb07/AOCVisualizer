@@ -414,7 +414,7 @@
     async function aviStartRun() {
         if (aviRunning || !aviSegs.length) return;
         if (typeof Worker === 'undefined' || location.protocol === 'file:') {
-            aviSetStatus('The converter only works on the hosted site. Opening the page as a local file disables the background engine it needs.');
+            aviSetStatus('The converter only works on the hosted site, since opening the page as a local file disables the background engine it needs.');
             return;
         }
         aviRunning = true; aviStopFlag = false; aviDone = false; aviDoneSeen = false;
@@ -543,7 +543,7 @@
                 msg += ' These segments could not be read and were left out: ' + aviSkipped.map(s => s.name).join(', ') + '.';
             }
             if (!aviModalOpen()) {
-                showToast('MMR video conversion finished. Open the converter to save it or load it into the player.', 8000);
+                showToast('MMR video conversion finished, so open the converter to save it or load it into the player.', 8000);
             }
             msg += ' You can save the .mp4 below or load it straight into the MMR player.';
             aviSetStatus(msg);
@@ -570,7 +570,7 @@
         aviEngines.forEach(eng => { try { eng.ff.terminate(); } catch (e) {} });
         aviEngines = [];
         aviSetBar(0);
-        aviSetStatus('Stopped. Your file list is still here, and starting again will run the conversion from the beginning.');
+        aviSetStatus('Stopped, with your file list still here, and starting again runs the conversion from the beginning.');
     }
 
     function aviBeforeUnload(e) { e.preventDefault(); e.returnValue = ''; }

@@ -34,7 +34,7 @@
          with no internet; only the recon-archive/satellite APIs need one.
          css/tailwind.css is COMPILED, not hand-written, regenerate after changing Tailwind
          classes in index.html or js/*.js:  npx tailwindcss@3 -i tailwind.input.css -o css/tailwind.css --minify -->
-    <link rel="stylesheet" href="css/tailwind.css?v=20261110b">
+    <link rel="stylesheet" href="css/tailwind.css?v=20261115a">
     <script src="lib/chart.umd.min.js"></script>
     <script src="lib/chartjs-plugin-zoom.min.js"></script>
     <script src="lib/three.min.js"></script>
@@ -44,7 +44,7 @@
 
     <!-- the interface font starts loading with the page, so text draws in it from the first frame -->
     <link rel="preload" href="lib/fonts/nunito-sans/nunito-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="css/app.css?v=20261110b">
+    <link rel="stylesheet" href="css/app.css?v=20261115a">
 </head>
 <body class="font-sans antialiased">
 
@@ -92,7 +92,6 @@
         </div>
         <div id="topRightControls" class="menu-group">
             <button id="helpBtn" type="button" onclick="var m=document.getElementById('helpModal');m.style.display=(m.style.display==='flex')?'none':'flex'" title="Help & feature guide" aria-label="Help and feature guide" class="menu-item">Help</button>
-            <button id="reportProblemBtn" type="button" title="Report a problem or ask a question" aria-label="Report a problem or ask a question" class="menu-item">Report a Problem</button>
             <button id="fullscreenBtn" class="menu-item">⛶ Fullscreen</button>
         </div>
     </nav>
@@ -525,21 +524,30 @@
 
 <div id="pointAnalysisModal" class="modal-overlay">
     <div class="modal-card">
-        <button class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none" onclick="document.getElementById('pointAnalysisModal').style.display='none'">✕</button>
-        <h2 id="pointAnalysisTitle" class="text-ink text-lg font-bold border-b border-hairline pb-2">Point Data Analysis</h2>
-        <div id="pointAnalysisMeta" class="text-[11px] text-muted mb-1"></div>
-        <div id="pointAnalysisStats"></div>
-        <button onclick="downloadPointAnalysis()" class="self-start mt-3 px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors shadow-sm whitespace-nowrap">↓ Download Report (.txt)</button>
+        <div class="modal-head">
+            <div class="modal-head-text"><h2 id="pointAnalysisTitle">Point Data Analysis</h2></div>
+            <button class="modal-x" title="Close" onclick="document.getElementById('pointAnalysisModal').style.display='none'">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="pointAnalysisMeta" class="text-[11px] text-muted"></div>
+            <div id="pointAnalysisStats"></div>
+        </div>
+        <div class="modal-foot">
+            <button onclick="downloadPointAnalysis()" class="modal-btn">↓ Download Report (.txt)</button>
+        </div>
     </div>
 </div>
 
 <div id="preloadModal" class="modal-overlay">
     <div class="modal-card">
-        <button id="preloadCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Batch Load Flight Data</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a season and check missions (or a whole storm), or upload your own flight files. The mission will be saved on your browser now, so that you can open it instantly from the 'Previously Loaded Missions' list.</p>
-        <div class="flex items-center gap-2 mt-3">
-            <span class="text-xs text-muted font-semibold">Season:</span>
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>Batch Load Flight Data</h2></div>
+            <button id="preloadCloseX" class="modal-x" title="Close">✕</button>
+        </div>
+        <div class="modal-body">
+        <p class="modal-intro">Pick a season and check its missions (or a whole storm), or upload your own flight files, and each flight is saved in this browser so it opens instantly from the Previously Loaded Missions list.</p>
+        <div class="modal-inline">
+            <span class="modal-label">Season</span>
             <span class="relative inline-flex">
                 <select id="preloadYearSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                     <option value="">Loading...</option>
@@ -553,12 +561,13 @@
                 <input type="file" id="preloadFileInput" accept=".txt,.nc" multiple class="hidden" />
             </label>
         </div>
-        <div id="preloadMissionChecks" class="mt-3 max-h-[45vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-ink select-none"></div>
-        <div class="mt-3 h-2 bg-panel-strip rounded overflow-hidden"><div id="preloadFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
-        <div id="preloadModalStatus" class="text-[11px] text-muted mt-1">Nothing selected.</div>
-        <div class="flex gap-2 mt-4">
-            <button id="preloadStartBtn" class="px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Batch load selected</button>
-            <button id="preloadCloseBtn" class="px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        <div id="preloadMissionChecks" class="max-h-[45vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-ink select-none"></div>
+        <div class="modal-progress"><div id="preloadFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
+        <div id="preloadModalStatus" class="modal-status">Nothing selected.</div>
+        </div>
+        <div class="modal-foot">
+            <button id="preloadCloseBtn" class="modal-btn secondary">Close</button>
+            <button id="preloadStartBtn" class="modal-btn">Batch load selected</button>
         </div>
     </div>
 </div>
@@ -567,11 +576,14 @@
      into one .mp4 with the vendored ffmpeg.wasm. Closing the modal leaves the pass running;
      the corner pill (below) keeps it reachable. -->
 <div id="aviConvertModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
-        <button id="aviConvertCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">AVI to MP4 Converter</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Combines the many MMR recordings that are segmented (.avi, can be single files or zipped) into .mp4 so that a user can upload it for use in the Visualizer.<br>You can upload multiple files. Feel free to move around and navigate the visualizer while converting, just avoid refreshing or closing the tab as this will interrupt the conversion.</p>
-        <div class="flex flex-wrap items-center gap-2 mt-1">
+    <div class="modal-card" style="max-width: 900px;">
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>AVI to MP4 Converter</h2></div>
+            <button id="aviConvertCloseX" class="modal-x" title="Close">✕</button>
+        </div>
+        <div class="modal-body">
+        <p class="modal-intro">Combines an MMR recording that is split into many .avi segments, as single files or zipped, into one .mp4 that you can upload as the MMR video, and you can add several files at once and keep using the visualizer while it converts, though refreshing or closing the tab stops the conversion.</p>
+        <div class="modal-inline">
             <label id="aviAddLabel" class="flex items-center gap-1.5 bg-panel-strip text-accent border border-hairline hover:bg-accent hover:text-accent-ink rounded px-2 py-1 text-[11px] font-semibold cursor-pointer transition-colors">
                 Add files (.zip / .avi / .ts)
                 <input type="file" id="aviFileInput" accept=".zip,.avi,.ts,.m2ts,.mts,.mov,.mp4,.mkv" multiple class="hidden" />
@@ -580,13 +592,14 @@
             <span id="aviListSummary" class="text-[11px] text-faint"></span>
         </div>
         <div id="aviFileList" class="avi-file-list" style="display:none;"></div>
-        <div class="mt-3 h-2 bg-panel-strip rounded overflow-hidden"><div id="aviConvertFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
-        <div id="aviConvertStatus" class="text-[11px] text-muted mt-1">No files added.</div>
-        <div id="aviResultRow" class="hidden flex-wrap gap-2 mt-1"></div>
-        <div class="flex gap-2 mt-4">
-            <button id="aviStartBtn" disabled class="px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Start converting</button>
-            <button id="aviStopBtn" class="hidden px-4 py-2 avi-stop-btn font-bold rounded text-xs transition-colors">Stop</button>
-            <button id="aviCloseBtn" class="px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        <div class="modal-progress"><div id="aviConvertFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
+        <div id="aviConvertStatus" class="modal-status">No files added.</div>
+        <div id="aviResultRow" class="hidden flex-wrap gap-2"></div>
+        </div>
+        <div class="modal-foot">
+            <button id="aviCloseBtn" class="modal-btn secondary">Close</button>
+            <button id="aviStopBtn" class="hidden modal-btn avi-stop-btn">Stop</button>
+            <button id="aviStartBtn" disabled class="modal-btn">Start converting</button>
         </div>
     </div>
 </div>
@@ -599,62 +612,75 @@
 </div>
 
 <div id="batchCacheModal" class="modal-overlay">
-    <div class="modal-card" style="max-height: 90vh; overflow-y: auto;">
-        <button id="batchCacheCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Pre-Cache Satellite Imagery</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Pick a satellite and band(s), then choose flights from the archive below, upload your own files, or both.</p>
-        <div class="mt-3 text-xs text-muted font-semibold">Satellite:</div>
-        <select id="batchSatSelect" class="mt-1 bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer"></select>
-        <div class="mt-3 text-xs text-muted font-semibold">Bands to cache:</div>
-        <div id="batchBandChecks" class="flex flex-wrap gap-4 mt-1 text-[11px] text-ink select-none"></div>
-        <div class="mt-3 flex items-center gap-2 relative">
-            <span class="text-xs text-muted font-semibold">From the archive:</span>
+    <div class="modal-card">
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>Pre-Cache Satellite Imagery</h2></div>
+            <button id="batchCacheCloseX" class="modal-x" title="Close">✕</button>
+        </div>
+        <div class="modal-body">
+        <p class="modal-intro">Pick a satellite and the bands to cache, then choose flights from the archive below, upload your own flight files, or both.</p>
+        <div class="modal-field">
+            <span class="modal-label">Satellite</span>
+            <select id="batchSatSelect" class="self-start bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer"></select>
+        </div>
+        <div class="modal-field">
+            <span class="modal-label">Bands to cache</span>
+            <div id="batchBandChecks" class="flex flex-wrap gap-4 text-[11px] text-ink select-none"></div>
+        </div>
+        <div class="modal-inline relative">
+            <span class="modal-label">From the archive</span>
             <select id="batchYearSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                 <option value="">Year&hellip;</option>
             </select>
             <span id="batchApiOfflineToast" class="hidden absolute inset-0 z-10 flex items-center justify-center rounded border border-[color-mix(in_oklab,var(--danger)_70%,transparent)] bg-danger-soft text-[10px] font-semibold text-danger whitespace-nowrap pointer-events-none">API Offline</span>
         </div>
-        <div id="batchMissionChecks" class="mt-2 max-h-[45vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-ink select-none"></div>
-        <label class="block mt-3 text-xs text-muted font-semibold">Or flight files:</label>
-        <input type="file" id="batchFileInput" multiple accept=".txt,.nc" class="mt-1 block w-full text-[11px] text-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[var(--border)] file:text-[var(--text)] file:cursor-pointer" />
-        <div class="mt-3 h-2 bg-panel-strip rounded overflow-hidden"><div id="batchCacheFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
-        <div id="batchCacheStatus" class="text-[11px] text-muted mt-1">No files selected.</div>
-        <div class="flex gap-2 mt-4">
-            <button id="batchCacheStartBtn" class="px-4 py-2 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-xs transition-colors">Start caching</button>
-            <button id="batchCacheCloseBtn" class="px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        <div id="batchMissionChecks" class="max-h-[45vh] overflow-y-auto flex flex-col gap-1.5 text-[11px] text-ink select-none"></div>
+        <div class="modal-field">
+            <label for="batchFileInput" class="modal-label">Or flight files</label>
+            <input type="file" id="batchFileInput" multiple accept=".txt,.nc" class="block w-full text-[11px] text-muted file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-[var(--border)] file:text-[var(--text)] file:cursor-pointer" />
+        </div>
+        <div class="modal-progress"><div id="batchCacheFill" class="h-full bg-accent transition-all" style="width:0%"></div></div>
+        <div id="batchCacheStatus" class="modal-status">No files selected.</div>
+        </div>
+        <div class="modal-foot">
+            <button id="batchCacheCloseBtn" class="modal-btn secondary">Close</button>
+            <button id="batchCacheStartBtn" class="modal-btn">Start caching</button>
         </div>
     </div>
 </div>
 
 <div id="flightSearchModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 860px; max-height: 90vh; overflow-y: auto;">
-        <button id="fsCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Search Across Loaded Flights</h2>
-        <p class="text-[11px] text-muted mt-2 leading-relaxed">Find which loaded flight recorded the highest or lowest value of a metric at any point, with the time, altitude, and position of that moment and a graph comparing every flight. Searches the flights loaded or batch loaded on this device (works offline).</p>
+    <div class="modal-card" style="max-width: 860px;">
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>Search Across Loaded Flights</h2></div>
+            <button id="fsCloseX" class="modal-x" title="Close">✕</button>
+        </div>
+        <div class="modal-body">
+        <p class="modal-intro">Find which flight recorded the highest or lowest value of a metric at any point, with the time, altitude, and position of that moment and a graph comparing every flight, searching the flights loaded or batch loaded on this device, which works offline too.</p>
 
-        <div class="flex flex-wrap items-end gap-3 mt-3">
-            <div class="flex flex-col">
-                <label class="text-xs text-muted font-semibold mb-1.5">Metric</label>
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="modal-field">
+                <label for="fsMetricSelect" class="modal-label">Metric</label>
                 <select id="fsMetricSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer" style="min-width:200px;"></select>
             </div>
-            <div class="flex flex-col">
-                <label class="text-xs text-muted font-semibold mb-1.5">Find</label>
+            <div class="modal-field">
+                <label for="fsModeSelect" class="modal-label">Find</label>
                 <select id="fsModeSelect" class="bg-panel-strip text-ink border border-hairline rounded px-2 py-1 text-[11px] outline-none cursor-pointer">
                     <option value="max">Highest (max)</option>
                     <option value="min">Lowest (min)</option>
                 </select>
             </div>
-            <button id="fsRunBtn" class="bg-accent hover:bg-accent text-accent-ink font-bold rounded px-4 py-1.5 text-xs transition-colors">Search</button>
+            <button id="fsRunBtn" class="modal-btn">Search</button>
         </div>
 
-        <div class="flex items-center justify-between mt-3">
-            <div class="text-xs text-muted font-semibold">Flights to search</div>
+        <div class="flex items-center justify-between" style="margin-bottom:-10px;">
+            <div class="modal-label">Flights to search</div>
             <label class="flex items-center gap-2 text-[11px] text-muted cursor-pointer select-none"><input type="checkbox" id="fsSelectAll" checked class="accent-accent flex-none"> Select all</label>
         </div>
         <div id="fsFlightChecks" class="text-[11px] text-ink select-none border border-hairline rounded" style="margin-top:4px;max-height:30vh;min-height:64px;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:2px;flex-shrink:0;"></div>
         <button id="fsPreloadBtn" title="Open Batch Load Flight Data to add more flights, then come back here" class="text-accent text-[11px] font-semibold hover:text-ink transition-colors" style="align-self:flex-start;background:none;border:none;padding:0;cursor:pointer;">+ Load more flights...</button>
 
-        <div id="fsResults" class="mt-4" style="display:none;flex-shrink:0;">
+        <div id="fsResults" style="display:none;flex-shrink:0;">
             <div id="fsWinner"></div>
             <div style="position:relative;height:280px;margin-top:12px;">
                 <canvas id="fsChart"></canvas>
@@ -662,26 +688,30 @@
             <div id="fsTable" class="mt-3" style="overflow-x:auto;"></div>
         </div>
 
-        <div id="fsStatus" class="text-[11px] text-muted mt-3"></div>
-        <div class="flex gap-2 mt-4">
-            <button id="fsCloseBtn" class="bg-elevated hover:bg-elevated text-ink rounded px-4 py-2 text-xs transition-colors">Close</button>
+        <div id="fsStatus" class="text-[11px] text-muted"></div>
+        </div>
+        <div class="modal-foot">
+            <button id="fsCloseBtn" class="modal-btn secondary">Close</button>
         </div>
     </div>
 </div>
 
 <div id="clipRecordModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 640px; max-height: 90vh; overflow-y: auto;">
-        <button id="clipRecordCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none" onclick="document.getElementById('clipRecordModal').style.display='none'">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">Record Mission Clip</h2>
+    <div class="modal-card" style="max-width: 640px;">
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>Record Mission Clip</h2></div>
+            <button id="clipRecordCloseX" class="modal-x" title="Close" onclick="document.getElementById('clipRecordModal').style.display='none'">✕</button>
+        </div>
+        <div class="modal-body">
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <label class="block text-xs font-semibold text-muted mb-2 uppercase">Start Point</label>
+                <label class="modal-label mb-2">Start Point</label>
                 <input type="range" id="clipStartSlider" min="0" max="100" value="0" class="w-full" />
                 <input type="text" id="clipStartTime" inputmode="numeric" placeholder="HH:MM:SS" title="Type a time as HH:MM:SS to jump the start point" class="block mx-auto text-center text-sm tabular-nums text-accent bg-panel-strip border border-hairline rounded px-2 py-1 mt-1 outline-none focus:border-accent transition-colors" style="width:7rem;" />
             </div>
             <div>
-                <label class="block text-xs font-semibold text-muted mb-2 uppercase">End Point</label>
+                <label class="modal-label mb-2">End Point</label>
                 <input type="range" id="clipEndSlider" min="0" max="100" value="100" class="w-full" />
                 <input type="text" id="clipEndTime" inputmode="numeric" placeholder="HH:MM:SS" title="Type a time as HH:MM:SS to jump the end point" class="block mx-auto text-center text-sm tabular-nums text-accent bg-panel-strip border border-hairline rounded px-2 py-1 mt-1 outline-none focus:border-accent transition-colors" style="width:7rem;" />
             </div>
@@ -709,14 +739,14 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <label class="block text-xs font-semibold text-muted mb-2 uppercase">Tracker</label>
+                <label class="modal-label mb-2">Tracker</label>
                 <select id="clipTrackerMode" class="w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer">
                     <option value="2d">2D Map Tracker</option>
                     <option value="3d">3D WebGL Tracker</option>
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-muted mb-2 uppercase">Satellite Overlay</label>
+                <label class="modal-label mb-2">Satellite Overlay</label>
                 <select id="clipSatSelect" class="w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer">
                     <option value="none">Sat: Off</option>
                 </select>
@@ -725,7 +755,7 @@
                 <span id="clipSatNote" class="hidden block text-[10px] text-faint leading-snug mt-1">The satellite overlay draws on the 2D tracker only.</span>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-muted mb-2 uppercase">MMR Video</label>
+                <label class="modal-label mb-2">MMR Video</label>
                 <select id="clipVideoStack" class="w-full bg-panel-strip text-ink border border-hairline rounded px-2 py-1.5 text-xs outline-none cursor-pointer">
                     <option value="off">Off (tracker only)</option>
                     <option value="above">Yes</option>
@@ -734,28 +764,32 @@
         </div>
 
         <div>
-            <label class="block text-xs font-semibold text-muted mb-2 uppercase">Graphs: stacked on the right <span class="text-muted normal-case">(4 Graphs Max)</span></label>
+            <label class="modal-label mb-2">Graphs: stacked on the right <span class="text-muted normal-case">(4 Graphs Max)</span></label>
             <div id="clipGraphList" class="max-h-44 overflow-y-auto bg-[color-mix(in_oklab,var(--bg)_50%,transparent)] border border-hairline rounded p-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1"></div>
             <!-- populateClipGraphList() relocates this button into #clipGraphList as a full-width cell so it
                  sits inside the pre-selected-graphs container; kept here in the DOM so its listener survives. -->
             <button id="clipAddCustomBtn" type="button" title="Build a graph from any variables, recorded with this clip only" class="text-accent text-[13px] font-semibold hover:text-ink transition-colors" style="width:100%;background:none;border:1px dashed var(--border-strong);border-radius:6px;cursor:pointer;padding:7px 10px;">+ Add customized graphs</button>
             <div id="clipCustomList" class="mt-1 flex flex-col gap-2"></div>
-            <p class="text-[13px] text-muted mt-2">4 graphs max</p>
         </div>
 
-        <p class="text-[10px] text-accent text-center whitespace-nowrap mt-2">After clicking Start Recording, angle and zoom the tracker during the 3-second countdown.</p>
-        <button id="startClipRecordBtn" class="mt-1 px-4 py-3 bg-accent hover:bg-accent text-accent-ink font-bold rounded text-sm transition-colors shadow-lg whitespace-nowrap w-full">● Start Recording</button>
+        </div>
+        <div class="modal-foot">
+            <span class="modal-foot-note">After clicking Start Recording, angle and zoom the tracker during the 3-second countdown.</span>
+            <button id="startClipRecordBtn" class="modal-btn">● Start Recording</button>
+        </div>
     </div>
 </div>
 
 <div id="helpModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 760px; max-height: 88vh; overflow-y: auto;">
-        <button id="helpCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none" onclick="document.getElementById('helpModal').style.display='none'">✕</button>
-        <div class="border-b border-hairline pr-8" style="padding-bottom:10px;">
-            <h2 class="text-ink text-lg font-bold">Help &amp; Feature Guide</h2>
-            <p class="text-[11px] text-muted mt-1 leading-snug">Full documentation and source: <a href="https://github.com/diegoxb07/AOCVisualizer" target="_blank" rel="noopener" class="text-accent underline">github.com/diegoxb07/AOCVisualizer</a></p>
+    <div class="modal-card" style="max-width: 760px;">
+        <div class="modal-head">
+            <div class="modal-head-text">
+                <h2>Help &amp; Feature Guide</h2>
+                <p class="modal-sub">Full documentation and source: <a href="https://github.com/diegoxb07/AOCVisualizer" target="_blank" rel="noopener">github.com/diegoxb07/AOCVisualizer</a></p>
+            </div>
+            <button id="helpCloseX" class="modal-x" title="Close" onclick="document.getElementById('helpModal').style.display='none'">✕</button>
         </div>
-        <div class="help-body">
+        <div class="modal-body help-body">
             <!-- Section pills: each jumps the guide's scroll to its h3 below. -->
             <div class="help-toc">
                 <button onclick="document.getElementById('hs-shortcuts').scrollIntoView({behavior:'smooth',block:'start'})">Shortcuts</button>
@@ -771,87 +805,89 @@
             </div>
             <h3 id="hs-shortcuts">Keyboard shortcuts</h3>
             <ul>
-                <li><kbd>Space</kbd>: play or pause.</li>
-                <li><kbd>Left</kbd> / <kbd>Right</kbd>: step through the timeline. Hold to speed up.</li>
-                <li><kbd>Shift</kbd> + <kbd>Left</kbd> / <kbd>Right</kbd>: jump 10 minutes of flight time.</li>
+                <li><kbd>Space</kbd> plays or pauses.</li>
+                <li><kbd>Left</kbd> / <kbd>Right</kbd> step through the timeline, faster while held.</li>
+                <li><kbd>Shift</kbd> + <kbd>Left</kbd> / <kbd>Right</kbd> jumps 10 minutes of flight time.</li>
             </ul>
 
             <h3 id="hs-loading">1. Loading a mission</h3>
             <p>Archive loads and manual uploads use the same parser, so the map, charts, PFD, and exports are identical either way.</p>
             <ul>
-                <li><b>Archive browser (needs the API online):</b> in the <b>Load Mission</b> row at the top, search by mission id, storm name, or date (YY-MM-DD), or pick <b>Year</b>, <b>Storm</b>, and <b>Flight</b> from the dropdowns. Then click <b>Load Flight + Storm Track</b>. A storm name with no year searches every season, newest first; click a result to see its flights. Loading downloads the full-resolution mission NetCDF and the storm's whole-life best-track.</li>
-                <li><b>Recent mission missing?</b> A new mission can take up to a day to appear in the SEB archive. Upload the file manually in the meantime.</li>
-                <li><b>Manual upload (works offline):</b> drop a <b>.nc</b> file (for example <kbd>20221028H1_A.nc</kbd>) on the <b>or upload:</b> area. While the API is offline, the archive controls are greyed out under an "API Offline" banner, and the upload area moves right next to the banner, enlarged and labeled <b>Upload:</b>. <b>Batch Load Flight Data</b> and <b>Pre-Cache Satellite Imagery</b> are greyed out too. The app checks the API every 60 seconds and turns the archive back on once the API responds.</li>
-                <li><b>Batch Load Flight Data</b> downloads and parses several missions in the background. They are saved on this device and open instantly from <b>Previously Loaded Missions</b>, including after a reload.</li>
-                <li><b>Metrics Across Flights</b> shows which loaded flight recorded the highest or lowest value of a metric, with a comparison graph. It works offline.</li>
+                <li><b>Archive browser (needs the API online):</b> in the <b>Load Mission</b> row at the top, search by mission id, storm name, or date (YY-MM-DD), or pick <b>Year</b>, <b>Storm</b>, and <b>Flight</b> from the dropdowns, then click <b>Load Flight + Storm Track</b>, which downloads the full-resolution mission NetCDF along with the storm's whole-life best-track. A storm name with no year searches every season, newest first, and clicking a result lists its flights.</li>
+                <li><b>Recent mission missing?</b> A new mission can take up to a day to appear in the SEB archive, so upload the file manually in the meantime.</li>
+                <li><b>Manual upload (works offline):</b> drop a <b>.nc</b> file (for example <kbd>20221028H1_A.nc</kbd>) on the <b>or upload:</b> area. While the API is offline, the archive controls are greyed out under an "API Offline" banner and <b>Batch Load Flight Data</b> and <b>Pre-Cache Satellite Imagery</b> are greyed out in the menu bar, while the upload area moves right next to the banner, enlarged and labeled <b>Upload:</b>; the app checks the API every 60 seconds and turns the archive back on once the API responds.</li>
+                <li><b>Batch Load Flight Data</b> downloads and parses several missions in the background and saves them on this device, so they open instantly from <b>Previously Loaded Missions</b>, including after a reload.</li>
+                <li><b>Metrics Across Flights</b> shows which loaded flight recorded the highest or lowest value of a metric, with a comparison graph, and works offline.</li>
                 <li><b>Opening a different flight</b> unloads the MMR video and resets the overlays: satellite off at 100% opacity, TDR layers cleared, both sections folded, and Storm Track on.</li>
             </ul>
 
             <h3 id="hs-playback">2. Playback and time window</h3>
-            <p>The playback controls are in the bottom bar. To replay a segment, set <b>Flight Start</b> and <b>Flight End</b> (<kbd>HHMMSS</kbd> UTC); the map, charts, PFD, and timeline then cover only that window.</p>
+            <p>The playback controls are in the bottom bar, and to replay a segment you set <b>Flight Start</b> and <b>Flight End</b> (<kbd>HHMMSS</kbd> UTC) so the map, charts, PFD, and timeline cover only that window.</p>
             <ul>
                 <li><b>Play</b>/<b>Pause</b>, playback speed, and <b>Reset</b>, which jumps to the start of the window.</li>
-                <li>Drag the <b>timeline slider</b> to any moment in the flight. The UTC time is shown beside it.</li>
-                <li><b>8Hz Smoothing</b> (map header) interpolates between the 1-second samples for smooth motion and is recommended for training. It also adds a small synthesized turbulence motion to the drawn aircraft, scaled by the recorded vertical wind, or a small fixed amount when the file has no vertical-wind channel. This motion is visual only: the HUD and the PFD altitude readouts show the recorded values.</li>
-                <li>With a synced MMR video loaded, playback is timed by the video's clock. Without one, playback uses the app's internal timer.</li>
+                <li>Drag the <b>timeline slider</b> to any moment in the flight, with the UTC time shown beside it.</li>
+                <li><b>8Hz Smoothing</b> (map header) interpolates between the 1-second samples for smooth motion and is recommended for training, and it adds a small synthesized turbulence motion to the drawn aircraft, scaled by the recorded vertical wind or set to a small fixed amount when the file has no vertical-wind channel. That motion is visual only, so the Metric HUD and the PFD altitude readouts show the recorded values.</li>
+                <li>With a synced MMR video loaded, playback is timed by the video's clock, and without one it is timed by the app's internal timer.</li>
             </ul>
 
             <h3 id="hs-map">3. Map tracker (2D and 3D)</h3>
             <p>Choose <b>2D Map Tracker</b> or <b>3D Tracker</b> in the dropdown in the map header.</p>
             <ul>
-                <li><b>2D:</b> a world map with coastlines and US states, satellite imagery, and wind barbs. Scroll to zoom and drag to pan. After you pan away, the <b>Recenter on Aircraft</b> button appears.</li>
-                <li><b>3D:</b> a Three.js scene with terrain in the 2D map's colors, hill shading on low side views, ocean shaded by depth, nearby city names on the ground, and an aircraft model, with the track drawn at GPS or pressure altitude. Use the mouse to orbit and zoom.</li>
-                <li><b>Settings</b> in the bottom bar holds <b>Track Color Type</b> (wind speed or warming/cooling), <b>Wind Barb Preset</b> (wind speed, or hurricane wind field, which colors winds by Saffir-Simpson category and draws winds below 64 kt in black), <b>3D Altitude Track</b>, <b>Cockpit PFD</b>, <b>Metric HUD</b> and <b>Pitch HUD (3D)</b> (both on by default), <b>S.I Units</b>, <b>Simple Icon (2D)</b>, and <b>Real Scale (3D)</b>.</li>
-                <li><b>TDR</b> (in the <b>Overlays</b> dropdown) shows Tail Doppler Radar on the tracker, in 2D or 3D, while the MMR video keeps playing. Click <b>TDR</b> to unfold its controls. It uses quality-controlled (level 2) radar. For a mission without level 2 radar, the button reads "TDR Unavailable" and is greyed out.</li>
-                <li><b>TDR layers:</b> layers are selected when the first radar volume arrives, so the radar shows right away: every layer in 3D, and on the 2D map 500 mb and below (about 0 to 5.6 km). Until you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick altitude layers to show alone or together, or use <b>All</b> and <b>None</b>; <b>None</b> turns the radar off. Each layer is labelled with the millibar level of its altitude in the <i>standard</i> atmosphere, so read the mb value as a name for the height; a storm's actual pressure surfaces are at different heights. Under <b>TDR Legs</b>, each radar leg's button (named by its number and time window) shows that leg alone at the end of the leg (click it again for all legs), and <b>Jump to Eye</b>, at the right of a leg's row, jumps to the leg's closest approach to the storm center. The radar fills in around the aircraft as playback moves through each leg; in 3D, the white beam is the aircraft's position. The first time the radar shows with every leg downloaded, the playhead jumps to the end of the last leg, where every leg's radar is complete, with the MMR video and satellite imagery following it. If every leg fails to load, the section folds and <b>TDR Failed to Load</b> stays locked; load the flight again to retry.</li>
-                <li><b>TDR in 2D:</b> the <b>TDR opacity</b> slider fades the radar for use with satellite imagery. <b>Draw a Cross-Section</b> starts a two-point vertical cross-section: click two points inside the shown radar, and the section opens with compass directions at its ends. <b>Cancel Cross-Section</b> or Esc stops a pick.</li>
-                <li><b>Measure</b> (map header) draws a polygon, circle, or rectangle and shows its distance and area. <b>Mark Point</b> (bottom bar) drops a marker. Click a marker on the map to open its <b>Point Report</b>, which you can download.</li>
+                <li><b>2D:</b> a world map with coastlines and US states, satellite imagery, and wind barbs, where scrolling zooms and dragging pans, and once you pan away the <b>Recenter on Aircraft</b> button appears.</li>
+                <li><b>3D:</b> a Three.js scene with terrain in the 2D map's colors, hill shading on low side views, ocean shaded by depth, nearby city names on the ground, and an aircraft model, with the track drawn at GPS or pressure altitude and the mouse to orbit and zoom.</li>
+                <li>The <b>Settings</b> menu in the bottom bar has <b>Track Color Type</b> (wind speed or warming/cooling), <b>Wind Barb Preset</b> (wind speed, or hurricane wind field, which colors winds by Saffir-Simpson category and draws winds below 64 kt in black), <b>3D Altitude Track</b>, <b>Cockpit PFD</b>, <b>Metric HUD</b> and <b>Pitch HUD (3D)</b> (both on by default), <b>S.I Units</b>, <b>Simple Icon (2D)</b>, and <b>Real Scale (3D)</b>.</li>
+                <li><b>TDR</b> (in the <b>Overlays</b> dropdown) shows Tail Doppler Radar on the tracker, in 2D or 3D, while the MMR video keeps playing, and clicking <b>TDR</b> unfolds its controls. It uses quality-controlled (level 2) radar, so for a mission without level 2 radar the button reads "TDR Unavailable" and is greyed out.</li>
+                <li><b>TDR layers:</b> layers are selected when the first radar volume arrives so the radar shows right away, every layer in 3D and 500 mb and below (about 0 to 5.6 km) on the 2D map, and until you change the layers yourself, switching between 2D and 3D swaps between those two picks. Pick altitude layers to show alone or together, or use <b>All</b> and <b>None</b>, where <b>None</b> turns the radar off. Each layer is labelled with the millibar level of its altitude in the <i>standard</i> atmosphere, so read the mb value as a name for the height, since a storm's actual pressure surfaces are at different heights.</li>
+                <li><b>TDR Legs:</b> each radar leg's button, named by its number and time window, shows that leg alone at its end (click it again for all legs), and <b>Jump to Eye</b>, at the right of a leg's row, jumps to the leg's closest approach to the storm center. The radar fills in around the aircraft as playback moves through each leg, with the white beam marking the aircraft's position in 3D, and the first time the radar shows with every leg downloaded, the playhead jumps to the end of the last leg, where every leg's radar is complete, with the MMR video and satellite imagery following it. If every leg fails to load, the section folds and <b>TDR Failed to Load</b> stays locked until you load the flight again.</li>
+                <li><b>TDR in 2D:</b> the <b>TDR opacity</b> slider fades the radar for use with satellite imagery, and <b>Draw a Cross-Section</b> starts a two-point vertical cross-section, where you click two points inside the shown radar and the section opens with compass directions at its ends, while <b>Cancel Cross-Section</b> or Esc stops a pick.</li>
+                <li><b>Measure</b> (map header) draws a polygon, circle, or rectangle and shows its distance and area, and <b>Mark Point</b> (bottom bar) drops a marker that opens its <b>Point Report</b> when you click it on the map, which you can download.</li>
             </ul>
 
             <h3 id="hs-mmr">4. MMR video sync</h3>
-            <p>Load a cockpit or radar <b>.mp4</b> in the <b>Upload MMR to Sync</b> row at the top. Without a video, the tracker spans the full width.</p>
+            <p>Load a cockpit or radar <b>.mp4</b> in the <b>Upload MMR to Sync</b> row at the top; without a video, the tracker spans the full width.</p>
             <ul>
-                <li><b>Auto-Sync (default):</b> OCR reads the burned-in clock anywhere in the frame and locks onto the time that advances with the video. A pulsing dot at the top right of the MMR player means OCR is running, and a "Syncing" pill is shown while it searches. Click <b>Sync Now</b> on a clear frame to force a lock. If the scans find a plausible time but cannot confirm that it ticks with the video, Auto-Sync locks onto that time and the message marks the sync as <b>unverified</b>; compare the tracker time with the MMR before relying on it. If Auto-Sync fails for 30 seconds, upload the plain MMR recording in place of the compiled nose-radar video.</li>
-                <li><b>Manual Time Input:</b> choose it in the sync mode dropdown beside the MMR upload area. Fields for the flight-data window and the video's UTC start time (<kbd>HHMMSS</kbd>) open to the right of the dropdown.</li>
+                <li><b>Auto-Sync (default):</b> OCR reads the burned-in clock anywhere in the frame and locks onto the time that advances with the video, with a pulsing dot at the top right of the MMR player while OCR runs and a "Syncing" pill while it searches, and clicking <b>Sync Now</b> on a clear frame forces a lock. If the scans find a plausible time but cannot confirm that it ticks with the video, Auto-Sync locks onto that time and the message marks the sync as <b>unverified</b>, so compare the tracker time with the MMR before relying on it, and if Auto-Sync fails for 30 seconds, upload the plain MMR recording in place of the compiled nose-radar video.</li>
+                <li><b>Manual Time Input:</b> choose it in the sync mode dropdown beside the MMR upload area, and fields for the flight-data window and the video's UTC start time (<kbd>HHMMSS</kbd>) open to the right of the dropdown.</li>
             </ul>
 
             <h3 id="hs-sat">5. Satellite overlays</h3>
-            <p>Open <b>Overlays</b> in the map header and choose a satellite; its products appear right below it. The options are filled in from the flight's date and location.</p>
+            <p>Open <b>Overlays</b> in the map header and choose a satellite, and its products appear right below it, with the options filled in from the flight's date and location.</p>
             <ul>
-                <li><b>MODIS / VIIRS (polar, NASA GIBS):</b> any date back to each mission's start. The day-stepper moves between days, and overpass times are looked up automatically.</li>
-                <li><b>GOES-East / GOES-West (archive, needs the API):</b> rendered on the server from the GOES S3 archive for the flight's date, refreshed at a 10-minute interval. The list of spectral bands comes from the API. A product the API cannot serve right now is greyed out as <b>unavailable</b>, and the rest of that satellite stays usable. A GOES option is greyed out entirely when the flight is outside that satellite's Earth-disk view.</li>
-                <li><b>Pre-Cache Satellite Imagery</b> (menu bar) downloads imagery for several flights at once. Cached imagery is saved on this device and kept across reloads.</li>
-                <li><b>When is the imagery from?</b> The image time differs from the playback moment. Hover the <b>Overlays</b> button to see the time of the image on the map and its source: a real scan or overpass time from the archive, the requested 10-minute slot when the archive returned no scan time, or, for a polar orbiter, the single daily pass used for the whole flight.</li>
+                <li><b>MODIS / VIIRS (polar, NASA GIBS):</b> any date back to each mission's start, with the day-stepper moving between days and overpass times looked up automatically.</li>
+                <li><b>GOES-East / GOES-West (archive, needs the API):</b> rendered on the server from the GOES S3 archive for the flight's date and refreshed at a 10-minute interval, with the list of spectral bands coming from the API. A product the API cannot serve right now is greyed out as <b>unavailable</b> while the rest of that satellite stays usable, and a GOES option is greyed out entirely when the flight is outside that satellite's Earth-disk view.</li>
+                <li><b>Pre-Cache Satellite Imagery</b> (menu bar) downloads imagery for several flights at once and saves it on this device, where it is kept across reloads.</li>
+                <li><b>When is the imagery from?</b> The image time differs from the playback moment, so hover the <b>Overlays</b> button to see the time of the image on the map and its source: a real scan or overpass time from the archive, the requested 10-minute slot when the archive returned no scan time, or, for a polar orbiter, the single daily pass used for the whole flight.</li>
             </ul>
 
             <h3 id="hs-storm">6. Storm best-track overlay</h3>
-            <p>Archive loads draw the storm's whole-life best-track on both trackers as a dashed line colored by intensity. Turn it on or off with <b>Storm Track</b> in the <b>Overlays</b> dropdown. A spinning cyclone marker shows the storm's estimated position at the playback time, interpolated between best-track fixes so it moves smoothly during playback.</p>
+            <p>Archive loads draw the storm's whole-life best-track on both trackers as a dashed line colored by intensity, which <b>Storm Track</b> in the <b>Overlays</b> dropdown turns on or off, and a spinning cyclone marker shows the storm's estimated position at the playback time, interpolated between best-track fixes so it moves smoothly during playback.</p>
 
             <h3 id="hs-charts">7. Charts, PFD, and HUD</h3>
             <ul>
-                <li><b>Eight synced charts</b> (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accel, pressure, thermodynamics) show the playback moment as a vertical line. Each chart has its own zoom reset and controls for adding or removing series.</li>
+                <li><b>Eight synced charts</b> (temperature, nav angles, flow angles, altitude, speeds, vertical speeds and accel, pressure, thermodynamics) show the playback moment as a vertical line, and each chart has its own zoom reset and controls for adding or removing series.</li>
                 <li><b>Create Your Own Graph</b> plots any variables together for custom comparisons.</li>
                 <li><b>Cockpit PFD</b> (<b>Settings</b> in the bottom bar): a G1000-style attitude ladder, airspeed, altitude, and heading tapes, a VSI, a bank scale with a slip/skid indicator, a wind box, and a ground-track pointer. Three readouts are computed, since the flight-level file has no channel for them: the <b>VSI</b> is the rate of change of altitude between samples, <b>GS</b> is the distance between neighbouring positions over time and is shown in grey to mark it as computed, and the <b>slip/skid</b> ball uses the measured sideslip angle when the flight recorded one, or else a coordinated-turn estimate from roll, heading rate, and speed.</li>
-                <li>The on-map <b>Metric HUD</b> shows live flight-level values at the playback moment, and the <b>Pitch HUD (3D)</b> shows pitch, roll, heading, and track on the 3D map. Both are on by default; turn either off in <b>Settings</b>.</li>
+                <li>The on-map <b>Metric HUD</b> shows live flight-level values at the playback moment and the <b>Pitch HUD (3D)</b> shows pitch, roll, heading, and track on the 3D map, and both are on by default and can be turned off in <b>Settings</b>.</li>
             </ul>
 
             <h3 id="hs-export">8. Exporting and sharing</h3>
             <ul>
-                <li><b>Record Clip:</b> pick a start and end (with a live preview of both frames), a tracker mode, a satellite overlay, an optional MMR video, and up to four graphs. Recording plays that range and saves it as a video file.</li>
+                <li><b>Record Clip:</b> pick a start and end (with a live preview of both frames), a tracker mode, a satellite overlay, an optional MMR video, and up to four graphs, and recording plays that range and saves it as a video file.</li>
                 <li><b>Share Link:</b> copies a URL that opens this mission at the current playback moment and tracker view.</li>
             </ul>
 
             <h3 id="hs-trouble">9. Troubleshooting</h3>
             <ul>
-                <li><b>Archive greyed out with "API Offline":</b> use manual upload in the meantime. The archive turns back on once the API responds.</li>
-                <li><b>A GOES option is greyed out:</b> either the API is offline or the flight is outside that satellite's view. Try the other GOES satellite or a MODIS/VIIRS pass.</li>
-                <li><b>GOES picked but the map is empty:</b> pick a product in the picker. GOES products are picked by hand.</li>
+                <li><b>Archive greyed out with "API Offline":</b> use manual upload in the meantime, and the archive turns back on once the API responds.</li>
+                <li><b>A GOES option is greyed out:</b> either the API is offline or the flight is outside that satellite's view, so try the other GOES satellite or a MODIS/VIIRS pass.</li>
+                <li><b>GOES picked but the map is empty:</b> GOES products are picked by hand, so pick a product in the picker.</li>
                 <li><b>Auto-Sync locks onto the wrong time:</b> click <b>Sync Now</b> on a clear frame, hide other on-screen timestamps, or switch to Manual Time Input.</li>
                 <li><b>Slow playback with satellite on:</b> wait for the pre-cache to finish, or pre-cache the flight in advance.</li>
-                <li><b>Found a bug or have a question:</b> <b>Report a Problem</b> in the menu bar opens a report form addressed to diegoxiaobarbero@gmail.com, with the mission id attached and the tool named in the subject. <b>Send</b> opens Gmail with the message filled in. Your draft is saved in the form until you send it.</li>
             </ul>
         </div>
-        <button onclick="document.getElementById('helpModal').style.display='none'" class="self-start mt-2 px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        <div class="modal-foot">
+            <button onclick="document.getElementById('helpModal').style.display='none'" class="modal-btn secondary">Close</button>
+        </div>
     </div>
 </div>
 
@@ -935,11 +971,17 @@
      across, altitude up, painted with the API's reflectivity colorscale. -->
 <div id="tdrSliceModal" class="modal-overlay">
     <div class="modal-card" style="max-width: 760px;">
-        <button id="tdrSliceCloseX" class="absolute top-4 right-4 bg-transparent border-none text-faint text-2xl cursor-pointer hover:text-ink transition-colors focus:outline-none">✕</button>
-        <h2 class="text-ink text-lg font-bold border-b border-hairline pb-2">TDR Cross-Section</h2>
-        <p id="tdrSliceInfo" class="text-[11px] text-muted mt-2 leading-snug"></p>
-        <canvas id="tdrSliceCanvas" style="width:100%;margin-top:8px;border:1px solid var(--border);border-radius:4px;background:var(--panel-strip);"></canvas>
-        <button id="tdrSliceCloseBtn" class="mt-3 px-4 py-2 bg-elevated hover:bg-elevated text-ink rounded text-xs transition-colors">Close</button>
+        <div class="modal-head">
+            <div class="modal-head-text"><h2>TDR Cross-Section</h2></div>
+            <button id="tdrSliceCloseX" class="modal-x" title="Close">✕</button>
+        </div>
+        <div class="modal-body">
+            <p id="tdrSliceInfo" class="modal-intro"></p>
+            <canvas id="tdrSliceCanvas" style="width:100%;border:1px solid var(--border);border-radius:2px;background:var(--panel-strip);"></canvas>
+        </div>
+        <div class="modal-foot">
+            <button id="tdrSliceCloseBtn" class="modal-btn secondary">Close</button>
+        </div>
     </div>
 </div>
 
@@ -962,36 +1004,35 @@
      whole page. Classic scripts, one shared global scope, load order matters. -->
     <!-- ?v= cache-buster: bump this token after editing any css/js so browsers (and the Codespaces
          port-preview) fetch the new files instead of a stale cached copy. -->
-    <script src="js/00-var-catalog.js?v=20261110b"></script>
-    <script src="js/01-state.js?v=20261110b"></script>
-    <script src="js/02-satellite.js?v=20261110b"></script>
-    <script src="js/03-metrics.js?v=20261110b"></script>
-    <script src="js/04-geo-measure.js?v=20261110b"></script>
-    <script src="js/05-interpolation.js?v=20261110b"></script>
-    <script src="js/06-ocr.js?v=20261110b"></script>
-    <script src="js/07-ui-controls.js?v=20261110b"></script>
-    <script src="js/07b-plane-models.js?v=20261110b"></script>
-    <script src="js/07c-terrain.js?v=20261110b"></script>
-    <script src="js/07d-tdr.js?v=20261110b"></script>
-    <script src="js/08-ocr-lock-export.js?v=20261110b"></script>
-    <script src="js/09-interaction.js?v=20261110b"></script>
-    <script src="js/10-point-analysis.js?v=20261110b"></script>
-    <script src="js/11-layout.js?v=20261110b"></script>
-    <script src="js/11c-float-panels.js?v=20261110b"></script>
-    <script src="js/11b-parser-core.js?v=20261110b"></script>
-    <script src="js/12-file-parsing.js?v=20261110b"></script>
-    <script src="js/12b-recon-archive.js?v=20261110b"></script>
-    <script src="js/13-charts-master.js?v=20261110b"></script>
-    <script src="js/14-filters-sync.js?v=20261110b"></script>
-    <script src="js/15-map-render.js?v=20261110b"></script>
-    <script src="js/16-pfd-hud.js?v=20261110b"></script>
-    <script src="js/17-charts.js?v=20261110b"></script>
-    <script src="js/18-engine.js?v=20261110b"></script>
-    <script src="js/18b-flight-search.js?v=20261110b"></script>
-    <script src="js/19-bootstrap.js?v=20261110b"></script>
-    <script src="js/20-ui-polish.js?v=20261110b"></script>
-    <script src="js/21-report.js?v=20261110b"></script>
-    <script src="js/22-avi-convert.js?v=20261110b"></script>
+    <script src="js/00-var-catalog.js?v=20261115a"></script>
+    <script src="js/01-state.js?v=20261115a"></script>
+    <script src="js/02-satellite.js?v=20261115a"></script>
+    <script src="js/03-metrics.js?v=20261115a"></script>
+    <script src="js/04-geo-measure.js?v=20261115a"></script>
+    <script src="js/05-interpolation.js?v=20261115a"></script>
+    <script src="js/06-ocr.js?v=20261115a"></script>
+    <script src="js/07-ui-controls.js?v=20261115a"></script>
+    <script src="js/07b-plane-models.js?v=20261115a"></script>
+    <script src="js/07c-terrain.js?v=20261115a"></script>
+    <script src="js/07d-tdr.js?v=20261115a"></script>
+    <script src="js/08-ocr-lock-export.js?v=20261115a"></script>
+    <script src="js/09-interaction.js?v=20261115a"></script>
+    <script src="js/10-point-analysis.js?v=20261115a"></script>
+    <script src="js/11-layout.js?v=20261115a"></script>
+    <script src="js/11c-float-panels.js?v=20261115a"></script>
+    <script src="js/11b-parser-core.js?v=20261115a"></script>
+    <script src="js/12-file-parsing.js?v=20261115a"></script>
+    <script src="js/12b-recon-archive.js?v=20261115a"></script>
+    <script src="js/13-charts-master.js?v=20261115a"></script>
+    <script src="js/14-filters-sync.js?v=20261115a"></script>
+    <script src="js/15-map-render.js?v=20261115a"></script>
+    <script src="js/16-pfd-hud.js?v=20261115a"></script>
+    <script src="js/17-charts.js?v=20261115a"></script>
+    <script src="js/18-engine.js?v=20261115a"></script>
+    <script src="js/18b-flight-search.js?v=20261115a"></script>
+    <script src="js/19-bootstrap.js?v=20261115a"></script>
+    <script src="js/20-ui-polish.js?v=20261115a"></script>
+    <script src="js/22-avi-convert.js?v=20261115a"></script>
     <!-- Offline support: sw.js precaches the whole app (css/js/lib/fonts/data, OCR engine), so
          after one online visit the page loads and replays flights with no network
          (docs/CONNECTIVITY.md). Registered on 'load' so the first-visit precache download never

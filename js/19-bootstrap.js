@@ -58,7 +58,7 @@
             if (toast) toast.classList.toggle('hidden', !offline);
             if (yearSel) yearSel.disabled = offline;
             // Uploaded files still cache fine with the archive down, so only the tree is dropped.
-            if (offline) { reconChecksNote(checksBox, 'The recon archive is unreachable, so flights cannot be listed. Uploading files below still works.'); return; }
+            if (offline) { reconChecksNote(checksBox, 'The recon archive is unreachable, so flights cannot be listed, though uploading files below still works.'); return; }
             await reconFillSeasonYears(yearSel);
             loadSeason(yearSel ? yearSel.value : '');
         }

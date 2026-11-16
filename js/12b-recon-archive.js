@@ -1323,7 +1323,7 @@
             if (isReconApiDown()) {
                 if (yearSel) yearSel.disabled = true;
                 if (startBtn) startBtn.disabled = true;   // nothing to download offline; steer users to the file picker
-                checksNote('The recon archive is unreachable, so seasons cannot be listed. Uploaded files still load normally.');
+                checksNote('The recon archive is unreachable, so seasons cannot be listed, though uploaded files still load normally.');
                 return;
             }
             if (yearSel) yearSel.disabled = false;
@@ -1381,7 +1381,7 @@
                 if (fill) fill.style.width = Math.round((i + 1) / ids.length * 100) + '%';
             }
             preloadRunning = false; if (startBtn) startBtn.disabled = false;
-            setModalStatus(`Done: ${ok}/${ids.length} preloaded. They stay on this device and open instantly from the Previously Loaded Missions list.`);
+            setModalStatus(`Done: ${ok}/${ids.length} preloaded, and they stay on this device and open instantly from the Previously Loaded Missions list.`);
             setReconStatus(`Preloaded ${ok}/${ids.length} missions.`);
             if (yearSel && yearSel.value) loadSeasonIntoModal(yearSel.value);   // relist so finished missions show checked and locked
         }

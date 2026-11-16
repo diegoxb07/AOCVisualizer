@@ -286,6 +286,54 @@
     // level with data, each at its true altitude through the same get3DCoord projection the track
     // uses) PLUS the per-level canvases and geometry the 2D picker composites from. km offsets from
     // the storm-center origin become degrees, with lon stretched by 1/cos(lat).
+    // the solid outer skin of one level: an opaque wall one level thick on every cell edge where the
+    // radar data ends (the outer rim and the eye), in that cell's color and shaded by which way it
+    // faces, so the stack reads as a solid storm with the translucent planes inside it. built in the
+    // level plane's own space (local z points up), it follows the plane's visibility and the shared
+    // reveal mask, sampled at each cell's center.
+    function tdrLevelSkin(volU8, li, W, H, levels, stops, width, depth, maskTex) {
+        const base = li * W * H;
+        const has = (r, c) => r >= 0 && r < H && c >= 0 && c < W && volU8[base + r * W + c] !== 0;
+        const step = levels.length > 1 ? Math.abs(levels[1] - levels[0]) : 0.5;
+        const hh = step * 1000 / 690 / 2;
+        const pos = [], col = [], uv = [], idx = [];
+        const quad = (u0, v0, u1, v1, uc, vc, rgb, shade) => {
+            const n = pos.length / 3;
+            const xa = (u0 - 0.5) * width, ya = (v0 - 0.5) * depth, xb = (u1 - 0.5) * width, yb = (v1 - 0.5) * depth;
+            pos.push(xa, ya, -hh, xb, yb, -hh, xb, yb, hh, xa, ya, hh);
+            for (let k = 0; k < 4; k++) { col.push(rgb[0] * shade, rgb[1] * shade, rgb[2] * shade); uv.push(uc, vc); }
+            idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+        };
+        for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+            const q = volU8[base + r * W + c];
+            if (!q) continue;
+            const w = !has(r, c - 1), e = !has(r, c + 1), s = !has(r - 1, c), nn = !has(r + 1, c);
+            if (!w && !e && !s && !nn) continue;
+            const f = (q - 1) / 254;
+            let lo = stops[0], hi = stops[stops.length - 1];
+            for (let si = 0; si < stops.length - 1; si++) {
+                if (f >= stops[si].f && f <= stops[si + 1].f) { lo = stops[si]; hi = stops[si + 1]; break; }
+            }
+            const t = hi.f > lo.f ? (f - lo.f) / (hi.f - lo.f) : 0;
+            const rgb = [(lo.r + (hi.r - lo.r) * t) / 255, (lo.g + (hi.g - lo.g) * t) / 255, (lo.b + (hi.b - lo.b) * t) / 255];
+            const u0 = c / W, u1 = (c + 1) / W, v0 = r / H, v1 = (r + 1) / H, uc = (c + 0.5) / W, vc = (r + 0.5) / H;
+            if (w) quad(u0, v1, u0, v0, uc, vc, rgb, 0.7);
+            if (e) quad(u1, v0, u1, v1, uc, vc, rgb, 0.7);
+            if (s) quad(u0, v0, u1, v0, uc, vc, rgb, 0.85);
+            if (nn) quad(u1, v1, u0, v1, uc, vc, rgb, 0.85);
+        }
+        if (!idx.length) return null;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+        g.setIndex(pos.length / 3 > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+        const skin = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, alphaMap: maskTex, alphaTest: 0.5, side: THREE.DoubleSide }));
+        skin.userData.km = levels[li];
+        skin.renderOrder = 2;
+        return skin;
+    }
+
     function buildTdrAssets(vol, idxInMission) {
         const W = vol.x.length, H = vol.y.length;
         const stops = tdrColorStops(vol.colorscale);
@@ -357,6 +405,8 @@
             // coplanar levels from z-fighting and draw the newest analysis on top of the mosaic.
             mesh.position.y += idxInMission * 0.012;
             mesh.renderOrder = 3 + idxInMission * 0.001 + li * 0.00001;
+            const skin = tdrLevelSkin(volU8, li, W, H, levels, stops, width, depth, maskTex);
+            if (skin) mesh.add(skin);
             group.add(mesh);
         }
         if (!levelAssets.some(l => l.canvas)) return null;

@@ -168,7 +168,7 @@ button:not(.collapse-lip), select, input:not([type="range"]):not([type="file"]):
    runs down while a short one stops at its own contents, so no empty block is left under a folded
    section, and the edge the two columns share reads as a divider. */
 .sat-picker-head, .ov-toggle-group, .ov-columns > #tdrControlGroup, .ov-columns > #ovSatSection { background: color-mix(in oklab, var(--panel) 97%, transparent); border: 1px solid var(--border); }
-.sat-picker-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 8px 10px 6px; border-bottom: none; border-radius: 6px 6px 0 0; }
+.sat-picker-head { cursor: pointer; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 8px 10px 6px; border-bottom: none; border-radius: 6px 6px 0 0; }
 /* Umbrella "Overlays" dropdown: on/off toggle rows above the satellite picker section. */
 .ov-toggle-group { display: flex; flex-direction: column; gap: 1px; padding: 0 6px; border-top: none; border-bottom: none; }
 .ov-row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 12px; font-weight: 600; padding: 7px 8px; border-radius: 4px; cursor: pointer; transition: background 0.12s, color 0.12s; }

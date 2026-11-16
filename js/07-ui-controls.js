@@ -1360,6 +1360,9 @@
             if (open) renderSatPickerPanel();
             positionSatPicker();   // the panel's width follows which sections are unfolded
         });
+        // clicking the dropdown's own OVERLAYS title row closes it, the same as the Overlays button
+        const pickerHead = document.getElementById('satPickerHead');
+        if (pickerHead) pickerHead.addEventListener('click', closeSatPicker);
         // outside click or esc closes, like the measure popover.
         document.addEventListener('mousedown', (e) => {
             const panel = document.getElementById('satPickerPanel');

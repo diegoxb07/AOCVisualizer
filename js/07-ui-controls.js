@@ -114,12 +114,12 @@
         return getConvertedVal(val, key, isImperial).toFixed(dec) + (isImperial ? units[1] : units[0]);
     }
 
-    // 2D tracker aircraft glyphs: top-down silhouettes in a flight-tracker style, a yellow fill with a
+    // 2D tracker aircraft glyphs: top-down silhouettes in a flight-tracker style, a white fill with a
     // thin dark outline. coordinate frame: nose at +X (about x=24), span along Y, roughly 55 units
     // long, so the heading arrows and the nose wind barb line up as before. each part is a Path2D
     // built once; every part is stroked wide first and then filled over, so the seams between parts
     // vanish and only the outer edge of the whole silhouette keeps an outline.
-    const PLANE_FILL = '#ffcf1f', PLANE_LINE = '#1c1c1c', PLANE_DETAIL = '#b48a06', PLANE_OUTLINE_W = 0.9;
+    const PLANE_FILL = '#ffffff', PLANE_LINE = '#1c1c1c', PLANE_DETAIL = '#9a9a9a', PLANE_OUTLINE_W = 0.9;
 
     // a mirrored part: pts lists the top half (y <= 0) from the centerline round to the centerline,
     // as [cmd, ...coords] steps ('M', 'L', 'Q', 'C'); the bottom half is the same steps reflected

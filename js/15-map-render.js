@@ -608,7 +608,10 @@
         let dPlane = visualRow || filteredData[idx];
         if (dPlane) { 
             const d = dPlane; ctx.save(); ctx.translate(getX(d.lon), getY(d.lat)); ctx.scale(1/mapScale, 1/mapScale); 
-            const zoomFactor = Math.max(1, Math.pow(mapScale, 0.6));
+            // the aircraft grows with zoom until its longest side (about 56 glyph units at the 0.15
+            // glyph scale below) reaches 25 px and stays that size past it, so the wind barb at its
+            // nose stays the main thing to read
+            const zoomFactor = Math.min(25 / (56 * 0.15), Math.max(1, Math.pow(mapScale, 0.6)));
             if (document.getElementById('simpleTrackerIcon').checked) {
                 // a dark dot with a white rim, which reads on the light map and over imagery
                 ctx.beginPath(); ctx.arc(0, 0, 3 * zoomFactor, 0, 2 * Math.PI); ctx.fillStyle = '#1f2937'; ctx.fill(); ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5 * zoomFactor; ctx.stroke();

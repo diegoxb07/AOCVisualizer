@@ -293,11 +293,10 @@ html.pref-tracker-3d #measureCluster { display: none; }
    only its satellite section greys out and stops taking clicks, so it reads as present-but-N/A. */
 html.pref-tracker-3d #ovSatSection { opacity: 0.45; pointer-events: none; }
 #satStepCluster { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 40; }
-/* Fullscreen pins the map over the fixed bottom bar (z-2000). These two centered clusters must
-   clear the bar by position (child z-index can't beat it from the z-1500 panel), so they use
+/* Fullscreen pins the map over the fixed bottom bar (z-2000). The centered skip cluster must
+   clear the bar by position (child z-index can't beat it from the z-1500 panel), so it uses
    the bar's live measured height (--bottom-bar-h, js/11-layout.js) plus a margin, which stays
-   correct when the bar wraps taller. z-2001 lifts them over the bar's shadow gradient. Recenter
-   is a row above the 10-minute skip cluster. */
+   correct when the bar wraps taller. z-2001 lifts it over the bar's shadow gradient. */
 #mapPanel:is(:fullscreen, .fake-fs) #satStepCluster { bottom: calc(var(--bottom-bar-h, 96px) + 18px); z-index: 2001; }
 #mapPanel:is(:fullscreen, .fake-fs) #mapHeader { padding: 16px 22px 0 22px; }
 #mapPanel:is(:fullscreen, .fake-fs) .map-controls { padding-right: 50px; }
@@ -755,12 +754,6 @@ input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius
     border: none !important;
 }
 .sticky-bottom-bar .cmd-group button#playPauseBtn:hover { filter: brightness(1.12); }
-
-/* recenter-on-aircraft button: above the 10-min satellite stepper (bottom: 12px) instead
-   of overlapping it. In fullscreen it clears the fixed bottom bar and stays one row above the
-   skip cluster, using the same live bar height. */
-#recenterPlaneBtn { bottom: 36px !important; }
-#mapPanel:is(:fullscreen, .fake-fs) #recenterPlaneBtn { bottom: calc(var(--bottom-bar-h, 96px) + 58px) !important; z-index: 2001; }
 
 
 /* AVI to MP4 converter (js/22-avi-convert.js): the modal's ordered segment list, the Stop

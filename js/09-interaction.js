@@ -230,7 +230,7 @@
         if (!btn) return;
         if (filteredData.length === 0) { btn.style.display = 'none'; return; }
         const tdrView = trackerModeSelect.value === '3d' && typeof tdrCamFixed !== 'undefined' && tdrCamFixed;
-        const label = tdrView ? '\u25CE Recenter on TDR' : '\u25CE Recenter on Aircraft';
+        const label = tdrView ? 'Recenter on TDR' : 'Recenter on Aircraft';
         if (btn.textContent !== label) {
             btn.textContent = label;
             btn.title = tdrView ? 'Go back to the zoomed-out view over the radar' : 'Re-center the map on the aircraft and keep following it';

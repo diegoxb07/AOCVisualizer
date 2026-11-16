@@ -112,7 +112,7 @@ The radar shows on whichever tracker you have open, 2D or 3D, while the MMR vide
 
 Under **TDR Legs**, each button is one radar leg, labeled with its number and time window (for example Leg 1 · 22:00-22:30Z). Click one to see just that leg as it looks at the end of the leg, and click it again to go back to all legs, or click **Jump to Eye** at the right of a leg's row to go to the moment the aircraft came closest to the storm center on that leg. **Layers** lists the levels grouped into bands that you can show alone or together, with **All** and **None** above them. Each band row shows the altitude range it covers and is labeled with the pressure that altitude would have in a *standard* atmosphere, and since the radar grid is in kilometers of height, think of the millibar value as a name for the height, because a storm's real pressure levels are further from it the deeper the storm is.
 
-As you play through each leg, the radar fills in around the aircraft. Once you're using TDR, every leg downloads in the background so moving from one leg to the next is seamless, and where a later pass scanned the same area again, you see the newest data. In 3D, the white beam marks where the aircraft is.
+As you play through each leg, the radar fills in around the aircraft. Once you're using TDR, every leg downloads in the background so moving from one leg to the next is seamless, and where a later pass scanned the same area again, you see the newest data. In 3D, the white beam marks where the aircraft is, and while the radar shows, the view stays zoomed out over it: **Real Scale (3D)** turns off, you can zoom in only partway, and **Recenter on TDR** at the bottom of the map takes you back to the full view.
 
 On the 2D map, drag the **TDR opacity** slider to see satellite imagery through the radar, and click **Draw a Cross-Section** to pick two points for a vertical slice, the same way you use the measure tool. Click **Cancel Cross-Section** or press Esc if you change your mind.
 
@@ -121,7 +121,7 @@ The visualizer only uses quality-controlled (level 2) TDR data from after the se
 
 ## MMR video sync
 
-Load an MMR or nose-radar `.mp4` in the **Upload MMR to Sync** row, and then you have two ways to line it up with the flight data.
+Load an MMR or nose-radar `.mp4` in the **Upload MMR to Sync** row. When you do, the tracker switches to 2D, every overlay turns off, and playback starts, so Auto-Sync has a moving clock to lock onto, and you have two ways to line the video up with the flight data.
 
 **Auto-Sync** uses OCR to find the clock burned into the video anywhere in the frame (usually the bottom right, though exports vary) and locks onto the time that keeps advancing with the video, so any number on screen that stays still is ignored. You'll see a "Syncing" label while it searches, and while it syncs, the timeline slider is swapped for "Syncing MMR to flight data..." so scrubbing can't move the video in the middle of a scan. A short "Synced!" message confirms the lock. If it's slow to lock, click **Sync Now** a few times on a frame where the clock is easy to read. The app also checks each reading against the flight's own time range and throws out anything outside it.
 

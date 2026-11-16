@@ -46,6 +46,7 @@
     const TDR_SCAN_RADIUS_KM = 70;    // swath revealed around the aircraft as it flies the leg
     const TDR_BEAM_H = 26000 / 690;   // the aircraft beam rises well past the 18 km stack top
     const TDR_ZOOM_OUT_DIST = 110;    // camera distance that frames the ~500 km radar box
+    const TDR_MIN_DIST = 36;          // the closest the camera can zoom while the radar view is parked
     let tdrPlaneBeam = null;          // tall white beam marking the aircraft inside the radar volume
     let tdrScratch = null;            // work canvas: ribbon intersected with footprint for the rescan erase
     let tdrAnyFetched = false;        // once TDR is in use, every remaining leg keeps preloading
@@ -84,6 +85,7 @@
             });
         });
         if (tdrCamFixed && typeof followAircraft3D !== 'undefined') followAircraft3D = true;
+        if (tdrCamFixed) tdrCamLimits(false);
         tdrCamFixed = false; tdrCamReadyCount = 0;
         if (tdrPlaneBeam) {
             if (tdrPlaneBeam.geometry) tdrPlaneBeam.geometry.dispose();
@@ -643,6 +645,33 @@
     // moves the orbit target over the radar's center. the first move looks nearly straight down
     // from overhead (the slight lateral offset keeps the orbit controls stable at the pole); later
     // moves, as more legs load, shift the target but keep the user's view direction.
+    // while the radar view is parked in 3D: Real Scale is off and greyed out, and the camera cannot
+    // zoom in closer than TDR_MIN_DIST, so the view always stays out where the radar reads and a
+    // close zoom into the aircraft cannot leave the user inside the volume. off restores both.
+    function tdrCamLimits(on) {
+        const rs = document.getElementById('toggleRealScale');
+        if (on) {
+            if (rs && rs.checked) { rs.checked = false; rs.dispatchEvent(new Event('change')); }
+            // a pending Real Scale reframe would pull the camera back in on the next frame
+            if (typeof _reframeRealScale !== 'undefined') _reframeRealScale = false;
+            if (rs) { rs.disabled = true; rs.title = 'Real Scale is off while the radar shows in 3D'; }
+            if (typeof controls3D !== 'undefined' && controls3D) controls3D.minDistance = TDR_MIN_DIST;
+        } else {
+            if (rs) { rs.disabled = false; rs.title = ''; }
+            if (typeof controls3D !== 'undefined' && controls3D) controls3D.minDistance = (typeof realScale3D !== 'undefined' && realScale3D) ? 0.005 : 0.02;
+        }
+        if (typeof updateFollowButton === 'function') updateFollowButton();
+    }
+
+    // turns the radar off the way None does, and keeps the flight's automatic first pick from turning
+    // it back on later (used when an MMR video is loaded)
+    function tdrTurnOff() {
+        tdrAutoPicked = true;
+        if (!tdrSelectedKm.size) return;
+        tdrSelectedKm.clear(); tdrSelectionIsAuto = false;
+        tdrSelectionChanged();
+    }
+
     function tdrCamPark(overhead) {
         if (typeof camera3D === 'undefined' || !camera3D || typeof controls3D === 'undefined' || !controls3D) return;
         const c = tdrCenterWorld();
@@ -730,6 +759,7 @@
             if (anyReady && !tdrCamFixed) {
                 tdrCamFixed = true;
                 if (typeof followAircraft3D !== 'undefined') followAircraft3D = false;
+                tdrCamLimits(true);
                 tdrCamPark(true);
                 if (typeof updateFollowButton === 'function') updateFollowButton();
             } else if (anyReady && tdrCamFixed && !(typeof followAircraft3D !== 'undefined' && followAircraft3D)
@@ -739,6 +769,7 @@
         } else if (tdrCamFixed) {
             // the radar went off (None) or the view left 3D: back to the normal view following the aircraft
             tdrCamFixed = false; tdrCamReadyCount = 0;
+            tdrCamLimits(false);
             if (typeof reset3DView === 'function') reset3DView();
             if (typeof followAircraft3D !== 'undefined') followAircraft3D = true;
             if (typeof updateFollowButton === 'function') updateFollowButton();
@@ -1270,6 +1301,8 @@
             tdrSelectionIsAuto = false;
             tdrSelectionChanged();
         });
+        // the Recenter on TDR button in 3D: back to the zoomed-out view over the radar's center
+        window.tdrRecenterView = () => { if (tdrCamFixed) tdrCamPark(true); };
         // 2D-only radar opacity: fades the composite so satellite imagery reads through it.
         const opSl = document.getElementById('tdr2dOpacitySlider');
         if (opSl) opSl.addEventListener('input', () => {

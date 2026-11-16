@@ -23,6 +23,14 @@
     }
     function hideLoadingOverlay() { setFlightLoading(false); const l = document.getElementById('loadingOverlay'); l.classList.add('hidden'); l.classList.remove('flex'); }
 
+    function prepareViewForMmr() {
+        if (trackerModeSelect.value === '3d') { trackerModeSelect.value = '2d'; trackerModeSelect.dispatchEvent(new Event('change')); }
+        if (typeof satPickerChooseOff === 'function') satPickerChooseOff();
+        if (typeof tdrTurnOff === 'function') tdrTurnOff();
+        const storm = document.getElementById('toggleStormTrack');
+        if (storm && storm.checked) { storm.checked = false; storm.dispatchEvent(new Event('change')); }
+    }
+
     document.getElementById('videoInput').addEventListener('change', function(e) {
         if (!e.target.files[0]) return;
         markDropZoneLoaded('videoDropZone', 'videoDropLabel', e.target.files[0].name);
@@ -32,6 +40,10 @@
         // awaited, the video is usable meanwhile; evaluateAutoSyncDefault below flips on Auto and
         // shows the warmup badge, and the locks await it themselves.
         ensureOCR();
+        // the MMR goes with the 2D tracker and a plain map: 3D switches to 2D and every overlay turns
+        // off, then playback starts once the video can play, which gives Auto-Sync a moving clock to lock onto
+        prepareViewForMmr();
+        video.addEventListener('loadeddata', () => { if (filteredData.length && !isPlaying) playPauseBtn.click(); }, { once: true });
         syncMediaGridLayout();
         // A floating map means the user works in PiP; the fresh video joins it at its side.
         if (typeof floatVideoBesideMap === 'function') floatVideoBesideMap();

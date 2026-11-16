@@ -223,16 +223,27 @@
     // The recenter button surfaces once the user has moved off the aircraft: in 2D on a pan or zoom,
     // in 3D on a pan away from the orbit target. Each mode keeps a follow flag that its own handlers
     // clear, and calls this when one flips.
+    // while the radar view is parked in 3D (js/07d-tdr.js), the same button reads Recenter on TDR, stays
+    // up, and returns to the zoomed-out view over the radar.
     function updateFollowButton() {
         const btn = document.getElementById('recenterPlaneBtn');
         if (!btn) return;
         if (filteredData.length === 0) { btn.style.display = 'none'; return; }
-        const show = trackerModeSelect.value === '3d' ? !followAircraft3D : !followAircraft2D;
+        const tdrView = trackerModeSelect.value === '3d' && typeof tdrCamFixed !== 'undefined' && tdrCamFixed;
+        const label = tdrView ? '\u25CE Recenter on TDR' : '\u25CE Recenter on Aircraft';
+        if (btn.textContent !== label) {
+            btn.textContent = label;
+            btn.title = tdrView ? 'Go back to the zoomed-out view over the radar' : 'Re-center the map on the aircraft and keep following it';
+        }
+        const show = tdrView || (trackerModeSelect.value === '3d' ? !followAircraft3D : !followAircraft2D);
         btn.style.display = show ? '' : 'none';
     }
     const recenterBtn = document.getElementById('recenterPlaneBtn');
     if (recenterBtn) recenterBtn.addEventListener('click', () => {
-        if (trackerModeSelect.value === '3d') { if (typeof recenter3DOnPlane === 'function') recenter3DOnPlane(); }
+        if (trackerModeSelect.value === '3d') {
+            if (typeof tdrCamFixed !== 'undefined' && tdrCamFixed && typeof tdrRecenterView === 'function') tdrRecenterView();
+            else if (typeof recenter3DOnPlane === 'function') recenter3DOnPlane();
+        }
         else engageFollowAircraft();
     });
 

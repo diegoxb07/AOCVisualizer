@@ -194,7 +194,32 @@
         if (videoLoaded && filteredData[currentIdx]) { let targetVT = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); if (video.duration) targetVT = Math.min(targetVT, video.duration); pumpScrubSeek(targetVT); }
     });
     
-    let arrowSkipSpeed = 1;
+    // holding an arrow key scrubs by elapsed time, once per drawn frame: after a short pause it starts
+    // at 30 rows a second and speeds up to 1500, and a slow frame (a heavy radar draw) moves no more
+    // than 100 ms of that pace, so the playhead never leaps past a leg while the radar draws
+    let arrowHold = null;
+    function arrowStep(n) {
+        if (typeof syncLockActive === 'function' && syncLockActive()) return;
+        const newIdx = Math.max(0, Math.min(filteredData.length - 1, currentIdx + n));
+        if (newIdx === currentIdx) return;
+        currentIdx = newIdx;
+        if (videoLoaded) { video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); scheduleOcrRecheck(); }
+        updateVisualComponents(currentIdx);
+    }
+    function arrowHoldTick(now) {
+        const h = arrowHold;
+        if (!h || !filteredData.length) return;
+        const dt = Math.min(now - h.last, 100) / 1000;
+        h.last = now;
+        const held = (now - h.start) / 1000 - 0.3;
+        if (held > 0) {
+            const rate = 30 * Math.min(50, 1 + held * 30);
+            h.carry += rate * dt;
+            const n = Math.floor(h.carry);
+            if (n) { h.carry -= n; arrowStep(h.dir * n); }
+        }
+        requestAnimationFrame(arrowHoldTick);
+    }
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && isMeasuring) { stopMeasuringState(); if (filteredData.length > 0 && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]); return; }
         if (!filteredData || filteredData.length === 0) return; if (e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'number')) return;
@@ -209,12 +234,17 @@
             if (typeof syncLockActive === 'function' && syncLockActive()) { e.preventDefault(); return; }   // no scrubbing until the MMR sync commits
             // Shift+arrow = jump 10 flight-minutes (same step as the satellite scan buttons).
             if (e.shiftKey) { e.preventDefault(); skipFlightMinutes(e.key === 'ArrowRight' ? 10 : -10); return; }
-            e.preventDefault(); if (e.repeat) arrowSkipSpeed = Math.min(arrowSkipSpeed + 1, 50); else arrowSkipSpeed = 1;
-            let dir = e.key === 'ArrowRight' ? 1 : -1; let newIdx = currentIdx + (dir * arrowSkipSpeed); newIdx = Math.max(0, Math.min(filteredData.length - 1, newIdx)); 
-            if (newIdx !== currentIdx) { currentIdx = newIdx; if (videoLoaded) { video.currentTime = Math.max(0, filteredData[currentIdx].absSeconds - videoStartSeconds); scheduleOcrRecheck(); } updateVisualComponents(currentIdx); }
+            e.preventDefault();
+            if (e.repeat) return;   // a held key moves in arrowHoldTick, once per drawn frame
+            const dir = e.key === 'ArrowRight' ? 1 : -1;
+            arrowStep(dir);
+            arrowHold = { dir, start: performance.now(), last: performance.now(), carry: 0 };
+            requestAnimationFrame(arrowHoldTick);
         }
     });
-    document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowSkipSpeed = 1; });
+    const arrowHoldEnd = () => { arrowHold = null; };
+    document.addEventListener('keyup', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') arrowHoldEnd(); });
+    window.addEventListener('blur', arrowHoldEnd);
 
     // Reset the 2D view = re-engage follow (zoom in and re-center on the aircraft). Called on a
     // double-click on the map, and on a new flight or time window.

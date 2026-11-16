@@ -55,7 +55,7 @@
     let _tdrSliceRaf = false;         // one queued redraw at a time for the live pick line
     let tdrSectionOpen = false;       // the Overlays TDR section is unfolded: its rows need data, so fetching starts
     let tdrIntroDone = false;         // the once-per-flight jump to the end of the last leg has run
-    let tdrAutoPicked = false;        // the first volume of this flight has preselected the view's layers
+    let tdrAutoPicked = false;        // the first volume has preselected every layer since the section last unfolded
     let tdrSelectionIsAuto = false;   // the picked layers are still that automatic pick (no row, All, or None click since)
     let tdrCamFixed = false;          // the 3D camera is parked zoomed out over the radar's center
     let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
@@ -469,9 +469,9 @@
                     a.state = 'ready';
                     let autoPicked = false;
                     if (!tdrSelectedKm.size && !tdrAutoPicked) {
-                        // the flight's first volume with nothing picked selects the view's default
-                        // layers (tdrDefaultLevels), so the radar shows (and the jump to the last leg can run)
-                        // without a pick first. once per flight: a later None stays off as legs arrive.
+                        // the first volume with nothing picked selects every layer, so the radar shows
+                        // (and the jump to the last leg can run) without a pick first. a later None stays
+                        // off as legs arrive, until the section unfolds again.
                         tdrDefaultLevels(a.levels).forEach(km => tdrSelectedKm.add(km));
                         tdrAutoPicked = true; tdrSelectionIsAuto = true; autoPicked = true;
                     } else if (tdrSelectionIsAuto) {
@@ -666,9 +666,9 @@
     // turns the radar off the way None does, and keeps the flight's automatic first pick from turning
     // it back on later (used when an MMR video is loaded)
     function tdrTurnOff() {
-        tdrAutoPicked = true;
+        tdrAutoPicked = true; tdrSelectionIsAuto = false;
         if (!tdrSelectedKm.size) return;
-        tdrSelectedKm.clear(); tdrSelectionIsAuto = false;
+        tdrSelectedKm.clear();
         tdrSelectionChanged();
     }
 
@@ -875,16 +875,16 @@
              + 'analysed pressure; a storm' + '\u2019' + 's actual pressure surfaces are at different heights.';
     }
 
-    // the automatic layer pick for the view showing: every layer with data in 3D, and on the 2D map
-    // only 500 mb and below (about 0 to 5.6 km), the lower layers where storm centers read clearly
+    // the automatic layer pick: every layer with data, in 2D and 3D alike
     function tdrDefaultLevels(levels) {
-        const in2d = typeof trackerModeSelect !== 'undefined' && trackerModeSelect.value === '2d';
-        return (levels || []).filter(l => l.canvas && (!in2d || tdrMb(l.km) >= 500)).map(l => l.km);
+        return (levels || []).filter(l => l.canvas).map(l => l.km);
     }
-    // re-applies that pick across every loaded leg, after a switch between 2D and 3D
+    // selects every layer across the loaded legs, and keeps legs that arrive later joining that pick
     function tdrApplyDefaultSelection() {
         tdrSelectedKm.clear();
         tdrAnalyses.forEach(x => { if (x.state === 'ready') tdrDefaultLevels(x.levels).forEach(km => tdrSelectedKm.add(km)); });
+        tdrAutoPicked = tdrSelectedKm.size > 0;
+        tdrSelectionIsAuto = true;
     }
 
     function tdrBandMembers(ref, band) {
@@ -1065,6 +1065,7 @@
     // (3D stack and 2D composite), and repaint the 2D map, which otherwise waits for the next frame
     // and shows nothing new while playback is paused
     function tdrSelectionChanged() {
+        _tdrScanWallSec = -1;   // the cross-section wall at the aircraft repaints with the new layers
         buildTdrHero();
         updateTdr3D();
         if (typeof renderMapEngineFrame === 'function' && filteredData.length && trackerModeSelect.value === '2d') renderMapEngineFrame(currentIdx, filteredData[currentIdx]);
@@ -1269,9 +1270,10 @@
             if (!body) return;
             tdrSectionOpen = !body.classList.toggle('hidden');
             btn.setAttribute('aria-expanded', String(tdrSectionOpen));
+            // each unfold starts from every layer selected, whatever was picked before
+            if (tdrSectionOpen) tdrApplyDefaultSelection();
             tdrUpdateSliceButtons();
-            buildTdrHero();
-            updateTdr3D();
+            tdrSelectionChanged();
             if (typeof positionSatPicker === 'function') positionSatPicker();
         });
         // the Esc key cancels an armed cross-section pick.
@@ -1314,15 +1316,15 @@
         });
 
         // leaving the 2D map drops a pick in progress (it needs map clicks); either way the section's
-        // 2D-only controls, the leg highlight, and the radar follow the new view, and a still
-        // automatic layer pick switches to the new view's default (tdrDefaultLevels).
+        // 2D-only controls, the leg highlight, and the radar follow the new view, and a radar that
+        // is showing, or a section that is open, comes back with every layer selected.
         if (typeof trackerModeSelect !== 'undefined' && trackerModeSelect) trackerModeSelect.addEventListener('change', () => {
             if (trackerModeSelect.value !== '2d' && (tdrSliceArm || tdrSliceLine)) {
                 tdrSliceArm = 0; tdrSlicePtA = null; tdrSliceMouse = null; tdrSliceLine = null;
                 setTdrSliceHint('');
             }
             tdrUpdateSliceButtons();
-            if (tdrSelectionIsAuto) { tdrApplyDefaultSelection(); tdrSelectionChanged(); }
+            if (tdrSelectedKm.size || tdrSectionOpen) { tdrApplyDefaultSelection(); tdrSelectionChanged(); }
             else { buildTdrHero(); updateTdr3D(); }
         });
         // Draw a Cross-Section arms the two-click pick and closes the Overlays dropdown so the clicks

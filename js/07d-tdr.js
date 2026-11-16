@@ -57,6 +57,7 @@
     let tdrIntroDone = false;         // the once-per-flight jump to the end of the last leg has run
     let tdrAutoPicked = false;        // the first volume has preselected the layers since the section last unfolded
     let tdrSelectionIsAuto = false;   // the picked layers are still that automatic pick (no row, All, or None click since)
+    let tdrUserOff = false;           // the TDR checkbox is unchecked: nothing turns the radar back on until it is checked or a layer is clicked
     let tdrSessionPick = null;        // the layers you picked this session (kept across flights, in memory only); null = every layer
     let tdrCamFixed = false;          // the 3D camera is parked zoomed out over the radar's center
     let tdrCamReadyCount = 0;         // ready analyses the parked camera's center was computed from
@@ -106,6 +107,7 @@
         tdrLevel2Missing = false; tdrLegPick = null; tdrEyeActive = false;
         tdrAnyFetched = false;
         tdrIntroDone = false; tdrAutoPicked = false; tdrSelectionIsAuto = false;
+        tdrSyncMaster();
         if (tdrScanWall) {
             if (tdrScanWall.geometry) tdrScanWall.geometry.dispose();
             if (tdrScanWall.material) { if (tdrScanWall.material.map) tdrScanWall.material.map.dispose(); tdrScanWall.material.dispose(); }
@@ -564,7 +566,7 @@
                     a.maskStamp = 0; a.maskFull = false; a.lastStampSec = null; a._stampIdx = 0;
                     a.state = 'ready';
                     let autoPicked = false;
-                    if (!tdrSelectedKm.size && !tdrAutoPicked) {
+                    if (!tdrSelectedKm.size && !tdrAutoPicked && !tdrUserOff) {
                         // the first volume with nothing picked selects the layers you picked earlier in
                         // the session, or every layer, so the radar shows (and the jump to the last leg
                         // can run) without a pick first. a later None stays off as legs arrive, until
@@ -763,7 +765,8 @@
     // turns the radar off the way None does, and keeps the flight's automatic first pick from turning
     // it back on later (used when an MMR video is loaded)
     function tdrTurnOff() {
-        tdrAutoPicked = true; tdrSelectionIsAuto = false;
+        tdrAutoPicked = true; tdrSelectionIsAuto = false; tdrUserOff = true;
+        tdrSyncMaster();
         if (!tdrSelectedKm.size) return;
         tdrSelectedKm.clear();
         tdrSelectionChanged();
@@ -997,12 +1000,20 @@
         tdrSessionPick = (!tdrSelectedKm.size || all) ? null : new Set(tdrSelectedKm);
     }
 
+    // the TDR checkbox shows whether any layer draws, and greys out while the radar cannot load
+    function tdrSyncMaster() {
+        const cb = document.getElementById('toggleTdr'); if (!cb) return;
+        cb.checked = tdrSelectedKm.size > 0;
+        const btn = document.getElementById('tdrPickerBtn');
+        cb.disabled = !!(btn && btn.disabled);
+    }
+
     function tdrBandMembers(ref, band) {
         return ref.levels.filter(l => { const p = tdrMb(l.km); return p >= band.pMin && p < band.pMax; });
     }
 
     function updateTdrPickerBtn() {
-        if (tdrLevel2Missing) return;   // the button holds its disabled "TDR Unavailable" state
+        if (tdrLevel2Missing) { tdrSyncMaster(); return; }   // the button holds its disabled "TDR Unavailable" state
         const lbl = document.getElementById('tdrPickerBtnLabel'), btn = document.getElementById('tdrPickerBtn');
         if (!lbl) return;
         // while the first volume downloads the section header shows TDR Loading..., so its rows never
@@ -1032,6 +1043,7 @@
         // the loading ring over the skeleton layer rows shows while that first volume downloads
         const grp = document.getElementById('tdrControlGroup'); if (grp) grp.classList.toggle('tdr-is-loading', loading);
         // the Overlays button lights while any overlay draws, the radar included
+        tdrSyncMaster();
         if (typeof updateSatPickerButton === 'function') updateSatPickerButton();
     }
 
@@ -1176,6 +1188,8 @@
     // (3D stack and 2D composite), and repaint the 2D map, which otherwise waits for the next frame
     // and shows nothing new while playback is paused
     function tdrSelectionChanged() {
+        if (tdrSelectedKm.size) tdrUserOff = false;   // clicking a layer turns the radar back on
+        tdrSyncMaster();
         _tdrScanWallSec = -1;   // the cross-section wall at the aircraft repaints with the new layers
         buildTdrHero();
         updateTdr3D();
@@ -1382,7 +1396,7 @@
             tdrSectionOpen = !body.classList.toggle('hidden');
             btn.setAttribute('aria-expanded', String(tdrSectionOpen));
             // an unfold with no layer selected brings back your earlier pick, or every layer
-            if (tdrSectionOpen && !tdrSelectedKm.size) tdrApplyDefaultSelection();
+            if (tdrSectionOpen && !tdrSelectedKm.size && !tdrUserOff) tdrApplyDefaultSelection();
             tdrUpdateSliceButtons();
             tdrSelectionChanged();
             if (typeof positionSatPicker === 'function') positionSatPicker();
@@ -1416,6 +1430,23 @@
             tdrSessionPick = null;
             tdrSelectionChanged();
         });
+        // the TDR checkbox: unchecked clears the layers and keeps the radar off; checked brings back
+        // your earlier pick or every layer, and starts loading if nothing has loaded yet
+        const master = document.getElementById('toggleTdr');
+        if (master) {
+            master.closest('label').addEventListener('click', (e) => e.stopPropagation());
+            master.addEventListener('change', () => {
+                if (master.checked) {
+                    tdrUserOff = false; tdrAnyFetched = true;
+                    tdrApplyDefaultSelection();
+                    if (!tdrSelectedKm.size) tdrAutoPicked = false;   // the first volume to arrive picks the layers
+                } else {
+                    tdrUserOff = true;
+                    tdrSelectedKm.clear(); tdrSelectionIsAuto = false;
+                }
+                tdrSelectionChanged();
+            });
+        }
         // the Recenter on TDR button in 3D: back to the zoomed-out view over the radar's center
         window.tdrRecenterView = () => { if (tdrCamFixed) tdrCamPark(true); };
         // 2D-only radar opacity: fades the composite so satellite imagery reads through it.
@@ -1437,7 +1468,7 @@
                 setTdrSliceHint('');
             }
             tdrUpdateSliceButtons();
-            if (!tdrSelectedKm.size && tdrSectionOpen) { tdrApplyDefaultSelection(); tdrSelectionChanged(); }
+            if (!tdrSelectedKm.size && tdrSectionOpen && !tdrUserOff) { tdrApplyDefaultSelection(); tdrSelectionChanged(); }
             else { buildTdrHero(); updateTdr3D(); }
         });
         // Draw a Cross-Section arms the two-click pick and closes the Overlays dropdown so the clicks

@@ -114,37 +114,138 @@
         return getConvertedVal(val, key, isImperial).toFixed(dec) + (isImperial ? units[1] : units[0]);
     }
 
-    function drawP3Orion(c) {
-        c.fillStyle = '#ffffff'; c.strokeStyle = '#222222'; c.lineWidth = 2.5; c.beginPath();
-        c.moveTo(22, 0); c.quadraticCurveTo(22, -3.5, 14, -3.5); c.lineTo(4, -3.5); c.lineTo(0, -25); c.lineTo(-4, -25); c.lineTo(-6, -3.5); c.lineTo(-16, -2.5); c.lineTo(-18, -10); c.lineTo(-21, -10); c.lineTo(-21, -1.5); c.lineTo(-30, -0.5); c.lineTo(-30, 0.5); c.lineTo(-21, 1.5); c.lineTo(-21, 10); c.lineTo(-18, 10); c.lineTo(-16, 2.5); c.lineTo(-6, 3.5); c.lineTo(-4, 25); c.lineTo(0, 25); c.lineTo(4, 3.5); c.lineTo(14, 3.5); c.quadraticCurveTo(22, 3.5, 22, 0); c.closePath(); c.fill(); c.stroke();
-        const drawEngine = (cx, cy) => { c.beginPath(); c.ellipse(cx, cy, 6, 1.5, 0, 0, Math.PI * 2); c.fillStyle = '#ffffff'; c.fill(); c.stroke(); c.beginPath(); c.moveTo(cx + 6, cy - 1); c.lineTo(cx + 10, cy); c.lineTo(cx + 6, cy + 1); c.fillStyle = '#cccccc'; c.fill(); };
-        drawEngine(1.5, -9); drawEngine(-0.5, -16); drawEngine(1.5, 9); drawEngine(-0.5, 16);
-        const drawProps = (cx, cy) => { c.beginPath(); c.ellipse(cx, cy, 0.5, 5, 0, 0, Math.PI * 2); c.fillStyle = 'rgba(200, 230, 255, 0.7)'; c.fill(); c.beginPath(); c.moveTo(cx, cy - 5); c.lineTo(cx, cy + 5); c.strokeStyle = '#aaaaaa'; c.lineWidth = 1; c.stroke(); };
-        drawProps(11.5, -9); drawProps(9.5, -16); drawProps(11.5, 9); drawProps(9.5, 16);
-        c.beginPath(); c.moveTo(17, -1.5); c.lineTo(19, -1); c.lineTo(19, 1); c.lineTo(17, 1.5); c.lineTo(16, 0); c.closePath(); c.fillStyle = '#222222'; c.fill();
+    // 2D tracker aircraft glyphs: top-down silhouettes in a flight-tracker style, a yellow fill with a
+    // thin dark outline. coordinate frame: nose at +X (about x=24), span along Y, roughly 55 units
+    // long, so the heading arrows and the nose wind barb line up as before. each part is a Path2D
+    // built once; every part is stroked wide first and then filled over, so the seams between parts
+    // vanish and only the outer edge of the whole silhouette keeps an outline.
+    const PLANE_FILL = '#ffcf1f', PLANE_LINE = '#1c1c1c', PLANE_DETAIL = '#b48a06', PLANE_OUTLINE_W = 0.9;
+
+    // a mirrored part: pts lists the top half (y <= 0) from the centerline round to the centerline,
+    // as [cmd, ...coords] steps ('M', 'L', 'Q', 'C'); the bottom half is the same steps reflected
+    function planeMirrorPath(steps) {
+        const p = new Path2D();
+        const run = (flip) => steps.forEach(([cmd, ...a]) => {
+            const v = a.map((n, i) => (i % 2 ? n * flip : n));
+            if (cmd === 'M') (flip > 0 ? p.moveTo(v[0], v[1]) : p.lineTo(v[0], v[1]));
+            else if (cmd === 'L') p.lineTo(v[0], v[1]);
+            else if (cmd === 'Q') p.quadraticCurveTo(v[0], v[1], v[2], v[3]);
+            else if (cmd === 'C') p.bezierCurveTo(v[0], v[1], v[2], v[3], v[4], v[5]);
+        });
+        run(1);
+        // walk the bottom half back from the tail to the nose so the outline stays one loop
+        const rev = [];
+        for (let i = steps.length - 1; i > 0; i--) {
+            const [cmd, ...a] = steps[i];
+            const prevEnd = steps[i - 1].slice(-2);
+            if (cmd === 'L' || cmd === 'M') rev.push(['L', prevEnd[0], prevEnd[1]]);
+            else if (cmd === 'Q') rev.push(['Q', a[0], a[1], prevEnd[0], prevEnd[1]]);
+            else if (cmd === 'C') rev.push(['C', a[2], a[3], a[0], a[1], prevEnd[0], prevEnd[1]]);
+        }
+        const last = steps[steps.length - 1].slice(-2);
+        p.lineTo(last[0], -last[1]);
+        rev.forEach(([cmd, ...a]) => {
+            const v = a.map((n, i) => (i % 2 ? -n : n));
+            if (cmd === 'L') p.lineTo(v[0], v[1]);
+            else if (cmd === 'Q') p.quadraticCurveTo(v[0], v[1], v[2], v[3]);
+            else if (cmd === 'C') p.bezierCurveTo(v[0], v[1], v[2], v[3], v[4], v[5]);
+        });
+        p.closePath();
+        return p;
+    }
+    // one side's part (a wing, a nacelle) drawn on the top side and copied to the bottom side
+    function planeSidePath(build) {
+        const p = new Path2D();
+        build(p, 1); build(p, -1);
+        return p;
+    }
+    function planeCapsule(p, x0, x1, cy, hw) {
+        p.moveTo(x1, cy - hw);
+        p.lineTo(x0 + hw, cy - hw);
+        p.arc(x0 + hw, cy, hw, -Math.PI / 2, Math.PI / 2, true);
+        p.lineTo(x1, cy + hw);
+        p.arc(x1, cy, hw, Math.PI / 2, -Math.PI / 2, true);
+        p.closePath();
+    }
+    function drawPlaneSilhouette(c, parts, details) {
+        c.save();
+        c.lineJoin = 'round'; c.lineCap = 'round';
+        c.strokeStyle = PLANE_LINE; c.lineWidth = PLANE_OUTLINE_W * 2;
+        parts.forEach(p => c.stroke(p));
+        c.fillStyle = PLANE_FILL;
+        parts.forEach(p => c.fill(p));
+        if (details) details(c);
+        c.restore();
     }
 
-    // G-IV (NOAA49) glyph for the 2D tracker, same coordinate frame as drawP3Orion
-    // (nose at +X, drawn white with a dark outline). Swept wings, two aft-fuselage
-    // nacelles, T-tail; picked over the P-3 by isGulfstreamFlight().
+    const P3_PARTS = (() => {
+        const fuselage = planeMirrorPath([
+            ['M', 24, 0], ['C', 24, -1.7, 22.2, -2.7, 19, -2.75], ['L', -12, -2.75],
+            ['C', -17.5, -2.7, -22.5, -1.8, -25.5, -0.95], ['L', -30.6, -0.5], ['Q', -31.6, -0.4, -31.7, 0]
+        ]);
+        const wings = planeSidePath((p, s) => {
+            p.moveTo(5.8, -2.5 * s); p.lineTo(2.4, -21.6 * s);
+            p.quadraticCurveTo(1.4, -22.8 * s, -0.4, -22.6 * s);
+            p.lineTo(-1.6, -21.8 * s); p.lineTo(-4.6, -2.5 * s); p.closePath();
+        });
+        const nacelles = planeSidePath((p, s) => {
+            planeCapsule(p, -5.2, 10, -7.2 * s, 1.15);
+            planeCapsule(p, -4.2, 9, -14.6 * s, 1.05);
+        });
+        const tailplane = planeSidePath((p, s) => {
+            p.moveTo(-18.8, -1.3 * s); p.lineTo(-22, -9.4 * s);
+            p.quadraticCurveTo(-22.6, -10 * s, -23.6, -9.8 * s);
+            p.lineTo(-25.2, -9.2 * s); p.lineTo(-25.6, -1.1 * s); p.closePath();
+        });
+        return [wings, tailplane, nacelles, fuselage];
+    })();
+
+    function drawP3Orion(c) {
+        drawPlaneSilhouette(c, P3_PARTS, (c) => {
+            // propeller discs ahead of each nacelle, faint so the silhouette stays clean
+            c.strokeStyle = 'rgba(28, 28, 28, 0.45)'; c.lineWidth = 0.7;
+            [[11.3, 7.2], [10.2, 14.6]].forEach(([x, y]) => {
+                [y, -y].forEach(cy => { c.beginPath(); c.moveTo(x, cy - 4.3); c.lineTo(x, cy + 4.3); c.stroke(); });
+            });
+            // the fin seen from above, and the cockpit glazing
+            c.strokeStyle = PLANE_DETAIL; c.lineWidth = 0.9;
+            c.beginPath(); c.moveTo(-17.5, 0); c.lineTo(-26.5, 0); c.stroke();
+            c.fillStyle = PLANE_LINE;
+            c.beginPath(); c.moveTo(20.4, -1.75); c.quadraticCurveTo(22.4, 0, 20.4, 1.75); c.lineTo(19.3, 1.55); c.quadraticCurveTo(20.6, 0, 19.3, -1.55); c.closePath(); c.fill();
+        });
+    }
+
+    // G-IV (NOAA49) glyph, same frame as the P-3: swept wings with winglets, two engines on the
+    // aft fuselage, and a T-tail; picked over the P-3 by isGulfstreamFlight()
+    const GIV_PARTS = (() => {
+        const fuselage = planeMirrorPath([
+            ['M', 25.5, 0], ['C', 25.5, -1.5, 23.4, -2.4, 19.5, -2.45], ['L', -11, -2.45],
+            ['C', -17, -2.4, -23.5, -1.6, -27.4, -0.75], ['Q', -28.6, -0.4, -28.8, 0]
+        ]);
+        const wings = planeSidePath((p, s) => {
+            p.moveTo(4.4, -2.2 * s); p.lineTo(-11.2, -21.2 * s);
+            p.lineTo(-12.3, -22.6 * s); p.quadraticCurveTo(-13.1, -23.2 * s, -13.6, -22.4 * s);
+            p.lineTo(-14.6, -21 * s); p.lineTo(-8.6, -8.2 * s); p.lineTo(-9.8, -2.2 * s); p.closePath();
+        });
+        const engines = planeSidePath((p, s) => { planeCapsule(p, -18.6, -9.6, -4.9 * s, 1.95); });
+        const tailplane = planeSidePath((p, s) => {
+            p.moveTo(-23.2, -0.8 * s); p.lineTo(-28.2, -9.4 * s);
+            p.quadraticCurveTo(-28.9, -10.1 * s, -29.8, -9.7 * s);
+            p.lineTo(-30.6, -9 * s); p.lineTo(-29.6, -0.8 * s); p.closePath();
+        });
+        return [wings, tailplane, engines, fuselage];
+    })();
+
     function drawGulfstreamIV(c) {
-        c.fillStyle = '#ffffff'; c.strokeStyle = '#222222'; c.lineWidth = 2.5; c.beginPath();
-        c.moveTo(24, 0); c.quadraticCurveTo(23, -2.6, 17, -2.8); c.lineTo(5, -2.8);
-        c.lineTo(-11, -21); c.lineTo(-14, -21); c.lineTo(-9, -2.8);
-        c.lineTo(-21, -2.2); c.lineTo(-26.5, -9.5); c.lineTo(-28.5, -9.5); c.lineTo(-29.5, -1.2);
-        c.lineTo(-30.5, 0);
-        c.lineTo(-29.5, 1.2); c.lineTo(-28.5, 9.5); c.lineTo(-26.5, 9.5); c.lineTo(-21, 2.2);
-        c.lineTo(-9, 2.8); c.lineTo(-14, 21); c.lineTo(-11, 21);
-        c.lineTo(5, 2.8); c.lineTo(17, 2.8); c.quadraticCurveTo(23, 2.6, 24, 0);
-        c.closePath(); c.fill(); c.stroke();
-        const nacelle = (cy) => {
-            c.beginPath(); c.ellipse(-13.5, cy, 4.4, 1.8, 0, 0, Math.PI * 2); c.fillStyle = '#ffffff'; c.fill(); c.stroke();
-            c.beginPath(); c.moveTo(-9.4, cy - 1.2); c.lineTo(-8.2, cy); c.lineTo(-9.4, cy + 1.2); c.fillStyle = '#cccccc'; c.fill();
-        };
-        nacelle(-4.8); nacelle(4.8);
-        c.beginPath(); c.moveTo(-11, -21); c.lineTo(-9.8, -19.4); c.moveTo(-11, 21); c.lineTo(-9.8, 19.4); c.lineWidth = 1.5; c.stroke();  // winglets
-        c.beginPath(); c.moveTo(-21, 0); c.lineTo(-29.5, 0); c.strokeStyle = '#999999'; c.lineWidth = 1; c.stroke();  // fin seen from above
-        c.beginPath(); c.moveTo(19, -1.4); c.lineTo(21, -0.8); c.lineTo(21, 0.8); c.lineTo(19, 1.4); c.lineTo(18, 0); c.closePath(); c.fillStyle = '#222222'; c.fill();
+        drawPlaneSilhouette(c, GIV_PARTS, (c) => {
+            // engine intakes, the fin seen from above, and the cockpit glazing
+            c.strokeStyle = PLANE_DETAIL; c.lineWidth = 0.8;
+            [4.9, -4.9].forEach(cy => { c.beginPath(); c.moveTo(-9.9, cy - 1.4); c.lineTo(-9.9, cy + 1.4); c.stroke(); });
+            c.lineWidth = 0.9;
+            c.beginPath(); c.moveTo(-20.5, 0); c.lineTo(-28.6, 0); c.stroke();
+            c.fillStyle = PLANE_LINE;
+            c.beginPath(); c.moveTo(21.8, -1.6); c.quadraticCurveTo(23.7, 0, 21.8, 1.6); c.lineTo(20.7, 1.45); c.quadraticCurveTo(21.9, 0, 20.7, -1.45); c.closePath(); c.fill();
+        });
     }
 
     // True when the loaded flight is the Gulfstream: aircraft letter N in the AOC

@@ -414,6 +414,8 @@
                     // it turns about its middle, so shift up by its half-height against the vertical,
                     // or standing it up puts its lower half through the terrain
                     sl.mesh.position.set(a.x, a.y + (k / 2) * Math.cos(elev), a.z);
+                    // a name behind the TDR radar hides behind it
+                    sl.mesh.visible = !(typeof tdrOccludes === 'function' && tdrOccludes(a));
                 }
             }
             // Storm symbols and ribbon hold one screen size off camera distance, capped at
@@ -486,6 +488,7 @@
                         cl.sprite.position.y = by + sc * 0.7;
                         cl.sprite.scale.set(sc * cl.aspect, sc, 1);
                         cl.mat.opacity = dist <= R0 ? 1 : (R1 - dist) / (R1 - R0);
+                        if (typeof tdrOccludes === 'function' && tdrOccludes(cl.sprite.position)) cl.sprite.visible = false;
                     } else cl.sprite.visible = false;
                 }
             }
@@ -499,7 +502,7 @@
                     const R1 = cl.big ? 90 : 45, R0 = R1 * 0.7;   // world units, 20 per degree
                     const dist = Math.hypot(cl.at.x - px, cl.at.z - pz);
                     if (!in3dC || !filteredData.length || dist >= R1) { cl.mesh.visible = false; continue; }
-                    cl.mesh.visible = true;
+                    cl.mesh.visible = !(typeof tdrOccludes === 'function' && tdrOccludes(cl.at));
                     cl.mesh.rotation.y = Math.atan2(camera3D.position.x - cl.at.x, camera3D.position.z - cl.at.z);
                     cl.mat.opacity = dist <= R0 ? 1 : (R1 - dist) / (R1 - R0);
                 }
